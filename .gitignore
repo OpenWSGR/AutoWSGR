@@ -1,9 +1,6 @@
 data/log
 .vscode/
 
-source /home/chenfeng/anaconda3/bin/activate
-conda activate unseen_marl
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
