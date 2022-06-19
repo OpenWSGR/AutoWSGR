@@ -105,6 +105,7 @@ def goto_game_page(timer: Timer, target='main'):
         target (str, str): 目标章节名(见 ./constants/other_constants). Defaults to 'main'.
     """
     walk_to(timer, target)
+    # wait_pages(timer, names=[timer.now_page.name])
 
 
 @logit_time()

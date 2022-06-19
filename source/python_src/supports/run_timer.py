@@ -130,11 +130,11 @@ class Timer():
         """
         dir = POINT_POSITION
         self.ship_point = "A"
-        for i in range(0, 26):
+        for i in range(26):
             ch = chr(ord('A') + i)
             node1 = (self.chapter, self.node, ch)
             node2 = (self.chapter, self.node, self.ship_point)
-            if((node1 in dir) == False):
+            if node1 not in dir:
                 break
             if(CalcDis(dir[node1], self.ship_position) < CalcDis(dir[node2], self.ship_position)):
                 self.ship_point = ch

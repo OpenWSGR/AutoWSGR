@@ -1,5 +1,10 @@
 data/log
 .vscode/
+test/
+tmp/
+data/tunnel/*.PNG
+data/tunnel/*.in
+data/tunnel/*.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

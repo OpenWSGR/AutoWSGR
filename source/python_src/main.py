@@ -4,6 +4,7 @@ from save_load import *
 from supports import *
 from fight import *
 from game import *
+from digit_recognition.digit_ocr import *
 
 import keyboard as kd
 
@@ -62,7 +63,7 @@ def start_script():
 
 
 if __name__=="__main__":
-    timer = start_script()
+    # timer = start_script()
     # kd.hook(keyborad_input)
     # time.sleep(10000)
     #ChangeShips(timer, 4, [None, "萤火虫", "伏尔塔", "吹雪", "明斯克", "基辅", "黑潮"])
@@ -79,7 +80,8 @@ if __name__=="__main__":
     #normal_exercise(timer, 1)
 
     # DH add tests here
-    # while True:
-    #     print(get_now_page(timer))
-    #     time.sleep(0.5)
-    SL(timer)
+    timer = start_script()
+    ret = get_resources(timer)
+    print(ret)
+    ret = get_loot_and_ship(timer)
+    print(ret)

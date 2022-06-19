@@ -1,10 +1,3 @@
-if(__name__ == '__main__'):
-    path = './source/python/rewrite'
-    import os
-    import sys
-    print(os.path.abspath(path))
-    sys.path.append(os.path.abspath(path))
-
 from supports import *
 from api import *
 
@@ -19,8 +12,8 @@ def intergrative_page_identify(timer: Timer):
 
 
 @logit_time()
-def identify_page(timer: Timer, name, need_screen_shot=1):
-    if(need_screen_shot):
+def identify_page(timer: Timer, name, need_screen_shot=True):
+    if need_screen_shot:
         UpdateScreen(timer)
 
     if (name == 'main_page') and (identify_page(timer, 'options_page', 0)):
@@ -32,10 +25,7 @@ def identify_page(timer: Timer, name, need_screen_shot=1):
     if (name == 'develop_page') and (intergrative_page_identify(timer) != 3):
         return False
 
-    for template in identify_images[name]:
-        if(ImagesExist(timer, template, 0)):
-            return True
-    return False
+    return any(ImagesExist(timer, template, 0) for template in identify_images[name])
 
 
 @logit_time()
@@ -49,7 +39,7 @@ def wait_pages(timer: Timer, names, timeout=5, gap=.1):
             if(identify_page(timer, name, 0)):
                 return i + 1
 
-        if(time.time() - start_time > timeout):
+        if (time.time() - start_time > timeout):
             break
         time.sleep(gap)
 
@@ -58,8 +48,9 @@ def wait_pages(timer: Timer, names, timeout=5, gap=.1):
 
 @logit_time()
 def get_now_page(timer: Timer):
+    UpdateScreen(timer)
     for page in ALL_UI:
-        if(identify_page(timer, page, no_log=True)):
+        if (identify_page(timer, page, need_screen_shot=False, no_log=True)):
             return page
 
 
