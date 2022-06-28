@@ -173,7 +173,7 @@ class UI():
     def page_exist(self, page):
         return page in self.nodes.values()
 
-
+@logit(level=INFO2)
 def GoMainPage(timer: Timer, QuitOperationTime=0, List=[], ExList=[]):
     """回退到游戏主页
 
@@ -195,8 +195,10 @@ def GoMainPage(timer: Timer, QuitOperationTime=0, List=[], ExList=[]):
     type = WaitImages(timer, List + [GameUI[3]], 0.8, timeout=0)
 
     if type is None:
-        GoMainPage(timer, QuitOperationTime + 1, List)
-    if (type >= len(List)):
+        GoMainPage(timer, QuitOperationTime + 1, List, no_log=True)
+        return 
+    
+    if(type >= len(List)):
         type = WaitImages(timer, List, timeout=0)
         if type is None:
             return
@@ -205,7 +207,7 @@ def GoMainPage(timer: Timer, QuitOperationTime=0, List=[], ExList=[]):
     click(timer, pos[0], pos[1])
 
     NewList = List[1:] + [List[0]]
-    GoMainPage(timer, QuitOperationTime + 1, NewList)
+    GoMainPage(timer, QuitOperationTime + 1, NewList, no_log=True)
 
 
 def list_walk_path(timer: Timer, start: Node, end: Node):
@@ -214,11 +216,11 @@ def list_walk_path(timer: Timer, start: Node, end: Node):
     for node in path:
         print(node, end="->")
 
-
+@logit(level=INFO1)
 def is_bad_network(timer: Timer, timeout=10):
     return WaitImages(timer, [error_images['bad_network'][0], SymbolImage[10]], timeout=timeout) != None
 
-
+@logit(level=INFO2)
 def process_bad_network(timer: Timer, extra_info=""):
     """判断并处理网络状况问题
 

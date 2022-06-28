@@ -1,10 +1,9 @@
 
-from functools import partial
+import threading
 from save_load import *
 from supports import *
 from fight import *
 from game import *
-from digit_recognition.digit_ocr import *
 
 import keyboard as kd
 
@@ -34,8 +33,7 @@ def keyborad_input(event: kd.KeyboardEvent):
         tmp_fight(timer, join_fun=lambda: click(timer, 852, 484), formation=4, night=0)
     finished = 1
 
-
-def start_script():
+def start_script(device_name="emulator-5554"):
     """启动脚本,返回一个 Timer 记录器
 
     Returns:
@@ -47,6 +45,10 @@ def start_script():
     ConnectAndroid(timer)
     UpdateScreen(timer)
     timer.resolution = timer.screen.shape[:2]
+    
+    if(is_game_running(timer) == False):
+        start_game(timer)
+    
     print("resolution:", timer.resolution)
     timer.ammo = 10
     timer.defaul_repair_logic = RepairBlock()
@@ -54,34 +56,47 @@ def start_script():
     timer.expedition_status = ExpeditionStatus(timer)
     timer.fight_result = FightResult(timer)
     GetEnemyCondition(timer)
+    
     try:
         timer.set_page(page_name=get_now_page(timer))
     except:
-        timer.set_page('main_page')
+        restart(timer)
+        timer.set_page(page_name=get_now_page(timer))
+        
     print(timer.now_page.name)
     return timer
 
+def listener(event:kd.KeyboardEvent):
+    global main_thread
+    on_press = Globals.event_pressed
+    if(event.event_type == 'down'):
+        if(event.name in on_press):
+            return 
+        on_press.add(event.name)
+    if(event.event_type == 'up'):
+        on_press.discard(event.name)
 
-if __name__=="__main__":
-    # timer = start_script()
-    # kd.hook(keyborad_input)
-    # time.sleep(10000)
-    #ChangeShips(timer, 4, [None, "萤火虫", "伏尔塔", "吹雪", "明斯克", "基辅", "黑潮"])
-    #work(lambda:normal_fight(timer, 3, 2, 4, mod=1), times=3)
-    # GainBounds(timer)
-    #ChangeShips(timer, 4, [None, "U-96", "鲃鱼", "大青花鱼", "U-47", "U-1206", "射水鱼"])
-    # work(lambda: normal_fight(timer, 1, 1, 1, mod=1), times=15)
-    # GainBounds(timer)
-    #battle(timer, 10, 1)
-    #battle(timer, 8, 2)
-    #battle(timer, 9, 2)
-    #work(lambda:normal_fight(timer, 8, 1, 3, mod=1), times=100)
-    # GetEnemyCondition(timer)
-    #normal_exercise(timer, 1)
-
-    # DH add tests here
+    if('ctrl' in on_press and 'alt' in on_press and 'c' in on_press):
+        Globals.script_end = 1
+        print("Script end by user request")
+        
+        GoMainPage
+def main_function():
     timer = start_script()
-    ret = get_resources(timer)
+    #  restart(timer)
+    friend_exercise(timer, 1)
+    normal_exercise(timer, 1)    
+    #friend_exercise(timer, 1)
+    
+    #  print(ImagesExist(timer, ConfirmImage[1:]))
+    """ret = get_resources(timer)
     print(ret)
     ret = get_loot_and_ship(timer)
-    print(ret)
+    print(ret)"""
+if __name__=="__main__":
+   
+    
+    #  print(str(os.po("adb devices -l")).split('\n'))
+    kd.hook(listener)
+    main_function()
+    

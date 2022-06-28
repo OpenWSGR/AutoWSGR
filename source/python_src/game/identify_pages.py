@@ -3,7 +3,7 @@ from api import *
 
 __all__ = ["identify_page", "wait_pages", "get_now_page", "check_now_page"]
 
-
+@logit()
 def intergrative_page_identify(timer: Timer):
     positions = [(171, 47), (300, 47), (393, 47), (504, 47), (659, 47)]
     for i, position in enumerate(positions):
@@ -11,7 +11,7 @@ def intergrative_page_identify(timer: Timer):
             return i + 1
 
 
-@logit_time()
+@logit()
 def identify_page(timer: Timer, name, need_screen_shot=True):
     if need_screen_shot:
         UpdateScreen(timer)
@@ -28,7 +28,7 @@ def identify_page(timer: Timer, name, need_screen_shot=True):
     return any(ImagesExist(timer, template, 0) for template in identify_images[name])
 
 
-@logit_time()
+@logit()
 def wait_pages(timer: Timer, names, timeout=5, gap=.1):
     start_time = time.time()
     if(isinstance(names, str)):
@@ -46,7 +46,7 @@ def wait_pages(timer: Timer, names, timeout=5, gap=.1):
     raise TimeoutError("identify timeout of" + str(names))
 
 
-@logit_time()
+@logit(level=INFO1)
 def get_now_page(timer: Timer):
     UpdateScreen(timer)
     for page in ALL_UI:
@@ -54,6 +54,6 @@ def get_now_page(timer: Timer):
             return page
 
 
-@logit_time()
+@logit()
 def check_now_page(timer: Timer):
     return identify_page(timer, name=timer.now_page.name, no_log=True)

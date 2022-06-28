@@ -8,6 +8,7 @@ from fight.apis import *
 
 __all__ = ['normal_exercise', 'friend_exercise']
 
+@logit(level=INFO3)
 def normal_exercise(timer:Timer, team, decision_maker:DecisionBlock=None, refresh_times=0, *args, **kwargs):
     """常规演习:挑战所有可以挑战的
 
@@ -49,14 +50,16 @@ def normal_exercise(timer:Timer, team, decision_maker:DecisionBlock=None, refres
         click(timer, 804, 390, delay=0)
         exercise_fight(timer, team, decision_maker, *args, **kwargs)
         normal_exercise(timer, team, decision_maker, 0, challenge_status=status, *args, **kwargs)      
-    
+
+@logit(level=INFO3)    
 def exercise_fight(timer:Timer, team, decision_maker:DecisionBlock=None, *args, **kwargs):
     print("演习中:队伍:", timer.team, "敌方:", timer.node)
     wait_pages(timer, names='fight_prepare_page')
     MoveTeam(timer, team)
     click(timer, 900, 500, delay=0)
     fight(timer, 'fight', decision_maker, mod=1, *args, **kwargs)
-    
+
+@logit(level=INFO3)    
 def friend_exercise(timer:Timer, team, decision_maker:DecisionBlock=None, targets=[1, 2, 3], uids=None, *args, **kwargs):
     """好友演习
     目前只支持选前四个演习

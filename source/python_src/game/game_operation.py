@@ -5,19 +5,20 @@ if(__name__ == '__main__'):
     print(os.path.abspath(path))
     sys.path.append(os.path.abspath(path))
 
-
 from game.switch_page import *
 from game.get_game_info import *
 from game.identify_pages import *
+
+from api import *
 from supports import *
 from save_load import *
 
 __all__ = ['ConfirmOperation', 'restart', 'goto_game_page', 'expedition',
            'DestoryShip', 'change_fight_map', 'MoveTeam', 'SetSupport',
            'QuickRepair', 'GainBounds', 'RepairByBath', 'SetAutoSupply', 'Supply',
-           'ChangeShip', 'ChangeShips', ]
+           'ChangeShip', 'ChangeShips', 'start_game']
 
-
+@logit(level=INFO2)
 def ConfirmOperation(timer: Timer, must_confirm=0, delay=0.5, confidence=.9, timeout=0):
     """等待并点击弹出在屏幕中央的各种确认按钮
 
@@ -41,9 +42,23 @@ def ConfirmOperation(timer: Timer, must_confirm=0, delay=0.5, confidence=.9, tim
     click(timer, res[0], res[1], delay=delay)
     return True
 
+@logit(level=INFO3)
+def log_in(timer:Timer, account, password):
+    pass
 
-def restart(timer: Timer, TryTimes=0):
-    """重新启动游戏(实现不优秀,需重写)
+@logit(level=INFO3)
+def log_out(timer:Timer, account, password):
+    """在登录界面登出账号
+
+    Args:
+        timer (Timer): _description_
+        account (_type_): _description_
+        password (_type_): _description_
+    """
+
+@logit(level=INFO3)
+def start_game(timer:Timer, account=None, password=None, delay=1.0):
+    """启动游戏(实现不优秀,需重写)
 
     Args:
         timer (Timer): _description_
@@ -52,51 +67,69 @@ def restart(timer: Timer, TryTimes=0):
     Raises:
         NetworkErr: _description_
     """
-    if(TryTimes > 4):
-        print("Failed,Checking Error")
-        if(CheckNetWork() == False):
-            print("Catched,NetWorkError")
-            print("Trying restart")
-        else:
-            raise NetworkErr()
-    if(TryTimes > 2):
-        print("Error:Couldn't start application")
-        print("Try Restart Android")
-        RestartAndroid(timer, TryTimes)
-        ConnectAndroid(timer, 0)
-        time.sleep(1)
-        print("Checked,Trying")
+    start_app("com.huanmeng.zhanjian2")
+    res = WaitImages(timer, [StartImage[2]] + ConfirmImage[1:], .85, timeout=30 * delay)
+    if(res == None):
+        raise TimeoutError("start_app timeout")
+    
+    if(res != 0):
+        ConfirmOperation(timer)
+        if(WaitImage(timer, StartImage[2], timeout=200) == False):
+            raise TimeoutError("resource downloading timeout")
 
-    print("Restarting Game")
-    ShellCmd(timer, "am force-stop com.huanmeng.zhanjian2")
-    result = WaitImage(timer, StartImage[1])
-    if(result == False and TryTimes > 10):
-        print("Configration Error:Couldn't find application on desktop")
-        time.sleep(100000)
-    click(timer, result[0], result[1])
-    if(S.LONGUSED == 1):
-        ConfirmOperation(timer, 1, timeout=100)
-    starttime = time.time()
-    while True:
-        if(time.time() - starttime >= 200):
-            restart(timer, TryTimes + 1)
-            return
-        print("Waiting Start")
-        type = WaitImages(timer, [StartImage[2]]+ConfirmImage[1:], TimeOut=60)
-        print("Type Get:", type)
-        if (type == 0):
-            result = WaitImage(timer, StartImage[2], 0.9, 200)
-            if (result != False):
-                click(result[0], result[1])
-            else:
-                restart(TryTimes + 1)
-            return
-        else:
-            print("Confirming")
-            if(type != None):
-                ConfirmOperation(timer)
+    if(account != None and password != None):
+        click(timer, 75, 450)   #点击"账号管理"
+        if(WaitImage(timer, StartImage[3]) == False):
+            raise TimeoutError("can't enter account manage page")
+        click(timer, 460, 380)  #点击"退出登录"
+        if(WaitImage(timer, StartImage[4]) == False):
+            raise TimeoutError("can't logout successfully")
+        click(timer, 350, 180)  #点击账号文本框
+        text(str(account))
+        click(timer, 390, 180)  #点击密码文本框
+        text(str(password))
+        click(timer, 400, 300)  #点击"登录"
+        res = WaitImages(timer, [StartImage[5], StartImage[2]])
+        if(res == None):
+            raise TimeoutError("login timeout")
+        if(res == 0):
+            raise BaseException("password or account is wrong")
+    
+    ClickImage(timer, StartImage[2])
+    try:
+        GoMainPage(timer)
+    except:
+        raise BaseException("fail to start game")
 
+@logit(level=INFO3)
+def restart(timer: Timer, times=0):
+    
+    try:
+        ShellCmd(timer, "am force-stop com.huanmeng.zhanjian2")
+        ShellCmd(timer, "input keyevent 3")
+        start_game(timer)
+    except:
+        if(is_android_online(timer) == False):
+            pass
+        
+        elif(times == 1):
+            raise CriticalErr("on restart,")
 
+        elif(CheckNetWork() == False):
+            for i in range(11):
+                time.sleep(10)
+                if(CheckNetWork() == True):
+                    break
+                if(i == 10):
+                    raise NetworkErr()
+            
+        elif(is_game_running(timer)):
+            raise CriticalErr("CriticalErr on restart function")
+        
+        ConnectAndroid(timer)
+        restart(timer, times + 1)  
+
+@logit(level=INFO2)
 def goto_game_page(timer: Timer, target='main'):
     """到某一个游戏界面
 
@@ -107,8 +140,7 @@ def goto_game_page(timer: Timer, target='main'):
     walk_to(timer, target)
     # wait_pages(timer, names=[timer.now_page.name])
 
-
-@logit_time()
+@logit(level=INFO3)
 def expedition(timer: Timer, try_times=0):
     """检查远征,如果有未收获远征,则全部收获并用原队伍继续
 
@@ -133,7 +165,7 @@ def expedition(timer: Timer, try_times=0):
         raise ImageNotFoundErr("Unknown error led to this error")
     return expedition(timer, try_times + 1)
 
-
+@logit(level=INFO3)
 def DestoryShip(timer, reserve=1, amount=1):
     # amount:重要舰船的个数
     # 解装舰船
@@ -187,7 +219,7 @@ def DestoryShip(timer, reserve=1, amount=1):
         click(807, 346)
     click(timer, 364, 304, delay=0.66)
 
-
+@logit(level=INFO2)
 def MoveChapter(timer: Timer, target, chapter_now=None):
     """移动地图章节到 target
     含错误检查
@@ -245,7 +277,7 @@ def MoveChapter(timer: Timer, target, chapter_now=None):
         else:
             raise ImageNotFoundErr("unknow reason can't find chapter image")
 
-
+@logit(level=INFO2)
 def MoveNode(timer: Timer, target):
     """改变地图节点,不检查是否有该节点
     含网络错误检查
@@ -279,7 +311,7 @@ def MoveNode(timer: Timer, target):
         else:
             raise ImageNotFoundErr("unknow reason can't find number image" + str(target))
 
-
+@logit(level=INFO3)
 def change_fight_map(timer: Timer, chapter, node):
     """在地图界面改变战斗地图(通常是为了出征)
     可以处理网络错误
@@ -302,7 +334,7 @@ def change_fight_map(timer: Timer, chapter, node):
     timer.chapter = chapter
     timer.node = node
 
-
+@logit(level=INFO2)
 def vertify_team(timer: Timer):
     """检验目前是哪一个队伍(1~4)
     含网络状况处理
@@ -327,7 +359,7 @@ def vertify_team(timer: Timer):
 
     raise ImageNotFoundErr()
 
-
+@logit(level=INFO2)
 def MoveTeam(timer: Timer, target, try_times=0):
     """切换队伍
     Args:
@@ -350,7 +382,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
     if(vertify_team(timer) != target):
         MoveTeam(timer, target, try_times + 1)
 
-
+@logit(level=INFO3)
 def SetSupport(timer: Timer, target, try_times=0):
     """启用战役支援
 
@@ -362,7 +394,6 @@ def SetSupport(timer: Timer, target, try_times=0):
     """
     target = bool(target)
     walk_to(timer, "fight_prepare_page")
-    is_bad_network
     if(CheckSupportStatu() != target):
         click(timer, 628, 82, delay=1)
         click(timer, 760, 273, delay=1)
@@ -373,7 +404,7 @@ def SetSupport(timer: Timer, target, try_times=0):
         else:
             raise ValueError("can't set right support")
 
-
+@logit(level=INFO3)
 def QuickRepair(timer: Timer, repair_logic=None, *args, **kwargs):
     """战斗界面的快速修理
 
@@ -400,7 +431,7 @@ def QuickRepair(timer: Timer, repair_logic=None, *args, **kwargs):
                 click(timer, BLOODLIST_POSITION[0][i][0], BLOODLIST_POSITION[0][i][1], delay=1.5)
         click(timer, 163, 420, delay=1)
 
-
+@logit(level=INFO3)
 def GainBounds(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取
 
@@ -415,7 +446,7 @@ def GainBounds(timer: Timer):
         ConfirmOperation(timer, must_confirm=1)
     #click(timer, 774, 502)
 
-
+@logit(level=INFO2)
 def RepairByBath(timer: Timer):
     """使用浴室修理修理时间最长的单位
 
@@ -425,14 +456,14 @@ def RepairByBath(timer: Timer):
     walk_to(timer, 'choose_repair_page')
     click(timer, 115, 233)
 
-
+@logit(level=INFO2)
 def SetAutoSupply(timer: Timer, type=1):
     UpdateScreen(timer)
     NowType = int(PixelChecker(timer, (48, 508), (224, 135, 35)))
     if(NowType != type):
         click(timer, 44, 503, delay=0.33)
 
-
+@logit(level=INFO2)
 def Supply(timer: Timer, List=[1, 2, 3, 4, 5, 6], try_times=0):
     """补给指定舰船
 
@@ -461,7 +492,7 @@ def Supply(timer: Timer, List=[1, 2, 3, 4, 5, 6], try_times=0):
         process_bad_network(timer, 'supply ships')
         Supply(timer, List, try_times + 1)
 
-
+@logit(level=INFO2)
 def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None):
 
     if(team is not None):
@@ -492,7 +523,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None):
     if(ImagesExist(timer, SymbolImage[7])):
         click(timer, 27, 30, delay=1)
 
-
+@logit(level=INFO3)
 def ChangeShips(timer: Timer, team, list):
     """更换编队舰船
 

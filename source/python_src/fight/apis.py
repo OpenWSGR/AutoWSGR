@@ -18,7 +18,7 @@ def work(fun, times=0):
             print(e)
         times -= 1
 
-
+@logit(level=INFO3)
 def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBlock = None, repair: RepairBlock = None, *args, **kwargs):
     """进行常规地图战斗
 
@@ -68,7 +68,7 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
 
     return map_fight(timer, decision_maker, 'normal', 'map_page', *args, **kwargs)
 
-
+@logit(level=INFO2)
 def fight_during(timer: Timer, decision_maker: DecisionBlock = None, *args, **kwargs):
     """单点战斗,完成选阵型后的所有操作,到战斗结束进入结算界面为止
 
@@ -101,7 +101,7 @@ def fight_during(timer: Timer, decision_maker: DecisionBlock = None, *args, **kw
         else:
             raise TimeoutError("unknown error lead to fight timeout")
 
-
+@logit(level=INFO2)
 def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True, try_times=0, *args, **kwargs):
     """战斗结算,到领取舰船结束(可能没有)为止
     Todo:
@@ -167,7 +167,7 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
 
     return fight_end(timer, type, end_page, gap, False, try_times + 1, *args, **kwargs)
 
-
+@logit(level=INFO2)
 def wait_until_decision(timer: Timer, type='map_fight', *args, **kwargs):
     """一轮战斗,等待到需要某一决策时
 
@@ -210,7 +210,7 @@ def wait_until_decision(timer: Timer, type='map_fight', *args, **kwargs):
             print("WaitRound")
 
         if 'no_click' not in kwargs and i % 2 == 1:
-            p = click(timer, 380, 520, delay=0, enable_subprocess=True, print=0)
+            p = click(timer, 380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
 
         UpdateScreen(timer)
 
@@ -246,7 +246,7 @@ def wait_until_decision(timer: Timer, type='map_fight', *args, **kwargs):
 
     raise TimeoutError('unknown error')
 
-
+@logit(level=INFO2)
 def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0, *args, **kwargs):
     """执行战斗种做出的决策
 
@@ -351,13 +351,13 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
         else:
             raise TimeoutError("can't do this operation" + type + str(value))
 
-
+@logit(level=INFO2)
 def SL(timer: Timer):
     restart(timer)
     GoMainPage(timer)
     timer.set_page('main_page')
 
-
+@logit(level=INFO3)
 def map_fight(timer: Timer, decision_maker: DecisionBlock = None, type='normal', end_page='map_page', *args, **kwargs):
     """处理地图战斗开始出征后(进入战斗地图后)的所有情况
 
@@ -389,7 +389,7 @@ def map_fight(timer: Timer, decision_maker: DecisionBlock = None, type='normal',
 
     timer.set_page(end_page)
 
-
+@logit(level=INFO3)
 def fight(timer: Timer, type='map_fight', decision_maker: DecisionBlock = None, *args, **kwargs):
     """处理一个阶段的单点战斗
     包括从上一次出征或继续前进开始,进行的战况选择,索敌,决策是否战斗,战斗,结算获取舰船到选择是否回港的全部过程
@@ -420,7 +420,7 @@ def fight(timer: Timer, type='map_fight', decision_maker: DecisionBlock = None, 
             return 'map_end'
         elif formation == 6:
             timer.oil -= 1
-            if res := choose_decision(timer, decision, 2):
+            if choose_decision(timer, decision, 2):
                 return 'detour_success'
         else:
             choose_decision(timer, decision, 1)
