@@ -33,6 +33,11 @@ def load_other_images():
 
     StartImage.append(MyTemplate(PrePath + "StartImage\\1.PNG", resolution=(960, 540)))  # app ico
     StartImage.append(MyTemplate(PrePath + "StartImage\\2.PNG", resolution=(960, 540)))  # 开始游戏图标
+    StartImage.append(MyTemplate(PrePath + "StartImage\\3.PNG", resolution=(960, 540)))  # 用户中心
+    StartImage.append(MyTemplate(PrePath + "StartImage\\4.PNG", resolution=(960, 540)))  # 账号登录
+    StartImage.append(MyTemplate(PrePath + "StartImage\\5.PNG", resolution=(960, 540)))  # 用户名或密码错误
+    StartImage.append(MyTemplate(PrePath + "StartImage\\5.PNG", resolution=(960, 540)))  # 开始游戏图标
+    
     ConfirmImage.append(MyTemplate(PrePath + "ConfirmImage\\1.PNG", resolution=(960, 540)))
     ConfirmImage.append(MyTemplate(PrePath + "ConfirmImage\\2.PNG", resolution=(960, 540)))
     ConfirmImage.append(MyTemplate(PrePath + "ConfirmImage\\3.PNG", resolution=(960, 540)))

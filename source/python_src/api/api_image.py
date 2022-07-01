@@ -74,7 +74,6 @@ def locateCenterOnImage(timer: Timer, image: np.ndarray, query: MyTemplate, conf
     else:
         return None
 
-
 def locateCenterOnScreen(timer: Timer, query: MyTemplate, confidence=0.85, this_mehods=["tpl"]):
     """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
         参考 locateCenterOnImage
@@ -85,7 +84,7 @@ def locateCenterOnScreen(timer: Timer, query: MyTemplate, confidence=0.85, this_
     """
     return locateCenterOnImage(timer, timer.screen, query, confidence, this_mehods)
 
-
+@logit()
 def GetImagePosition(timer: Timer, image: MyTemplate, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
     """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
         参考 locateCenterOnScreen
@@ -103,7 +102,7 @@ def GetImagePosition(timer: Timer, image: MyTemplate, need_screen_shot=1, confid
         return None
     return timer.covert_position(res[0], res[1], mode='this_to_960')
 
-
+@logit()
 def ImagesExist(timer: Timer, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
     """判断图像是否存在于屏幕中
     Returns:
@@ -114,11 +113,13 @@ def ImagesExist(timer: Timer, images, need_screen_shot=1, confidence=0.85, this_
     if(need_screen_shot):
         UpdateScreen(timer)
     for image in images:
-        if(GetImagePosition(timer, image, 0, confidence, this_methods) is not None):
+        if(not isinstance(image, MyTemplate)):
+            pass
+        if(GetImagePosition(timer, image, 0, confidence, this_methods, no_log=True) is not None):
             return True
     return False
 
-
+@logit()
 def WaitImage(timer: Timer, image: MyTemplate, confidence=0.85, timeout=10, gap=.15, after_get_delay=0, this_methods=["tpl"]):
     """等待一张图片出现在屏幕中,置信度超过一定阈值
 
@@ -133,7 +134,7 @@ def WaitImage(timer: Timer, image: MyTemplate, confidence=0.85, timeout=10, gap=
         raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
     StartTime = time.time()
     while(True):
-        x = GetImagePosition(timer, image, 1, confidence, this_methods)
+        x = GetImagePosition(timer, image, 1, confidence, this_methods, no_log=True)
         if(x != None):
             time.sleep(after_get_delay)
             return x
@@ -142,7 +143,7 @@ def WaitImage(timer: Timer, image: MyTemplate, confidence=0.85, timeout=10, gap=
             return False
         time.sleep(gap)
 
-
+@logit(level=INFO1)
 def ClickImage(timer: Timer, image: MyTemplate, must_click=False, timeout=0, delay=0.5):
     """点击一张图片的中心位置
     Args:
@@ -164,10 +165,11 @@ def ClickImage(timer: Timer, image: MyTemplate, must_click=False, timeout=0, del
             return False
         else:
             raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
+    
     click(timer, pos[0], pos[1], delay=delay)
     return True
 
-
+@logit()
 def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_delay=0, timeout=10, *args, **kwargs):
     """等待一系列图片中的一个在屏幕中出现
 
@@ -196,13 +198,13 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
 
     StartTime = time.time()
     while(True):
-        UpdateScreen(timer)
+        UpdateScreen(timer, no_log=True)
         for res, image in images:
             try:
                 assert(isinstance(image, MyTemplate))
             except AssertionError as info:
                 raise TypeError("elements in 'images' must be an object of 'MyTemplate'," + str(info))
-            if(ImagesExist(timer, image, 0, confidence)):
+            if(ImagesExist(timer, image, 0, confidence, no_log=True)):
                 time.sleep(after_get_delay)
                 return res
         time.sleep(gap)

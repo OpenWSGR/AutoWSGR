@@ -48,7 +48,7 @@ class FightResult():
         return
 
 
-@logit_time()
+@logit(level=INFO2)
 def GetChapter(timer: Timer):
     """在出征界面获取当前章节(远征界面也可获取)
 
@@ -67,7 +67,7 @@ def GetChapter(timer: Timer):
     raise TimeoutError("can't vertify chapter")
 
 
-@logit_time()
+@logit(level=INFO2)
 def GetNode(timer: Timer):
     """不够完善"""
     """出征界面获取当前显示地图节点编号
@@ -85,7 +85,7 @@ def GetNode(timer: Timer):
     raise TimeoutError("can't vertify map")
 
 
-@logit_time()
+@logit(level=INFO2)
 def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     """获取敌方舰船类型数据并更新到 timer.enemy_type_count
     timer.enemy_type_count 为一个记录了敌方情况的字典
@@ -148,7 +148,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         print("")
 
 
-@logit_time()
+@logit(level=INFO2)
 def DetectShipStatu(timer: Timer, type='prepare'):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_status
 
@@ -203,13 +203,13 @@ def DetectShipStatu(timer: Timer, type='prepare'):
         print(type, ":ship_status =", result)
     return result
 
-
+@logit(level=INFO2)
 def DetectShipType(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
 
-
+@logit(level=INFO2)
 def UpdateShipPosition(timer: Timer):
     """在战斗移动界面(有一个黄色小船在地图上跑)更新黄色小船的位置
 

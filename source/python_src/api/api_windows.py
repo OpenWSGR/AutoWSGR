@@ -11,7 +11,7 @@ from api.api_android import click
 from airtest.core.api import auto_setup
 
 __all__ = ["GetAndroidInfo", "CopyRequirements",
-           "ConnectAndroid", "RestartAndroid", "CheckNetWork",
+           "ConnectAndroid", "RestartAndroid", "CheckNetWork", "is_android_online"
            ]
 
 # Win 和 Android 的通信
@@ -41,7 +41,6 @@ def GetAndroidInfo():
     print("Devices list:", res)
     return res
 
-
 def CopyRequirements(timer: Timer, path):
     """还没写好"""
     print(path)
@@ -53,46 +52,46 @@ def CopyRequirements(timer: Timer, path):
     os.system(f"xcopy req {path} /E/H/C/I")
     time.sleep(5)
 
-
-def ConnectAndroid(timer: Timer, TryTimes=0, device="emulator-5554"):
-    """还没写好"""
+@try_for_times
+def ConnectAndroid(timer: Timer):
     """连接指定安卓设备
     Args:
-        TryTimes (int, optional): 当前已重试次数. Defaults to 0.
-        device (str, optional): 目标设备编号. Defaults to "emulator-5554".
     """
-    if(TryTimes > 3):
-        print("ADB Crashed,Checking")
-        RestartAndroid(timer, TryTimes - 1)
-        ConnectAndroid(timer, 0, device)
-        return
-    try:
-        from logging import getLogger, ERROR
-        getLogger("airtest").setLevel(ERROR)
-        auto_setup(__file__, devices=[
-                   f"android://127.0.0.1:5037//{device}?cap_method=MINICAP&&ori_method=MINICAPORI&&touch_method=MINITOUCH"])
+    
+    if(not any((is_android_online(timer), is_android_online(timer), is_android_online(timer)))):
+        RestartAndroid(timer)
+        
+    from logging import getLogger, ERROR
+    getLogger("airtest").setLevel(ERROR)
+    auto_setup(__file__, devices=[
+        f"android://127.0.0.1:5037//{timer.device_name}?cap_method=MINICAP&&ori_method=MINICAPORI&&touch_method=MINITOUCH"])
 
-        print("Hello,I am WSGR auto commanding system")
-    except Exception as e:
-        print("Error:", e)
-        print("Checking ADB connection")
-        try:
-            os.system("adb devices -l")
-            os.system("adb devices -l")
-        except:
-            print("Failed,ADB Crashed")
-        else:
-            print("ADB Fixed,Trying Start up")
-            ConnectAndroid(timer, TryTimes + 1, device)
+    print("Hello,I am WSGR auto commanding system")
 
+def is_android_online(timer:Timer):
+    """判断 timer 给定的设备是否在线
 
-def RestartAndroid(timer: Timer, times: int):
-    """还没写好"""
+    Args:
+        timer (Timer): _description_
+
+    Returns:
+        bool: 在线返回 True,否则返回 False
+    """
+    res = os.popen("adb devices -l")
+    for x in res:
+        print(x, end=' ')
+        if(timer.device_name in x and 'device' in x):
+            return True
+    return False
+
+@logit(level=INFO2)
+def RestartAndroid(timer: Timer):
     """重启安卓设备
 
     Args:
         times (int):重启次数
     """
+    restart_time = time.time()
     print("Android Restaring")
     try:
         dir = os.getcwd()
@@ -103,11 +102,12 @@ def RestartAndroid(timer: Timer, times: int):
         os.chdir(S.RESTART_PATH)
         os.popen(r".\dnplayer.exe")
         os.chdir(dir)
+        while(is_android_online(timer) == False):
+            time.sleep(1)
+            if(time.time() - restart_time > 120):
+                raise TimeoutError("can't start the emulator")
     except:
-        pass
-    print("Waiting")
-    time.sleep(15 * (times - 1))
-
+        raise CriticalErr("on Restart Android")
 
 def CheckNetWork():
     """检查网络状况
@@ -117,7 +117,6 @@ def CheckNetWork():
     """
     time.sleep(.5)
     return os.system("ping baidu.com") == False
-
 
 if(__name__ == '__main__'):
     timer = Timer()

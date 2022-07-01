@@ -7,6 +7,7 @@ from api import *
 
 __all__ = ['battle']
 
+@logit(level=INFO3)
 def battle(timer:Timer, node, times, decision_maker:DecisionBlock=None, repair_logic:RepairBlock=None, team=None, try_times=0, *args, **kwargs):
     """进行战役
 

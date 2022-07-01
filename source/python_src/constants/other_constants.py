@@ -44,3 +44,7 @@ FIGHT_RESULTS = {"SS", "S", "A", "B", "C", "D"}
 
 NODE_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),
              range(1, 6), range(1, 5), range(1, 6), range(1, 6)]
+
+INFO1 = 13
+INFO2 = 16
+INFO3 = 19

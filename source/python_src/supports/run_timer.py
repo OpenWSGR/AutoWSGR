@@ -1,7 +1,9 @@
+from cv2 import warpPerspective
 from supports.models import *
 from supports.math_functions import *
 from functools import wraps
-__all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr']
+__all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr', \
+    "CriticalErr", "try_for_times", 'stopper', 'LogitException']
 
 
 def get_time_as_string(accuracy='year'):
@@ -36,7 +38,7 @@ class Timer():
         self.start_time = time.time()
         self.log_filepre = get_time_as_string()
         self.screen = None
-        self.resolution = (960, 540)
+        self.resolution = (540, 960)
         self.ship_position = (0, 0)
         self.ship_point = "A"  # 常规地图战斗中,当前战斗点位的编号
         self.chapter = 1  # 章节名,战役为 'battle', 演习为 'exercise'
@@ -166,11 +168,41 @@ class NetworkErr(BaseException):
     def __init__(self, *args: object):
         super().__init__(*args)
 
+class CriticalErr(BaseException):
+    """严重错误
+    通常发生严重错误表明实现有重大问题
+    Args:
+        BaseException (_type_): _description_
+    """
+    def __init__(self, *args: object):
+        super().__init__(*args)
 
-def logit(acc='str', file='log.txt'):
-    def logger(fun):
-        @wraps(fun)
-        def log_info(*args, **kwargs):
-            return fun(*args, **kwargs)
-        return log_info
-    return logger
+class LogitException(BaseException):
+    def __init__(self, *args: object):
+        super().__init__()(*args)
+
+def try_for_times(fun):
+    @wraps(fun)
+    def imtemplate(*arg, **kwargs):
+        if(Globals.script_end == 1):
+            return 
+        for i in range(2):
+            try:
+                return fun(*arg, **kwargs)
+            except:
+                pass
+        return fun(*arg, **kwargs)
+    
+    return imtemplate
+        
+def stopper(fun):
+    @wraps(fun)
+    def imtemplate(*arg, **kwargs):
+        if(Globals.script_end == 1):
+            return 'end'
+        return fun(*arg, **kwargs)
+    
+    return imtemplate
+
+
+    

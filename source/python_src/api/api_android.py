@@ -1,21 +1,27 @@
 
 from supports import *
 
-from airtest.core.api import shell
+from airtest.core.api import shell, start_app
 from airtest.core.settings import Settings as ST
 from airtest.core.helper import G
 
-__all__ = ["ShellCmd", "click", "swipe", "long_tap", "UpdateScreen"]
+__all__ = ["ShellCmd", "click", "swipe", "long_tap", "UpdateScreen", \
+    "start_app", "is_game_running"]
 
-
+@logit()
 def ShellCmd(timer: Timer, cmd, *args, **kwargs):
     """向链接的模拟器发送 shell 命令
     Args:
         cmd (str):命令字符串
     """
-    shell(cmd)
+    return shell(cmd)
 
+@logit()
+def is_game_running(timer:Timer):
+    apps = ShellCmd(timer, "ps")
+    return "zhanjian2" in apps
 
+@logit(level=INFO1)
 def click(timer: Timer, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
     if(S.DEBUG):
         if('print' not in kwargs):
@@ -55,7 +61,7 @@ def click(timer: Timer, x, y, times=1, delay=0.5, enable_subprocess=False, *args
         ShellCmd(timer, "input tap " + str(x) + " " + str(y))
         time.sleep(delay * S.DELAY)
 
-
+@logit(level=INFO1)
 def swipe(timer: Timer, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
     """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
     Args:
@@ -80,7 +86,7 @@ def swipe(timer: Timer, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs
 
     time.sleep(delay)
 
-
+@logit(level=INFO1)
 def long_tap(timer: Timer, x, y, duration=1, delay=0.5, *args, **kwargs):
     """长按相对坐标 (x,y)
     Args:
@@ -98,7 +104,7 @@ def long_tap(timer: Timer, x, y, duration=1, delay=0.5, *args, **kwargs):
         raise ValueError("duration time too short,arg 'duration' should greater than 0.2")
     swipe(timer, x, y, x, y, duration=duration, delay=delay, *args, **kwargs)
 
-
+@logit()
 def UpdateScreen(timer: Timer, *args, **kwargs):
     """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 RD.screen
     """
