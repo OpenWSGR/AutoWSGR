@@ -118,7 +118,7 @@ def expedition(timer: Timer, try_times=0):
     if(timer.now_page.name != 'map_page'):
         goto_game_page(timer, 'expedition_page')
     timer.expedition_status.update()
-    if(timer.expedition_status.is_ready() == False):
+    if not timer.expedition_status.is_ready():
         return try_times
     try:
         goto_game_page(timer, 'expedition_page')

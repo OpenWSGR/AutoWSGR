@@ -80,8 +80,14 @@ if __name__=="__main__":
     #normal_exercise(timer, 1)
 
     # DH add tests here
+    # 获取资源、捞船测试
     timer = start_script()
     ret = get_resources(timer)
     print(ret)
     ret = get_loot_and_ship(timer)
     print(ret)
+
+    while True:
+        expedition(timer)
+        GainBounds(timer)
+        time.sleep(60)

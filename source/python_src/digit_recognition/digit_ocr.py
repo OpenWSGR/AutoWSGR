@@ -1,17 +1,11 @@
+from curses.ascii import isdigit
 import cv2
 import pytesseract
-from utils.position_utils import relative_to_absolute
-from utils.io_utils import yaml_to_dict
 from game import *
+from utils.image_position import crop_image
+from utils.io import yaml_to_dict
 
 POS = yaml_to_dict('./source/python_src/digit_recognition/relative_location.yaml')
-
-
-def crop_image(image, pos1, pos2, resolution=(960, 540)):
-    """ 按照给定的位置裁剪图片 """
-    x1, y2 = map(int, relative_to_absolute(pos1, resolution))
-    x2, y1 = map(int, relative_to_absolute(pos2, resolution))
-    return image[y1:y2, x1:x2]
 
 
 def get_resources(timer):
@@ -22,7 +16,24 @@ def get_resources(timer):
     ret = {}
     for key in POS['main_page']['resources']:
         image_crop = crop_image(image, *POS['main_page']['resources'][key])
-        ret[key] = pytesseract.image_to_string(image_crop).strip()
+        raw_str = pytesseract.image_to_string(image_crop).strip()  # 原始字符串
+
+        if raw_str[-1] == 'K':
+            num = raw_str[:-1]
+            unit = 1000
+        elif raw_str[-1] == 'M':
+            num = raw_str[:-1]
+            unit = 1000000
+        else:
+            num = raw_str
+            unit = 1
+        
+        # 容错处理，如果监测出来不是数字则出错了
+        try:
+            ret[key] = eval(num) * unit
+        except NameError:
+            print("读取资源失败！")
+            quit()
 
     return ret
 
@@ -35,6 +46,12 @@ def get_loot_and_ship(timer):
     ret = {}
     for key in POS['map_page']:
         image_crop = crop_image(image, *POS['map_page'][key])
-        ret[key] = pytesseract.image_to_string(image_crop).strip()
+        raw_str = pytesseract.image_to_string(image_crop).strip()  # 原始字符串
+        try:
+            ret[key] = eval(raw_str.split('/')[0])  # 当前值
+            ret[key+'_max'] = eval(raw_str.split('/')[1])  # 最大值
+        except NameError:
+            print("读今日战利品、捞船失败！")
+            quit()
 
     return ret

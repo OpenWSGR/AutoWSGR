@@ -325,7 +325,7 @@ def construct_intergrative_pages(timer: Timer, father, click_positions=[], names
 
     for i, node in enumerate(nodes):
         for j, click_position in enumerate(click_positions):
-            if(i == j):
+            if i == j:
                 continue
             add_edge(timer, node, nodes[j], construct_clicks_method(timer, [click_position]))
 

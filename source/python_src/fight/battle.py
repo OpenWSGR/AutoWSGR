@@ -44,7 +44,7 @@ def battle(timer:Timer, node, times, decision_maker:DecisionBlock=None, repair_l
         
         click(timer, 180 * (node - hard * 5), 200)
         start_time = time.time()
-        while(identify_page(timer, 'fight_prepare_page') == False):
+        while not identify_page(timer, 'fight_prepare_page'):
             time.sleep(.15)
             if(time.time() - start_time > 15):
                 raise BaseException()
