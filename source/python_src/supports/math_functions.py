@@ -29,7 +29,11 @@ def get_nearest(positon, points):
     if(len([points]) == 0):
         raise ValueError("no color template")
 
-    result = 0
+    if(points[0] is not None):
+        result = 0
+    else:
+        result = 1
+    
     for i in range(1, len(points)):
         if(CalcDis(positon, points[i]) < CalcDis(positon, points[result])):
             result = i

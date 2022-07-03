@@ -7,12 +7,12 @@ def log_image(timer: Timer, image, name, ndarray_mode="BGR", ignore_existed_imag
     """向默认数据记录路径记录图片
     Args:
         image: 图片,PIL.Image.Image 格式或者 numpy.ndarray 格式
-        name (str): 图片文件名(不含后缀名)
+        name (str): 图片文件名
     """
-    name += '.PNG'
-    if(isinstance(image, np.ndarray)):
-        image = PIM.fromarray(image, mode=ndarray_mode)
-    path = os.path.join(S.LOG_PATH, name)
+    if('png' not in name and 'PNG' not in name):
+        name += '.PNG'
+    path = os.path.join(timer.log_filepre, name)
+    
     save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
 
 

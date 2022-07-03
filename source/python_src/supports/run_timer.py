@@ -1,10 +1,42 @@
-from cv2 import warpPerspective
+
 from supports.models import *
 from supports.math_functions import *
 from functools import wraps
-__all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr', \
-    "CriticalErr", "try_for_times", 'stopper', 'LogitException']
 
+__all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr', \
+    "CriticalErr", "try_for_times", 'stopper', 'LogitException', 'get_last_point']
+
+def get_last_point(c, n):
+    if(c == 2 and n == 5):
+        return ("J", "O", "L", "M", "N")
+    if(c == 1 and n == 1):
+        return 'B'
+    if(c == 1 and n == 2):
+        return 'C'
+    if(c == 1 and n == 4):
+        return 'E'
+    if(c == 2 and n == 2):
+        return 'G'
+    if(c == 2 and n == 3):
+        return 'K'
+    if(c == 2 and n == 6):
+        return 'L'
+    if(c == 4 and n == 1):
+        return 'I'
+    if(c == 6 and n == 1):
+        return 'K'
+    if(c == 6 and n == 4):
+        return 'K'
+    
+    result = 'A'
+    for key in POINT_POSITION.keys():
+        chapter, node, point = key
+        if(chapter != c or node != n):
+            continue
+        if(point > result):
+            result = point
+    
+    return result
 
 def get_time_as_string(accuracy='year'):
     """返回一个字符串时间戳,可以用于文件保存
@@ -23,7 +55,6 @@ def get_time_as_string(accuracy='year'):
         return res[4:]
     if(accuracy == 'second'):
         return res[8:]
-
 
 class Timer():
     """程序运行记录器,用于记录和传递部分数据,同时用于区分多开
@@ -53,6 +84,8 @@ class Timer():
         self.defaul_decision_maker = None  # 默认决策模块
         self.ammo = 10
         self.oil = 10
+        self.resources = None
+        self.last_error_time = time.time() - 1800
         """
         以上时能用到的
         以下是暂时用不到的
@@ -155,8 +188,21 @@ class Timer():
     def get_ui_page_by_name(self, name):
         return self.ui.get_node_by_name(name)
 
+    def is_fight_end(self):
+        c, n = self.chapter, self.node
+        last_point = get_last_point(c, n)
+        if(c == 'exercise'):
+            return True
+        if(c == 'battle'):
+            if(self.fight_result >= 'B'):
+                return True    
+        if(self.fight_result >= 'S' and (self.ship_point == last_point or self.ship_point in last_point)):
+            return True
+        return False
+
     def __str__(self):
         return "this is a timer"
+
 
 
 class ImageNotFoundErr(BaseException):

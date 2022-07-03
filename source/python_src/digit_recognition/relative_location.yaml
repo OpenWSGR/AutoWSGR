@@ -8,6 +8,72 @@ main_page:
     aluminum: [[0.303, -0.252], [0.366, -0.274]]
     diamond: [[0.407, -0.249], [0.459, -0.273]]
     
+#建造界面(选资源那一个界面)
+build_page:
+  resources:
+    oil: 
+    ammo: 
+    steel: 
+    aluminum: 
+    quick_build:
+    ship_blueprint:
+
+  port_facilities:
+    ship_limit:
+    ship_ammount:
+
+  #建造界面用的资源
+  resources_use:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+
+#解装界面
+destroy_page:
+  resources:
+    oil: 
+    ammo: 
+    steel: 
+    aluminum: 
+
+#开发界面(选资源那一个界面)
+develop_page:
+  resources:
+    oil: 
+    ammo: 
+    steel: 
+    aluminum: 
+    quick_build:
+    equipment_blueprint:
+
+  resources_use:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+
+  port_facilities:
+    equipment_limit:
+    equipment_amount:
+
+#resources 位置和 build_page 一样的
+discard_page:
+  resources:
+    oil: 
+    ammo: 
+    steel: 
+    aluminum:
+  port_facilities:
+    equipment_limit:
+    equipment_amount:
+
+#任何一个选择舰船的界面(需识别船舱容量数据)
+choose_ship_page:
+  port_facilities:
+    ship_limit:
+    ship_amount:
+
 map_page:
   loot: [[0.301, -0.243], [0.354, -0.268]]
-  ship: [[0.405, -0.244], [0.464, -0.266]]
+  ship: [[0.381, -0.244], [0.421, -0.266]]

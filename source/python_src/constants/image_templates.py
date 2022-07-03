@@ -15,3 +15,4 @@ BackImage = [""]  # 回退按钮的图片
 identify_images = {}
 error_images = {}
 fight_result_images = {}
+choose_ship_images = ['', ]

@@ -192,6 +192,8 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
     if(isinstance(images, list) or isinstance(images, Tuple)):
         for i in range(len(images)):
             images[i] = (i, images[i])
+    if(isinstance(images, dict)):
+        images = images.items()
 
     if(timeout < 0):
         raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
@@ -200,10 +202,6 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
     while(True):
         UpdateScreen(timer, no_log=True)
         for res, image in images:
-            try:
-                assert(isinstance(image, MyTemplate))
-            except AssertionError as info:
-                raise TypeError("elements in 'images' must be an object of 'MyTemplate'," + str(info))
             if(ImagesExist(timer, image, 0, confidence, no_log=True)):
                 time.sleep(after_get_delay)
                 return res

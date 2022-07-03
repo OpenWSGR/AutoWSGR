@@ -3,11 +3,12 @@ from api import *
 from supports import *
 from save_load import *
 from game.switch_page import *
+from digit_recognition import *
 # 获取游戏信息
 
 __all__ = ["GetChapter", "GetNode", "GetEnemyCondition", "DetectShipStatu", "DetectShipType",
            "UpdateShipPosition", "UpdateShipPoint", "CheckSupportStatu", "is_bad_network",
-           "ExpeditionStatus", 'get_exercise_status', 'FightResult'
+           "ExpeditionStatus", 'get_exercise_status', 'FightResult', "Resources"
            ]
 
 
@@ -15,19 +16,20 @@ class ExpeditionStatus():
     def __init__(self, timer: Timer):
         self.exist_ready = False
         self.timer = timer
+        self.last_check = time.time()
 
     def is_ready(self):
-        self.update()
         return self.exist_ready
 
-    def update(self):
+    @logit(level=INFO1)
+    def update(self, force=False):
         UpdateScreen(self.timer)
-        if self.timer.now_page.name in ['expedition_page', 'map_page']:
+        if self.timer.now_page.name in ['expedition_page', 'map_page', 'battle_page', 'exercise_page', 'decisive_battle_entrance']:
             self.exist_ready = bool(PixelChecker(self.timer, (464, 11), bgr_color=(45, 89, 255)))
-            return
-        walk_to(self.timer, end='main_page')
-        self.exist_ready = bool(PixelChecker(self.timer, (933, 454), bgr_color=(45, 89, 255)))
-
+        else:
+            if(force or time.time() - self.last_check > 1800):goto_game_page(self.timer, 'main_page')
+            if(self.timer.now_page.name == 'main_page'):
+                self.exist_ready = bool(PixelChecker(self.timer, (933, 454), bgr_color=(45, 89, 255)))
 
 class FightResult():
     def __init__(self, timer: Timer):
@@ -36,19 +38,90 @@ class FightResult():
         self.mvp = 0
         self.experiences = [None, 0, 0, 0, 0, 0, 0]
 
+    @logit(level=INFO1)
     def detect_result(self):
         mvp_pos = GetImagePosition(self.timer, FightImage[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
         self.result = WaitImages(self.timer, fight_result_images)
+        return self
 
     def detect_experiences(self):
         pass
 
     def __str__(self):
-        return
+        return "mvp:{mvp},result:{result}".format(mvp=str(self.mvp), result=str(self.result))
 
+    def __lt__(self, other):    # <
+        list = ["D", "C", "B", "A", "S", "SS"]
+        if(isinstance(other, FightResult)):
+            other = other.result
+            
+        list.index(self.result) < list.index(other)
+    def __le__(self, other):    # <=
+        list = ["D", "C", "B", "A", "S", "SS"]
+        if(isinstance(other, FightResult)):
+            other = other.result
+            
+        list.index(self.result) <= list.index(other)
 
-@logit(level=INFO2)
+    def __gt__(self, other):    # >
+        return not (self <= other)
+
+    def __ge__(self, other):    # >=
+        return not (self < other)
+
+class Resources():
+    
+    def __init__(self, timer:Timer):
+        self.timer = timer
+        self.resources = {}
+
+    def detect_resources(self, name=None):
+        timer = self.timer
+        if(name is not None):
+            if(name == 'normal' or name in ('oil', 'ammo', 'steel', 'aluminum')):
+                goto_game_page(timer, 'main_page')
+                self.detect_resources()
+            if(name == 'quick_repair'):
+                goto_game_page(timer, 'choose_repair_page')
+                self.detect_resources()
+            if(name == 'quick_build'):
+                goto_game_page(timer, 'build_page')
+                self.detect_resources()
+            if(name == 'ship_blueprint'):
+                goto_game_page(timer, 'build_page')
+                self.detect_resources()
+            if(name == 'equipment_blueprint'):
+                goto_game_page(timer, 'develop_page')
+                self.detect_resources()
+        else:
+            result = get_resources(timer)
+            for key, value in result.items():
+                self.resources[key] = value
+
+    def ask_resources(self, name, detect=False):
+        """查询资源量(不会从游戏中探查,会根据程序维护的数据返回)
+        如果游戏脱离程序监控,可能会不准确，需要先 detect
+
+        Args:
+            name (资源名称): 
+                values:
+                    refer to constants.other_constants.RESOURCE_NAME
+            detect (bool, optional): 是否从游戏中重新探查(如果否，则使用由程序维护的数据)
+
+        Returns:
+            int: 资源量
+        """
+        if(name not in RESOURCE_NAME):
+            raise ValueError("Unsupported resource name")
+        if(detect or name not in self.resources.keys()):
+            self.detect_resources(name)
+        
+        return self.resources.get(name)
+
+    
+
+@logit(level=INFO1)
 def GetChapter(timer: Timer):
     """在出征界面获取当前章节(远征界面也可获取)
 
@@ -67,8 +140,8 @@ def GetChapter(timer: Timer):
     raise TimeoutError("can't vertify chapter")
 
 
-@logit(level=INFO2)
-def GetNode(timer: Timer):
+@logit(level=INFO1)
+def GetNode(timer: Timer, need_screen_shot=True):
     """不够完善"""
     """出征界面获取当前显示地图节点编号
     例如在出征界面显示的地图 2-5,则返回 5
@@ -76,16 +149,18 @@ def GetNode(timer: Timer):
     Returns:
         int: 节点编号
     """
-    UpdateScreen(timer)
+    
     for try_times in range(5):
-        time.sleep(0.5 * 2 ** try_times)
+        time.sleep(.15 * 2 ** i)
+        if(need_screen_shot):
+            UpdateScreen(timer)
         for i in range(1, 7):
             if(ImagesExist(timer, NumberImage[i], 0, confidence=0.95)):
                 return i
     raise TimeoutError("can't vertify map")
 
 
-@logit(level=INFO2)
+@logit(level=INFO1)
 def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     """获取敌方舰船类型数据并更新到 timer.enemy_type_count
     timer.enemy_type_count 为一个记录了敌方情况的字典
@@ -148,7 +223,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         print("")
 
 
-@logit(level=INFO2)
+@logit(level=INFO1)
 def DetectShipStatu(timer: Timer, type='prepare'):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_status
 
@@ -177,6 +252,7 @@ def DetectShipStatu(timer: Timer, type='prepare'):
     """
 
     UpdateScreen(timer)
+    #  log_image(timer, timer.screen, 'blood.png', ignore_existed_image=True)
     result = [-1, 0, 0, 0, 0, 0, 0]
     if(type == 'prepare'):
         for i in range(1, 7):
@@ -203,13 +279,13 @@ def DetectShipStatu(timer: Timer, type='prepare'):
         print(type, ":ship_status =", result)
     return result
 
-@logit(level=INFO2)
+@logit(level=INFO1)
 def DetectShipType(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
 
-@logit(level=INFO2)
+@logit(level=INFO1)
 def UpdateShipPosition(timer: Timer):
     """在战斗移动界面(有一个黄色小船在地图上跑)更新黄色小船的位置
 
@@ -224,11 +300,11 @@ def UpdateShipPosition(timer: Timer):
 
     timer.ship_position = pos
 
-
+@logit(level=INFO1)
 def UpdateShipPoint(timer: Timer):
     timer.update_ship_point()
 
-
+@logit(level=INFO1)
 def get_exercise_status(timer: Timer):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
@@ -249,7 +325,7 @@ def get_exercise_status(timer: Timer):
     swipe(timer, 800, 200, 800, 400)
     return result
 
-
+@logit(level=INFO1)
 def CheckSupportStatu(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 

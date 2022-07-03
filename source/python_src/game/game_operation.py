@@ -13,7 +13,7 @@ from api import *
 from supports import *
 from save_load import *
 
-__all__ = ['ConfirmOperation', 'restart', 'goto_game_page', 'expedition',
+__all__ = ['ConfirmOperation', 'restart', 'expedition',
            'DestoryShip', 'change_fight_map', 'MoveTeam', 'SetSupport',
            'QuickRepair', 'GainBounds', 'RepairByBath', 'SetAutoSupply', 'Supply',
            'ChangeShip', 'ChangeShips', 'start_game']
@@ -84,30 +84,42 @@ def start_game(timer:Timer, account=None, password=None, delay=1.0):
         click(timer, 460, 380)  #点击"退出登录"
         if(WaitImage(timer, StartImage[4]) == False):
             raise TimeoutError("can't logout successfully")
-        click(timer, 350, 180)  #点击账号文本框
+        
+        click(timer, 540, 180)  #点击账号文本框
+        for i in range(20):
+            p = th.Thread(target=lambda:ShellCmd(timer, 'input keyevent 67'))
+            p.start()
+        p.join()
         text(str(account))
-        click(timer, 390, 180)  #点击密码文本框
+        
+        click(timer, 540, 260)  #点击密码文本框
+        for i in range(20):
+            p = th.Thread(target=lambda:ShellCmd(timer, 'input keyevent 67'))
+            p.start()
+        p.join()
+        time.sleep(0.5)
         text(str(password))
-        click(timer, 400, 300)  #点击"登录"
+        click(timer, 400, 330)  #点击"登录"
         res = WaitImages(timer, [StartImage[5], StartImage[2]])
         if(res == None):
             raise TimeoutError("login timeout")
         if(res == 0):
             raise BaseException("password or account is wrong")
     
-    ClickImage(timer, StartImage[2])
+    while(ImagesExist(timer, StartImage[2])):
+        ClickImage(timer, StartImage[2])
     try:
         GoMainPage(timer)
     except:
         raise BaseException("fail to start game")
 
 @logit(level=INFO3)
-def restart(timer: Timer, times=0):
+def restart(timer: Timer, times=0, *args, **kwargs):
     
     try:
         ShellCmd(timer, "am force-stop com.huanmeng.zhanjian2")
         ShellCmd(timer, "input keyevent 3")
-        start_game(timer)
+        start_game(timer, **kwargs)
     except:
         if(is_android_online(timer) == False):
             pass
@@ -127,49 +139,34 @@ def restart(timer: Timer, times=0):
             raise CriticalErr("CriticalErr on restart function")
         
         ConnectAndroid(timer)
-        restart(timer, times + 1)  
-
-@logit(level=INFO2)
-def goto_game_page(timer: Timer, target='main'):
-    """到某一个游戏界面
-
-    Args:
-        timer (Timer): _description_
-        target (str, str): 目标章节名(见 ./constants/other_constants). Defaults to 'main'.
-    """
-    walk_to(timer, target)
-    # wait_pages(timer, names=[timer.now_page.name])
+        restart(timer, times + 1, *args, **kwargs)  
 
 @logit(level=INFO3)
-def expedition(timer: Timer, try_times=0):
+def expedition(timer: Timer, force=False):
     """检查远征,如果有未收获远征,则全部收获并用原队伍继续
 
     Args:
-        timer (Timer): _description_
+        force (bool): 是否强制检查
     """
-    if(timer.now_page.name != 'map_page'):
-        goto_game_page(timer, 'expedition_page')
-    timer.expedition_status.update()
-    if not timer.expedition_status.is_ready():
-        return try_times
-    try:
-        goto_game_page(timer, 'expedition_page')
-        pos = WaitImage(timer, GameUI[6], timeout=2)
-        click(timer, pos[0], pos[1], delay=1)
-        WaitImage(timer, FightImage[3], after_get_delay=.25)
-        click(timer, 900, 500, delay=1)
-        ConfirmOperation(timer, must_confirm=1, delay=.5, confidence=.9)
-    except:
-        if(process_bad_network(timer, 'expedition')):
-            pass
-        raise ImageNotFoundErr("Unknown error led to this error")
-    return expedition(timer, try_times + 1)
+    timer.expedition_status.update(force=force)
+    while(timer.expedition_status.is_ready()):
+        try:
+            goto_game_page(timer, 'expedition_page')
+            pos = WaitImage(timer, GameUI[6], timeout=2)
+            click(timer, pos[0], pos[1], delay=1)
+            WaitImage(timer, FightImage[3], after_get_delay=.25)
+            click(timer, 900, 500, delay=1)
+            ConfirmOperation(timer, must_confirm=1, delay=.5, confidence=.9)
+            timer.expedition_status.update()
+        except:
+            if(not process_bad_network(timer, 'expedition')):
+                raise ImageNotFoundErr("Unknown error led to this error")
 
 @logit(level=INFO3)
 def DestoryShip(timer, reserve=1, amount=1):
     # amount:重要舰船的个数
     # 解装舰船
-    walk_to(timer, 'destroy_page')
+    goto_game_page(timer, 'destroy_page')
 
     WaitImage(timer, SymbolImage[5], after_get_delay=.33)
     click(timer, 301, 25)  # 这里动态延迟，点解装
@@ -270,7 +267,7 @@ def MoveChapter(timer: Timer, target, chapter_now=None):
                 raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
             time.sleep(0.15)
             MoveChapter(timer, target, chapter_now)
-    except Exception as exception:
+    except:
         print("can't move chapter, time now is", time.time)
         if(process_bad_network(timer, 'move_chapter')):
             MoveChapter(timer, target)
@@ -393,7 +390,7 @@ def SetSupport(timer: Timer, target, try_times=0):
         ValueError: 未能成功切换战役支援状态
     """
     target = bool(target)
-    walk_to(timer, "fight_prepare_page")
+    goto_game_page(timer, "fight_prepare_page")
     if(CheckSupportStatu() != target):
         click(timer, 628, 82, delay=1)
         click(timer, 760, 273, delay=1)
@@ -438,12 +435,20 @@ def GainBounds(timer: Timer):
     Args:
         timer (Timer): _description_
     """
+    goto_game_page(timer, 'main_page')
+    if(bool(PixelChecker(timer, (694, 457), bgr_color=(45, 89, 255))) == False):
+        return 'no'
+    
     goto_game_page(timer, 'mission_page')
-    walk_to(timer, 'mission_page')
+    goto_game_page(timer, 'mission_page')
     if(ClickImage(timer, GameUI[15])):
         ConfirmOperation(timer, must_confirm=1)
+        return 'ok'
     elif(ClickImage(timer, GameUI[12])):
         ConfirmOperation(timer, must_confirm=1)
+        return 'ok'
+    
+    return 'no'
     #click(timer, 774, 502)
 
 @logit(level=INFO2)
@@ -453,8 +458,13 @@ def RepairByBath(timer: Timer):
     Args:
         timer (Timer): _description_
     """
-    walk_to(timer, 'choose_repair_page')
+    goto_game_page(timer, 'choose_repair_page')
     click(timer, 115, 233)
+    if(not identify_page(timer, 'choose_repair_page')):
+        if(identify_page(timer, 'bath_page')):
+            timer.set_page('bath_page')
+        else:
+            timer.set_page(get_now_page(timer))
 
 @logit(level=INFO2)
 def SetAutoSupply(timer: Timer, type=1):
@@ -493,10 +503,12 @@ def Supply(timer: Timer, List=[1, 2, 3, 4, 5, 6], try_times=0):
         Supply(timer, List, try_times + 1)
 
 @logit(level=INFO2)
-def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None):
+def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_statu=True):
+    """切换舰船(不支持第一舰队)
 
+    """
     if(team is not None):
-        walk_to(timer, 'fight_prepare_page')
+        goto_game_page(timer, 'fight_prepare_page')
         MoveTeam(timer, team)
         if(team >= 5):
             # 切换为预设编队
@@ -505,42 +517,57 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None):
 
     # 切换单船
     # 懒得做 OCR 所以默认第一个
-    DetectShipStatu(timer)
+    if(detect_ship_statu):
+        DetectShipStatu(timer)
     if(name == None and timer.ship_status[pos] == -1):
         return
-    click(timer, 110 * pos, 250, delay=1.5)
+    click(timer, 110 * pos, 250, delay=0)
+    res = WaitImages(timer, [choose_ship_images[1], choose_ship_images[2]], after_get_delay=.4, gap=0)
+    if(res == 1):
+        click(timer, 839, 113)
+    
     if(name == None):
-        click(timer, 83, 167, delay=1)
-        return
+        click(timer, 83, 167, delay=0)
+        wait_pages(timer, 'fight_prepare_page', gap=0)
+        return 
 
-    click(timer, 700, 30, delay=0.5)
+    click(timer, 700, 30, delay=0)
+    WaitImage(timer, choose_ship_images[3], gap=0, after_get_delay=.1)
+    
     text(name)
-    click(timer, 50, 50, delay=0.5)
+    click(timer, 50, 50, delay=.5)
     if(timer.ship_status[pos] == -1):
-        click(timer, 83, 167, delay=1)
+        click(timer, 83, 167, delay=0)
     else:
-        click(timer, 183, 167, delay=1)
-    if(ImagesExist(timer, SymbolImage[7])):
-        click(timer, 27, 30, delay=1)
+        click(timer, 183, 167, delay=0)
+    
+    wait_pages(timer, 'fight_prepare_page', gap=0)
 
 @logit(level=INFO3)
 def ChangeShips(timer: Timer, team, list):
     """更换编队舰船
 
     Args:
-        team (int): 1~4,表示舰队编号
+        team (int): 2~4,表示舰队编号
         list (舰船名称列表): 
 
     For instance:
         ChangeShips(timer, 2, [None, "萤火虫", "伏尔塔", "吹雪", "明斯克", None, None])
 
     """
-    for i in range(6):
-        ChangeShip(timer, team, 1, None)
-    list = list + [None] * 6
+    if(team is not None):
+        goto_game_page(timer, 'fight_prepare_page')
+        MoveTeam(timer, team)
+        
+    DetectShipStatu(timer)
     for i in range(1, 7):
-        ChangeShip(timer, team, i, list[i])
-
+        if(timer.ship_status[i] != -1):
+            ChangeShip(timer, team, 1, None, detect_ship_statu=False)
+    list = list + [None] * 6
+    time.sleep(.3)
+    DetectShipStatu(timer)
+    for i in range(1, 7):
+        ChangeShip(timer, team, i, list[i], detect_ship_statu=False)
 
 def get_new_things(timer: Timer, lock=0):
     pass

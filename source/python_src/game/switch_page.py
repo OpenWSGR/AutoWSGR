@@ -6,7 +6,8 @@ from game.identify_pages import *
 整个游戏 UI 将被构建为一颗以主页为根的有向树,该有向树带横插边
 """
 
-__all__ = ['walk_to', 'GoMainPage', "is_bad_network", 'load_game_ui', 'process_bad_network']
+__all__ = ['GoMainPage', "is_bad_network", \
+    'goto_game_page', 'load_game_ui', 'process_bad_network']
 
 page_count = 0
 ui_tree = None
@@ -296,7 +297,18 @@ def walk_to(timer: Timer, end, try_times=0):
             walk_to(timer, end)
 
 
-def construct_node(timer: Timer, name: str, father) -> Node:
+@logit(level=INFO2)
+def goto_game_page(timer: Timer, target='main'):
+    """到某一个游戏界面
+
+    Args:
+        timer (Timer): _description_
+        target (str, str): 目标章节名(见 ./constants/other_constants). Defaults to 'main'.
+    """
+    walk_to(timer, target)
+    # wait_pages(timer, names=[timer.now_page.name])
+
+def construct_node(timer: Timer, name: str, father):
     global page_count, ui_tree
     page_count += 1
     node = Node(name, page_count)

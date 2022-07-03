@@ -10,13 +10,30 @@ from supports import *
 from api.api_android import click
 from airtest.core.api import auto_setup
 
-__all__ = ["GetAndroidInfo", "CopyRequirements",
+__all__ = ["GetAndroidInfo", "CopyRequirements", 'wait_network', \
            "ConnectAndroid", "RestartAndroid", "CheckNetWork", "is_android_online"
            ]
 
 # Win 和 Android 的通信
 # Win 向系统写入数据
 
+def wait_network(timer, timeout=1000):
+    """等待到网络恢复
+
+    Args:
+        timer (_type_): _description_
+        timeout (int, optional): _description_. Defaults to 1000.
+
+    Returns:
+        _type_: _description_
+    """
+    start_time = time.time()
+    while(time.time() - start_time <= timeout):
+        if(CheckNetWork):
+            return True
+        time.sleep(10)
+    
+    return False
 
 def GetAndroidInfo():
     """还没写好"""
@@ -58,7 +75,7 @@ def ConnectAndroid(timer: Timer):
     Args:
     """
     
-    if(not any((is_android_online(timer), is_android_online(timer), is_android_online(timer)))):
+    if(is_android_online(timer, 5) == False):
         RestartAndroid(timer)
         
     from logging import getLogger, ERROR
@@ -68,7 +85,7 @@ def ConnectAndroid(timer: Timer):
 
     print("Hello,I am WSGR auto commanding system")
 
-def is_android_online(timer:Timer):
+def is_android_online(timer:Timer, times=1):
     """判断 timer 给定的设备是否在线
 
     Args:
@@ -77,11 +94,13 @@ def is_android_online(timer:Timer):
     Returns:
         bool: 在线返回 True,否则返回 False
     """
-    res = os.popen("adb devices -l")
-    for x in res:
-        print(x, end=' ')
-        if(timer.device_name in x and 'device' in x):
-            return True
+    while(times):
+        times -= 1
+        res = os.popen("adb devices -l")
+        for x in res:
+            print(x, end=' ')
+            if(timer.device_name in x and 'device' in x):
+                return True
     return False
 
 @logit(level=INFO2)
@@ -102,6 +121,7 @@ def RestartAndroid(timer: Timer):
         os.chdir(S.RESTART_PATH)
         os.popen(r".\dnplayer.exe")
         os.chdir(dir)
+        time.sleep(3)
         while(is_android_online(timer) == False):
             time.sleep(1)
             if(time.time() - restart_time > 120):
