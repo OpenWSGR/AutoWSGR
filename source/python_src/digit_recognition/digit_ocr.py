@@ -9,7 +9,12 @@ POS = yaml_to_dict('./source/python_src/digit_recognition/relative_location.yaml
 
 
 def get_resources(timer):
-    """ 获取资源数据 """
+    """
+    It reads the resources of the game.
+    
+    :param timer: the timer object
+    :return: A dictionary of resources.
+    """
     goto_game_page(timer, 'main_page')
     image = timer.screen
 
@@ -27,7 +32,7 @@ def get_resources(timer):
         else:
             num = raw_str
             unit = 1
-        
+
         # 容错处理，如果监测出来不是数字则出错了
         try:
             ret[key] = eval(num) * unit
@@ -39,7 +44,14 @@ def get_resources(timer):
 
 
 def get_loot_and_ship(timer):
-    """ 获取掉落数据 """
+    """
+    It takes a screenshot of the game page, crops the image to the area where the loot and ship are, and
+    then uses OCR to read the numbers
+    
+    :param timer: the timer object
+    :return: A dictionary with the following keys:
+        'loot_today', 'loot_today_max', 'ship_today', 'ship_today_max'
+    """
     goto_game_page(timer, 'map_page')
     image = timer.screen
 
