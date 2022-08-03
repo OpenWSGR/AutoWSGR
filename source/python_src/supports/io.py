@@ -1,4 +1,5 @@
 
+from cv2 import imwrite
 from supports.models import *
 __all__ = ['get_file_suffixname', 'read_file', 'create_file_with_path',
            'delete_file', 'write_file', 'save_image', 'get_all_files']
@@ -88,11 +89,12 @@ def save_image(path, image, ignore_existed_image=False, *args, **kwargs):
     Raises:
         FileExistsError: 如果未忽略已存在图片并且图片已存在
     """
-    if(isinstance(image, np.ndarray)):
-        image = PIM.fromarray(image)
     if(ignore_existed_image == False and os.path.exists(path)):
         raise FileExistsError("该图片已存在")
-    image.save(os.path.abspath(path))
+    if(isinstance(image, PIM.Image)):
+        image.save(os.path.abspath(path))
+    if(isinstance(image, np.ndarray)):
+        imwrite(path, image)
 
 
 def get_all_files(dir, must='/'):

@@ -1,21 +1,48 @@
-from curses.ascii import isdigit
-import cv2
+
 import pytesseract
-from game import *
-from utils.image_position import crop_image
-from utils.io import yaml_to_dict
+
+from utils import *
+from supports import *
+from save_load import *
+
+__all__ = ['get_resources', 'get_loot_and_ship']
 
 POS = yaml_to_dict('./source/python_src/digit_recognition/relative_location.yaml')
 
 
-def get_resources(timer):
+def crop_image(image, pos1, pos2, resolution=(960, 540)):
+    """ 按照给定的位置裁剪图片 """
+    x1, y2 = map(int, relative_to_absolute(pos1, resolution))
+    x2, y1 = map(int, relative_to_absolute(pos2, resolution))
+    return image[y1:y2, x1:x2]
+
+def image_to_number(image:np.ndarray):
+    """根据图片返回数字
+
+    Args:
+        image (np.ndarray): 图片
+
+    Returns:
+        int, None: 存在则返回数字,否则为 None
     """
-    It reads the resources of the game.
+    result = pytesseract.image_to_string(image).strip()
+    if(len(result) == 0):
+        return None
+    scale = 1
     
-    :param timer: the timer object
-    :return: A dictionary of resources.
+    if('K' in result):
+        result = result[:-2]
+        scale = 1000
+    if('M' in result):
+        result = result[:-2]
+        scale = 10 ** 6
+    
+    return scale * int(result)
+
+def get_resources(timer):
+    """ 根据 timer 所处界面获取对应资源数据 
+    未完成
     """
-    goto_game_page(timer, 'main_page')
     image = timer.screen
 
     ret = {}
@@ -40,19 +67,10 @@ def get_resources(timer):
             print("读取资源失败！")
             quit()
 
-    return ret
-
-
 def get_loot_and_ship(timer):
+    """ 获取掉落数据 
+    要求处于地图界面    
     """
-    It takes a screenshot of the game page, crops the image to the area where the loot and ship are, and
-    then uses OCR to read the numbers
-    
-    :param timer: the timer object
-    :return: A dictionary with the following keys:
-        'loot_today', 'loot_today_max', 'ship_today', 'ship_today_max'
-    """
-    goto_game_page(timer, 'map_page')
     image = timer.screen
 
     ret = {}
@@ -66,4 +84,5 @@ def get_loot_and_ship(timer):
             print("读今日战利品、捞船失败！")
             quit()
 
-    return ret
+
+

@@ -1,3 +1,4 @@
+from tkinter import E
 from game import *
 from supports import *
 from api import *
@@ -5,17 +6,40 @@ from fight.data_structures import *
 
 __all__ = ['fight', 'normal_fight', 'choose_decision', 'work', 'SL']
 
-
-def work(fun, times=0):
+def work(timer:Timer, fun, times=1, end=False):
     while(times):
+        print("Round", times)
         try:
             res = fun()
+            if(res == 'retry'):
+                continue
             if(res is not None):
                 print(res)
                 time.sleep(1)
-
-        except Exception as e:
+            if(end and timer.is_fight_end() == False):
+                print("The Fight isn't end, retrying")
+                continue  
+            
+        except (BaseException, Exception) as e:
             print(e)
+            if(time.time() - timer.last_error_time < 2000 or is_android_online(timer, 5) == False):
+                RestartAndroid(timer)
+                ConnectAndroid(timer)
+                start_game(timer)
+            else:
+                if(is_game_running(timer)):
+                    if(wait_network() == False):
+                        raise NetworkErr("Network error, please check your hardware or network configuration")
+                    if(process_bad_network(timer)):
+                        if(get_now_page(timer) is not None):
+                            goto_game_page(timer, 'main_page')
+                        else:
+                            restart(timer)
+                    else:
+                        restart(timer)
+                else:
+                    restart(timer)
+                    
         times -= 1
 
 @logit(level=INFO3)
@@ -38,8 +62,8 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
         decision_maker = timer.defaul_decision_maker
     timer.oil = timer.ammo = 10
     goto_game_page(timer, 'map_page')
-    if(expedition(timer)):
-        goto_game_page(timer, 'map_page')
+    expedition(timer)
+    goto_game_page(timer, 'map_page')
     change_fight_map(timer, chapter, node)
     goto_game_page(timer, 'fight_prepare_page')
     MoveTeam(timer, team)
@@ -140,8 +164,8 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
         """
         time.sleep(1.5)
         DetectShipStatu(timer, 'sumup')
-        # timer.fight_result.detect_result()
-        # print(timer.fight_result)
+        timer.fight_result.detect_result()
+        print(timer.fight_result)
         click(timer, 900, 500, 2, .16)
         if('no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0)):
             click(timer, 900, 500, 1, .25)

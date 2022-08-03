@@ -1,4 +1,5 @@
 
+from numpy import choose
 from supports import *
 from api import *
 
@@ -100,6 +101,10 @@ def load_other_images():
     TeamImage.append(MyTemplate(PrePath + "TeamImage\\3.PNG", resolution=(960, 540)))
     TeamImage.append(MyTemplate(PrePath + "TeamImage\\4.PNG", resolution=(960, 540)))
 
+    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\1.PNG", resolution=(960, 540)))  #有标记选择舰船界面
+    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\2.PNG", resolution=(960, 540)))  #无标记选择舰船界面
+    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\3.PNG", resolution=(960, 540)))  #文本框确认
+
     FightImage.append(MyTemplate(PrePath + "FightImage\\1.PNG", resolution=(960, 540)))  # 选择阵型
     FightImage.append(MyTemplate(PrePath + "FightImage\\2.PNG", resolution=(960, 540)))  # 开始战斗
     FightImage.append(MyTemplate(PrePath + "FightImage\\3.PNG", resolution=(960, 540)))  # 点击继续
@@ -117,17 +122,6 @@ def load_other_images():
     FightImage.append(MyTemplate(PrePath + "FightImage\\15.PNG", resolution=(960, 540)))  # 简单模式
 
     RepairImage.append(MyTemplate(PrePath + "RepairImage\\1.PNG", resolution=(960, 540)))  # 修理中
-
-    Image20220129.append(MyTemplate(PrePath + "20220129\\1.PNG", resolution=(960, 540)))  # 怪物图标
-    Image20220129.append(MyTemplate(PrePath + "20220129\\2.PNG", resolution=(960, 540)))  # 开始出征
-    Image20220129.append(MyTemplate(PrePath + "20220129\\3.PNG", resolution=(960, 540)))  # 章节10标志
-    Image20220129.append(MyTemplate(PrePath + "20220129\\4.PNG", resolution=(960, 540)))  # 章节7标志
-    Image20220129.append(MyTemplate(PrePath + "20220129\\5.PNG", resolution=(960, 540)))  # 探索图标"""
-
-    Image20220415.append(MyTemplate(PrePath + "20220415\\1.PNG", resolution=(960, 540)))  # 困难模式图片"""
-    Image20220415.append(MyTemplate(PrePath + "20220415\\2.PNG", resolution=(960, 540)))  # 简单模式图片"""
-    Image20220415.append(MyTemplate(PrePath + "20220415\\3.PNG", resolution=(960, 540)))  # alpha 点进入"""
-    Image20220415.append(MyTemplate(PrePath + "20220415\\4.PNG", resolution=(960, 540)))  # beta 点进入"""
 
 
 def load_fightresult_images():

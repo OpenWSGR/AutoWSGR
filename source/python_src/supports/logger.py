@@ -3,12 +3,10 @@ if(__name__ == '__main__'):
     import os
     sys.path.append(os.path.abspath('./source/python_src'))
 
-from tkinter import E
 from supports.models import *
 from supports.io import *
 from constants import *
 from functools import wraps
-from logging import FileHandler, StreamHandler
 
 import logging
 

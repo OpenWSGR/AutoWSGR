@@ -35,6 +35,7 @@ class DecisionBlock():
                     if(timer.ship_point != 'F'):
                         return False
             if(c == 3 and n == 1):
+                # 3-2 6DD 周常
                 if(mod == 1):
                     if((10 - timer.ammo) / 2 == 1):
                         return 2
@@ -52,7 +53,6 @@ class DecisionBlock():
                     if(e[SAP] != 0 or (10 - timer.ammo) / 2 == 3):
                         return 0
             if(c == 4 and n == 4):
-                
                 if(mod == 1):
                     #4-4SS周常
                     if((10 - timer.ammo) / 2 == 0 and timer.ship_point != 'A'):

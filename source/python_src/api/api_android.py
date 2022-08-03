@@ -28,8 +28,8 @@ def click(timer: Timer, x, y, times=1, delay=0.5, enable_subprocess=False, *args
             print("click:", time.time(), x, y)
         else:
             is_print = kwargs.get('print')
-            if(is_print):
-                print("click:", time.time(), x, y)
+            #  if(is_print):
+            #   print("click:", time.time(), x, y)
     """点击模拟器相对坐标 (x,y).
     Args:
         x:相对横坐标  (相对 960x540 屏幕)

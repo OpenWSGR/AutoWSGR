@@ -45,6 +45,16 @@ FIGHT_RESULTS = {"SS", "S", "A", "B", "C", "D"}
 NODE_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),
              range(1, 6), range(1, 5), range(1, 6), range(1, 6)]
 
+RESOURCE_NAME = {'oil', 'ammo', 'steel', 'aluminum', 'diamond', 'quick_repair', 'quick_build', \
+    'ship_blueprint', 'equipment_builprint', }
+
+#船舱容量,装备容量
+PORT_FACILITIES = {'ship_limit', 'ship_ammount', 'equipment_limit', 'equipment_ammount'}
+
+#维修船坞,建造位,开发位
+
+
+
 INFO1 = 13
 INFO2 = 16
 INFO3 = 19

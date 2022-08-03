@@ -52,6 +52,7 @@ def get_now_page(timer: Timer):
     for page in ALL_UI:
         if (identify_page(timer, page, need_screen_shot=False, no_log=True)):
             return page
+    return None
 
 
 @logit()
