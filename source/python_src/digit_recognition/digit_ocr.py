@@ -4,6 +4,8 @@ import pytesseract
 from utils import *
 from supports import *
 from save_load import *
+from game.switch_page import *
+
 
 __all__ = ['get_resources', 'get_loot_and_ship']
 
@@ -41,8 +43,9 @@ def image_to_number(image:np.ndarray):
 
 def get_resources(timer):
     """ 根据 timer 所处界面获取对应资源数据 
-    未完成
+    部分 case 会没掉,请重写
     """
+    goto_game_page(timer, 'main_page')
     image = timer.screen
 
     ret = {}
@@ -68,9 +71,9 @@ def get_resources(timer):
             quit()
 
 def get_loot_and_ship(timer):
-    """ 获取掉落数据 
-    要求处于地图界面    
+    """ 获取掉落数据     
     """
+    goto_game_page(timer, 'map_page')
     image = timer.screen
 
     ret = {}

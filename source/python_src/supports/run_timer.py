@@ -86,6 +86,7 @@ class Timer():
         self.oil = 10
         self.resources = None
         self.last_error_time = time.time() - 1800
+        self.decisive_battle_data = None
         """
         以上时能用到的
         以下是暂时用不到的
@@ -146,8 +147,8 @@ class Timer():
         """获取当前屏幕相对坐标 (x,y) 处的像素值
 
         Args:
-            x (_type_): _description_
-            y (_type_): _description_
+            x (int): [0, 960)
+            y (int): [0, 549)
 
         Returns:
             Tuple(int,int,int): RGB 格式的像素值

@@ -120,7 +120,7 @@ class DecisionBlock():
             if(c == 6 and n == 3):
                 if(mod == 1):
                     #6SS周常
-                    if(e[CA] != 2 and (10 - timer.ammo) / 2 == 1):
+                    if(e[CA] != 2 and timer.ship_point == 'B'):
                         return 0
             if(c == 8 and n == 1):
                 if(mod == 1):
@@ -265,6 +265,7 @@ class DecisionBlock():
                     'night': 是否进行夜战返回 0/1
                     'fight_condition': 选择战况,返回 1~5, 左上为 1, 中间为 2, 右上为 3, 左下为 4
                     'continue:' 回港或继续, 回港为 0, 继续为 1
+                    'SL': 进入战斗后是否 SL
         Returns:
             int: 描述决策
         """
@@ -287,6 +288,8 @@ class DecisionBlock():
         
         if(type == 'continue'):
             pass
+        if(type == 'SL'):
+            return False
             
         return self.old_version(timer, type, timer.chapter, timer.node, mod, timer.ship_status , timer.enemy_type_count)
         

@@ -1,10 +1,10 @@
-from tkinter import E
+
 from game import *
 from supports import *
 from api import *
 from fight.data_structures import *
 
-__all__ = ['fight', 'normal_fight', 'choose_decision', 'work', 'SL']
+__all__ = ['fight', 'normal_fight', 'choose_decision', 'work', 'SL', 'fight_end', 'wait_until_decision']
 
 def work(timer:Timer, fun, times=1, end=False):
     while(times):
@@ -101,7 +101,6 @@ def fight_during(timer: Timer, decision_maker: DecisionBlock = None, *args, **kw
     """
     if decision_maker is None:
         decision_maker = timer.defaul_decision_maker
-
     res = WaitImages(timer, [FightImage[3], FightImage[6]], timeout=120)
     if(res == 0):
         return
@@ -145,7 +144,7 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
     Rasie:
         TimeoutError:未知原因导致了战斗无法结算
     """
-    if(try_times > 30):
+    if(try_times > 75):
         if(process_bad_network(timer)):
             try_times = 0
         else:
@@ -421,6 +420,11 @@ def fight(timer: Timer, type='map_fight', decision_maker: DecisionBlock = None, 
     Args:
         timer (Timer): _description_
         type (str, optional): 描述战斗类型. Defaults to 'map_fight'.
+            values:
+                'map_fight'
+                'fight'
+                'exercise'
+                'battle'
 
     Returns:
         str: 'detour_sucess' 该点迂回成功
@@ -457,9 +461,10 @@ def fight(timer: Timer, type='map_fight', decision_maker: DecisionBlock = None, 
         res = choose_decision(timer, decision, value)
         if(res == 'SL'):
             return res
-
         timer.ammo -= 2
         timer.oil -= 2
-
+    if(decision_maker.make_decision(timer, "SL") == True):
+        restart(timer)
+        return "SL"
     fight_during(timer, decision_maker, *args, **kwargs)
     return fight_end(timer, type, *args, **kwargs)

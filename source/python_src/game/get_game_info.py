@@ -43,6 +43,8 @@ class FightResult():
         mvp_pos = GetImagePosition(self.timer, FightImage[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
         self.result = WaitImages(self.timer, fight_result_images)
+        if(ImagesExist(self.timer, fight_result_images['SS'])):
+            self.result = 'SS'
         return self
 
     def detect_experiences(self):
@@ -151,7 +153,7 @@ def GetNode(timer: Timer, need_screen_shot=True):
     """
     
     for try_times in range(5):
-        time.sleep(.15 * 2 ** i)
+        time.sleep(.15 * 2 ** try_times)
         if(need_screen_shot):
             UpdateScreen(timer)
         for i in range(1, 7):
@@ -333,7 +335,7 @@ def CheckSupportStatu(timer: Timer):
         bool: 如果开启了返回 True,否则返回 False
     """
     UpdateScreen(timer)
-    pixel = timer.get_pixel(75, 623)
+    pixel = timer.get_pixel(623, 75)
     d1 = CalcDis(pixel, SUPPORT_ENALBE)
     d2 = CalcDis(pixel, SUPPOER_DISABLE)
     return d1 < d2
