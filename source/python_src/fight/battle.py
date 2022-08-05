@@ -50,6 +50,7 @@ def battle(timer:Timer, node, times, decision_maker:DecisionBlock=None, repair_l
             if(time.time() - start_time > 15):
                 raise BaseException()
             
+        QuickRepair(timer)   
         click(timer, 900, 500, delay=0)    
         while(identify_page(timer, 'fight_prepare_page')):
             time.sleep(.15)

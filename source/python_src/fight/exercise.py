@@ -45,7 +45,7 @@ def normal_exercise(timer:Timer, team, decision_maker:DecisionBlock=None, refres
     formation = decision_maker.make_decision(timer, 'formation')
     if(formation == 0 and refresh_times <= 3):
         click(timer, 665, 400, delay=0.75)
-        normal_exercise(timer, team, decision_maker, refresh_times + 1, challenge_status=status *args, **kwargs)
+        normal_exercise(timer, team, decision_maker, refresh_times + 1, challenge_status=status, *args, **kwargs)
     else:
         click(timer, 804, 390, delay=0)
         exercise_fight(timer, team, decision_maker, *args, **kwargs)
@@ -82,13 +82,16 @@ def friend_exercise(timer:Timer, team, decision_maker:DecisionBlock=None, target
     timer.chapter, timer.node = 'exercise', target
     
     click(timer, 600, (60 + target * 140) * .75, delay=.75)
-    click(timer, 938 * .75, 434 * .75, delay=.74)
+    click(timer, 938 * .75, 434 * .75, delay=0)
+    wait_pages(timer, 'friend_home_page', gap=0)
     click(timer, 1145 * .75, 546 * .75, delay=.75)
     click(timer, 1148 * .75, 386 * .75, delay=.75)
     click(timer, 1107 * .75, 538 * .75, delay=.75)
     
+    
     exercise_fight(timer, team, decision_maker)
-    click(timer, 50, 30, delay=.5)
+    wait_pages(timer, 'friend_home_page')
+    click(timer, 50, 30, delay=0)
     friend_exercise(timer, team, decision_maker, targets[1:])
     
     

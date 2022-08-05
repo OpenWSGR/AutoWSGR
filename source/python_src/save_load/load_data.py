@@ -1,5 +1,4 @@
 
-from numpy import choose
 from supports import *
 from api import *
 
@@ -68,7 +67,10 @@ def load_other_images():
     GameUI.append(MyTemplate(PrePath + "GameUI\\13.PNG", resolution=(960, 540)))  # 浴场选择舰船
     GameUI.append(MyTemplate(PrePath + "GameUI\\14.PNG", resolution=(960, 540)))  # 浴场全部修理
     GameUI.append(MyTemplate(PrePath + "GameUI\\15.PNG", resolution=(960, 540)))  # 领取奖励
+    GameUI.append(MyTemplate(PrePath + "GameUI\\16.PNG", resolution=(960, 540)))  # 决战小地图右下角"编队  出征"
+    GameUI.append(MyTemplate(PrePath + "GameUI\\17.PNG", resolution=(960, 540)))  # 决战小地图选择舰船"刷新  关闭"
 
+    
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\1.PNG", resolution=(960, 540)))
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\2.PNG", resolution=(960, 540)))
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\3.PNG", resolution=(960, 540)))
@@ -127,8 +129,13 @@ def load_other_images():
 def load_fightresult_images():
     for result in FIGHT_RESULTS:
         fight_result_images[result] = make_tmplate('fight_result/' + result)
-
-
+    
+"""def load_decisive_data():
+    global all_images
+    images = [image for image in all_images if("decisive_images" in image)]
+    for image in images:
+        decisive_objects_images"""
+    
 def load_images():
 
     load_error_images()
@@ -518,3 +525,7 @@ def load_point_positions():
 def load_all_data(timer: Timer):
     load_point_positions()
     load_images()
+    #load_decisive_data()
+
+
+    

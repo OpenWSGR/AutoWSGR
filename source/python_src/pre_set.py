@@ -47,7 +47,7 @@ def week7(timer, team=4, times=5, change=1):
     work(timer, lambda:normal_fight(timer, 7, 4, team, mod=2), times, end=1)
     GainBounds(timer)
     
-def week8(timer, team, times=5, change=1):
+def week8(timer, team=4, times=5, change=1):
     if(change):ChangeShips(timer, team, [None, "U-1405", "鲃鱼", "大青花鱼", "狼群47", "U-1206","射水鱼"])
     work(timer, lambda:normal_fight(timer, 8, 4, team, mod=1), times, end=1)
     GainBounds(timer)

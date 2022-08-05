@@ -72,8 +72,8 @@ def start_game(timer: Timer, account=None, password=None, delay=1.0):
         NetworkErr: _description_
     """
     start_app("com.huanmeng.zhanjian2")
-    res = WaitImages(timer, [StartImage[2]] + ConfirmImage[1:], .85, timeout=30 * delay)
-    if res is None:
+    res = WaitImages(timer, [StartImage[2]] + ConfirmImage[1:], .85, timeout=60 * delay)
+    if(res == None):
         raise TimeoutError("start_app timeout")
 
     if(res != 0):
@@ -404,10 +404,14 @@ def SetSupport(timer: Timer, target, try_times=0):
     """
     target = bool(target)
     goto_game_page(timer, "fight_prepare_page")
-    if(CheckSupportStatu() != target):
+    # if(bool(PixelChecker(timer, (623, 75), )) == ):
+    #    
+    # 支援次数已用尽    
+    if(CheckSupportStatu(timer) != target):
         click(timer, 628, 82, delay=1)
         click(timer, 760, 273, delay=1)
         click(timer, 480, 270, delay=1)
+        
     if(is_bad_network(timer, 0) or CheckSupportStatu(timer) != target):
         if(process_bad_network(timer, 'set_support')):
             SetSupport(timer, target)
