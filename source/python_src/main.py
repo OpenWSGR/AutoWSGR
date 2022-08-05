@@ -1,4 +1,5 @@
 
+import logging
 from digit_recognition import *
 from save_load import *
 from pre_set import *
@@ -126,6 +127,33 @@ if __name__=="__main__":
    
     
     #  print(str(os.po("adb devices -l")).split('\n'))
-    kd.hook(listener)
-    main_function()
+    # kd.hook(listener)
+    # main_function()
     
+    ## TODO: dh的调试，记得删掉
+    timer = start_script(account=None, password=None)
+
+    DB = DecisionBlock(formation=5, night=1)
+    work(timer, lambda:battle(timer, 8, 1, DB), 6)
+
+    # # 8-2B 单点刷
+    # total_time = 0
+    # each_time = 10
+    # start_time = time.time()
+    # while total_time < 2000:
+    #     goto_game_page(timer, 'expedition_page')
+    #     expedition(timer)
+    #     time.sleep(60)
+        
+    #     DB = DecisionBlock(formation=4, night=0, fight_condition=4, proceed=0)
+    #     work(timer, lambda:normal_fight(timer, 8, 2, 1, decision_maker=DB), each_time)
+    #     total_time += each_time
+    #     print(f"time_passed: {time.time() - start_time}  total_time: {total_time}") 
+        
+        
+
+        # DestoryShip(timer, reserve=0, amount=0)
+        
+        
+        
+        

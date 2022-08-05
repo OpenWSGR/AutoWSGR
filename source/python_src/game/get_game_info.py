@@ -150,13 +150,14 @@ def GetNode(timer: Timer, need_screen_shot=True):
         int: 节点编号
     """
     
+    # TODO（已修复）: 你改了循环变量的名字，但没改下面
     for try_times in range(5):
-        time.sleep(.15 * 2 ** i)
+        time.sleep(.15 * 2 ** try_times)
         if(need_screen_shot):
             UpdateScreen(timer)
-        for i in range(1, 7):
-            if(ImagesExist(timer, NumberImage[i], 0, confidence=0.95)):
-                return i
+        for try_times in range(1, 7):
+            if(ImagesExist(timer, NumberImage[try_times], 0, confidence=0.95)):
+                return try_times
     raise TimeoutError("can't vertify map")
 
 

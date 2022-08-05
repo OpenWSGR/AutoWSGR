@@ -156,17 +156,21 @@ def expedition(timer: Timer, force=False):
     """
     timer.expedition_status.update(force=force)
     while(timer.expedition_status.is_ready()):
-        try:
-            goto_game_page(timer, 'expedition_page')
-            pos = WaitImage(timer, GameUI[6], timeout=2)
+        # try:
+        goto_game_page(timer, 'expedition_page')
+        pos = WaitImage(timer, GameUI[6], timeout=2)
+        # TODO: 暂时修复远征按钮的位置，需要更好的解决方案
+        if pos:
             click(timer, pos[0], pos[1], delay=1)
             WaitImage(timer, FightImage[3], after_get_delay=.25)
             click(timer, 900, 500, delay=1)
             ConfirmOperation(timer, must_confirm=1, delay=.5, confidence=.9)
             timer.expedition_status.update()
-        except:
-            if(not process_bad_network(timer, 'expedition')):
-                raise ImageNotFoundErr("Unknown error led to this error")
+        else:
+            break
+        # except:
+        #     if(not process_bad_network(timer, 'expedition')):
+        #         raise ImageNotFoundErr("Unknown error led to this error")
 
 
 @logit(level=INFO3)
@@ -180,14 +184,14 @@ def DestoryShip(timer, reserve=1, amount=1):
     WaitImage(timer, SymbolImage[6], after_get_delay=.33)
     click(timer, 90, 206)  # 点添加
     WaitImage(timer, SymbolImage[7], after_get_delay=.33)
-    # 进去
-    click(timer, 877, 378, delay=1)
+    # TODO：有bug，先注释 # 进去
+    # click(timer, 877, 378, delay=1)
 
-    click(timer, 544, 105, delay=0.33)
-    click(timer, 619, 105, delay=0.33)
-    click(timer, 624, 152, delay=0.33)
-    click(timer, 537, 204, delay=0.33)
-    click(timer, 851, 459, delay=0.33)
+    # click(timer, 544, 105, delay=0.33)
+    # click(timer, 619, 105, delay=0.33)
+    # click(timer, 624, 152, delay=0.33)
+    # click(timer, 537, 204, delay=0.33)
+    # click(timer, 851, 459, delay=0.33)
     # 筛出第一波
 
     for i in range(1, 8):
@@ -200,28 +204,29 @@ def DestoryShip(timer, reserve=1, amount=1):
     if(ImagesExist(timer, GameUI[8])):
         click(timer, 807, 346)
     click(timer, 870, 480, delay=1)
-    click(timer, 364, 304, delay=0.66)
+    click(timer, 364, 304, delay=0.66)  # TODO：需要容错，如果没有选中任何船咋办？
     # 清理第一波
 
-    click(timer, 90, 206, delay=1)
-    WaitImage(timer, SymbolImage[7], after_get_delay=.5)
-    click(timer, 877, 378, delay=1)  # 点“类型”
-    click(timer, 536, 62, delay=0.33)
-    click(timer, 851, 459, delay=0.33)
-    # 再进去并筛出第二波
-    if(reserve == 1):
-        click(timer, 853, 270, delay=0.66)
-        click(timer, 579, 208, delay=0.66)
-    # 是否解装小船
-    for i in range(1, amount + 1):
-        click(timer, i * 100, 166, delay=0.33)
-    # 选中第二波
+    # TODO：跟上面一样
+    # click(timer, 90, 206, delay=1)
+    # WaitImage(timer, SymbolImage[7], after_get_delay=.5)
+    # click(timer, 877, 378, delay=1)  # 点“类型”
+    # click(timer, 536, 62, delay=0.33)
+    # click(timer, 851, 459, delay=0.33)
+    # # 再进去并筛出第二波
+    # if(reserve == 1):
+    #     click(timer, 853, 270, delay=0.66)
+    #     click(timer, 579, 208, delay=0.66)
+    # # 是否解装小船
+    # for i in range(1, amount + 1):
+    #     click(timer, i * 100, 166, delay=0.33)
+    # # 选中第二波
 
-    click(timer, 860, 480, delay=0.66)
-    click(timer, 870, 480, delay=1)
-    if(ImagesExist(timer, GameUI[8])):
-        click(807, 346)
-    click(timer, 364, 304, delay=0.66)
+    # click(timer, 860, 480, delay=0.66)
+    # click(timer, 870, 480, delay=1)
+    # if(ImagesExist(timer, GameUI[8])):
+    #     click(807, 346)
+    # click(timer, 364, 304, delay=0.66)
 
 
 @logit(level=INFO2)

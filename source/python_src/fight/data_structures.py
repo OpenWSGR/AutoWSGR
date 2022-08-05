@@ -222,7 +222,7 @@ class DecisionBlock():
                 return True
             return False
         
-        if(type == 'continue'):
+        if(type == 'proceed'):
             if(2 in statu):
                 print("存在大破，停止战斗")
                 return False
@@ -264,7 +264,7 @@ class DecisionBlock():
                     'formation': 阵型返回 0~6 的整数,0 为撤退, 6 为迂回, 其它依次为单纵,复纵...
                     'night': 是否进行夜战返回 0/1
                     'fight_condition': 选择战况,返回 1~5, 左上为 1, 中间为 2, 右上为 3, 左下为 4
-                    'continue:' 回港或继续, 回港为 0, 继续为 1
+                    'proceed:' 回港或继续, 回港为 0, 继续为 1
         Returns:
             int: 描述决策
         """
@@ -285,7 +285,7 @@ class DecisionBlock():
         if(type == 'fight_condition'):
             pass
         
-        if(type == 'continue'):
+        if(type == 'proceed'):
             pass
             
         return self.old_version(timer, type, timer.chapter, timer.node, mod, timer.ship_status , timer.enemy_type_count)

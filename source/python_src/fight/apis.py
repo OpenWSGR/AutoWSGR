@@ -18,10 +18,11 @@ def work(timer:Timer, fun, times=1, end=False):
                 time.sleep(1)
             if(end and timer.is_fight_end() == False):
                 print("The Fight isn't end, retrying")
-                continue  
+                continue
             
         except (BaseException, Exception) as e:
             print(e)
+            # TODO: 有bug，模拟器闪退
             if(time.time() - timer.last_error_time < 2000 or is_android_online(timer, 5) == False):
                 RestartAndroid(timer)
                 ConnectAndroid(timer)
@@ -61,8 +62,9 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
     if(decision_maker is None):
         decision_maker = timer.defaul_decision_maker
     timer.oil = timer.ammo = 10
-    goto_game_page(timer, 'map_page')
-    expedition(timer)
+    # TODO: 并无耦合的意义，先注释掉
+    # goto_game_page(timer, 'map_page')
+    # expedition(timer)
     goto_game_page(timer, 'map_page')
     change_fight_map(timer, chapter, node)
     goto_game_page(timer, 'fight_prepare_page')
@@ -140,7 +142,7 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
 
     Returns:
        'map_end':地图已经结束
-       'continue':需要继续决策
+       'proceed':需要继续决策
        'fight_end':单点战斗已经结束
     Rasie:
         TimeoutError:未知原因导致了战斗无法结算
@@ -156,7 +158,7 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
     if type in ['exercise', 'battle']:
         kwargs['no_ship_get'] = True
         kwargs['no_flagship_check'] = True
-        kwargs['no_continue'] = True
+        kwargs['no_proceed'] = True
 
     time.sleep(gap)
     if(begin):
@@ -183,8 +185,8 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
         return 'map_end'
     if('no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0)):
         click(timer, 900, 500, 1, .25)
-    if('no_continue' not in kwargs and ImagesExist(timer, FightImage[5], need_screen_shot=0)):
-        return 'continue'
+    if('no_proceed' not in kwargs and ImagesExist(timer, FightImage[5], need_screen_shot=0)):
+        return 'proceed'
     if('oil_check' in kwargs):
         # 检查燃油
         pass
@@ -280,7 +282,7 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
                 'fight':是否进行战斗
                 'figth_condition':选择战况
                 'formation':选择战斗阵型
-                'continue': 是否继续前景或回港
+                'proceed': 是否继续前进或回港
         value (int, optional): 决策参数. Defaults to 1.
             values:
                 0:撤退 if type=='fight'
@@ -356,8 +358,9 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
                     raise BaseException()
             print("decision done:", type, value)
 
-        if(type == 'continue'):
+        if(type == 'proceed'):
             if(not bool(value)):
+                # TODO：回港需要结束战斗
                 click(timer, 615, 350)
             else:
                 click(timer, 325, 350)
@@ -405,10 +408,11 @@ def map_fight(timer: Timer, decision_maker: DecisionBlock = None, type='normal',
         if(res == 'SL'):
             return 'SL'
 
-        decision = 'continue'
+        decision = 'proceed'
         value = decision_maker.make_decision(timer, decision, *args, **kwargs)
         choose_decision(timer, decision, value)
         if(value == 0):
+            end_page = 'map_page'   # TODO：暂时解决了bug，需要修改
             break
 
     timer.set_page(end_page)

@@ -1,7 +1,8 @@
 
 import pytesseract
 
-from utils import *
+from utils.io import yaml_to_dict
+from utils.image_position import relative_to_absolute
 from supports import *
 from save_load import *
 
