@@ -3,40 +3,43 @@ from supports.models import *
 from supports.math_functions import *
 from functools import wraps
 
-__all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr', \
-    "CriticalErr", "try_for_times", 'stopper', 'LogitException', 'get_last_point']
+__all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr',
+           "CriticalErr", "try_for_times", 'stopper', 'LogitException', 'get_last_point']
+
 
 def get_last_point(c, n):
-    if(c == 2 and n == 5):
-        return ("J", "O", "L", "M", "N")
-    if(c == 1 and n == 1):
-        return 'B'
-    if(c == 1 and n == 2):
-        return 'C'
-    if(c == 1 and n == 4):
-        return 'E'
-    if(c == 2 and n == 2):
-        return 'G'
-    if(c == 2 and n == 3):
-        return 'K'
-    if(c == 2 and n == 6):
-        return 'L'
-    if(c == 4 and n == 1):
+    if c == 2 and n == 5:
+        return "J", "O", "L", "M", "N"
+    if c == 1:
+        if n == 1:
+            return 'B'
+        if n == 2:
+            return 'C'
+        if n == 4:
+            return 'E'
+    elif c == 2:
+        if n == 2:
+            return 'G'
+        if n == 3:
+            return 'K'
+        if n == 6:
+            return 'L'
+    if c == 4 and n == 1:
         return 'I'
-    if(c == 6 and n == 1):
-        return 'K'
-    if(c == 6 and n == 4):
-        return 'K'
-    
+    if c == 6:
+        if n == 1:
+            return 'K'
+        if n == 4:
+            return 'K'
     result = 'A'
     for key in POINT_POSITION.keys():
         chapter, node, point = key
-        if(chapter != c or node != n):
+        if chapter != c or node != n:
             continue
-        if(point > result):
+        if point > result:
             result = point
-    
     return result
+
 
 def get_time_as_string(accuracy='year'):
     """返回一个字符串时间戳,可以用于文件保存
@@ -55,6 +58,7 @@ def get_time_as_string(accuracy='year'):
         return res[4:]
     if(accuracy == 'second'):
         return res[8:]
+
 
 class Timer():
     """程序运行记录器,用于记录和传递部分数据,同时用于区分多开
@@ -196,14 +200,13 @@ class Timer():
             return True
         if(c == 'battle'):
             if(self.fight_result >= 'B'):
-                return True    
+                return True
         if(self.fight_result >= 'S' and (self.ship_point == last_point or self.ship_point in last_point)):
             return True
         return False
 
     def __str__(self):
         return "this is a timer"
-
 
 
 class ImageNotFoundErr(BaseException):
@@ -215,41 +218,43 @@ class NetworkErr(BaseException):
     def __init__(self, *args: object):
         super().__init__(*args)
 
+
 class CriticalErr(BaseException):
     """严重错误
     通常发生严重错误表明实现有重大问题
     Args:
         BaseException (_type_): _description_
     """
+
     def __init__(self, *args: object):
         super().__init__(*args)
+
 
 class LogitException(BaseException):
     def __init__(self, *args: object):
         super().__init__()(*args)
 
+
 def try_for_times(fun):
     @wraps(fun)
     def imtemplate(*arg, **kwargs):
         if(Globals.script_end == 1):
-            return 
+            return
         for i in range(2):
             try:
                 return fun(*arg, **kwargs)
             except:
                 pass
         return fun(*arg, **kwargs)
-    
+
     return imtemplate
-        
+
+
 def stopper(fun):
     @wraps(fun)
     def imtemplate(*arg, **kwargs):
         if(Globals.script_end == 1):
             return 'end'
         return fun(*arg, **kwargs)
-    
+
     return imtemplate
-
-
-    

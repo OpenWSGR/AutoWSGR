@@ -62,9 +62,6 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
     if(decision_maker is None):
         decision_maker = timer.defaul_decision_maker
     timer.oil = timer.ammo = 10
-    # TODO: 并无耦合的意义，先注释掉
-    # goto_game_page(timer, 'map_page')
-    # expedition(timer)
     goto_game_page(timer, 'map_page')
     change_fight_map(timer, chapter, node)
     goto_game_page(timer, 'fight_prepare_page')

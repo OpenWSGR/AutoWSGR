@@ -1,0 +1,17 @@
+# MapLevel
+chapter: 8 # 章节
+map: 2 # 地图
+fleet_id: 1 # 舰队编号
+fleet_ships: [] # TODO: 舰队船只，未实现
+repair_mode: 0 # TODO：修理方案，未实现
+selected_nodes: ["B"] # 选择要打的节点，白名单模式
+fight_condition: 4 # 战况选择
+
+# NodeLevel
+node_plans:
+  B:
+    SL: False # 是否SL
+    formation: 3 # 阵型选择，1-5
+    night: False # 是否夜战
+    proceed: False # 结束后是否继续
+    supply_ship_mode: 0 # TODO: 如何处理补给舰，未实现

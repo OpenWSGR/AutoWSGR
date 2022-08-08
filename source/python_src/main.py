@@ -1,5 +1,7 @@
 import sys, os
 
+from fight_dh.normal_fight import NormalFight
+
 sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(__file__))
 print(sys.path)
@@ -105,34 +107,38 @@ def main_function():
 
 if __name__=="__main__":
    
-    #  print(str(os.po("adb devices -l")).split('\n'))
+    # print(str(os.po("adb devices -l")).split('\n'))
     # kd.hook(listener)
     # main_function()
     
     ## TODO: dh的调试，记得删掉
     timer = start_script(account=None, password=None)
 
-    DB = DecisionBlock(formation=5, night=1)
-    work(timer, lambda:battle(timer, 8, 1, DB), 6)
+    # DB = DecisionBlock(formation=4, night=1)
+    # work(timer, lambda:battle(timer, 10, 1, DB), 8)
 
     # # 8-2B 单点刷
     # total_time = 0
-    # each_time = 10
+    # each_time = 20
     # start_time = time.time()
     # while total_time < 2000:
-    #     goto_game_page(timer, 'expedition_page')
+    #     # TODO: bug 在前往远征界面之后 远征，会检测不到
     #     expedition(timer)
-    #     time.sleep(60)
+    #     goto_game_page(timer, 'main_page')
+    #     print(f"time_passed: {time.time() - start_time}  Finish expedition") 
         
-    #     DB = DecisionBlock(formation=4, night=0, fight_condition=4, proceed=0)
-    #     work(timer, lambda:normal_fight(timer, 8, 2, 1, decision_maker=DB), each_time)
-    #     total_time += each_time
-    #     print(f"time_passed: {time.time() - start_time}  total_time: {total_time}") 
+        # DB = DecisionBlock(formation=4, night=0, fight_condition=4, proceed=0)
+        # work(timer, lambda:normal_fight(timer, 8, 2, 1, decision_maker=DB), each_time)
+        # total_time += each_time
+        # print(f"time_passed: {time.time() - start_time}  total_time: {total_time}") 
         
-        
-
         # DestoryShip(timer, reserve=0, amount=0)
         
+        # time.sleep(60 * 5)
         
+    
+    defaults = NormalFight(timer, "source/python_src/fight_dh/default_plan.yaml")
+    nf = NormalFight(timer, "source/python_src/fight_dh/tmp_plan.yaml", defaults)
+    nf.run()
         
         
