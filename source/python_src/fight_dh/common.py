@@ -20,9 +20,5 @@ class NodeLevelDecisionBlock():
     """ 地图上一个节点的决策模块 """
 
     def __init__(self, args) -> None:
-        self.args = args
 
-        self.SL = args["SL"]
-        self.formation = args["formation"]
-        self.night = args["night"]
-        self.proceed = args["proceed"]
+        self.__dict__.update(args)
