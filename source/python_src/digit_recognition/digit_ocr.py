@@ -70,11 +70,15 @@ def get_resources(timer):
         except NameError:
             print("读取资源失败！")
             quit()
+    
+    return ret
+
 
 def get_loot_and_ship(timer):
     """ 获取掉落数据     
     """
     goto_game_page(timer, 'map_page')
+    UpdateScreen(timer)
     image = timer.screen
 
     ret = {}
@@ -84,9 +88,12 @@ def get_loot_and_ship(timer):
         try:
             ret[key] = eval(raw_str.split('/')[0])  # 当前值
             ret[key+'_max'] = eval(raw_str.split('/')[1])  # 最大值
-        except NameError:
+        except:
             print("读今日战利品、捞船失败！")
+            print(raw_str)
             quit()
+    
+    return ret
 
 
 

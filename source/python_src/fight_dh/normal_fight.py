@@ -3,7 +3,8 @@ import time
 
 import yaml
 from api import ClickImage, GetImagePosition, ImagesExist, UpdateScreen, click
-from constants import FIGHT_CONDITIONS_POSITON, FightImage, identify_images
+from constants import (FIGHT_CONDITIONS_POSITON, SAP, FightImage,
+                       identify_images)
 from fight import SL
 from game import (ConfirmOperation, DetectShipStatu, GetEnemyCondition,
                   MoveTeam, QuickRepair, UpdateShipPoint, UpdateShipPosition,
@@ -117,7 +118,7 @@ class NormalFightInfo():
                 UpdateShipPosition(self.timer)
                 UpdateShipPoint(self.timer)
                 self.node = self.timer.ship_point
-            # 点确定
+            # TODO：搞清楚为什么要点确定
             if may_need_confirm:
                 ConfirmOperation(self.timer, delay=0)
 
@@ -251,10 +252,14 @@ class NormalFight():
                     click(self.timer, 540, 500, delay=0)
                     self.FI.last_action = "detour"
                     return "fight continue"
-                else:
-                    click(self.timer, 855, 501, delay=0)
-                    self.FI.last_action = "fight"
-                    return "fight continue"
+                # 功能：遇到补给舰则战斗，否则撤退
+                elif node.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0:
+                    click(self.timer, 677, 492, delay=0)
+                    self.FI.last_action = "retreat"
+                    return "fight end"
+                click(self.timer, 855, 501, delay=0)
+                self.FI.last_action = "fight"
+                return "fight continue"
 
             case "formation":
                 spot_enemy = self.FI.last_state == "spot_enemy_success"

@@ -23,4 +23,4 @@ node_defaults:
   proceed: False # 结束后是否继续
 
   # 特殊情况
-  supply_ship_mode: 0 # TODO: 如何处理补给舰，未实现
+  supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退

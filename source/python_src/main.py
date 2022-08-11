@@ -112,34 +112,32 @@ def main_function():
 
 if __name__ == "__main__":
 
-    # print(str(os.po("adb devices -l")).split('\n'))
-    # kd.hook(listener)
-    # main_function()
-
-    # TODO: dh的调试，记得删掉
     timer = start_script(account=None, password=None)
+    
 
     # DB = DecisionBlock(formation=4, night=1)
     # work(timer, lambda:battle(timer, 10, 1, DB), 8)
 
     # 8-2B 单点刷
-    # total_time = 0
-    # each_time = 20
-    # start_time = time.time()
-    # while total_time < 2000:
-    #     # TODO: bug 在前往远征界面之后 远征，会检测不到
-    #     expedition(timer)
-    #     goto_game_page(timer, 'main_page')
-    #     print(f"time_passed: {time.time() - start_time}  Finish expedition")
+    plan = NormalFight(timer, "plans/normal_fight/8-2BJ.yaml", "plans/normal_fight/default.yaml")
+    total_time = 0
+    each_time = 10
+    start_time = time.time()
+    while True:
+        # TODO: bug 在前往远征界面之后 远征，会检测不到
+        expedition(timer)
+        print(f"time_passed: {time.time() - start_time}  Finish expedition")
+        GainBounds(timer)
 
-    #     # DB = DecisionBlock(formation=4, night=0, fight_condition=4, proceed=0)
-    #     # work(timer, lambda:normal_fight(timer, 8, 2, 1, decision_maker=DB), each_time)
-    #     # total_time += each_time
-    #     # print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
+        # ret = get_loot_and_ship(timer)
+        # print(ret)
+        # if ret['loot'] < ret['loot_max']:
+        for _ in range(each_time):
+            plan.run()
+        total_time += each_time
+        print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
 
-    #     # DestoryShip(timer, reserve=0, amount=0)
+        if total_time % 40 == 0:
+            DestoryShip(timer, reserve=0, amount=0)
 
-    #     time.sleep(60 * 5)
-
-    nf = NormalFight(timer, "source/python_src/fight_dh/tmp_plan.yaml", "source/python_src/fight_dh/default_plan.yaml")
-    nf.run()
+        # time.sleep(60 * 5)
