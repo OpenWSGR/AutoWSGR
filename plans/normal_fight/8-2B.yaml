@@ -10,7 +10,7 @@ selected_nodes: ["B"] # 选择要打的节点，白名单模式，一旦到达�
 fight_condition: 4 # 战况选择
 
 # NodeLevel
-node_plans:
+node_args:
   B:
     formation: 4 # 阵型选择，1-5
     night: False # 是否夜战

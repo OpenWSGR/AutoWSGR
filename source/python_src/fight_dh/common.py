@@ -1,3 +1,12 @@
+import copy
+import time
+from abc import ABC, abstractmethod
+
+from api import GetImagePosition, click
+from constants import SAP
+from fight import SL
+from supports import ImageNotFoundErr, Timer
+
 
 # TODO: 完成
 class Ship():
@@ -19,6 +28,168 @@ class Ship():
 class NodeLevelDecisionBlock():
     """ 地图上一个节点的决策模块 """
 
-    def __init__(self, args) -> None:
+    def __init__(self, timer: Timer, args) -> None:
 
+        self.timer = timer
         self.__dict__.update(args)
+
+    def make_decision(self, state, last_state, last_action):
+
+        match state:
+            case "fight_period":
+                return None, "fight continue"
+
+            case "spot_enemy_success":
+                if self.detour:  # 由Node指定是否要迂回
+                    click(self.timer, 540, 500, delay=0)
+                    return "detour", "fight continue"
+                # 功能：遇到补给舰则战斗，否则撤退
+                elif self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0:
+                    click(self.timer, 677, 492, delay=0)
+                    return "retreat", "fight end"
+                click(self.timer, 855, 501, delay=0)
+                return "fight", "fight continue"
+
+            case "formation":
+                spot_enemy = last_state == "spot_enemy_success"
+                value = self.formation
+                if spot_enemy:
+                    # 功能：迂回失败SL
+                    if self.SL_when_detour_fails and last_action == "detour":
+                        return None, "need SL"
+                else:
+                    # 功能：索敌失败SL
+                    if self.SL_when_spot_enemy_fails:
+                        return None, "need SL"
+                    # 功能：索敌失败采用不同阵型
+                    if self.formation_when_spot_enemy_fails[0]:
+                        value = self.formation_when_spot_enemy_fails[1]
+
+                click(self.timer, 573, value * 100 - 20, delay=2)
+                return value, "fight continue"
+
+            case "night":
+                is_night = self.night
+                if is_night:
+                    click(self.timer, 325, 350, delay=2)
+                    return "yes", "fight continue"
+                else:
+                    click(self.timer, 615, 350, delay=2)
+                    return "no", "fight continue"
+
+            case "result":
+                time.sleep(1.5)
+                click(self.timer, 900, 500, 2, 0.16)    # TODO：需要获取经验则只点一下就行
+                return None, "fight continue"
+
+            case "get_ship":
+                click(self.timer, 900, 500, 1, 0.25)
+                return None, "fight continue"
+
+            case "lock_ship":
+                pass    # TODO: 锁定舰船
+
+            case _:
+                print("===========Unknown State==============")
+                raise BaseException()
+
+
+class FightInfo(ABC):
+    def __init__(self, timer: Timer) -> None:
+        self.timer = timer
+        self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
+        self.state2image = {}  # 所需用到的图片模板。格式为 [模板，等待时间]
+        self.last_state = ""
+        self.last_action = ""
+        self.state = ""
+
+    def update_state(self):
+
+        self.last_state = self.state
+
+        # 计算当前可能的状态
+        possible_states = copy.deepcopy(self.successor_states[self.state])
+        if isinstance(possible_states, dict):
+            possible_states = possible_states[self.last_action]
+        modified_timeout = [-1 for _ in possible_states]    # 某些状态需要修改等待时间
+        for i, state in enumerate(possible_states):
+            if isinstance(state, list):
+                state, timeout = state
+                possible_states[i] = state
+                modified_timeout[i] = timeout
+        print("waiting:", possible_states, end="  ")
+        images = [self.state2image[state][0] for state in possible_states]
+        timeout = [self.state2image[state][1] for state in possible_states]
+        timeout = [timeout[i] if modified_timeout[i] == -1 else modified_timeout[i] for i in range(len(timeout))]
+        timeout = max(timeout)
+
+        # 等待其中一种出现
+        fun_start_time = time.time()
+        while time.time() - fun_start_time <= timeout:
+            self._before_match()
+
+            # 尝试匹配
+            ret = [GetImagePosition(self.timer, image, 0, .8, no_log=True) is not None for image in images]
+            if any(ret):
+                self.state = possible_states[ret.index(True)]
+                print("matched:", self.state)
+                self._after_match()
+
+                return self.state
+
+        # 匹配不到时报错
+        print("\n===================================================")
+        print(f"state: {self.state} last_action: {self.last_action}")
+        raise ImageNotFoundErr()
+
+    @abstractmethod
+    def reset(self):
+        """ 需要记录与初始化的战斗信息 """
+        pass
+
+    @abstractmethod
+    def _before_match(self):
+        """ 每一轮尝试匹配状态前执行的操作 """
+        pass
+
+    @abstractmethod
+    def _after_match(self):
+        """ 匹配到状态后执行的操作 """
+        pass
+
+
+class FightPlan(ABC):
+    def __init__(self, timer) -> None:
+        # 把timer引用作为内置对象，减少函数调用的时候所需传入的参数
+        self.timer = timer
+
+    def run(self):
+        """ 主函数，负责一次完整的战斗. """
+
+        # 战斗前逻辑
+        while ret := self._enter_fight() != "success":
+            if ret == "dock is full":
+                return  # TODO：加入分解逻辑
+
+        # 战斗中逻辑
+        self.Info.reset()  # 初始化战斗信息
+        while True:  # TODO：可能需要加入异常处理
+            self.Info.update_state()
+            ret = self._make_decision()
+
+            if ret == "fight continue":
+                continue
+            elif ret == "need SL":
+                SL(self.timer)  # TODO：SL之后该干嘛
+                self.run()
+            elif ret == "fight end":
+                self.timer.set_page("map_page")
+                break
+
+    @abstractmethod
+    def _enter_fight(self) -> str:
+        pass
+
+    @abstractmethod
+    def _make_decision(self) -> str:
+        pass

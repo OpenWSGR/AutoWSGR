@@ -9,6 +9,6 @@ PATH2 = 0
 DEVICE = 0
 UI = {}
 FightTimeLimit = 120
-DEBUG = 1
+DEBUG = 0
 LONGUSED = 0
 WORK_PATH = "./"

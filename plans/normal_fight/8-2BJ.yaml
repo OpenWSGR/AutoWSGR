@@ -11,7 +11,7 @@ selected_nodes: ["B", "J"]
 fight_condition: 4 # 瞄准
 
 # NodeLevel
-node_plans:
+node_args:
   B:
     formation: 4
     night: False

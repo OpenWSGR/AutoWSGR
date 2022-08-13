@@ -5,7 +5,7 @@ import sys
 import keyboard as kd
 
 from digit_recognition import *
-from fight_dh import NormalFight
+from fight_dh import BattlePlan, NormalFightPlan
 from pre_set import *
 from save_load import *
 
@@ -113,31 +113,34 @@ def main_function():
 if __name__ == "__main__":
 
     timer = start_script(account=None, password=None)
-    
-
-    # DB = DecisionBlock(formation=4, night=1)
-    # work(timer, lambda:battle(timer, 10, 1, DB), 8)
-
-    # 8-2B 单点刷
-    plan = NormalFight(timer, "plans/normal_fight/8-2BJ.yaml", "plans/normal_fight/default.yaml")
-    total_time = 0
-    each_time = 10
     start_time = time.time()
+
+    # # 战役
+    # plan2 = BattlePlan(timer, "plans/battle/hard_AircraftCarrier.yaml", "plans/default.yaml")
+    # for _ in range(8):
+    #     plan2.run()
+
+    # # 8-2B 单点刷
+    # plan = NormalFightPlan(timer, "plans/normal_fight/8-2BJ.yaml", "plans/default.yaml")
+    # total_time = 0
+    # each_time = 10
+    # while total_time < 250:
+    #     expedition(timer)
+    #     print(f"time_passed: {time.time() - start_time}  Finish expedition")
+    #     GainBounds(timer)
+
+    #     for _ in range(each_time):
+    #         plan.run()
+    #     total_time += each_time
+    #     print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
+
+    #     if total_time % 30 == 0:
+    #         DestoryShip(timer, reserve=0, amount=0)
+
     while True:
         # TODO: bug 在前往远征界面之后 远征，会检测不到
         expedition(timer)
         print(f"time_passed: {time.time() - start_time}  Finish expedition")
         GainBounds(timer)
 
-        # ret = get_loot_and_ship(timer)
-        # print(ret)
-        # if ret['loot'] < ret['loot_max']:
-        for _ in range(each_time):
-            plan.run()
-        total_time += each_time
-        print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
-
-        if total_time % 40 == 0:
-            DestoryShip(timer, reserve=0, amount=0)
-
-        # time.sleep(60 * 5)
+        time.sleep(60 * 5)
