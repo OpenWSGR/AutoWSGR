@@ -136,7 +136,7 @@ def GetChapter(timer: Timer):
     for try_times in range(5):
         time.sleep(0.15 * 2 ** try_times)
         UpdateScreen(timer)
-        for i in range(1, 9):
+        for i in range(1, len(ChapterImage)):
             if(ImagesExist(timer, ChapterImage[i], 0)):
                 return i
     raise TimeoutError("can't vertify chapter")

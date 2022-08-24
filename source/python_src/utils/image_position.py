@@ -1,13 +1,13 @@
-def relative_to_absolute(record_pos, resolution):
+def relative_to_absolute(record_pos, resolution=(960, 540)):
     """ 将相对坐标转换为绝对坐标 """
     delta_x, delta_y = record_pos
     _w, _h = resolution
-    target_x = delta_x * _w + _w * 0.5
-    target_y = delta_y * _w + _h * 0.5
+    target_x = _w * (0.5 + delta_x)
+    target_y = _h * (0.5 + delta_y)
     return target_x, target_y
 
 
-def absolute_to_relative(absolute_pos, resolution):
+def absolute_to_relative(absolute_pos, resolution=(960, 540)):
     """ 将绝对坐标转换为相对坐标 """
     _w, _h = resolution
     delta_x = (absolute_pos[0] - _w * 0.5) / _w

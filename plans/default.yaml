@@ -3,24 +3,26 @@ normal_fight_defaults:
   map: 1 # 地图
   fleet_id: 1 # 舰队编号
   fleet_ships: [] # TODO: 舰队船只，未实现
-  repair_mode: 0 # TODO：修理方案，未实现
+  repair_mode: 2 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案
   selected_nodes: [] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
   fight_condition: 1 # 战况选择
 
 battle_defaults:
   map: 1 # 简单1-5 困难6-10
   fleet_ships: [] # TODO: 舰队船只，未实现
-  repair_mode: 0 # TODO：修理方案，未实现
+  repair_mode: 1 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案
 
 node_defaults:
-  # 索敌阶段
-  SL_when_spot_enemy_fails: False # 索敌失败时是否SL
-  # 战斗选择阶段
+  # 索敌成功阶段
   detour: False # 是否迂回
-  SL_when_detour_fails: False # 是否迂回失败后退出
+  enemy_rules: [] # 每条按照 ["(类型 符号 数量) and/or ()", "操作"] 的字符串形式给出，从上到下执行第一条符合的命令。
+                  # 类型：舰船类型；符号：[>=、<=、>、<、=、!=]；数量：数字；操作：[retreat、detour、阵型数字(1-5)]
+                  # 如果在这里做了阵型选择决定，则优先级将高过下面的阵型选择。例子：["(SS >= 2)", "5"]
   # 阵型选择阶段
+  SL_when_spot_enemy_fails: False # 索敌失败时是否SL
+  SL_when_detour_fails: False # 是否迂回失败后退出
   formation: 3 # 正常情况阵型选择，1-5
-  formation_when_spot_enemy_fails: [False, 3] # True启用，索敌失败时阵型选择，1-5
+  formation_when_spot_enemy_fails: False # 启用时改为数字，索敌失败时阵型选择，1-5
   # 夜战选择阶段
   night: False # 是否夜战
   # 前进选择阶段
@@ -28,3 +30,4 @@ node_defaults:
 
   # 特殊情况
   supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退
+  

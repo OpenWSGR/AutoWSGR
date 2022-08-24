@@ -1,9 +1,10 @@
 import copy
+from re import L
 import time
 from abc import ABC, abstractmethod
 
 from api import GetImagePosition, click
-from constants import SAP
+from constants import *
 from fight import SL
 from supports import ImageNotFoundErr, Timer
 
@@ -23,75 +24,6 @@ class Ship():
         self.level = 0  # 舰船等级
         self.exp = 0  # 舰船经验值
         self.friendliness = 0  # 舰船好感度
-
-
-class NodeLevelDecisionBlock():
-    """ 地图上一个节点的决策模块 """
-
-    def __init__(self, timer: Timer, args) -> None:
-
-        self.timer = timer
-        self.__dict__.update(args)
-
-    def make_decision(self, state, last_state, last_action):
-
-        match state:
-            case "fight_period":
-                return None, "fight continue"
-
-            case "spot_enemy_success":
-                if self.detour:  # 由Node指定是否要迂回
-                    click(self.timer, 540, 500, delay=0)
-                    return "detour", "fight continue"
-                # 功能：遇到补给舰则战斗，否则撤退
-                elif self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0:
-                    click(self.timer, 677, 492, delay=0)
-                    return "retreat", "fight end"
-                click(self.timer, 855, 501, delay=0)
-                return "fight", "fight continue"
-
-            case "formation":
-                spot_enemy = last_state == "spot_enemy_success"
-                value = self.formation
-                if spot_enemy:
-                    # 功能：迂回失败SL
-                    if self.SL_when_detour_fails and last_action == "detour":
-                        return None, "need SL"
-                else:
-                    # 功能：索敌失败SL
-                    if self.SL_when_spot_enemy_fails:
-                        return None, "need SL"
-                    # 功能：索敌失败采用不同阵型
-                    if self.formation_when_spot_enemy_fails[0]:
-                        value = self.formation_when_spot_enemy_fails[1]
-
-                click(self.timer, 573, value * 100 - 20, delay=2)
-                return value, "fight continue"
-
-            case "night":
-                is_night = self.night
-                if is_night:
-                    click(self.timer, 325, 350, delay=2)
-                    return "yes", "fight continue"
-                else:
-                    click(self.timer, 615, 350, delay=2)
-                    return "no", "fight continue"
-
-            case "result":
-                time.sleep(1.5)
-                click(self.timer, 900, 500, 2, 0.16)    # TODO：需要获取经验则只点一下就行
-                return None, "fight continue"
-
-            case "get_ship":
-                click(self.timer, 900, 500, 1, 0.25)
-                return None, "fight continue"
-
-            case "lock_ship":
-                pass    # TODO: 锁定舰船
-
-            case _:
-                print("===========Unknown State==============")
-                raise BaseException()
 
 
 class FightInfo(ABC):
@@ -167,24 +99,24 @@ class FightPlan(ABC):
         """ 主函数，负责一次完整的战斗. """
 
         # 战斗前逻辑
-        while ret := self._enter_fight() != "success":
+        while (ret := self._enter_fight()) != "success":
+            print(ret)
             if ret == "dock is full":
-                return  # TODO：加入分解逻辑
+                return ret  # TODO：加入分解逻辑
+            elif ret == "out of times":
+                return ret
 
         # 战斗中逻辑
         self.Info.reset()  # 初始化战斗信息
-        while True:  # TODO：可能需要加入异常处理
-            self.Info.update_state()
-            ret = self._make_decision()
+        while (ret := self._make_decision()) == "fight continue":
+            pass
+        if ret == "need SL":
+            SL(self.timer)
+            return self.run()
+        elif ret == "fight end":
+            self.timer.set_page("map_page")
 
-            if ret == "fight continue":
-                continue
-            elif ret == "need SL":
-                SL(self.timer)  # TODO：SL之后该干嘛
-                self.run()
-            elif ret == "fight end":
-                self.timer.set_page("map_page")
-                break
+        return "success"
 
     @abstractmethod
     def _enter_fight(self) -> str:
@@ -193,3 +125,97 @@ class FightPlan(ABC):
     @abstractmethod
     def _make_decision(self) -> str:
         pass
+
+
+class NodeLevelDecisionBlock():
+    """ 地图上一个节点的决策模块 """
+
+    def __init__(self, timer: Timer, args) -> None:
+
+        self.timer = timer
+        self.__dict__.update(args)
+
+        # 用于根据规则设置阵型
+        self.set_formation_by_rule = False
+        self.formation_by_rule = 0
+
+    def make_decision(self, state, last_state, last_action):
+
+        match state:
+            case "fight_period" | "night_fight_period":
+                return None, "fight continue"
+
+            case "spot_enemy_success":
+                retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
+                detour = self.detour  # 由Node指定是否要迂回
+
+                # 功能，根据敌方阵容进行选择
+                for rule in self.enemy_rules:
+                    condition, act = rule
+                    for ship_type in ALL_SHIP_TYPES:
+                        condition = condition.replace(ship_type, f"self.timer.enemy_type_count[{ship_type}]")
+                    if eval(condition):
+                        if act == "retreat":
+                            retreat = True
+                        elif act == "detour":
+                            detour = True
+                        elif isinstance(act, int):
+                            self.set_formation_by_rule = True
+                            self.formation_by_rule = act
+
+                if retreat:
+                    click(self.timer, 677, 492, delay=0)
+                    return "retreat", "fight end"
+                elif detour:
+                    click(self.timer, 540, 500, delay=0)
+                    return "detour", "fight continue"
+
+                click(self.timer, 855, 501, delay=0)
+                return "fight", "fight continue"
+
+            case "formation":
+                spot_enemy = last_state == "spot_enemy_success"
+                value = self.formation
+                if spot_enemy:
+                    # 功能：迂回失败SL
+                    if self.SL_when_detour_fails and last_action == "detour":
+                        return None, "need SL"
+                    # 功能：根据规则设置阵型
+                    if self.set_formation_by_rule:
+                        value = self.formation_by_rule
+                        self.set_formation_by_rule = False
+                else:
+                    # 功能：索敌失败SL
+                    if self.SL_when_spot_enemy_fails:
+                        return None, "need SL"
+                    # 功能：索敌失败采用不同阵型
+                    if self.formation_when_spot_enemy_fails != False:
+                        value = self.formation_when_spot_enemy_fails
+
+                click(self.timer, 573, value * 100 - 20, delay=2)
+                return value, "fight continue"
+
+            case "night":
+                is_night = self.night
+                if is_night:
+                    click(self.timer, 325, 350, delay=2)
+                    return "yes", "fight continue"
+                else:
+                    click(self.timer, 615, 350, delay=2)
+                    return "no", "fight continue"
+
+            case "result":
+                time.sleep(1.5)
+                click(self.timer, 900, 500, 2, 0.16)    # TODO：需要获取经验则只点一下就行
+                return None, "fight continue"
+
+            case "get_ship":
+                click(self.timer, 900, 500, 1, 0.25)
+                return None, "fight continue"
+
+            case "lock_ship":
+                pass    # TODO: 锁定舰船
+
+            case _:
+                print("===========Unknown State==============")
+                raise BaseException()

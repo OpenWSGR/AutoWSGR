@@ -1,4 +1,5 @@
 
+from utils import relative_to_absolute
 from supports import *
 from api import *
 
@@ -37,7 +38,7 @@ def load_other_images():
     StartImage.append(MyTemplate(PrePath + "StartImage\\4.PNG", resolution=(960, 540)))  # 账号登录
     StartImage.append(MyTemplate(PrePath + "StartImage\\5.PNG", resolution=(960, 540)))  # 用户名或密码错误
     StartImage.append(MyTemplate(PrePath + "StartImage\\5.PNG", resolution=(960, 540)))  # 开始游戏图标
-    
+
     ConfirmImage.append(MyTemplate(PrePath + "ConfirmImage\\1.PNG", resolution=(960, 540)))
     ConfirmImage.append(MyTemplate(PrePath + "ConfirmImage\\2.PNG", resolution=(960, 540)))
     ConfirmImage.append(MyTemplate(PrePath + "ConfirmImage\\3.PNG", resolution=(960, 540)))
@@ -70,7 +71,6 @@ def load_other_images():
     GameUI.append(MyTemplate(PrePath + "GameUI\\16.PNG", resolution=(960, 540)))  # 决战小地图右下角"编队  出征"
     GameUI.append(MyTemplate(PrePath + "GameUI\\17.PNG", resolution=(960, 540)))  # 决战小地图选择舰船"刷新  关闭"
 
-    
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\1.PNG", resolution=(960, 540)))
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\2.PNG", resolution=(960, 540)))
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\3.PNG", resolution=(960, 540)))
@@ -79,6 +79,7 @@ def load_other_images():
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\6.PNG", resolution=(960, 540)))
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\7.PNG", resolution=(960, 540)))
     ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\8.PNG", resolution=(960, 540)))
+    ChapterImage.append(MyTemplate(PrePath + "ChapterImage\\9.PNG", resolution=(960, 540)))
 
     NumberImage.append(MyTemplate(PrePath + "number\\1.PNG", resolution=(960, 540)))
     NumberImage.append(MyTemplate(PrePath + "number\\2.PNG", resolution=(960, 540)))
@@ -103,9 +104,9 @@ def load_other_images():
     TeamImage.append(MyTemplate(PrePath + "TeamImage\\3.PNG", resolution=(960, 540)))
     TeamImage.append(MyTemplate(PrePath + "TeamImage\\4.PNG", resolution=(960, 540)))
 
-    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\1.PNG", resolution=(960, 540)))  #有标记选择舰船界面
-    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\2.PNG", resolution=(960, 540)))  #无标记选择舰船界面
-    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\3.PNG", resolution=(960, 540)))  #文本框确认
+    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\1.PNG", resolution=(960, 540)))  # 有标记选择舰船界面
+    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\2.PNG", resolution=(960, 540)))  # 无标记选择舰船界面
+    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\3.PNG", resolution=(960, 540)))  # 文本框确认
 
     FightImage.append(MyTemplate(PrePath + "FightImage\\1.PNG", resolution=(960, 540)))  # 选择阵型
     FightImage.append(MyTemplate(PrePath + "FightImage\\2.PNG", resolution=(960, 540)))  # 开始战斗
@@ -122,6 +123,7 @@ def load_other_images():
     FightImage.append(MyTemplate(PrePath + "FightImage\\13.PNG", resolution=(960, 540)))  # 战术迂回
     FightImage.append(MyTemplate(PrePath + "FightImage\\14.PNG", resolution=(960, 540)))  # MVP
     FightImage.append(MyTemplate(PrePath + "FightImage\\15.PNG", resolution=(960, 540)))  # 简单模式
+    FightImage.append(MyTemplate(PrePath + "FightImage\\16.PNG", resolution=(960, 540)))  # 战役 点击继续
 
     RepairImage.append(MyTemplate(PrePath + "RepairImage\\1.PNG", resolution=(960, 540)))  # 修理中
 
@@ -129,13 +131,15 @@ def load_other_images():
 def load_fightresult_images():
     for result in FIGHT_RESULTS:
         fight_result_images[result] = make_tmplate('fight_result/' + result)
-    
+
+
 """def load_decisive_data():
     global all_images
     images = [image for image in all_images if("decisive_images" in image)]
     for image in images:
         decisive_objects_images"""
-    
+
+
 def load_images():
 
     load_error_images()
@@ -521,11 +525,24 @@ def load_point_positions():
     POINT_POSITION[(8, 4, 'L')] = (264-1, 386-35)
     POINT_POSITION[(8, 4, 'M')] = (127-1, 296-35)
 
+    POINT_POSITION[(9, 1, 'A')] = relative_to_absolute((-0.22, -0.18))
+    POINT_POSITION[(9, 1, 'B')] = relative_to_absolute((-0.272, -0.029))
+    POINT_POSITION[(9, 1, 'C')] = relative_to_absolute((-0.361, 0.07))
+    POINT_POSITION[(9, 1, 'D')] = relative_to_absolute((0.139, -0.158))
+    POINT_POSITION[(9, 1, 'E')] = relative_to_absolute((-0.005, -0.1))
+    POINT_POSITION[(9, 1, 'F')] = relative_to_absolute((-0.109, 0.052))
+    POINT_POSITION[(9, 1, 'G')] = relative_to_absolute((-0.189, 0.154))
+    POINT_POSITION[(9, 1, 'H')] = relative_to_absolute((-0.048, 0.242))
+    POINT_POSITION[(9, 1, 'I')] = relative_to_absolute((-0.001, 0.186))
+    POINT_POSITION[(9, 1, 'J')] = relative_to_absolute((0.062, 0.13))
+    POINT_POSITION[(9, 1, 'K')] = relative_to_absolute((0.131, -0.064))
+    POINT_POSITION[(9, 1, 'L')] = relative_to_absolute((0.296, -0.203))
+    POINT_POSITION[(9, 1, 'M')] = relative_to_absolute((0.265, -0.04))
+    POINT_POSITION[(9, 1, 'N')] = relative_to_absolute((0.406, 0.06))
+    POINT_POSITION[(9, 1, 'O')] = relative_to_absolute((0.264, 0.157))
+
 
 def load_all_data(timer: Timer):
     load_point_positions()
     load_images()
-    #load_decisive_data()
-
-
-    
+    # load_decisive_data()

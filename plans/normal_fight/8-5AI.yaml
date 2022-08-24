@@ -1,0 +1,22 @@
+# 功能：
+#   1）练6鱼  2）捞胖次，电表倒转
+#   3）捞稀有池[鲃鱼、霞飞、尼古拉斯、哥伦比亚、B65、塞班、托戈、吸血鬼、七省联盟、U47、墨尔波墨涅、龙骧、哈曼、留里克、埃德加·居内]
+# 带路条件：平均航速<=27，最低航速<=21
+# 推荐配置：6鱼
+# 来源：https://nga.178.com/read.php?tid=16860675
+
+# MapLevel
+chapter: 8
+map: 5
+fleet_id: 2
+selected_nodes: [A, I]
+
+# NodeLevel
+node_args:
+  A:
+    formation: 2
+    night: False
+    proceed: True
+  I:
+    formation: 4
+    night: True

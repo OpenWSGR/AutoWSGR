@@ -1,0 +1,19 @@
+# 功能：炸鱼练6船，顺便打捞[墨尔波墨涅、鲃鱼、海达人、卡约·杜伊里奥、库欣]
+# 带路条件：驱逐>=2，最高航速>=40
+# 推荐配置：满足带路条件的可炸鱼船均可
+# 来源：https://nga.178.com/read.php?tid=30166633
+
+# MapLevel
+chapter: 9
+map: 1
+fleet_id: 1
+selected_nodes: [B]
+
+# NodeLevel
+node_args:
+  B:
+    enemy_rules: [[DD >= 2, retreat]]
+    SL_when_spot_enemy_fails: True
+    formation: 5
+    night: True
+    proceed: False

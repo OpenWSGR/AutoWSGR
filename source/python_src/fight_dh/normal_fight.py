@@ -15,7 +15,7 @@ from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship
 
 """
 常规战决策模块
-TODO: 1.资源点 2.获得新船锁定确认 3.依据敌方选择阵型
+TODO: 1.资源点 2.依据敌方选择阵型
 """
 
 
@@ -27,10 +27,10 @@ class NormalFightInfo(FightInfo):
 
         self.successor_states = {
             "proceed": {
-                "yes": ["fight_condition", "spot_enemy_success", "formation"],
+                "yes": ["fight_condition", "spot_enemy_success", "formation", "fight_period"],
                 "no": ["map_page"]
             },
-            "fight_condition": ["spot_enemy_success", "formation"],
+            "fight_condition": ["spot_enemy_success", "formation", "fight_period"],
             "spot_enemy_success": {
                 "detour": ["fight_condition", "spot_enemy_success", "formation"],
                 "retreat": ["map_page"],
@@ -44,8 +44,7 @@ class NormalFightInfo(FightInfo):
             },
             "night_fight_period": ["result"],
             "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],    # 两页战果
-            "get_ship": ["lock_new_ship", "proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
-            "lock_new_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 锁定新船
+            "get_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
             "flagship_severe_damage": ["map_page"],
         }
 
@@ -59,7 +58,6 @@ class NormalFightInfo(FightInfo):
             "night_fight_period": [SymbolImage[4], 3],
             "result": [FightImage[3], 60],
             "get_ship": [SymbolImage[8], 5],
-            "lock_new_ship": [FightImage[1], 3],  # TODO: 这里只是占位符，需要实现”新船锁定“页面的图片模板
             "flagship_severe_damage": [FightImage[4], 5],
             "map_page": [identify_images["map_page"][0], 5]
         }
@@ -84,10 +82,10 @@ class NormalFightInfo(FightInfo):
         if self.state in ["proceed", "fight_condition"]:
             UpdateShipPosition(self.timer)
             UpdateShipPoint(self.timer)
-        
-        # TODO：什么情况要点确定？
-        # if self.state in ["proceed", "fight_condition", "result"]:
-        #     ConfirmOperation(self.timer, delay=0)
+
+        # TODO：试试资源点能不能行
+        if self.state in ["proceed", "fight_condition", "get_ship"]:
+            ConfirmOperation(self.timer, delay=0)
 
     def _after_match(self):
         # 在某些State下可以记录额外信息
@@ -136,13 +134,14 @@ class NormalFightPlan(FightPlan):
         change_fight_map(self.timer, self.chapter, self.map)
         goto_game_page(self.timer, 'fight_prepare_page')
         MoveTeam(self.timer, self.fleet_id)  # TODO: 支持按列表修改舰船
-        QuickRepair(self.timer)  # TODO：支持复杂修理逻辑，暂时用快修，修中破
-        click(self.timer, 900, 500, 1, delay=0)  # 点击：开始出征
+        QuickRepair(self.timer, self.repair_mode)
 
         # 异常处理
         start_time = time.time()
-        while identify_page(self.timer, 'fight_prepare_page'):
-            UpdateScreen(self.timer)  # 获取当前屏幕
+        UpdateScreen(self.timer)
+        while identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
+            click(self.timer, 900, 500, 1, delay=0)  # 点击：开始出征
+            UpdateScreen(self.timer)
             if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
                 return "dock is full"
             if False:  # TODO: 大破出征确认
@@ -160,6 +159,7 @@ class NormalFightPlan(FightPlan):
 
     def _make_decision(self) -> str:
 
+        self.Info.update_state()
         state = self.Info.state
 
         # 进行MapLevel的决策

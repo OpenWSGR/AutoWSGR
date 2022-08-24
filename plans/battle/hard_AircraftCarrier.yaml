@@ -1,7 +1,6 @@
 # MapLevel
 map: 9 # 简单1-5 困难6-10
-fleet_ships: [] # TODO: 舰队船只，未实现
-repair_mode: 0 # TODO：修理方案，未实现
+repair_mode: [1, 1, 2, 2, 2, 2]
 
 # NodeLevel
 node_args:

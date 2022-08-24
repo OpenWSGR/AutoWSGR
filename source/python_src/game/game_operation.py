@@ -88,28 +88,28 @@ def start_game(timer: Timer, account=None, password=None, delay=1.0):
         click(timer, 460, 380)  # 点击"退出登录"
         if(WaitImage(timer, StartImage[4]) == False):
             raise TimeoutError("can't logout successfully")
-        
-        click(timer, 540, 180)  #点击账号文本框
+
+        click(timer, 540, 180)  # 点击账号文本框
         for i in range(20):
-            p = th.Thread(target=lambda:ShellCmd(timer, 'input keyevent 67'))
+            p = th.Thread(target=lambda: ShellCmd(timer, 'input keyevent 67'))
             p.start()
         p.join()
         text(str(account))
-        
-        click(timer, 540, 260)  #点击密码文本框
+
+        click(timer, 540, 260)  # 点击密码文本框
         for i in range(20):
-            p = th.Thread(target=lambda:ShellCmd(timer, 'input keyevent 67'))
+            p = th.Thread(target=lambda: ShellCmd(timer, 'input keyevent 67'))
             p.start()
         p.join()
         time.sleep(0.5)
         text(str(password))
-        click(timer, 400, 330)  #点击"登录"
+        click(timer, 400, 330)  # 点击"登录"
         res = WaitImages(timer, [StartImage[5], StartImage[2]])
         if res is None:
             raise TimeoutError("login timeout")
         if(res == 0):
             raise BaseException("password or account is wrong")
-    
+
     while(ImagesExist(timer, StartImage[2])):
         ClickImage(timer, StartImage[2])
     try:
@@ -120,7 +120,7 @@ def start_game(timer: Timer, account=None, password=None, delay=1.0):
 
 @logit(level=INFO3)
 def restart(timer: Timer, times=0, *args, **kwargs):
-    
+
     try:
         ShellCmd(timer, "am force-stop com.huanmeng.zhanjian2")
         ShellCmd(timer, "input keyevent 3")
@@ -144,7 +144,7 @@ def restart(timer: Timer, times=0, *args, **kwargs):
             raise CriticalErr("CriticalErr on restart function")
 
         ConnectAndroid(timer)
-        restart(timer, times + 1, *args, **kwargs)  
+        restart(timer, times + 1, *args, **kwargs)
 
 
 @logit(level=INFO3)
@@ -405,13 +405,13 @@ def SetSupport(timer: Timer, target, try_times=0):
     target = bool(target)
     goto_game_page(timer, "fight_prepare_page")
     # if(bool(PixelChecker(timer, (623, 75), )) == ):
-    #    
-    # 支援次数已用尽    
+    #
+    # 支援次数已用尽
     if(CheckSupportStatu(timer) != target):
         click(timer, 628, 82, delay=1)
         click(timer, 760, 273, delay=1)
         click(timer, 480, 270, delay=1)
-        
+
     if(is_bad_network(timer, 0) or CheckSupportStatu(timer) != target):
         if(process_bad_network(timer, 'set_support')):
             SetSupport(timer, target)
@@ -420,27 +420,40 @@ def SetSupport(timer: Timer, target, try_times=0):
 
 
 @logit(level=INFO3)
-def QuickRepair(timer: Timer, repair_logic=None, *args, **kwargs):
+def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
     """战斗界面的快速修理
 
     Args:
         timer (Timer): _description_
+        repair_mode:
+            1: 快修，修中破
+            2: 快修，修大破
     """
-    ShipStatu = DetectShipStatu(timer)
-    broken = 0
-    for x in ShipStatu[1:]:
-        if x not in [0, -1]:
-            broken = 1
+    ShipStatus = DetectShipStatu(timer)
+    assert type(repair_mode) in [int, list]
+    if type(repair_mode) == int:  # 指定所有统一修理方案
+        repair_mode = [repair_mode for _ in range(6)]
 
-    print("ShipStatu:", ShipStatu)
-    if (broken >= 1 or ImagesExist(timer, RepairImage[1])):
-        click(timer, 420, 420, delay=1.5)
+    assert len(repair_mode) == 6
+    need_repair = [False for _ in range(6)]
+    for i, x in enumerate(repair_mode):
+        assert x in [1, 2]
+        if x == 1:
+            need_repair[i] = ShipStatus[i+1] not in [-1, 0]
+        elif x == 2:
+            need_repair[i] = ShipStatus[i+1] not in [-1, 0, 1]
+
+    print("ShipStatus:", ShipStatus)
+    if any(need_repair) or ImagesExist(timer, RepairImage[1]):
+        click(timer, 420, 420, delay=1.5)   # 进入修理页面
+        # 快修已经开始泡澡的船
         pos = GetImagePosition(timer, RepairImage[1])
         while(pos != None):
             click(timer, pos[0], pos[1], delay=1)
             pos = GetImagePosition(timer, RepairImage[1])
+        # 按逻辑修理
         for i in range(1, 7):
-            if ShipStatu[i] not in [0, -1]:
+            if need_repair[i-1]:
                 log_info(timer, "WorkInfo:" + str(kwargs))
                 log_info(timer, str(i)+" Repaired")
                 click(timer, BLOODLIST_POSITION[0][i][0], BLOODLIST_POSITION[0][i][1], delay=1.5)
@@ -457,7 +470,7 @@ def GainBounds(timer: Timer):
     goto_game_page(timer, 'main_page')
     if(bool(PixelChecker(timer, (694, 457), bgr_color=(45, 89, 255))) == False):
         return 'no'
-    
+
     goto_game_page(timer, 'mission_page')
     goto_game_page(timer, 'mission_page')
     if(ClickImage(timer, GameUI[15])):
@@ -466,7 +479,7 @@ def GainBounds(timer: Timer):
     elif(ClickImage(timer, GameUI[12])):
         ConfirmOperation(timer, must_confirm=1)
         return 'ok'
-    
+
     return 'no'
     #click(timer, 774, 502)
 
@@ -548,22 +561,22 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
     res = WaitImages(timer, [choose_ship_images[1], choose_ship_images[2]], after_get_delay=.4, gap=0)
     if(res == 1):
         click(timer, 839, 113)
-    
+
     if(name == None):
         click(timer, 83, 167, delay=0)
         wait_pages(timer, 'fight_prepare_page', gap=0)
-        return 
+        return
 
     click(timer, 700, 30, delay=0)
     WaitImage(timer, choose_ship_images[3], gap=0, after_get_delay=.1)
-    
+
     text(name)
     click(timer, 50, 50, delay=.5)
     if(timer.ship_status[pos] == -1):
         click(timer, 83, 167, delay=0)
     else:
         click(timer, 183, 167, delay=0)
-    
+
     wait_pages(timer, 'fight_prepare_page', gap=0)
 
 
@@ -582,7 +595,7 @@ def ChangeShips(timer: Timer, team, list):
     if(team is not None):
         goto_game_page(timer, 'fight_prepare_page')
         MoveTeam(timer, team)
-        
+
     DetectShipStatu(timer)
     for i in range(1, 7):
         if(timer.ship_status[i] != -1):
@@ -592,6 +605,7 @@ def ChangeShips(timer: Timer, team, list):
     DetectShipStatu(timer)
     for i in range(1, 7):
         ChangeShip(timer, team, i, list[i], detect_ship_statu=False)
+
 
 def get_new_things(timer: Timer, lock=0):
     pass

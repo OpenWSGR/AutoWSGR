@@ -3,7 +3,8 @@ import time
 import yaml
 from api import ImagesExist, UpdateScreen, WaitImages, click
 from constants import FightImage, SymbolImage, identify_images
-from game import QuickRepair, goto_game_page, identify_page
+from game import (QuickRepair, goto_game_page, identify_page,
+                  process_bad_network)
 from supports import Timer
 from utils.io import recursive_dict_update
 
@@ -11,7 +12,6 @@ from fight_dh import FightInfo, FightPlan, NodeLevelDecisionBlock
 
 """
 战役模块
-TODO: 1.区分战役次数耗尽与船坞已满导致不能进入
 """
 
 
@@ -20,7 +20,7 @@ class BattleInfo(FightInfo):
         super().__init__(timer)
 
         self.successor_states = {
-            "proceed": ["spot_enemy_success", "formation"],
+            "proceed": ["spot_enemy_success", "formation", "fight_period"],
             "spot_enemy_success": {
                 "retreat": ["battle_page"],
                 "fight": ["formation", "fight_period"],
@@ -42,7 +42,8 @@ class BattleInfo(FightInfo):
             "fight_period": [SymbolImage[4], 3],
             "night": [FightImage[6], .85, 120],
             "night_fight_period": [SymbolImage[4], 3],
-            "result": [FightImage[3], 60], "battle_page": [identify_images["battle_page"][0], 5]
+            "result": [FightImage[16], 60],
+            "battle_page": [identify_images["battle_page"][0], 5]
         }
 
     def reset(self):
@@ -70,6 +71,8 @@ class BattlePlan(FightPlan):
         plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
+        self.timer.chapter = 'battle'
+        self.timer.node = self.map
         # 加载战役节点计划
         default_args = default_args["node_defaults"]
         node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
@@ -79,37 +82,40 @@ class BattlePlan(FightPlan):
 
     def _enter_fight(self) -> str:
         goto_game_page(self.timer, "battle_page")
+        # 切换正确难度
         now_hard = WaitImages(self.timer, [FightImage[9], FightImage[15]])
         hard = self.map > 5
-
         if now_hard != hard:
-            click(self.timer, 800, 80, delay=3)
-
-        self.timer.chapter = 'battle'
-        self.timer.node = self.map
-
+            click(self.timer, 800, 80, delay=1)
         click(self.timer, 180 * (self.map - hard * 5), 200)
-        start_time = time.time()
-        while not identify_page(self.timer, 'fight_prepare_page'):
-            time.sleep(.15)
-            if(time.time() - start_time > 15):
-                raise BaseException()
+        QuickRepair(self.timer, self.repair_mode)
 
-        QuickRepair(self.timer)
-        click(self.timer, 900, 500, delay=0)
-        while(identify_page(self.timer, 'fight_prepare_page')):
-            time.sleep(.15)
-            if(ImagesExist(self.timer, SymbolImage[9], need_screen_shot=0)):
-                return 'run out of battle times'
-            if(time.time() - start_time > 15):
-                raise BaseException()
+        start_time = time.time()
+        UpdateScreen(self.timer)
+        while identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
+            click(self.timer, 900, 500, delay=0)    # 点“开始出征”
+            UpdateScreen(self.timer)
+            if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
+                return "dock is full"
+            if ImagesExist(self.timer, SymbolImage[9], need_screen_shot=0):
+                return 'out of times'
+            if time.time() - start_time > 15:
+                if process_bad_network(self.timer):
+                    if identify_page(self.timer, 'fight_prepare_page'):
+                        return self._enter_fight(self.timer)
+                else:
+                    raise TimeoutError("map_fight prepare timeout")
+            time.sleep(0.2)
 
         return 'success'
 
     def _make_decision(self) -> str:
+
+        self.Info.update_state()
         match self.Info.state:
             case "battle_page":
                 return "fight end"
+
         # 进行通用NodeLevel决策
         action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action)
         self.Info.last_action = action
