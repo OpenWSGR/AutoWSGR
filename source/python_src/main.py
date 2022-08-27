@@ -13,10 +13,6 @@ sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(__file__))
 print(sys.path)
 
-from fight.exercise import exercise_fight
-
-import keyboard as kd
-
 
 finished = 1
 timer = None
@@ -81,14 +77,6 @@ def listener(event: kd.KeyboardEvent):
         Globals.script_end = 1
         print("Script end by user request")
         quit()
-        
-def friend_exercise_test(team):
-    wait_pages(timer, 'friend_home_page', gap=0)
-    click(timer, 1145 * .75, 546 * .75, delay=.75)
-    click(timer, 1148 * .75, 386 * .75, delay=.75)
-    click(timer, 1107 * .75, 538 * .75, delay=.75)
-    exercise_fight(timer, team, DecisionBlock(formation=4))
-    wait_pages(timer, 'friend_home_page')
 
 def main_function():
     global timer
