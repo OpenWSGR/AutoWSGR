@@ -12,7 +12,8 @@ selected_nodes: [B]
 # NodeLevel
 node_args:
   B:
-    enemy_rules: [[DD >= 2, retreat]]
+    enemy_rules:
+      - [DD >= 2, retreat]
     SL_when_spot_enemy_fails: True
     formation: 5
     night: True

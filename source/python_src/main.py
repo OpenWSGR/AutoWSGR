@@ -114,30 +114,30 @@ if __name__ == "__main__":
     timer = start_script(account=None, password=None)
     start_time = time.time()
 
-    plan2 = BattlePlan(timer, "plans/battle/hard_Cruiser.yaml", "plans/default.yaml")
+    plan2 = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
     ret = "success"
     while ret == "success":
         ret = plan2.run()
 
-    # 9-1BF
-    plan = NormalFightPlan(timer, "plans/normal_fight/8-2B.yaml", "plans/default.yaml")
-    total_time = 0
-    each_time = 10
-    ret = "success"
-    while ret == "success":
-        goto_game_page(timer, "main_page")
-        expedition(timer, force=True)
-        print(f"time_passed: {time.time() - start_time}  Finish expedition")
-        GainBounds(timer)
+    # # 9-1BF
+    # plan = NormalFightPlan(timer, "plans/normal_fight/8-2B.yaml", "plans/default.yaml")
+    # total_time = 0
+    # each_time = 10
+    # ret = "success"
+    # while ret == "success":
+    #     goto_game_page(timer, "main_page")
+    #     expedition(timer, force=True)
+    #     print(f"time_passed: {time.time() - start_time}  Finish expedition")
+    #     GainBounds(timer)
 
-        for _ in range(each_time):
-            ret = plan.run()
-        total_time += each_time
-        print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
+    #     for _ in range(each_time):
+    #         ret = plan.run()
+    #     total_time += each_time
+    #     print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
 
-        # if total_time % 30 == 0:
-        #     DestoryShip(timer, reserve=0, amount=0)
-        #     DestoryShip(timer, reserve=0, amount=0)
+    #     # if total_time % 30 == 0:
+    #     #     DestoryShip(timer, reserve=0, amount=0)
+    #     #     DestoryShip(timer, reserve=0, amount=0)
 
     while True:
         # TODO: bug 在前往远征界面之后 远征，会检测不到
