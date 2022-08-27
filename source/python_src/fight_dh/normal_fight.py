@@ -6,6 +6,17 @@ import copy
 import time
 
 import yaml
+
+from api import ClickImage, ImagesExist, UpdateScreen, click
+from constants import FIGHT_CONDITIONS_POSITON, FightImage, identify_images
+from game import (ConfirmOperation, DetectShipStatu, GetEnemyCondition,
+                  MoveTeam, QuickRepair, UpdateShipPoint, UpdateShipPosition,
+                  change_fight_map, goto_game_page, identify_page,
+                  process_bad_network)
+from fight import start_fight
+from supports import SymbolImage, Timer
+from utils.io import recursive_dict_update
+
 from constants.custom_expections import ImageNotFoundErr
 from constants.image_templates import (ChapterImage, FightImage,
                                        IdentifyImages, NumberImage,
@@ -17,7 +28,6 @@ from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from game.identify_pages import identify_page
 from game.switch_page import goto_game_page, process_bad_network
 from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
-
 
 """
 常规战决策模块
@@ -94,7 +104,7 @@ class NormalFightInfo(FightInfo):
             self._update_ship_position(self.timer)
             self._update_ship_point(self.timer)
 
-        # 1. proceed, 资源点 (TODO 验证)
+        # 1. proceed, 资源点 (OK)
         # 2. get_ship, 锁定新船 (OK)
         if self.state in ["proceed", "get_ship"]:
             ConfirmOperation(self.timer, delay=0)
@@ -103,6 +113,7 @@ class NormalFightInfo(FightInfo):
         # 在某些State下可以记录额外信息
         if self.state == "spot_enemy_success":
             GetEnemyCondition(self.timer, 'fight')
+            
         elif self.state == "result":
             DetectShipStatu(self.timer, 'sumup')
             self.fight_result.detect_result()
@@ -144,27 +155,43 @@ class NormalFightInfo(FightInfo):
 class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
 
-    # ==================== Unified Interface ====================
-    def __init__(self, timer: Timer, plan_path, default_path) -> None:
-        super().__init__(timer)
+    def __init__(self, timer: Timer, plan_path, default_path=None):
+        """初始化决策模块,可以重新指定默认参数,优先级更高
 
+        Args:
+            default_path (str): 默认配置路径. 
+
+        Raises:
+            BaseException: _description_
+        """
+        super().__init__(timer)
+        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        
+        if("default" in plan_args and default_path is None):
+            default_path = plan_args["default"]
+        if(default_path == None):
+            raise BaseException("No Defaulf Rules")
+        
         default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
         plan_defaults, node_defaults = default_args["normal_fight_defaults"], default_args["node_defaults"]
         # 加载地图计划
-        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
         # 加载各节点计划
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)
-            node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
+            if(node_name not in plan_args['node_args']):
+                pass
+            else: 
+                node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
 
         # 构建信息存储结构
         self.Info = NormalFightInfo(self.timer)
 
-    def _enter_fight(self) -> str:
+    def _enter_fight(self):
         """
         从任意界面进入战斗.
 
@@ -175,22 +202,13 @@ class NormalFightPlan(FightPlan):
         goto_game_page(self.timer, 'fight_prepare_page')
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
-        start_time = time.time()
-        self.timer.UpdateScreen()
-        while identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
-            self.timer.Android.click(900, 500, delay=0)
-            self.timer.UpdateScreen()
-            if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
-                return "dock is full"
-            if time.time() - start_time > 15:
-                if process_bad_network(self.timer):
-                    if identify_page(self.timer, 'fight_prepare_page'):
-                        return self._enter_fight(self.timer)
-                else:
-                    raise TimeoutError("map_fight prepare timeout")
+
+        if(start_fight(self.timer) != "ok"):
+            return self._enter_fight()
+
         return "success"
 
-    def _make_decision(self) -> str:
+    def _make_decision(self):
 
         self.Info.update_state()
         state = self.Info.state
@@ -212,7 +230,27 @@ class NormalFightPlan(FightPlan):
                 return "fight end"
 
         elif state == "proceed":
-            is_proceed = self.nodes[self.Info.node].proceed
+            
+            def check_blood(blood, rule):
+                """检查血量状态是否满足前进条件
+                    >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
+                    
+                    >>>True
+                Args:
+                    blood (list): 1-based
+                    rule (list): 0-based
+                """
+                l = max(len(blood) - 1, len(rule))
+                for i in range(l):
+                    if(blood[i + 1] == -1 or rule[i] == -1):
+                        continue
+                    if(blood[i + 1] >= rule[i]):
+                        return False
+                return True
+                
+            is_proceed = self.nodes[self.Info.node].proceed and \
+                         check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
+            
             if is_proceed:
                 self.timer.Android.click(325, 350)
                 self.Info.last_action = "yes"

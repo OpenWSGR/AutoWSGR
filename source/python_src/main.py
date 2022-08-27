@@ -19,12 +19,35 @@ from constants.load_data import load_all_data
 from controller.run_timer import Timer
 
 
+sys.path.append(os.getcwd())
+sys.path.append(os.path.dirname(__file__))
+
+
+finished = 1
+timer = None
+S.DEBUG = True
+
+def load_data_start():
+    global timer
+    timer = Timer()
+    load_all_data(timer)
+    load_game_ui(timer)
+    init_decisive()
+
+def lencmp(s1, s2):
+    if(len(s1) < len(s2)):
+        return 1
+    if(len(s1) > len(s2)):
+        return -1
+    return 0
+
 def start_script(device_name="emulator-5554", account=None, password=None):
     """启动脚本,返回一个 Timer 记录器
 
     Returns:
         Timer: 该模拟器的记录器
     """
+    global ALL_SHIP_TYPES
     timer = Timer()
     timer.device_name = device_name
     load_all_data()
@@ -47,8 +70,7 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     timer.expedition_status = ExpeditionStatus(timer)
     # timer.fight_result = FightResult(timer)
     timer.resources = Resources(timer)
-    # GetEnemyCondition(timer)
-    # DetectShipStatu(timer)
+    GoMainPage(timer)
     try:
         timer.set_page(page_name=get_now_page(timer))
     except Exception:
@@ -77,48 +99,33 @@ def listener(event: kd.KeyboardEvent):
         quit()
 
 
-def default_strategy():
+def main_function():
+    global timer
     timer = start_script()
+    decisive_fight(timer, '2A')
 
-    plan2 = BattlePlan(timer, "plans/battle/hard_Cruiser.yaml",  "plans/default.yaml")
-    ret = "success"
-    while ret == "success":
-        ret = plan2.run()
+    #weekliy()
+    #normal_exercise(timer, 1)
+    #friend_exercise(timer, 1)
+    #battle(timer, 9, 8)
+if __name__ == "__main__":    
 
-    # # 刷图练级
-    # plan = NormalFightPlan(timer, "plans/normal_fight/8-5AI.yaml", "plans/default.yaml")
-    # total_time = 0
-    # each_time = 10
+    # timer = start_script(account=1558718963, password=1558718963)
+    timer = start_script()
+    # start_time = time.time()
+    exercise_plan = NormalExercisePlan(timer, "plans/exercise/defaults_1.yaml", "plans/exercise/basics.yaml")
+    # exercise_plan.run()
+    battle_plan = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
+    battle_plan.run()
+
+    # start_time = time.time()
+    # main_function()
+    # plan2 = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
     # ret = "success"
     # while ret == "success":
-    #     goto_game_page(timer, "main_page")
-    #     expedition(timer, force=True)
-    #     print(f"time_passed: {time.time() - start_time}  Finish expedition")
-    #     GainBounds(timer)
+    #     ret = plan2.run()
 
-    #     for _ in range(each_time):
-    #         ret = plan.run()
-    #     total_time += each_time
-    #     print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
-
-    #     # if total_time % 30 == 0:
-    #     #     DestoryShip(timer, reserve=0, amount=0)
-    #     #     DestoryShip(timer, reserve=0, amount=0)
-
-    # 自动远征
-    while True:
-        RepairByBath(timer)
-        expedition(timer, force=True)
-        GainBounds(timer)
-        print(f"{datetime.datetime.now()} Complete a maintenance ")
-        time.sleep(60 * 5)
-
-
-if __name__ == "__main__":
-    default_strategy()
-
-    # timer = start_script()
-    # recognize_ship(timer)
-
-    # while True:
-    #     time.sleep(10)
+    # # 9-1BF
+    # plan = NormalFightPlan(timer, "plans/normal_fight/8-2B.yaml", "plans/default.yaml")
+    # total_time = 0
+    # each_time = 10

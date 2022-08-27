@@ -32,14 +32,15 @@ def identify_page(timer: Timer, name, need_screen_shot=True):
 
 
 @logit()
-def wait_pages(timer: Timer, names, timeout=5, gap=.1):
+def wait_pages(timer: Timer, names, timeout=5, gap=.1, after_wait=0.1):
     start_time = time.time()
     if (isinstance(names, str)):
         names = [names]
     while (True):
         timer.UpdateScreen()
         for i, name in enumerate(names):
-            if (identify_page(timer, name, 0)):
+            if(identify_page(timer, name, 0)):
+                time.sleep(after_wait)
                 return i + 1
 
         if (time.time() - start_time > timeout):

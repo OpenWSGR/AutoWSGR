@@ -1,0 +1,13 @@
+# 功能: 演习默认模块
+
+exercise_defaults:
+  chapter: 'exercise' # 不要改动
+  selected_nodes: [player, robot] # 如果你没看过代码,不要改动
+
+node_defaults:
+  fleet_id: 1 # 队伍编号,可以在自己的方案中设置,机器人和玩家独立
+  formation: 4
+  night: False
+  discard: False # 暂时不支持该参数,不要动
+  enemy_rules: []
+  max_refresh_times: 2 # 默认最大刷新次数,可以分别对玩家和机器人设置

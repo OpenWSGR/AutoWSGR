@@ -228,7 +228,7 @@ def DestoryShip(timer, reserve=1, amount=1):
 
 
 @logit(level=INFO2)
-def vertify_team(timer: Timer):
+def verify_team(timer: Timer):
     """检验目前是哪一个队伍(1~4)
     含网络状况处理
     Args:
@@ -243,13 +243,20 @@ def vertify_team(timer: Timer):
     """
     if (identify_page(timer, 'fight_prepare_page') == False):
         raise ImageNotFoundErr("not on fight_prepare_page")
+    
+    log_image(timer, timer.screen, str(time.time()))
+    for _ in range(5):
+        for i, position in enumerate([(64, 83), (186, 83), (310, 83), (430, 83)]):
+            # if(S.DEBUG):print(timer.screen[83][64])
+            if(PixelChecker(timer, position, bgr_color=(228, 132, 16))):
+                return i + 1
+        UpdateScreen(timer)
+        
+        
+    if(process_bad_network(timer)):
+        return verify_team(timer)
 
-    for i, position in enumerate([(64, 83), (186, 83), (310, 83), (430, 83)]):
-        if (PixelChecker(timer, position, bgr_color=(228, 132, 16))):
-            return i + 1
-    if (process_bad_network(timer)):
-        return vertify_team(timer)
-
+    log_screen(timer)
     raise ImageNotFoundErr()
 
 
@@ -266,7 +273,9 @@ def MoveTeam(timer: Timer, target, try_times=0):
     """
     if (try_times > 3):
         raise ValueError("can't change team sucessfully")
-    if (identify_page(timer, 'fight_prepare_page') == False):
+
+    if(identify_page(timer, 'fight_prepare_page') == False):
+        log_screen(timer)
         raise ImageNotFoundErr("not on 'fight_prepare_page' ")
 
     if (vertify_team(timer) == target):

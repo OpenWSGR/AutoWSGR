@@ -1,0 +1,15 @@
+# 功能: 演习默认模块
+
+# NodeLevel
+node_args:
+  player:
+    formation: 4
+    enemy_rules:
+      - [SS >= 1, refresh]
+      - [BB + BG + CBG + BC >= 2, refresh]
+      - [CV + AV >= 2, refresh]
+    night: True
+    max_refresh_times: 2
+  robot:
+    formation: 1
+

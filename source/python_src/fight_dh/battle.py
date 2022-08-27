@@ -5,6 +5,7 @@ from constants.image_templates import FightImage, SymbolImage, IdentifyImages
 from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network
 from controller.run_timer import Timer, ImagesExist, WaitImages
 from utils.io import recursive_dict_update
+from fight import start_fight
 
 from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
 
@@ -62,6 +63,7 @@ class BattleInfo(FightInfo):
 
 
 class BattlePlan(FightPlan):
+    
     def __init__(self, timer, plan_path, default_path) -> None:
         super().__init__(timer)
 
@@ -86,6 +88,7 @@ class BattlePlan(FightPlan):
         hard = self.map > 5
         if now_hard != hard:
             self.timer.Android.click(800, 80, delay=1)
+            
         self.timer.Android.click(180 * (self.map - hard * 5), 200)
         QuickRepair(self.timer, self.repair_mode)
 

@@ -41,6 +41,7 @@ ALL_UI = {'map_page', 'main_page', 'decisive_battle_entrance', 'exercise_page', 
 'fight_prepare_page':包含了快速修理,补给,综合属性等选项的界面
 'friend_home_page':好友演习界面(从好友界面点进去之后的，好友的提督室)
 """
+exercise_image_list = {"rival_info"}
 
 
 FIGHT_RESULTS = {"SS", "S", "A", "B", "C", "D"}

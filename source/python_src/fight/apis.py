@@ -12,11 +12,59 @@ from game.switch_page import GoMainPage, goto_game_page, process_bad_network
 from controller.run_timer import Timer, ClickImage, ImagesExist, WaitImage, WaitImages
 from utils.logger import logit
 
-from fight.data_structures import DecisionBlock, RepairBlock
+__all__ = ['fight', 'normal_fight', 'choose_decision', 'work', 'SL', 'fight_end', 'wait_until_decision', "start_fight"]
 
+def start_fight(timer:Timer):
+    start_time = time.time()
+    click(timer, 900, 500, 1, delay=0)  # 点击：开始出征
+    while identify_page(timer, 'fight_prepare_page'):
+        if(time.time() - start_time > 3):
+            click(timer, 900, 500, 1, delay=0)
+        if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
+            return "dock is full"
+        if False:  # TODO: 大破出征确认
+            pass
+        if False:  # TODO: 补给为空
+            pass
+        if time.time() - start_time > 15:
+            if process_bad_network(timer):
+                if identify_page(timer, 'fight_prepare_page'):
+                    return "bad_network"
+            else:
+                raise TimeoutError("map_fight prepare timeout")
+    return "ok"
 
-def work(timer: Timer, fun, times=1, end=False):
-    while times:
+from game import *
+from supports import *
+from api import *
+from fight.data_structures import *
+
+__all__ = ['fight', 'normal_fight', 'choose_decision', 'work', 'SL', 'fight_end', 'wait_until_decision', "start_fight"]
+
+def start_fight(timer:Timer):
+    click(timer, 900, 500, 1, delay=0)  # 点击：开始出征
+    start_time = time.time()
+    while identify_page(timer, 'fight_prepare_page'):
+        if(time.time() - start_time > 3):
+            click(timer, 900, 500, 1, delay=0)
+        if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
+            return "dock is full"
+        if ImagesExist(timer, SymbolImage[9], need_screen_shot=0):
+            return "out of battle times"
+        if False:  # TODO: 大破出征确认
+            pass
+        if False:  # TODO: 补给为空
+            pass
+        if time.time() - start_time > 15:
+            if process_bad_network(timer):
+                if identify_page(timer, 'fight_prepare_page'):
+                    return "bad_network"
+            else:
+                raise TimeoutError("map_fight prepare timeout")
+    return "ok"
+
+def work(timer:Timer, fun, times=1, end=False):
+    while(times):
         print("Round", times)
         try:
             res = fun()

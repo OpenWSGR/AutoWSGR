@@ -83,9 +83,9 @@ class FightInfo(ABC):
         self.last_state = ""
         self.last_action = ""
         self.state = ""
-
         self.fight_result = FightResult(self.timer) # 战斗结果记录器
 
+    @logit(level=INFO3)
     def update_state(self):
 
         self.last_state = self.state
@@ -112,7 +112,7 @@ class FightInfo(ABC):
             self._before_match()
 
             # 尝试匹配
-            ret = [GetImagePosition(self.timer, image, 0, .8, no_log=True) is not None for image in images]
+            ret = [ImagesExist(self.timer, image, 0, no_log=True) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
                 print("matched:", self.state)
@@ -142,17 +142,35 @@ class FightInfo(ABC):
 
 
 class FightPlan(ABC):
-    def __init__(self, timer) -> None:
+    def __init__(self, timer:Timer):
         # 把timer引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
-
+    
     def run(self):
         """ 主函数，负责一次完整的战斗. """
 
         # 战斗前逻辑
-        ret = self._enter_fight()
-        if ret != "success":
-            return ret
+        while True:
+            ret = self._enter_fight()
+            if ret == "success":
+                break
+
+            elif ret == "need SL":
+                SL(self.timer)
+                return self.run()
+            elif ret == "dock is full":
+                return ret  # TODO：加入分解逻辑
+            elif ret == "fight end":
+                self.timer.set_page(self.Info.start_page)
+                break
+            
+            elif ret == "out of times":
+                return ret
+            else:
+                print("\n==========================================")
+                print('enter fight error,screen logged')
+                log_screen(self.timer)
+                raise BaseException(str(time.time()) + "enter fight error")
 
         # 战斗中逻辑
         self.Info.reset()  # 初始化战斗信息
@@ -168,7 +186,7 @@ class FightPlan(ABC):
                 break
 
         return "success"
-
+    
     @abstractmethod
     def _enter_fight(self) -> str:
         pass
@@ -178,37 +196,55 @@ class FightPlan(ABC):
         pass
 
 
-class NodeLevelDecisionBlock():
-    """ 地图上一个节点的决策模块 """
-
-    def __init__(self, timer: Timer, args) -> None:
-
+class DecisionBlock():
+    def __init__(self, timer:Timer, args):
         self.timer = timer
         self.__dict__.update(args)
 
         # 用于根据规则设置阵型
         self.set_formation_by_rule = False
         self.formation_by_rule = 0
-
+        
+    def check_rules(self):
+        for rule in self.enemy_rules:
+            condition, act = rule
+            rcondition = ""
+            last = 0
+            for (i, ch) in enumerate(condition):
+                if(ord(ch) <= ord ("Z") and ord(ch) >= ord("A")):
+                    pass
+                else:
+                    if(last != i):
+                        if(condition[last:i] in ALL_SHIP_TYPES):
+                            rcondition += f"self.timer.enemy_type_count[{condition[last:i]}]"
+                        else:
+                            rcondition += condition[last:i]
+                    rcondition += ch
+                    last = i + 1
+                    
+            # print(rcondition)
+            if eval(rcondition):
+                return act
+        
     def make_decision(self, state, last_state, last_action):
+
         if state in ["fight_period", "night_fight_period"]:
             return None, "fight continue"
-        elif state == "spot_enemy_success":
-            retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0
-            detour = self.detour
-            for rule in self.enemy_rules:
-                condition, act = rule
-                for ship_type in ALL_SHIP_TYPES:
-                    condition = condition.replace(ship_type, f"self.timer.enemy_type_count[{ship_type}]")
 
-                if eval(condition):
-                    if act == "retreat":
-                        retreat = True
-                    elif act == "detour":
-                        detour = True
-                    elif isinstance(act, int):
-                        self.set_formation_by_rule = True
-                        self.formation_by_rule = act
+        elif state == "spot_enemy_success":
+            retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
+            detour = self.detour  # 由Node指定是否要迂回
+
+            # 功能，根据敌方阵容进行选择
+            act = self.check_rules()
+
+            if act == "retreat":
+                retreat = True
+            elif act == "detour":
+                detour = True
+            elif isinstance(act, int):
+                self.set_formation_by_rule = True
+                self.formation_by_rule = act
             if retreat:
                 self.timer.Android.click(677, 492, delay=0)
                 return "retreat", "fight end"
@@ -223,9 +259,11 @@ class NodeLevelDecisionBlock():
             if spot_enemy:
                 if self.SL_when_detour_fails and last_action == "detour":
                     return None, "need SL"
+                
                 if self.set_formation_by_rule:
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
+                    
             else:
                 if self.SL_when_spot_enemy_fails:
                     return None, "need SL"
@@ -248,6 +286,20 @@ class NodeLevelDecisionBlock():
         elif state == "get_ship":
             self.timer.Android.click(900, 500, 1, 0.25)
             return None, "fight continue"
+
+        elif state == "lock_ship":
+            pass    # TODO: 锁定舰船
+
         else:
             print("===========Unknown State==============")
             raise BaseException()
+
+
+class NodeLevelDecisionBlock(DecisionBlock):
+    """ 地图上一个节点的决策模块 """
+    def make_decision(self, state, last_state, last_action):
+        """进行决策并执行
+        """
+        return super().make_decision(state, last_state, last_action)
+        
+

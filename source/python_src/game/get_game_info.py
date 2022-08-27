@@ -88,8 +88,26 @@ class Resources():
             raise ValueError("Unsupported resource name")
         if (detect or name not in self.resources.keys()):
             self.detect_resources(name)
-
+        
         return self.resources.get(name)
+
+@logit(level=INFO1)
+def GetChapter(timer: Timer):
+    """在出征界面获取当前章节(远征界面也可获取)
+
+    Raises:
+        TimeoutError: 无法获取当前章节
+
+    Returns:
+        int: 当前章节
+    """
+    for try_times in range(5):
+        time.sleep(0.15 * 2 ** try_times)
+        UpdateScreen(timer)
+        for i in range(1, len(ChapterImage)):
+            if(ImagesExist(timer, ChapterImage[i], 0)):
+                return i
+    raise TimeoutError("can't vertify chapter")
 
 
 @logit(level=INFO1)

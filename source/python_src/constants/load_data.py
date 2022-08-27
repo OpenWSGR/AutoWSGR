@@ -33,6 +33,9 @@ def load_IdentifyImages():
 def load_ErrorImages():
     ErrorImages['bad_network'] = make_tmplate("bad_network")
 
+def load_exercise_images():
+    for image in exercise_image_list:
+        exercise_images[image] = make_tmplate(name=image)
 
 def load_other_images():
     PrePath = "./data/images/"
@@ -147,8 +150,9 @@ def load_fightresult_images():
 
 def load_images():
 
-    load_ErrorImages()
-    load_IdentifyImages()
+    load_exercise_images()
+    load_error_images()
+    load_identify_images()
     load_fightresult_images()
     load_other_images()
 
