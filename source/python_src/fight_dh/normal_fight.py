@@ -89,12 +89,11 @@ class NormalFightInfo(FightInfo):
 
     def _after_match(self):
         # 在某些State下可以记录额外信息
-        match self.state:
-            case "spot_enemy_success":
-                GetEnemyCondition(self.timer, 'fight')
-            case "result":
-                DetectShipStatu(self.timer, 'sumup')
-                self.timer.fight_result.detect_result()
+        if self.state == "spot_enemy_success":
+            GetEnemyCondition(self.timer, 'fight')
+        elif self.state ==  "result":
+            DetectShipStatu(self.timer, 'sumup')
+            self.timer.fight_result.detect_result()
 
     @property
     def node(self):
@@ -163,36 +162,35 @@ class NormalFightPlan(FightPlan):
         state = self.Info.state
 
         # 进行MapLevel的决策
-        match state:
-            case "map_page":
+        if state == "map_page":
+            return "fight end"
+
+        elif state ==  "fight_condition":
+            value = self.fight_condition
+            click(self.timer, *FIGHT_CONDITIONS_POSITON[value])
+            self.Info.last_action = value
+            return "fight continue"
+
+        elif state == "spot_enemy_success":
+            if self.Info.node not in self.selected_nodes:  # 不在白名单之内直接SL
+                click(self.timer, 677, 492, delay=0)
+                self.Info.last_action = "retreat"
                 return "fight end"
 
-            case "fight_condition":
-                value = self.fight_condition
-                click(self.timer, *FIGHT_CONDITIONS_POSITON[value])
-                self.Info.last_action = value
+        elif state == "proceed":
+            is_proceed = self.nodes[self.Info.node].proceed
+            if is_proceed:
+                click(self.timer, 325, 350)
+                self.Info.last_action = "yes"
                 return "fight continue"
+            else:
+                click(self.timer, 615, 350)
+                self.Info.last_action = "no"
+                return "fight end"
 
-            case "spot_enemy_success":
-                if self.Info.node not in self.selected_nodes:  # 不在白名单之内直接SL
-                    click(self.timer, 677, 492, delay=0)
-                    self.Info.last_action = "retreat"
-                    return "fight end"
-
-            case "proceed":
-                is_proceed = self.nodes[self.Info.node].proceed
-                if is_proceed:
-                    click(self.timer, 325, 350)
-                    self.Info.last_action = "yes"
-                    return "fight continue"
-                else:
-                    click(self.timer, 615, 350)
-                    self.Info.last_action = "no"
-                    return "fight end"
-
-            case "flagship_severe_damage":
-                ClickImage(self.timer, FightImage[4], must_click=True, delay=0.25)
-                return 'fight end'
+        elif state == "flagship_severe_damage":
+            ClickImage(self.timer, FightImage[4], must_click=True, delay=0.25)
+            return 'fight end'
 
         # 进行通用NodeLevel决策
         action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)

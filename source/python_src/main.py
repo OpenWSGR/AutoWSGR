@@ -86,28 +86,6 @@ def main_function():
     friend_exercise(timer, 1)
     battle(timer, 9, 8)
 
- #   battle(timer, 2, 100, DecisionBlock(SL=True))
-
- #   normal_exercise(timer, 1)
- #   work(timer, lambda:normal_fight(timer, 8, 5, 4, mod=1), times=300)
- #   decisive_fight(timer,'2A')
- #   normal_exercise(timer, 1)
- #   friend_exercise(timer, 1)
- #   week8(timer, change=0, times=5)
- #   friend_exercise(timer, 1)
- #   timer = start_script()
- #   weekliy(timer)
- #   normal_exercise(timer, 1)
- #   decisive_fight(timer, start='2A')
- #   kd.hook(listener)
- #   kd.hook(keyborad_input)
- #   time.sleep(100000)
-    """SetSupport(timer, False)
-    SetSupport(timer, False)
-    SetSupport(timer, True)
-    SetSupport(timer, True)
-    week8(timer, change=0)"""
-
 
 if __name__ == "__main__":
 

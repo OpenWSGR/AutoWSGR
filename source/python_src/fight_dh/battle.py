@@ -112,8 +112,7 @@ class BattlePlan(FightPlan):
     def _make_decision(self) -> str:
 
         self.Info.update_state()
-        match self.Info.state:
-            case "battle_page":
+        if self.Info.state == "battle_page":
                 return "fight end"
 
         # 进行通用NodeLevel决策
