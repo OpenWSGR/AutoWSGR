@@ -25,6 +25,8 @@ class NormalFightInfo(FightInfo):
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
 
+        self.start_page = "map_page"
+
         self.successor_states = {
             "proceed": {
                 "yes": ["fight_condition", "spot_enemy_success", "formation", "fight_period"],
@@ -91,7 +93,7 @@ class NormalFightInfo(FightInfo):
         # 在某些State下可以记录额外信息
         if self.state == "spot_enemy_success":
             GetEnemyCondition(self.timer, 'fight')
-        elif self.state ==  "result":
+        elif self.state == "result":
             DetectShipStatu(self.timer, 'sumup')
             self.timer.fight_result.detect_result()
 
@@ -165,7 +167,7 @@ class NormalFightPlan(FightPlan):
         if state == "map_page":
             return "fight end"
 
-        elif state ==  "fight_condition":
+        elif state == "fight_condition":
             value = self.fight_condition
             click(self.timer, *FIGHT_CONDITIONS_POSITON[value])
             self.Info.last_action = value

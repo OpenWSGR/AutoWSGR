@@ -98,24 +98,27 @@ class FightPlan(ABC):
         """ 主函数，负责一次完整的战斗. """
 
         # 战斗前逻辑
-        ret = self._enter_fight()
-        while ret != "success":
-            print(ret)
-            if ret == "dock is full":
+        while True:
+            ret = self._enter_fight()
+            if ret == "success":
+                break
+            elif ret == "dock is full":
                 return ret  # TODO：加入分解逻辑
             elif ret == "out of times":
                 return ret
 
         # 战斗中逻辑
         self.Info.reset()  # 初始化战斗信息
-        ret = self._make_decision()
-        while ret == "fight continue":
-            pass
-        if ret == "need SL":
-            SL(self.timer)
-            return self.run()
-        elif ret == "fight end":
-            self.timer.set_page("map_page")
+        while True:
+            ret = self._make_decision()
+            if ret == "fight continue":
+                continue
+            elif ret == "need SL":
+                SL(self.timer)
+                return self.run()
+            elif ret == "fight end":
+                self.timer.set_page(self.Info.start_page)
+                break
 
         return "success"
 
@@ -143,7 +146,7 @@ class NodeLevelDecisionBlock():
     def make_decision(self, state, last_state, last_action):
 
         if state == "fight_period" or state == "night_fight_period":
-                return None, "fight continue"
+            return None, "fight continue"
 
         elif state == "spot_enemy_success":
             retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退

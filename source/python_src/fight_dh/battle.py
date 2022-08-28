@@ -19,6 +19,8 @@ class BattleInfo(FightInfo):
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
 
+        self.start_page = "battle_page"
+
         self.successor_states = {
             "proceed": ["spot_enemy_success", "formation", "fight_period"],
             "spot_enemy_success": {
@@ -113,7 +115,7 @@ class BattlePlan(FightPlan):
 
         self.Info.update_state()
         if self.Info.state == "battle_page":
-                return "fight end"
+            return "fight end"
 
         # 进行通用NodeLevel决策
         action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action)
