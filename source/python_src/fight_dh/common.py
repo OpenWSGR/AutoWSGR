@@ -216,9 +216,6 @@ class NodeLevelDecisionBlock():
             click(self.timer, 900, 500, 1, 0.25)
             return None, "fight continue"
 
-        elif state == "lock_ship":
-            pass    # TODO: 锁定舰船
-
         else:
             print("===========Unknown State==============")
             raise BaseException()

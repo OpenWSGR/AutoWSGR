@@ -76,7 +76,6 @@ class BattlePlan(FightPlan):
         self.timer.chapter = 'battle'
         self.timer.node = self.map
         # 加载战役节点计划
-        default_args = default_args["node_defaults"]
         node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
         self.node = NodeLevelDecisionBlock(timer, node_args)
 

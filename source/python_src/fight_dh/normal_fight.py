@@ -80,13 +80,14 @@ class NormalFightInfo(FightInfo):
 
         UpdateScreen(self.timer)
 
-        # TODO：在少数情况下会获取错误，需要找到原因
-        if self.state in ["proceed", "fight_condition"]:
+        # 在地图上走的过程中获取舰船位置
+        if self.state in ["proceed"]:
             UpdateShipPosition(self.timer)
             UpdateShipPoint(self.timer)
 
-        # TODO：试试资源点能不能行
-        if self.state in ["proceed", "fight_condition", "get_ship"]:
+        # 1. proceed, 资源点 (TODO 验证)
+        # 2. get_ship, 锁定新船 (OK)
+        if self.state in ["proceed", "get_ship"]:
             ConfirmOperation(self.timer, delay=0)
 
     def _after_match(self):
