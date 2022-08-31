@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     timer = start_script(account=None, password=None)
     start_time = time.time()
-
+    
     # plan2 = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
     # ret = "success"
     # while ret == "success":
