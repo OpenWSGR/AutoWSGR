@@ -196,14 +196,11 @@ class Timer():
     def is_fight_end(self):
         c, n = self.chapter, self.node
         last_point = get_last_point(c, n)
-        if(c == 'exercise'):
+        if c == 'exercise':
             return True
-        if(c == 'battle'):
-            if(self.fight_result >= 'B'):
-                return True
-        if(self.fight_result >= 'S' and (self.ship_point == last_point or self.ship_point in last_point)):
+        if c == 'battle' and self.fight_result >= 'B':
             return True
-        return False
+        return bool(self.fight_result >= 'S' and (self.ship_point == last_point or self.ship_point in last_point))
 
     def __str__(self):
         return "this is a timer"

@@ -1,8 +1,5 @@
-
-import pytesseract
-
 from utils.io import yaml_to_dict
-from utils.image_position import relative_to_absolute
+from utils.image_position import crop_image
 from supports import *
 from save_load import *
 from game.switch_page import *
@@ -10,16 +7,10 @@ from game.switch_page import *
 
 __all__ = ['get_resources', 'get_loot_and_ship']
 
-POS = yaml_to_dict('./source/python_src/digit_recognition/relative_location.yaml')
+POS = yaml_to_dict('./source/python_src/ocr_dh/relative_location.yaml')
 
 
-def crop_image(image, pos1, pos2, resolution=(960, 540)):
-    """ 按照给定的位置裁剪图片 """
-    x1, y2 = map(int, relative_to_absolute(pos1, resolution))
-    x2, y1 = map(int, relative_to_absolute(pos2, resolution))
-    return image[y1:y2, x1:x2]
-
-def image_to_number(image:np.ndarray):
+def image_to_number(image: np.ndarray):
     """根据图片返回数字
 
     Args:
@@ -32,15 +23,16 @@ def image_to_number(image:np.ndarray):
     if(len(result) == 0):
         return None
     scale = 1
-    
+
     if('K' in result):
         result = result[:-2]
         scale = 1000
     if('M' in result):
         result = result[:-2]
         scale = 10 ** 6
-    
+
     return scale * int(result)
+
 
 def get_resources(timer):
     """ 根据 timer 所处界面获取对应资源数据 
@@ -70,7 +62,7 @@ def get_resources(timer):
         except NameError:
             print("读取资源失败！")
             quit()
-    
+
     return ret
 
 
@@ -92,8 +84,5 @@ def get_loot_and_ship(timer):
             print("读今日战利品、捞船失败！")
             print(raw_str)
             quit()
-    
+
     return ret
-
-
-

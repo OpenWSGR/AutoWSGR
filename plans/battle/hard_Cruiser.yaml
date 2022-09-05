@@ -1,5 +1,5 @@
 # MapLevel
-map: 6 # 简单1-5 困难6-10
+map: 7 # 简单1-5 困难6-10
 
 # NodeLevel
 node_args:

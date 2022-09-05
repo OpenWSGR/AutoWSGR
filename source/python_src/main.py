@@ -1,21 +1,11 @@
-import logging
-import os
-import sys
-
 import keyboard as kd
 
-from digit_recognition import *
+from fight import *
 from fight_dh import BattlePlan, NormalFightPlan
-from pre_set import *
+from game import *
+from ocr_dh import recognize_ship
 from save_load import *
-
-sys.path.append(os.getcwd())
-sys.path.append(os.path.dirname(__file__))
-print(sys.path)
-
-
-finished = 1
-timer = None
+from supports import *
 
 
 def start_script(device_name="emulator-5554", account=None, password=None):
@@ -34,12 +24,10 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     timer.resolution = timer.screen.shape[:2]
     from supports.logger import time_path
     timer.log_filepre = time_path
-    if(account != None and password != None):
+    if account != None and password != None:
         restart(timer, account=account, password=password)
-
-    if(is_game_running(timer) == False):
+    if is_game_running(timer) == False:
         start_game(timer)
-
     print("resolution:", timer.resolution)
     timer.ammo = 10
     timer.defaul_repair_logic = RepairBlock()
@@ -47,18 +35,16 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     timer.expedition_status = ExpeditionStatus(timer)
     timer.fight_result = FightResult(timer)
     timer.resources = Resources(timer)
-    GetEnemyCondition(timer)
-    DetectShipStatu(timer)
-    #  GoMainPage(timer)
+    # GetEnemyCondition(timer)
+    # DetectShipStatu(timer)
     try:
         timer.set_page(page_name=get_now_page(timer))
-    except:
-        if(S.DEBUG):
+    except Exception:
+        if S.DEBUG:
             timer.set_page('main_page')
         else:
             restart(timer)
             timer.set_page(page_name=get_now_page(timer))
-
     print(timer.now_page.name)
     return timer
 
@@ -66,62 +52,61 @@ def start_script(device_name="emulator-5554", account=None, password=None):
 def listener(event: kd.KeyboardEvent):
     global main_thread
     on_press = Globals.event_pressed
-    if(event.event_type == 'down'):
-        if(event.name in on_press):
+    if (event.event_type == 'down'):
+        if (event.name in on_press):
             return
         on_press.add(event.name)
-    if(event.event_type == 'up'):
+    if (event.event_type == 'up'):
         on_press.discard(event.name)
 
-    if('ctrl' in on_press and 'alt' in on_press and 'c' in on_press):
+    if ('ctrl' in on_press and 'alt' in on_press and 'c' in on_press):
         Globals.script_end = 1
         print("Script end by user request")
         quit()
 
-def main_function():
-    global timer
+
+def default_strategy():
     timer = start_script()
-    decisive_fight(timer, '2A')
-    normal_exercise(timer, 1)
-    friend_exercise(timer, 1)
-    battle(timer, 9, 8)
 
-
-if __name__ == "__main__":
-
-    timer = start_script(account=None, password=None)
-    start_time = time.time()
-
-    # plan2 = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
-    # ret = "success"
-    # while ret == "success":
-    #     ret = plan2.run()
-
-    # 刷图练级
-    plan = NormalFightPlan(timer, "plans/normal_fight/8-2B.yaml", "plans/default.yaml")
-    total_time = 0
-    each_time = 10
+    plan2 = BattlePlan(timer, "plans/battle/hard_Cruiser.yaml",  "plans/default.yaml")
     ret = "success"
     while ret == "success":
-        goto_game_page(timer, "main_page")
-        expedition(timer, force=True)
-        print(f"time_passed: {time.time() - start_time}  Finish expedition")
-        GainBounds(timer)
+        ret = plan2.run()
 
-        for _ in range(each_time):
-            ret = plan.run()
-        total_time += each_time
-        print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
+    # # 刷图练级
+    # plan = NormalFightPlan(timer, "plans/normal_fight/8-5AI.yaml", "plans/default.yaml")
+    # total_time = 0
+    # each_time = 10
+    # ret = "success"
+    # while ret == "success":
+    #     goto_game_page(timer, "main_page")
+    #     expedition(timer, force=True)
+    #     print(f"time_passed: {time.time() - start_time}  Finish expedition")
+    #     GainBounds(timer)
 
-        # if total_time % 30 == 0:
-        #     DestoryShip(timer, reserve=0, amount=0)
-        #     DestoryShip(timer, reserve=0, amount=0)
+    #     for _ in range(each_time):
+    #         ret = plan.run()
+    #     total_time += each_time
+    #     print(f"time_passed: {time.time() - start_time}  total_time: {total_time}")
+
+    #     # if total_time % 30 == 0:
+    #     #     DestoryShip(timer, reserve=0, amount=0)
+    #     #     DestoryShip(timer, reserve=0, amount=0)
 
     # 自动远征
     while True:
-        # TODO: bug 在前往远征界面之后 远征，会检测不到
+        RepairByBath(timer)
         expedition(timer)
-        print(f"time_passed: {time.time() - start_time}  Finish expedition")
         GainBounds(timer)
-
+        print(f"{datetime.datetime.now()} Complete a maintenance ")
         time.sleep(60 * 5)
+
+
+if __name__ == "__main__":
+    default_strategy()
+
+    # timer = start_script()
+    # recognize_ship(timer)
+
+    # while True:
+    #     time.sleep(10)

@@ -20,3 +20,4 @@ def crop_image(image, pos1, pos2, resolution=(960, 540)):
     x1, y2 = map(int, relative_to_absolute(pos1, resolution))
     x2, y1 = map(int, relative_to_absolute(pos2, resolution))
     return image[y1:y2, x1:x2]
+
