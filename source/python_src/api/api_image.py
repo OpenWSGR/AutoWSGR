@@ -68,7 +68,8 @@ def locateCenterOnImage(timer: Timer, image: np.ndarray, query: MyTemplate, conf
         否则返回 None 
     """
     query.threshold = confidence
-    if match_pos := query.match_in(image, this_methods=this_mehods):
+    match_pos = query.match_in(image, this_methods=this_mehods)
+    if match_pos:
         return match_pos
     else:
         return None

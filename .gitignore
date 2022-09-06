@@ -1,6 +1,8 @@
 data/log
 .vscode/
 test/
+test.py
+test.ipynb
 tmp/
 data/tunnel/*.PNG
 data/tunnel/*.in

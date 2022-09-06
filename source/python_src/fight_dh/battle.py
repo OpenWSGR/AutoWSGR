@@ -42,7 +42,7 @@ class BattleInfo(FightInfo):
             "spot_enemy_success": [FightImage[2], 15],
             "formation": [FightImage[1], 15],
             "fight_period": [SymbolImage[4], 3],
-            "night": [FightImage[6], .85, 120],
+            "night": [FightImage[6], 120],
             "night_fight_period": [SymbolImage[4], 3],
             "result": [FightImage[16], 60],
             "battle_page": [identify_images["battle_page"][0], 5]
@@ -92,21 +92,21 @@ class BattlePlan(FightPlan):
         QuickRepair(self.timer, self.repair_mode)
 
         start_time = time.time()
-        UpdateScreen(self.timer)
-        while identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
+        while True:
             click(self.timer, 900, 500, delay=0)    # 点“开始出征”
             UpdateScreen(self.timer)
             if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
                 return "dock is full"
             if ImagesExist(self.timer, SymbolImage[9], need_screen_shot=0):
                 return 'out of times'
+            if not identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
+                break
             if time.time() - start_time > 15:
                 if process_bad_network(self.timer):
                     if identify_page(self.timer, 'fight_prepare_page'):
                         return self._enter_fight(self.timer)
                 else:
                     raise TimeoutError("map_fight prepare timeout")
-            time.sleep(0.2)
 
         return 'success'
 

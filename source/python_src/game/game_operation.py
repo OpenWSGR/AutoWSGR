@@ -457,7 +457,7 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
                 log_info(timer, "WorkInfo:" + str(kwargs))
                 log_info(timer, str(i)+" Repaired")
                 click(timer, BLOODLIST_POSITION[0][i][0], BLOODLIST_POSITION[0][i][1], delay=1.5)
-        click(timer, 163, 420, delay=1)
+        # click(timer, 163, 420, delay=1) # 回到第一界面，并不需要，可直接出征
 
 
 @logit(level=INFO3)

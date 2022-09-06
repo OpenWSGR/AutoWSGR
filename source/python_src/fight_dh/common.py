@@ -98,14 +98,9 @@ class FightPlan(ABC):
         """ 主函数，负责一次完整的战斗. """
 
         # 战斗前逻辑
-        while True:
-            ret = self._enter_fight()
-            if ret == "success":
-                break
-            elif ret == "dock is full":
-                return ret  # TODO：加入分解逻辑
-            elif ret == "out of times":
-                return ret
+        ret = self._enter_fight()
+        if ret != "success":
+            return ret
 
         # 战斗中逻辑
         self.Info.reset()  # 初始化战斗信息

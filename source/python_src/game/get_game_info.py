@@ -3,7 +3,7 @@ from api import *
 from supports import *
 from save_load import *
 from game.switch_page import *
-from digit_recognition import *
+from ocr_dh import *
 # 获取游戏信息
 
 __all__ = ["GetChapter", "GetNode", "GetEnemyCondition", "DetectShipStatu", "DetectShipType",

@@ -56,7 +56,7 @@ class NormalFightInfo(FightInfo):
             "spot_enemy_success": [FightImage[2], 15],
             "formation": [FightImage[1], 15],
             "fight_period": [SymbolImage[4], 3],
-            "night": [FightImage[6], .85, 120],
+            "night": [FightImage[6], 120],
             "night_fight_period": [SymbolImage[4], 3],
             "result": [FightImage[3], 60],
             "get_ship": [SymbolImage[8], 5],
@@ -142,7 +142,7 @@ class NormalFightPlan(FightPlan):
         start_time = time.time()
         UpdateScreen(self.timer)
         while identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
-            click(self.timer, 900, 500, 1, delay=0)  # 点击：开始出征
+            click(self.timer, 900, 500, delay=0)  # 点击：开始出征
             UpdateScreen(self.timer)
             if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
                 return "dock is full"
