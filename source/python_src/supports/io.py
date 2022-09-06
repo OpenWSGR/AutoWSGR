@@ -1,6 +1,9 @@
+import os
 
+import numpy as np
 from cv2 import imwrite
-from supports.models import *
+from PIL import Image as PIM
+
 __all__ = ['get_file_suffixname', 'read_file', 'create_file_with_path',
            'delete_file', 'write_file', 'save_image', 'get_all_files']
 
@@ -21,9 +24,9 @@ def get_file_suffixname(path):
     Returns:
         str: 表示后缀名
     """
-    if(os.path.exists(path) == False):
+    if (os.path.exists(path) == False):
         raise FileNotFoundError("file " + os.path.abspath(path) + " not found")
-    if(os.path.isdir(path)):
+    if (os.path.isdir(path)):
         raise ValueError("arg 'path' is not a file but a dir")
     file = os.path.basename(path)
     return os.path.splitext(file)[-1][1:]
@@ -42,7 +45,7 @@ def read_file(path):
     Returns:
         _type_: _description_
     """
-    if(os.path.exists(path) == False):
+    if (os.path.exists(path) == False):
         raise FileNotFoundError("file " + os.path.abspath(path) + "not found")
     with open(path, mode='r') as f:
         return f.read()
@@ -54,9 +57,9 @@ def create_file_with_path(path):
         path (str):需要创建的文件路径 
     """
     dirname = os.path.dirname(path)
-    if(dirname != ''):
+    if (dirname != ''):
         os.makedirs(dirname, exist_ok=True)
-    if(os.path.exists(path) == False):
+    if (os.path.exists(path) == False):
         file = open(path, 'w')
         file.close()
 
@@ -72,7 +75,7 @@ def write_file(path, info):
         path (str): 文件路径
         info (str): 需要添加的信息 
     """
-    if(os.path.exists(path) == False):
+    if (os.path.exists(path) == False):
         create_file_with_path(path)
     with open(path, mode='a') as f:
         f.write(info)
@@ -89,11 +92,11 @@ def save_image(path, image, ignore_existed_image=False, *args, **kwargs):
     Raises:
         FileExistsError: 如果未忽略已存在图片并且图片已存在
     """
-    if(ignore_existed_image == False and os.path.exists(path)):
+    if (ignore_existed_image == False and os.path.exists(path)):
         raise FileExistsError("该图片已存在")
-    if(isinstance(image, PIM.Image)):
+    if (isinstance(image, PIM.Image)):
         image.save(os.path.abspath(path))
-    if(isinstance(image, np.ndarray)):
+    if (isinstance(image, np.ndarray)):
         imwrite(path, image)
 
 
@@ -101,10 +104,10 @@ def get_all_files(dir, must='/'):
     files = os.listdir(dir)
     res = []
     for x in files:
-        if(os.path.isdir(dir + "/" + x)):
+        if (os.path.isdir(dir + "/" + x)):
             res += get_all_files(dir + "/" + x, must)
             continue
-        if(must not in dir + "/" + x):
+        if (must not in dir + "/" + x):
             continue
         res.append(dir + "/" + x)
     return res

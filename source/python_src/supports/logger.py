@@ -1,15 +1,13 @@
-if(__name__ == '__main__'):
-    import sys
-    import os
-    sys.path.append(os.path.abspath('./source/python_src'))
-
-from supports.models import *
-from supports.io import *
-from constants import *
+import logging
+import os
+import time
 from functools import wraps
 
-import logging
+import constants.global_attributes as Globals
+import constants.settings as S
+from constants.other_constants import INFO1, INFO2, INFO3
 
+from supports.io import create_file_with_path
 
 __all__ = ['logit', 'logit_time']
 time_path = os.path.join(S.LOG_PATH, time.strftime("%Y-%m-%d %H-%M-%S", time.localtime()))
@@ -64,19 +62,20 @@ std_logger.addHandler(std_critical_handler)
 std_logger.addHandler(console_handler)
 
 
-def logit(acc='str', level=logging.DEBUG , time_rec=True):
+def logit(acc='str', level=logging.DEBUG, time_rec=True):
     global std_logger
 
     def logger(fun):
         @wraps(fun)
         def log_info(*args, **kwargs):
-            if(Globals.script_end == 1):
+            if (Globals.script_end == 1):
                 return 'end'
-            
+
             no_log = kwargs.get('no_log')
 
-            if(no_log is None):
-                std_logger.log(level, msg = "called " + fun.__name__ + '\nargs are' + str(args) + '\nkwargs are' + str(kwargs) + '\n')
+            if (no_log is None):
+                std_logger.log(level, msg="called " + fun.__name__ + '\nargs are' +
+                               str(args) + '\nkwargs are' + str(kwargs) + '\n')
                 start_time = time.time()
             else:
                 kwargs.pop('no_log')
@@ -86,9 +85,8 @@ def logit(acc='str', level=logging.DEBUG , time_rec=True):
                 std_logger.log(logging.ERROR, str(e))
                 print(e)
                 raise e
-                    
-                
-            if(time_rec and no_log is None):
+
+            if (time_rec and no_log is None):
                 std_logger.log(level, "ended " + fun.__name__ + " take time:" + str(time.time() - start_time) + '\n')
 
             return res
@@ -107,5 +105,5 @@ def hello(name):
     print("hello", name)
 
 
-if(__name__ == '__main__'):
+if (__name__ == '__main__'):
     hello('huan_yp')

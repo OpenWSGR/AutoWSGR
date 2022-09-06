@@ -1,6 +1,11 @@
+import os
+from distutils.file_util import write_file
 
-from api import *
-from supports import *
+from api.api_android import UpdateScreen
+from constants import settings as S
+from PIL import Image as PIM
+from supports.io import save_image
+from supports.run_timer import Timer, get_time_as_string
 
 
 def log_image(timer: Timer, image, name, ndarray_mode="BGR", ignore_existed_image=False, *args, **kwargs):
@@ -9,10 +14,10 @@ def log_image(timer: Timer, image, name, ndarray_mode="BGR", ignore_existed_imag
         image: 图片,PIL.Image.Image 格式或者 numpy.ndarray 格式
         name (str): 图片文件名
     """
-    if('png' not in name and 'PNG' not in name):
+    if ('png' not in name and 'PNG' not in name):
         name += '.PNG'
     path = os.path.join(timer.log_filepre, name)
-    
+
     save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
 
 
@@ -21,7 +26,7 @@ def log_screen(timer: Timer, need_screen_shot=False):
     Args:
         need_screen_shot (bool, optional): 是否新截取一张图片. Defaults to False.
     """
-    if(need_screen_shot):
+    if (need_screen_shot):
         UpdateScreen(timer)
     image = PIM.fromarray(timer.screen)
     log_image(timer, image=image, name=get_time_as_string(accuracy='second')+'screen')
@@ -42,7 +47,7 @@ def log_debug_info(timer: Timer, info):
     Args:
         info (str): 需要记录的信息
     """
-    if(S.DEBUG):
+    if (S.DEBUG):
         log_info(timer, info)
 
 

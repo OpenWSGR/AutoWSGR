@@ -1,9 +1,8 @@
-from utils.io import yaml_to_dict
+import numpy as np
+from api.api_android import UpdateScreen
+from game.switch_page import goto_game_page
 from utils.image_position import crop_image
-from supports import *
-from save_load import *
-from game.switch_page import *
-
+from utils.io import yaml_to_dict
 
 __all__ = ['get_resources', 'get_loot_and_ship']
 

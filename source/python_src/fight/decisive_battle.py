@@ -1,11 +1,17 @@
-from asyncio.proactor_events import _ProactorBaseWritePipeTransport
-from fight.apis import *
-from fight.data_structures import *
-from game import *
-from supports import *
-from api import *
+import time
+
+from api.api_android import click
+from api.api_image import WaitImage
+from constants.image_templates import DecisiveObjectImage, GameUI
+from game.game_operation import QuickRepair
+from game.identify_pages import wait_pages
+from supports.run_timer import Timer
+
+from fight.apis import fight, fight_end
+from fight.data_structures import DecisionBlock
 
 __all__ = ['init_decisive', 'tmp_fight', 'decisive_fight']
+
 decisive_objects = set()
 
 class DecisiveObject():
@@ -30,9 +36,7 @@ class DecisiveBattleData():
         self.ships = set()
         
 def init_decisive():
-    for object in decisive_objects_images:
-        if("buff" in object):
-            pass
+    pass
 
 def get_choices(timer:Timer): 
     pass

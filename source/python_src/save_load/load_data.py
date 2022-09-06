@@ -1,7 +1,11 @@
 
-from utils import relative_to_absolute
-from supports import *
-from api import *
+from api.api_image import MyTemplate
+from constants.image_templates import BackImage, ChapterImage, ChooseShipImages, ConfirmImage, ErrorImages, FightImage, FightResultImage, GameUI, IdentifyImages, NumberImage, RepairImage, StartImage, SymbolImage, TeamImage
+from constants.keypoint_info import POINT_POSITION
+from constants.other_constants import ALL_UI, FIGHT_RESULTS
+from supports.run_timer import Timer
+from utils.image_position import relative_to_absolute
+from supports.io import get_all_files
 
 __all__ = ["load_all_data"]
 
@@ -10,23 +14,20 @@ all_images = get_all_files('./data/images', must='')
 
 def make_tmplate(name=None, path=None, *args, **kwargs):
     MyTemplates = []
-    if(name is not None):
-        rec_pos = None
-        if "rec_pos" in kwargs:
-            rec_pos = kwargs['rec_pos']
-
+    if (name is not None):
+        rec_pos = kwargs['rec_pos'] if "rec_pos" in kwargs else None
         return [MyTemplate(image, 0.9, resolution=(960, 540), record_pos=rec_pos) for image in all_images if (name in image)]
 
     return [MyTemplate(path, 0.9, resolution=(960, 540))]
 
 
-def load_identify_images():
+def load_IdentifyImages():
     for page in ALL_UI:
-        identify_images[page] = make_tmplate(name=page)
+        IdentifyImages[page] = make_tmplate(name=page)
 
 
-def load_error_images():
-    error_images['bad_network'] = make_tmplate("bad_network")
+def load_ErrorImages():
+    ErrorImages['bad_network'] = make_tmplate("bad_network")
 
 
 def load_other_images():
@@ -104,9 +105,9 @@ def load_other_images():
     TeamImage.append(MyTemplate(PrePath + "TeamImage\\3.PNG", resolution=(960, 540)))
     TeamImage.append(MyTemplate(PrePath + "TeamImage\\4.PNG", resolution=(960, 540)))
 
-    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\1.PNG", resolution=(960, 540)))  # 有标记选择舰船界面
-    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\2.PNG", resolution=(960, 540)))  # 无标记选择舰船界面
-    choose_ship_images.append(MyTemplate(PrePath + "choose_ship_images\\3.PNG", resolution=(960, 540)))  # 文本框确认
+    ChooseShipImages.append(MyTemplate(PrePath + "ChooseShipImages\\1.PNG", resolution=(960, 540)))  # 有标记选择舰船界面
+    ChooseShipImages.append(MyTemplate(PrePath + "ChooseShipImages\\2.PNG", resolution=(960, 540)))  # 无标记选择舰船界面
+    ChooseShipImages.append(MyTemplate(PrePath + "ChooseShipImages\\3.PNG", resolution=(960, 540)))  # 文本框确认
 
     FightImage.append(MyTemplate(PrePath + "FightImage\\1.PNG", resolution=(960, 540)))  # 选择阵型
     FightImage.append(MyTemplate(PrePath + "FightImage\\2.PNG", resolution=(960, 540)))  # 开始战斗
@@ -130,20 +131,20 @@ def load_other_images():
 
 def load_fightresult_images():
     for result in FIGHT_RESULTS:
-        fight_result_images[result] = make_tmplate('fight_result/' + result)
+        FightResultImage[result] = make_tmplate('fight_result/' + result)
 
 
 """def load_decisive_data():
     global all_images
     images = [image for image in all_images if("decisive_images" in image)]
     for image in images:
-        decisive_objects_images"""
+        DecisiveObjectImage"""
 
 
 def load_images():
 
-    load_error_images()
-    load_identify_images()
+    load_ErrorImages()
+    load_IdentifyImages()
     load_fightresult_images()
     load_other_images()
 

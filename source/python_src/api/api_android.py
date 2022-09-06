@@ -1,9 +1,13 @@
+import threading as th
+import time
 
-from supports import *
-
+import constants.settings as S
 from airtest.core.api import shell, start_app
-from airtest.core.settings import Settings as ST
 from airtest.core.helper import G
+from airtest.core.settings import Settings as ST
+from constants.other_constants import INFO1
+from supports.logger import logit
+from supports.run_timer import Timer
 
 __all__ = ["ShellCmd", "click", "swipe", "long_tap", "UpdateScreen", \
     "start_app", "is_game_running"]
@@ -23,13 +27,11 @@ def is_game_running(timer:Timer):
 
 @logit(level=INFO1)
 def click(timer: Timer, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
-    if(S.DEBUG):
-        if('print' not in kwargs):
-            print("click:", time.time(), x, y)
-        else:
+    if S.DEBUG:
+        if 'print' in kwargs:
             is_print = kwargs.get('print')
-            #  if(is_print):
-            #   print("click:", time.time(), x, y)
+        else:
+            print("click:", time.time(), x, y)
     """点击模拟器相对坐标 (x,y).
     Args:
         x:相对横坐标  (相对 960x540 屏幕)
@@ -57,7 +59,7 @@ def click(timer: Timer, x, y, times=1, delay=0.5, enable_subprocess=False, *args
         p = th.Thread(target=lambda: ShellCmd(timer, "input tap "+str(x) + " " + str(y)))
         p.start()
         return p
-    for i in range(0, times):
+    for _ in range(times):
         ShellCmd(timer, "input tap " + str(x) + " " + str(y))
         time.sleep(delay * S.DELAY)
 

@@ -1,13 +1,23 @@
+import time
 
-from supports import *
-from api import *
-from game.identify_pages import *
+import constants.settings as S
+from api.api_android import click
+from api.api_image import GetImagePosition, ImagesExist, WaitImages
+from api.api_windows import CheckNetWork
+from constants.image_templates import (BackImage, ErrorImages, GameUI,
+                                       SymbolImage)
+from constants.other_constants import INFO1, INFO2
+from supports.logger import logit
+from supports.run_timer import Timer
+
+from game.identify_pages import get_now_page, wait_pages
+
 """用于切换界面的数据结构和操作
 整个游戏 UI 将被构建为一颗以主页为根的有向树,该有向树带横插边
 """
 
-__all__ = ['GoMainPage', "is_bad_network", \
-    'goto_game_page', 'load_game_ui', 'process_bad_network']
+__all__ = ['GoMainPage', "is_bad_network",  'goto_game_page', 'load_game_ui', 'process_bad_network']
+
 
 page_count = 0
 ui_tree = None
@@ -53,9 +63,7 @@ class Node():
     def find_edge(self, v):
         from random import choice
         edges = self.find_edges(v)
-        if(len(edges) != 0):
-            return choice(edges)
-        return None
+        return choice(edges) if len(edges) != 0 else None
 
     def print(self):
         print("节点名:", self.name, "节点编号:", self.id)
@@ -103,40 +111,40 @@ class UI():
         lca = self.lca(start, end)
         path1, path2 = [], []
 
-        while(start != lca):
+        while (start != lca):
             path1.append(start)
             start = start.father
-        while(end != lca):
+        while (end != lca):
             path2.append(end)
             end = end.father
         path2.reverse()
         path = path1 + [lca] + path2
         result, i = [], 0
-        while(i < len(path)):
+        while (i < len(path)):
             node = path[i]
             result.append(node)
-            if(node.find_edge(path[-1]) != None):
+            if (node.find_edge(path[-1]) != None):
                 return result + [path[-1]]
             for j in range(i + 2, len(path)):
                 dst = path[j]
-                if(node.find_edge(dst) != None):
+                if (node.find_edge(dst) != None):
                     i = j - 1
             i += 1
         return result
 
     def lca(self, u: Node, v: Node) -> Node:
-        if(v.depth > u.depth):
+        if (v.depth > u.depth):
             return self.lca(v, u)
-        if(u == v):
+        if (u == v):
             return v
-        if(u.depth == v.depth):
+        if (u.depth == v.depth):
             return self.lca(u.father, v.father)
         return self.lca(u.father, v)
 
     def dfs(self, u: Node):
         for edge in u.edges:
             son = edge.v
-            if(son == u.father or son.father != u):
+            if (son == u.father or son.father != u):
                 continue
 
             son.depth = u.depth + 1
@@ -149,7 +157,7 @@ class UI():
             edge.operate(timer)
             if (edge.other_dst is not None):
                 dst = wait_pages(timer, names=[timer.now_page.name, edge.other_dst.name])
-                if(dst == 1):
+                if (dst == 1):
                     continue
                 if S.DEBUG:
                     print(f"Go page {timer.now_page.name} but arrive ", edge.other_dst.name)
@@ -174,6 +182,7 @@ class UI():
     def page_exist(self, page):
         return page in self.nodes.values()
 
+
 @logit(level=INFO2)
 def GoMainPage(timer: Timer, QuitOperationTime=0, List=[], ExList=[]):
     """回退到游戏主页
@@ -187,19 +196,19 @@ def GoMainPage(timer: Timer, QuitOperationTime=0, List=[], ExList=[]):
     Raises:
         ValueError: _description_
     """
-    if(QuitOperationTime > 200):
+    if (QuitOperationTime > 200):
         raise ValueError("Error,Couldn't go main page")
 
     timer.now_page = get_node_by_name(timer, 'main_page')
-    if(len(List) == 0):
+    if (len(List) == 0):
         List = BackImage[1:] + ExList
     type = WaitImages(timer, List + [GameUI[3]], 0.8, timeout=0)
 
     if type is None:
         GoMainPage(timer, QuitOperationTime + 1, List, no_log=True)
-        return 
-    
-    if(type >= len(List)):
+        return
+
+    if (type >= len(List)):
         type = WaitImages(timer, List, timeout=0)
         if type is None:
             return
@@ -217,9 +226,11 @@ def list_walk_path(timer: Timer, start: Node, end: Node):
     for node in path:
         print(node, end="->")
 
+
 @logit(level=INFO1)
 def is_bad_network(timer: Timer, timeout=10):
-    return WaitImages(timer, [error_images['bad_network'][0], SymbolImage[10]], timeout=timeout) != None
+    return WaitImages(timer, [ErrorImages['bad_network'][0], SymbolImage[10]], timeout=timeout) != None
+
 
 @logit(level=INFO2)
 def process_bad_network(timer: Timer, extra_info=""):
@@ -239,21 +250,21 @@ def process_bad_network(timer: Timer, extra_info=""):
         print("bad network at", time.time())
         print('extra info:', extra_info)
         while True:
-            if(time.time() - start_time >= 180):
+            if (time.time() - start_time >= 180):
                 raise TimeoutError("Process bad network timeout")
             if CheckNetWork() != False:
                 break
 
         start_time2 = time.time()
-        while(ImagesExist(timer, [SymbolImage[10]] + error_images['bad_network'])):
+        while (ImagesExist(timer, [SymbolImage[10]] + ErrorImages['bad_network'])):
             time.sleep(.5)
-            if(time.time() - start_time2 >= 60):
+            if (time.time() - start_time2 >= 60):
                 break
-            if(ImagesExist(timer, error_images['bad_network'])):
+            if (ImagesExist(timer, ErrorImages['bad_network'])):
                 click(timer, 476, 298, delay=2)
 
-        if(time.time() - start_time2 < 60):
-            if(S.DEBUG):
+        if (time.time() - start_time2 < 60):
+            if (S.DEBUG):
                 print("ok network problem solved, at", time.time())
             return True
 
@@ -262,11 +273,11 @@ def process_bad_network(timer: Timer, extra_info=""):
 
 def walk_to(timer: Timer, end, try_times=0):
     try:
-        if(isinstance(end, Node)):
+        if (isinstance(end, Node)):
             timer.ui.walk_to(timer, end)
             wait_pages(timer, end.name)
             return
-        if(isinstance(end, str)):
+        if (isinstance(end, str)):
             walk_to(timer, get_node_by_name(timer, end))
 
     except TimeoutError as exception:
@@ -308,6 +319,7 @@ def goto_game_page(timer: Timer, target='main'):
     walk_to(timer, target)
     # wait_pages(timer, names=[timer.now_page.name])
 
+
 def construct_node(timer: Timer, name: str, father):
     global page_count, ui_tree
     page_count += 1
@@ -318,9 +330,8 @@ def construct_node(timer: Timer, name: str, father):
 
 
 def construct_clicks_method(timer: Timer, click_position_args):
-    operations = []
-    for operation in click_position_args:
-        operations.append(lambda oper=operation: click(timer, *oper))
+    operations = [lambda oper=operation: click(timer, *oper) for operation in click_position_args]
+
     return SwitchMethod(operations)
 
 
@@ -330,13 +341,11 @@ def add_edge(timer: Timer, u: Node, v: Node, method: SwitchMethod, other_dst=Non
 
 
 def construct_intergrative_pages(timer: Timer, father, click_positions=[], names=[], common_edges=[]):
-
-    assert(len(click_positions) == len(names))
+    assert len(click_positions) == len(names)
     first_node = construct_node(timer, names[0], father)
     nodes = [first_node]
-    for i, name in enumerate(names[1:]):
+    for name in names[1:]:
         nodes.append(construct_node(timer, name, first_node))
-
     for i, node in enumerate(nodes):
         for j, click_position in enumerate(click_positions):
             if i == j:
@@ -347,7 +356,6 @@ def construct_intergrative_pages(timer: Timer, father, click_positions=[], names
             dst = edge.get('dst')
             x, y = edge.get('pos')
             add_edge(timer, node, dst, construct_clicks_method(timer, [(x, y)]))
-
     return nodes
 
 

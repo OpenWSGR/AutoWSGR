@@ -1,13 +1,20 @@
-from supports import *
-from api import *
+import time
+
+from api.api_android import UpdateScreen
+from api.api_image import ImagesExist, PixelChecker
+from constants.image_templates import IdentifyImages
+from constants.other_constants import ALL_UI, INFO1
+from supports.logger import logit
+from supports.run_timer import Timer
 
 __all__ = ["identify_page", "wait_pages", "get_now_page", "check_now_page"]
+
 
 @logit()
 def intergrative_page_identify(timer: Timer):
     positions = [(171, 47), (300, 47), (393, 47), (504, 47), (659, 47)]
     for i, position in enumerate(positions):
-        if(PixelChecker(timer, position, (225, 130, 16))):
+        if (PixelChecker(timer, position, (225, 130, 16))):
             return i + 1
 
 
@@ -25,18 +32,18 @@ def identify_page(timer: Timer, name, need_screen_shot=True):
     if (name == 'develop_page') and (intergrative_page_identify(timer) != 3):
         return False
 
-    return any(ImagesExist(timer, template, 0) for template in identify_images[name])
+    return any(ImagesExist(timer, template, 0) for template in IdentifyImages[name])
 
 
 @logit()
 def wait_pages(timer: Timer, names, timeout=5, gap=.1):
     start_time = time.time()
-    if(isinstance(names, str)):
+    if (isinstance(names, str)):
         names = [names]
-    while(True):
+    while (True):
         UpdateScreen(timer)
         for i, name in enumerate(names):
-            if(identify_page(timer, name, 0)):
+            if (identify_page(timer, name, 0)):
                 return i + 1
 
         if (time.time() - start_time > timeout):

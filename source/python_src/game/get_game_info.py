@@ -1,9 +1,33 @@
+from ocr_dh.digit import get_resources
 
-from api import *
-from supports import *
-from save_load import *
-from game.switch_page import *
-from ocr_dh import *
+from game.switch_page import goto_game_page, is_bad_network
+import math
+from supports.run_timer import Timer
+import constants.settings as S
+
+
+from constants.color_info import (BLOOD_COLORS, CHALLENGE_BLUE,
+                                  SUPPOER_DISABLE, SUPPORT_ENALBE)
+from constants.image_templates import (ChapterImage, FightImage,
+                                       FightResultImage, NumberImage)
+from constants.keypoint_info import BLOODLIST_POSITION, TYPE_SCAN_AREA
+from constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC, BG, BM, CA,
+                                       CAV, CBG, CL, CLT, CV, CVL, DD, INFO1,
+                                       NAP, NO, RESOURCE_NAME, SAP, SC, SS)
+
+from supports.logger import logit
+from api.api_image import (GetImagePosition, ImagesExist, PixelChecker,
+                           WaitImages)
+from supports.math_functions import (CalcDis, CheckColor, get_nearest,
+            matri_to_str)
+from PIL import Image as PIM
+import os
+import time
+from supports.io import delete_file, read_file, save_image, write_file
+import numpy as np
+from api.api_android import UpdateScreen, swipe
+
+
 # 获取游戏信息
 
 __all__ = ["GetChapter", "GetNode", "GetEnemyCondition", "DetectShipStatu", "DetectShipType",
@@ -27,9 +51,11 @@ class ExpeditionStatus():
         if self.timer.now_page.name in ['expedition_page', 'map_page', 'battle_page', 'exercise_page', 'decisive_battle_entrance']:
             self.exist_ready = bool(PixelChecker(self.timer, (464, 11), bgr_color=(45, 89, 255)))
         else:
-            if(force or time.time() - self.last_check > 1800):goto_game_page(self.timer, 'main_page')
-            if(self.timer.now_page.name == 'main_page'):
+            if (force or time.time() - self.last_check > 1800):
+                goto_game_page(self.timer, 'main_page')
+            if (self.timer.now_page.name == 'main_page'):
                 self.exist_ready = bool(PixelChecker(self.timer, (933, 454), bgr_color=(45, 89, 255)))
+
 
 class FightResult():
     def __init__(self, timer: Timer):
@@ -42,8 +68,8 @@ class FightResult():
     def detect_result(self):
         mvp_pos = GetImagePosition(self.timer, FightImage[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
-        self.result = WaitImages(self.timer, fight_result_images)
-        if(ImagesExist(self.timer, fight_result_images['SS'])):
+        self.result = WaitImages(self.timer, FightResultImage)
+        if (ImagesExist(self.timer, FightResultImage['SS'])):
             self.result = 'SS'
         return self
 
@@ -55,15 +81,16 @@ class FightResult():
 
     def __lt__(self, other):    # <
         list = ["D", "C", "B", "A", "S", "SS"]
-        if(isinstance(other, FightResult)):
+        if (isinstance(other, FightResult)):
             other = other.result
-            
+
         list.index(self.result) < list.index(other)
+
     def __le__(self, other):    # <=
         list = ["D", "C", "B", "A", "S", "SS"]
-        if(isinstance(other, FightResult)):
+        if (isinstance(other, FightResult)):
             other = other.result
-            
+
         list.index(self.result) <= list.index(other)
 
     def __gt__(self, other):    # >
@@ -72,28 +99,29 @@ class FightResult():
     def __ge__(self, other):    # >=
         return not (self < other)
 
+
 class Resources():
-    
-    def __init__(self, timer:Timer):
+
+    def __init__(self, timer: Timer):
         self.timer = timer
         self.resources = {}
 
     def detect_resources(self, name=None):
         timer = self.timer
-        if(name is not None):
-            if(name == 'normal' or name in ('oil', 'ammo', 'steel', 'aluminum')):
+        if name is not None:
+            if name in ('normal', 'oil', 'ammo', 'steel', 'aluminum'):
                 goto_game_page(timer, 'main_page')
                 self.detect_resources()
-            if(name == 'quick_repair'):
+            if name == 'quick_repair':
                 goto_game_page(timer, 'choose_repair_page')
                 self.detect_resources()
-            if(name == 'quick_build'):
+            if name == 'quick_build':
                 goto_game_page(timer, 'build_page')
                 self.detect_resources()
-            if(name == 'ship_blueprint'):
+            if name == 'ship_blueprint':
                 goto_game_page(timer, 'build_page')
                 self.detect_resources()
-            if(name == 'equipment_blueprint'):
+            if name == 'equipment_blueprint':
                 goto_game_page(timer, 'develop_page')
                 self.detect_resources()
         else:
@@ -114,14 +142,13 @@ class Resources():
         Returns:
             int: 资源量
         """
-        if(name not in RESOURCE_NAME):
+        if (name not in RESOURCE_NAME):
             raise ValueError("Unsupported resource name")
-        if(detect or name not in self.resources.keys()):
+        if (detect or name not in self.resources.keys()):
             self.detect_resources(name)
-        
+
         return self.resources.get(name)
 
-    
 
 @logit(level=INFO1)
 def GetChapter(timer: Timer):
@@ -137,7 +164,7 @@ def GetChapter(timer: Timer):
         time.sleep(0.15 * 2 ** try_times)
         UpdateScreen(timer)
         for i in range(1, len(ChapterImage)):
-            if(ImagesExist(timer, ChapterImage[i], 0)):
+            if (ImagesExist(timer, ChapterImage[i], 0)):
                 return i
     raise TimeoutError("can't vertify chapter")
 
@@ -151,14 +178,14 @@ def GetNode(timer: Timer, need_screen_shot=True):
     Returns:
         int: 节点编号
     """
-    
+
     # TODO（已修复）: 你改了循环变量的名字，但没改下面
     for try_times in range(5):
         time.sleep(.15 * 2 ** try_times)
-        if(need_screen_shot):
+        if (need_screen_shot):
             UpdateScreen(timer)
         for try_times in range(1, 7):
-            if(ImagesExist(timer, NumberImage[try_times], 0, confidence=0.95)):
+            if (ImagesExist(timer, NumberImage[try_times], 0, confidence=0.95)):
                 return try_times
     raise TimeoutError("can't vertify map")
 
@@ -179,12 +206,12 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     timer.enemy_type_count = {CV: 0, BB: 0, SS: 0, BC: 0, NAP: 0, DD: 0, ASDG: 0, AADG: 0,
                               CL: 0, CA: 0, CLT: 0, CVL: 0, NO: 0, AV: 0, "all": 0, CAV: 0, AV: 0,
                               BM: 0, SAP: 0, BG: 0, CBG: 0, SC: 0, BBV: 0, 'AP': 0}
-    if(type == 'exercise'):
+    if (type == 'exercise'):
         type = 0
-    if(type == 'fight'):
+    if (type == 'fight'):
         type = 1
 
-    if(ImagesExist(timer, FightImage[12])):
+    if (ImagesExist(timer, FightImage[12])):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
 
@@ -214,14 +241,14 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         timer.enemy_ship_type[i] = x
         timer.enemy_type_count[x] += 1
         timer.enemy_ship_type[i] = x
-        if(x != NO):
+        if (x != NO):
             timer.enemy_type_count["ALL"] += 1
 
     timer.enemy_type_count[NAP] -= timer.enemy_type_count['AP'] - timer.enemy_type_count[SAP]
 
-    if(S.DEBUG):
+    if (S.DEBUG):
         for key, value in timer.enemy_type_count.items():
-            if(value != 0 and key != 'AP'):
+            if (value != 0 and key != 'AP'):
                 print(key, ':', value, end=',')
         print("")
 
@@ -248,45 +275,44 @@ def DetectShipStatu(timer: Timer, type='prepare'):
                 'sumup': 单场战斗结算界面
 
     """
-
     """ToDo:
     血量检测精确到是否满血和是否触发中破保护
     血量检测精确到数值,相对误差少于 3%
     """
 
     UpdateScreen(timer)
-    #  log_image(timer, timer.screen, 'blood.png', ignore_existed_image=True)
     result = [-1, 0, 0, 0, 0, 0, 0]
-    if(type == 'prepare'):
+    if type == 'prepare':
         for i in range(1, 7):
             pixel = timer.get_pixel(*BLOODLIST_POSITION[0][i])
             result[i] = CheckColor(pixel, BLOOD_COLORS[0])
-            if(result[i] == 3 or result[i] == 2):
+            if result[i] in [3, 2]:
                 result[i] = 2
-            elif(result[i] == 0):
+            elif result[i] == 0:
                 result[i] = 0
-            elif(result[i] == 4):
+            elif result[i] == 4:
                 result[i] = -1
             else:
                 result[i] = 1
-
-    if(type == 'sumup'):
+    if type == 'sumup':
         for i in range(1, 7):
-            if(timer.ship_status[i] == -1):
+            if timer.ship_status[i] == -1:
                 result[i] = -1
                 continue
             pixel = timer.get_pixel(*BLOODLIST_POSITION[1][i])
             result[i] = CheckColor(pixel, BLOOD_COLORS[1])
     timer.ship_status = result
-    if(S.DEBUG):
+    if S.DEBUG:
         print(type, ":ship_status =", result)
     return result
+
 
 @logit(level=INFO1)
 def DetectShipType(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
+
 
 @logit(level=INFO1)
 def UpdateShipPosition(timer: Timer):
@@ -296,16 +322,17 @@ def UpdateShipPosition(timer: Timer):
         timer (Timer): 记录器
     """
     pos = GetImagePosition(timer, FightImage[7], 0, 0.8)
-    if(pos == None):
+    if pos is None:
         pos = GetImagePosition(timer, FightImage[8], 0, 0.8)
-    if(pos == None):
+    if pos is None:
         return
-
     timer.ship_position = pos
+
 
 @logit(level=INFO1)
 def UpdateShipPoint(timer: Timer):
     timer.update_ship_point()
+
 
 @logit(level=INFO1)
 def get_exercise_status(timer: Timer):
@@ -327,6 +354,7 @@ def get_exercise_status(timer: Timer):
     result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
     swipe(timer, 800, 200, 800, 400)
     return result
+
 
 @logit(level=INFO1)
 def CheckSupportStatu(timer: Timer):

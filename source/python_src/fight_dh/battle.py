@@ -1,14 +1,14 @@
 import time
 
 import yaml
-from api import ImagesExist, UpdateScreen, WaitImages, click
-from constants import FightImage, SymbolImage, identify_images
-from game import (QuickRepair, goto_game_page, identify_page,
-                  process_bad_network)
-from supports import Timer
+from api.api_image import ImagesExist, WaitImages
+from api.api_android import UpdateScreen, click
+from constants.image_templates import FightImage, SymbolImage, IdentifyImages
+from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network
+from supports.run_timer import Timer
 from utils.io import recursive_dict_update
 
-from fight_dh import FightInfo, FightPlan, NodeLevelDecisionBlock
+from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
 
 """
 战役模块
@@ -45,7 +45,7 @@ class BattleInfo(FightInfo):
             "night": [FightImage[6], 120],
             "night_fight_period": [SymbolImage[4], 3],
             "result": [FightImage[16], 60],
-            "battle_page": [identify_images["battle_page"][0], 5]
+            "battle_page": [IdentifyImages["battle_page"][0], 5]
         }
 
     def reset(self):

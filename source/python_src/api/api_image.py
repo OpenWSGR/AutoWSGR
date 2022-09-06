@@ -1,8 +1,18 @@
 
+import copy
+import time
 from typing import Tuple
-from api.api_android import *
-from supports import *
-from airtest.core.cv import *
+
+import numpy as np
+from airtest.core.cv import (MATCHING_METHODS, ST, InvalidMatchingMethodError,
+                             TargetPos, Template)
+from airtest.core.helper import G
+from constants.other_constants import INFO1
+from supports.logger import logit
+from supports.math_functions import CalcDis
+from supports.run_timer import ImageNotFoundErr, Timer
+
+from api.api_android import UpdateScreen, click
 
 __all__ = ["MyTemplate", "GetImagePosition", "ImagesExist", "WaitImage", "ClickImage",
            "WaitImages", "UpdateScreen", "PixelChecker"]
@@ -69,10 +79,7 @@ def locateCenterOnImage(timer: Timer, image: np.ndarray, query: MyTemplate, conf
     """
     query.threshold = confidence
     match_pos = query.match_in(image, this_methods=this_mehods)
-    if match_pos:
-        return match_pos
-    else:
-        return None
+    return match_pos or None
 
 
 def locateCenterOnScreen(timer: Timer, query: MyTemplate, confidence=0.85, this_mehods=["tpl"]):
@@ -97,7 +104,7 @@ def GetImagePosition(timer: Timer, image: MyTemplate, need_screen_shot=1, confid
 
         否则返回 None
     """
-    if(need_screen_shot == 1):
+    if (need_screen_shot == 1):
         UpdateScreen(timer)
     res = locateCenterOnScreen(timer, image, confidence, this_methods)
     if res is None:
@@ -129,15 +136,15 @@ def WaitImage(timer: Timer, image: MyTemplate, confidence=0.85, timeout=10, gap=
 
         否则返回 False
     """
-    if(timeout < 0):
+    if (timeout < 0):
         raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
     StartTime = time.time()
-    while(True):
+    while (True):
         x = GetImagePosition(timer, image, 1, confidence, this_methods, no_log=True)
-        if(x != None):
+        if (x != None):
             time.sleep(after_get_delay)
             return x
-        if(time.time()-StartTime > timeout):
+        if (time.time()-StartTime > timeout):
             time.sleep(gap)
             return False
         time.sleep(gap)
@@ -155,13 +162,13 @@ def ClickImage(timer: Timer, image: MyTemplate, must_click=False, timeout=0, del
     Raises:
         NotFoundErr: 如果在 timeout 时间内未找到则抛出该异常
     """
-    if(timeout < 0):
+    if (timeout < 0):
         raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
-    if(delay < 0):
+    if (delay < 0):
         raise ValueError("arg 'delay' should at least be 0 but is ", str(delay))
     pos = WaitImage(timer, image, timeout=timeout)
-    if(pos == False):
-        if(must_click == False):
+    if (pos == False):
+        if (must_click == False):
             return False
         else:
             raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
@@ -188,24 +195,24 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
         the key of the value if images is a dict
     """
     images = copy.copy(images)
-    if(isinstance(images, MyTemplate)):
+    if (isinstance(images, MyTemplate)):
         images = [images]
-    if(isinstance(images, list) or isinstance(images, Tuple)):
+    if (isinstance(images, list) or isinstance(images, Tuple)):
         for i in range(len(images)):
             images[i] = (i, images[i])
-    if(isinstance(images, dict)):
+    if (isinstance(images, dict)):
         images = images.items()
 
-    if(timeout < 0):
+    if (timeout < 0):
         raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
 
     StartTime = time.time()
-    while(True):
+    while (True):
         UpdateScreen(timer, no_log=True)
         for res, image in images:
-            if(ImagesExist(timer, image, 0, confidence, no_log=True)):
+            if (ImagesExist(timer, image, 0, confidence, no_log=True)):
                 time.sleep(after_get_delay)
                 return res
         time.sleep(gap)
-        if(time.time() - StartTime > timeout):
+        if (time.time() - StartTime > timeout):
             return None

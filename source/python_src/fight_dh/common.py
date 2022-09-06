@@ -2,10 +2,11 @@ import copy
 import time
 from abc import ABC, abstractmethod
 
-from api import GetImagePosition, click
-from constants import *
-from fight import SL
-from supports import ImageNotFoundErr, Timer
+from api.api_android import click
+from api.api_image import GetImagePosition
+from constants.other_constants import ALL_SHIP_TYPES, SAP
+from fight.apis import SL
+from supports.run_timer import ImageNotFoundErr, Timer
 
 
 # TODO: 完成
@@ -139,19 +140,16 @@ class NodeLevelDecisionBlock():
         self.formation_by_rule = 0
 
     def make_decision(self, state, last_state, last_action):
-
-        if state == "fight_period" or state == "night_fight_period":
+        if state in ["fight_period", "night_fight_period"]:
             return None, "fight continue"
-
         elif state == "spot_enemy_success":
-            retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
-            detour = self.detour  # 由Node指定是否要迂回
-
-            # 功能，根据敌方阵容进行选择
+            retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0
+            detour = self.detour
             for rule in self.enemy_rules:
                 condition, act = rule
                 for ship_type in ALL_SHIP_TYPES:
                     condition = condition.replace(ship_type, f"self.timer.enemy_type_count[{ship_type}]")
+
                 if eval(condition):
                     if act == "retreat":
                         retreat = True
@@ -160,39 +158,30 @@ class NodeLevelDecisionBlock():
                     elif isinstance(act, int):
                         self.set_formation_by_rule = True
                         self.formation_by_rule = act
-
             if retreat:
                 click(self.timer, 677, 492, delay=0)
                 return "retreat", "fight end"
             elif detour:
                 click(self.timer, 540, 500, delay=0)
                 return "detour", "fight continue"
-
             click(self.timer, 855, 501, delay=0)
             return "fight", "fight continue"
-
         elif state == "formation":
             spot_enemy = last_state == "spot_enemy_success"
             value = self.formation
             if spot_enemy:
-                # 功能：迂回失败SL
                 if self.SL_when_detour_fails and last_action == "detour":
                     return None, "need SL"
-                # 功能：根据规则设置阵型
                 if self.set_formation_by_rule:
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
             else:
-                # 功能：索敌失败SL
                 if self.SL_when_spot_enemy_fails:
                     return None, "need SL"
-                # 功能：索敌失败采用不同阵型
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
-
             click(self.timer, 573, value * 100 - 20, delay=2)
             return value, "fight continue"
-
         elif state == "night":
             is_night = self.night
             if is_night:
@@ -201,16 +190,13 @@ class NodeLevelDecisionBlock():
             else:
                 click(self.timer, 615, 350, delay=2)
                 return "no", "fight continue"
-
         elif state == "result":
             time.sleep(1.5)
-            click(self.timer, 900, 500, 2, 0.16)    # TODO：需要获取经验则只点一下就行
+            click(self.timer, 900, 500, 2, 0.16)
             return None, "fight continue"
-
         elif state == "get_ship":
             click(self.timer, 900, 500, 1, 0.25)
             return None, "fight continue"
-
         else:
             print("===========Unknown State==============")
             raise BaseException()

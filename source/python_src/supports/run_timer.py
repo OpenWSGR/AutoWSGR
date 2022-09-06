@@ -1,7 +1,12 @@
-
-from supports.models import *
-from supports.math_functions import *
+import datetime
+import time
 from functools import wraps
+
+import constants.global_attributes as Globals
+from constants.keypoint_info import POINT_POSITION
+from constants.other_constants import NO
+
+from supports.math_functions import CalcDis
 
 __all__ = ["Timer", "ImageNotFoundErr", "get_time_as_string", 'NetworkErr',
            "CriticalErr", "try_for_times", 'stopper', 'LogitException', 'get_last_point']
@@ -52,11 +57,11 @@ def get_time_as_string(accuracy='year'):
                 'second':只记录时刻
     """
     res = "".join([ch for ch in str(datetime.datetime.now()) if ch.isdigit()])
-    if(accuracy == 'year'):
+    if (accuracy == 'year'):
         return res
-    if(accuracy == 'day'):
+    if (accuracy == 'day'):
         return res[4:]
-    if(accuracy == 'second'):
+    if (accuracy == 'second'):
         return res[8:]
 
 
@@ -124,9 +129,9 @@ class Timer():
             ValueError:如果不支持这个模式
         """
 
-        if(mode == '960_to_this'):
+        if (mode == '960_to_this'):
             return (int(x / 960 * self.resolution[1]), int(y / 540 * self.resolution[0]))
-        if(mode == 'this_to_960'):
+        if (mode == 'this_to_960'):
             return (int(x * 960 / self.resolution[1]), int(y * 540 / self.resolution[0]))
         raise ValueError("unsupported mode " + str(mode))
 
@@ -176,17 +181,17 @@ class Timer():
             node2 = (self.chapter, self.node, self.ship_point)
             if node1 not in dir:
                 break
-            if(CalcDis(dir[node1], self.ship_position) < CalcDis(dir[node2], self.ship_position)):
+            if (CalcDis(dir[node1], self.ship_position) < CalcDis(dir[node2], self.ship_position)):
                 self.ship_point = ch
 
     def set_page(self, page_name=None, page=None):
-        if(page is not None):
-            if(self.ui.page_exist(page)):
+        if (page is not None):
+            if (self.ui.page_exist(page)):
                 self.now_page = page
                 return
             raise ValueError('give page do not exist')
         page = self.ui.get_node_by_name(page_name)
-        if(page is None):
+        if (page is None):
             raise ValueError("can't find the page:", page_name)
         self.now_page = page
 
@@ -235,7 +240,7 @@ class LogitException(BaseException):
 def try_for_times(fun):
     @wraps(fun)
     def imtemplate(*arg, **kwargs):
-        if(Globals.script_end == 1):
+        if (Globals.script_end == 1):
             return
         for i in range(2):
             try:
@@ -250,8 +255,6 @@ def try_for_times(fun):
 def stopper(fun):
     @wraps(fun)
     def imtemplate(*arg, **kwargs):
-        if(Globals.script_end == 1):
-            return 'end'
-        return fun(*arg, **kwargs)
+        return 'end' if (Globals.script_end == 1) else fun(*arg, **kwargs)
 
     return imtemplate

@@ -1,11 +1,24 @@
+import datetime
+import time
+
 import keyboard as kd
 
-from fight import *
-from fight_dh import BattlePlan, NormalFightPlan
-from game import *
-from ocr_dh import recognize_ship
-from save_load import *
-from supports import *
+import constants.global_attributes as Globals
+import constants.settings as S
+from api.api_android import UpdateScreen, is_game_running
+from api.api_windows import ConnectAndroid
+from fight.data_structures import DecisionBlock, RepairBlock
+from fight.decisive_battle import init_decisive
+from fight_dh.battle import BattlePlan
+from fight_dh.normal_fight import NormalFightPlan
+from game.game_operation import (GainBounds, RepairByBath, expedition, restart,
+                                 start_game)
+from game.get_game_info import ExpeditionStatus, FightResult, Resources
+from game.identify_pages import get_now_page
+from game.switch_page import load_game_ui
+from ocr_dh.ship_name import recognize_ship
+from save_load.load_data import load_all_data
+from supports.run_timer import Timer
 
 
 def start_script(device_name="emulator-5554", account=None, password=None):
@@ -96,7 +109,7 @@ def default_strategy():
     # 自动远征
     while True:
         RepairByBath(timer)
-        expedition(timer)
+        expedition(timer, force=True)
         GainBounds(timer)
         print(f"{datetime.datetime.now()} Complete a maintenance ")
         time.sleep(60 * 5)

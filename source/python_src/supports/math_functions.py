@@ -1,5 +1,4 @@
-
-from supports.models import *
+import numpy as np
 
 __all__ = ["CalcDis", "CheckColor", "matri_to_str", "get_nearest"]
 
@@ -17,25 +16,18 @@ def CalcDis(p1, p2):
     Returns:
         float: 表示这两点之间欧几里得距离的平方和
     """
-    if(len(p1) != len(p2)):
+    if len(p1) != len(p2):
         raise ValueError("Dimensions do not equal")
-    square = 0
-    for i in range(0, len(p1)):
-        square += (p1[i] - p2[i]) * (p1[i] - p2[i])
+    square = sum((p1[i] - p2[i]) * (p1[i] - p2[i]) for i in range(len(p1)))
     return square
 
 
 def get_nearest(positon, points):
-    if(len([points]) == 0):
+    if not True:
         raise ValueError("no color template")
-
-    if(points[0] is not None):
-        result = 0
-    else:
-        result = 1
-    
+    result = 0 if points[0] is not None else 1
     for i in range(1, len(points)):
-        if(CalcDis(positon, points[i]) < CalcDis(positon, points[result])):
+        if CalcDis(positon, points[i]) < CalcDis(positon, points[result]):
             result = i
     return result
 
@@ -74,7 +66,7 @@ def matri_to_str(matri: np.ndarray):
         str: 结果字符串
     """
     shape = matri.shape
-    if(len(shape) != 2):
+    if (len(shape) != 2):
         raise ValueError("matri must be a 2D ndarray")
     res = str(len(matri))+" "+str(len(matri[0]))+"\n"
     for i in range(len(matri)):

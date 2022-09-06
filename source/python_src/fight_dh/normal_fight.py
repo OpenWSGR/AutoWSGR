@@ -2,13 +2,17 @@ import copy
 import time
 
 import yaml
-from api import ClickImage, ImagesExist, UpdateScreen, click
-from constants import FIGHT_CONDITIONS_POSITON, FightImage, identify_images
-from game import (ConfirmOperation, DetectShipStatu, GetEnemyCondition,
-                  MoveTeam, QuickRepair, UpdateShipPoint, UpdateShipPosition,
-                  change_fight_map, goto_game_page, identify_page,
-                  process_bad_network)
-from supports import SymbolImage, Timer
+from api.api_android import UpdateScreen, click
+from api.api_image import ClickImage, ImagesExist
+from constants.image_templates import FightImage, IdentifyImages, SymbolImage
+from constants.keypoint_info import FIGHT_CONDITIONS_POSITON
+from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
+                                 change_fight_map)
+from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
+                                UpdateShipPoint, UpdateShipPosition)
+from game.identify_pages import identify_page
+from game.switch_page import goto_game_page, process_bad_network
+from supports.run_timer import Timer
 from utils.io import recursive_dict_update
 
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship
@@ -61,7 +65,7 @@ class NormalFightInfo(FightInfo):
             "result": [FightImage[3], 60],
             "get_ship": [SymbolImage[8], 5],
             "flagship_severe_damage": [FightImage[4], 5],
-            "map_page": [identify_images["map_page"][0], 5]
+            "map_page": [IdentifyImages["map_page"][0], 5]
         }
 
     def reset(self):
@@ -131,32 +135,24 @@ class NormalFightPlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-
         goto_game_page(self.timer, 'map_page')
         change_fight_map(self.timer, self.chapter, self.map)
         goto_game_page(self.timer, 'fight_prepare_page')
-        MoveTeam(self.timer, self.fleet_id)  # TODO: 支持按列表修改舰船
+        MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
-
-        # 异常处理
         start_time = time.time()
         UpdateScreen(self.timer)
         while identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
-            click(self.timer, 900, 500, delay=0)  # 点击：开始出征
+            click(self.timer, 900, 500, delay=0)
             UpdateScreen(self.timer)
             if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
                 return "dock is full"
-            if False:  # TODO: 大破出征确认
-                pass
-            if False:  # TODO: 补给为空
-                pass
             if time.time() - start_time > 15:
                 if process_bad_network(self.timer):
                     if identify_page(self.timer, 'fight_prepare_page'):
                         return self._enter_fight(self.timer)
                 else:
                     raise TimeoutError("map_fight prepare timeout")
-
         return "success"
 
     def _make_decision(self) -> str:

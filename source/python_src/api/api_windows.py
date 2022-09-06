@@ -1,21 +1,21 @@
-if(__name__ == '__main__'):
-    path = './source/python/rewrite'
-    import os
-    import sys
-    print(os.path.abspath(path))
-    sys.path.append(os.path.abspath(path))
-
-
-from supports import *
+import os
+import shutil
+import time
 from api.api_android import click
 from airtest.core.api import auto_setup
+from constants.other_constants import INFO2
 
-__all__ = ["GetAndroidInfo", "CopyRequirements", 'wait_network', \
+from supports.logger import logit
+from supports.run_timer import CriticalErr, Timer, try_for_times
+import constants.settings as S
+
+__all__ = ["GetAndroidInfo", "CopyRequirements", 'wait_network',
            "ConnectAndroid", "RestartAndroid", "CheckNetWork", "is_android_online"
            ]
 
 # Win 和 Android 的通信
 # Win 向系统写入数据
+
 
 def wait_network(timer, timeout=1000):
     """等待到网络恢复
@@ -28,12 +28,13 @@ def wait_network(timer, timeout=1000):
         _type_: _description_
     """
     start_time = time.time()
-    while(time.time() - start_time <= timeout):
-        if(CheckNetWork):
+    while (time.time() - start_time <= timeout):
+        if (CheckNetWork):
             return True
         time.sleep(10)
-    
+
     return False
+
 
 def GetAndroidInfo():
     """还没写好"""
@@ -48,15 +49,16 @@ def GetAndroidInfo():
     res = []
     get = 0
     for x in info:
-        if(get == 0):
+        if (get == 0):
             get = 1
             continue
-        if(len(x.split()) == 0):
+        if (len(x.split()) == 0):
             break
         a = x.split()[0]
         res.append(a)
     print("Devices list:", res)
     return res
+
 
 def CopyRequirements(timer: Timer, path):
     """还没写好"""
@@ -69,15 +71,16 @@ def CopyRequirements(timer: Timer, path):
     os.system(f"xcopy req {path} /E/H/C/I")
     time.sleep(5)
 
+
 @try_for_times
 def ConnectAndroid(timer: Timer):
     """连接指定安卓设备
     Args:
     """
-    
-    if(is_android_online(timer, 5) == False):
+
+    if (is_android_online(timer, 5) == False):
         RestartAndroid(timer)
-        
+
     from logging import getLogger, ERROR
     getLogger("airtest").setLevel(ERROR)
     auto_setup(__file__, devices=[
@@ -85,7 +88,8 @@ def ConnectAndroid(timer: Timer):
 
     print("Hello,I am WSGR auto commanding system")
 
-def is_android_online(timer:Timer, times=1):
+
+def is_android_online(timer: Timer, times=1):
     """判断 timer 给定的设备是否在线
 
     Args:
@@ -94,14 +98,15 @@ def is_android_online(timer:Timer, times=1):
     Returns:
         bool: 在线返回 True,否则返回 False
     """
-    while(times):
+    while (times):
         times -= 1
         res = os.popen("adb devices -l")
         for x in res:
             print(x, end=' ')
-            if(timer.device_name in x and 'device' in x):
+            if (timer.device_name in x and 'device' in x):
                 return True
     return False
+
 
 @logit(level=INFO2)
 def RestartAndroid(timer: Timer):
@@ -122,12 +127,13 @@ def RestartAndroid(timer: Timer):
         os.popen(r".\dnplayer.exe")
         os.chdir(dir)
         time.sleep(3)
-        while(is_android_online(timer) == False):
+        while (is_android_online(timer) == False):
             time.sleep(1)
-            if(time.time() - restart_time > 120):
+            if (time.time() - restart_time > 120):
                 raise TimeoutError("can't start the emulator")
     except:
         raise CriticalErr("on Restart Android")
+
 
 def CheckNetWork():
     """检查网络状况
@@ -138,7 +144,8 @@ def CheckNetWork():
     time.sleep(.5)
     return os.system("ping baidu.com") == False
 
-if(__name__ == '__main__'):
+
+if (__name__ == '__main__'):
     timer = Timer()
     devices = GetAndroidInfo()
     timer.device_name = devices[-1]
