@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import time
@@ -6,8 +7,8 @@ from functools import wraps
 import constants.global_attributes as Globals
 import constants.settings as S
 from constants.other_constants import INFO1, INFO2, INFO3
-from utils.io import create_file_with_path
 
+from utils.io import create_file_with_path
 
 time_path = os.path.join(S.LOG_PATH, time.strftime("%Y-%m-%d %H-%M-%S", time.localtime()))
 log_debug_path = os.path.join(time_path, 'debug.txt')
@@ -61,6 +62,25 @@ std_logger.addHandler(std_critical_handler)
 std_logger.addHandler(console_handler)
 
 
+def get_time_as_string(accuracy='year'):
+    """返回一个字符串时间戳,可以用于文件保存
+
+    Args:
+        accuracy (str, optional): 时间戳粒度. Defaults to "year".
+            values:
+                'year':记录某年某月某日某时刻
+                'day':记录某天某时刻
+                'second':只记录时刻
+    """
+    res = "".join([ch for ch in str(datetime.datetime.now()) if ch.isdigit()])
+    if (accuracy == 'year'):
+        return res
+    if (accuracy == 'day'):
+        return res[4:]
+    if (accuracy == 'second'):
+        return res[8:]
+
+
 def logit(acc='str', level=logging.DEBUG, time_rec=True):
     global std_logger
 
@@ -97,12 +117,4 @@ def logit(acc='str', level=logging.DEBUG, time_rec=True):
 
 def logit_time():
     return logit(time_rec=True)
-
-
-@logit()
-def hello(name):
-    print("hello", name)
-
-
-if (__name__ == '__main__'):
-    hello('huan_yp')
+ 

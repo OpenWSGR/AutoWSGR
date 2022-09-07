@@ -1,11 +1,9 @@
 import time
 
-from utils.api_android import UpdateScreen
-from utils.api_image import ImagesExist, PixelChecker
 from constants.image_templates import IdentifyImages
 from constants.other_constants import ALL_UI, INFO1
 from utils.logger import logit
-from timer.run_timer import Timer
+from controller.run_timer import Timer, ImagesExist, PixelChecker
 
 
 @logit()
@@ -19,7 +17,7 @@ def intergrative_page_identify(timer: Timer):
 @logit()
 def identify_page(timer: Timer, name, need_screen_shot=True):
     if need_screen_shot:
-        UpdateScreen(timer)
+        timer.UpdateScreen()
 
     if (name == 'main_page') and (identify_page(timer, 'options_page', 0)):
         return False
@@ -39,7 +37,7 @@ def wait_pages(timer: Timer, names, timeout=5, gap=.1):
     if (isinstance(names, str)):
         names = [names]
     while (True):
-        UpdateScreen(timer)
+        timer.UpdateScreen()
         for i, name in enumerate(names):
             if (identify_page(timer, name, 0)):
                 return i + 1
@@ -53,7 +51,7 @@ def wait_pages(timer: Timer, names, timeout=5, gap=.1):
 
 @logit(level=INFO1)
 def get_now_page(timer: Timer):
-    UpdateScreen(timer)
+    timer.UpdateScreen()
     for page in ALL_UI:
         if (identify_page(timer, page, need_screen_shot=False, no_log=True)):
             return page

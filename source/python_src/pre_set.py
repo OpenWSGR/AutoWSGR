@@ -4,7 +4,7 @@ from fight.apis import work, normal_fight
 from game.game_operation import (ChangeShip, ChangeShips, GainBounds,
                                  RepairByBath, expedition)
 from game.switch_page import goto_game_page
-from timer.run_timer import Timer
+from controller.run_timer import Timer
 
 
 def weekliy(timer, team=4):

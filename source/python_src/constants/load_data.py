@@ -1,5 +1,6 @@
 
-from utils.api_image import MyTemplate, relative_to_absolute
+from utils.api_image import relative_to_absolute
+from controller.run_timer import MyTemplate
 from utils.io import get_all_files
 
 from constants.image_templates import (BackImage, ChapterImage,

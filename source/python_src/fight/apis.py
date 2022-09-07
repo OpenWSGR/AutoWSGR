@@ -1,20 +1,16 @@
 import time
 
-from utils.api_android import UpdateScreen, click, is_game_running
-from utils.api_image import ClickImage, ImagesExist, WaitImage, WaitImages
-from utils.api_windows import (ConnectAndroid, RestartAndroid, is_android_online,
-                               wait_network)
+from constants.custom_expections import ImageNotFoundErr, NetworkErr
 from constants.image_templates import FightImage, SymbolImage
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON
 from constants.other_constants import INFO2, INFO3
 from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
-                                 change_fight_map, restart, start_game)
-from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
-                                UpdateShipPoint, UpdateShipPosition)
+                                 restart, start_game)
+from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from game.identify_pages import get_now_page, identify_page
 from game.switch_page import GoMainPage, goto_game_page, process_bad_network
+from controller.run_timer import Timer, ClickImage, ImagesExist, WaitImage, WaitImages
 from utils.logger import logit
-from timer.run_timer import ImageNotFoundErr, NetworkErr, Timer
 
 from fight.data_structures import DecisionBlock, RepairBlock
 
@@ -34,12 +30,12 @@ def work(timer: Timer, fun, times=1, end=False):
                 continue
         except BaseException as e:
             print(e)
-            if time.time() - timer.last_error_time < 2000 or is_android_online(timer, 5) == False:
-                RestartAndroid(timer)
-                ConnectAndroid(timer)
+            if time.time() - timer.last_error_time < 2000 or timer.Windows.is_android_online(5) == False:
+                timer.Windows.RestartAndroid()
+                timer.Windows.ConnectAndroid()
                 start_game(timer)
-            elif is_game_running(timer):
-                if wait_network() == False:
+            elif timer.Android.is_game_running():
+                if timer.Windows.wait_network() == False:
                     raise NetworkErr("Network error, please check your hardware or network configuration")
 
                 if process_bad_network(timer):
@@ -78,10 +74,10 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
     goto_game_page(timer, 'fight_prepare_page')
     MoveTeam(timer, team)
     QuickRepair(timer, repair)
-    click(timer, 900, 500, 1, delay=0)
+    timer.Android.click(900, 500, 1, delay=0)
     start_time = time.time()
     while identify_page(timer, 'fight_prepare_page'):
-        UpdateScreen(timer)
+        timer.UpdateScreen()
         if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
             return "dock is full"
         if False:
@@ -172,13 +168,13 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=0.15, begin=Tru
         DetectShipStatu(timer, 'sumup')
         timer.fight_result.detect_result()
         print(timer.fight_result)
-        click(timer, 900, 500, 2, 0.16)
+        timer.Android.click(900, 500, 2, 0.16)
         if 'no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0):
-            click(timer, 900, 500, 1, 0.25)
+            timer.Android.click(900, 500, 1, 0.25)
     if type != 'map_fight':
         time.sleep(1)
         return 'fight_end'
-    UpdateScreen(timer)
+    timer.UpdateScreen()
     if end_page is not None and identify_page(timer, end_page, 0):
         return 'map_end'
     if 'no_flagship_check' not in kwargs and ImagesExist(timer, FightImage[4], need_screen_shot=0):
@@ -186,7 +182,7 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=0.15, begin=Tru
         ClickImage(timer, FightImage[4], must_click=True, delay=0.25)
         return 'map_end'
     if 'no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0):
-        click(timer, 900, 500, 1, 0.25)
+        timer.Android.click(900, 500, 1, 0.25)
     if 'no_proceed' not in kwargs and ImagesExist(timer, FightImage[5], need_screen_shot=0):
         return 'proceed'
     return fight_end(timer, type, end_page, gap, False, try_times + 1, *args, **kwargs)
@@ -235,9 +231,9 @@ def wait_until_decision(timer: Timer, type='map_fight', *args, **kwargs):
             print("WaitRound")
 
         if 'no_click' not in kwargs and i % 2 == 1:
-            p = click(timer, 380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
+            p = timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
 
-        UpdateScreen(timer)
+        timer.UpdateScreen()
 
         if "no_yellow_ship" not in kwargs:
             UpdateShipPosition(timer)
@@ -305,19 +301,19 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
             if extra_check and not ImagesExist(timer, FightImage[2]):
                 raise ImageNotFoundErr("no fight choose options")
             if value == 1:
-                click(timer, 855, 501, delay=0)
+                timer.Android.click(855, 501, delay=0)
                 res = WaitImages(timer, [FightImage[1], SymbolImage[4]], 0.8)
                 if res is None:
                     raise BaseException()
                 print("decision done:", type, value)
             elif value == 0:
-                click(timer, 677, 492, delay=0)
+                timer.Android.click(677, 492, delay=0)
                 print("decision done:", type, value)
                 return
             elif value == 2:
                 if not ImagesExist(timer, FightImage[13]):
                     raise ImageNotFoundErr("no detour option")
-                click(timer, 540, 500, delay=0)
+                timer.Android.click(540, 500, delay=0)
                 res = WaitImages(timer, [FightImage[1], FightImage[7], FightImage[8]], gap=0)
                 if res == 0:
                     return False
@@ -333,30 +329,30 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
                 SL(timer)
                 print("decision done:", type, 'SL')
                 return 'SL'
-            click(timer, 573, value * 100 - 20, delay=2)
+            timer.Android.click(573, value * 100 - 20, delay=2)
             res = WaitImage(timer, SymbolImage[4])
             if res == False:
                 raise BaseException()
             print("decision done:", type, value)
         if type == 'night':
             if not bool(value):
-                click(timer, 615, 350, delay=2)
+                timer.Android.click(615, 350, delay=2)
                 if WaitImage(timer, FightImage[3], confidence=0.85) == False:
                     raise BaseException()
                 print("decision done:", type, value)
             else:
-                click(timer, 325, 350, delay=2)
+                timer.Android.click(325, 350, delay=2)
                 if WaitImage(timer, FightImage[6], 0, 0.8) == False:
                     raise BaseException()
             print("decision done:", type, value)
         if type == 'proceed':
             if bool(value):
-                click(timer, 325, 350)
+                timer.Android.click(325, 350)
             else:
-                click(timer, 615, 350)
+                timer.Android.click(615, 350)
         if type == 'fight_condition':
             if ImagesExist(timer, FightImage[10]):
-                click(timer, *FIGHT_CONDITIONS_POSITON[value])
+                timer.Android.click(*FIGHT_CONDITIONS_POSITON[value])
             else:
                 raise ImageNotFoundErr("no fight condition options")
     except:

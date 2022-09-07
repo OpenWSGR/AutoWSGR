@@ -6,22 +6,17 @@ import constants.settings as S
 import numpy as np
 from constants.color_info import (BLOOD_COLORS, CHALLENGE_BLUE,
                                   SUPPOER_DISABLE, SUPPORT_ENALBE)
-from constants.image_templates import (ChapterImage, FightImage,
-                                       FightResultImage, NumberImage)
+from constants.image_templates import FightImage
 from constants.keypoint_info import BLOODLIST_POSITION, TYPE_SCAN_AREA
 from constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC, BG, BM, CA,
                                        CAV, CBG, CL, CLT, CV, CVL, DD, INFO1,
                                        NAP, NO, RESOURCE_NAME, SAP, SC, SS)
-from ocr_dh.digit import get_resources
+from ocr.digit import get_resources
 from PIL import Image as PIM
-from utils.logger import logit
-from utils.math_functions import (CalcDis, CheckColor, get_nearest,
-                                  matri_to_str)
-from timer.run_timer import Timer
-from utils.api_android import UpdateScreen, swipe
-from utils.api_image import (GetImagePosition, ImagesExist, PixelChecker,
-                             WaitImages)
+from controller.run_timer import Timer, ImagesExist, PixelChecker
 from utils.io import delete_file, read_file, save_image, write_file
+from utils.logger import logit
+from utils.math_functions import CalcDis, CheckColor, matri_to_str
 
 from game.switch_page import goto_game_page
 
@@ -37,7 +32,7 @@ class ExpeditionStatus():
 
     @logit(level=INFO1)
     def update(self, force=False):
-        UpdateScreen(self.timer)
+        self.timer.UpdateScreen()
         if self.timer.now_page.name in ['expedition_page', 'map_page', 'battle_page', 'exercise_page', 'decisive_battle_entrance']:
             self.exist_ready = bool(PixelChecker(self.timer, (464, 11), bgr_color=(45, 89, 255)))
         else:
@@ -45,49 +40,6 @@ class ExpeditionStatus():
                 goto_game_page(self.timer, 'main_page')
             if (self.timer.now_page.name == 'main_page'):
                 self.exist_ready = bool(PixelChecker(self.timer, (933, 454), bgr_color=(45, 89, 255)))
-
-
-class FightResult():
-    def __init__(self, timer: Timer):
-        self.timer = timer
-        self.result = 'D'
-        self.mvp = 0
-        self.experiences = [None, 0, 0, 0, 0, 0, 0]
-
-    @logit(level=INFO1)
-    def detect_result(self):
-        mvp_pos = GetImagePosition(self.timer, FightImage[14])
-        self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
-        self.result = WaitImages(self.timer, FightResultImage)
-        if (ImagesExist(self.timer, FightResultImage['SS'])):
-            self.result = 'SS'
-        return self
-
-    def detect_experiences(self):
-        pass
-
-    def __str__(self):
-        return "mvp:{mvp},result:{result}".format(mvp=str(self.mvp), result=str(self.result))
-
-    def __lt__(self, other):    # <
-        list = ["D", "C", "B", "A", "S", "SS"]
-        if (isinstance(other, FightResult)):
-            other = other.result
-
-        list.index(self.result) < list.index(other)
-
-    def __le__(self, other):    # <=
-        list = ["D", "C", "B", "A", "S", "SS"]
-        if (isinstance(other, FightResult)):
-            other = other.result
-
-        list.index(self.result) <= list.index(other)
-
-    def __gt__(self, other):    # >
-        return not (self <= other)
-
-    def __ge__(self, other):    # >=
-        return not (self < other)
 
 
 class Resources():
@@ -138,46 +90,6 @@ class Resources():
             self.detect_resources(name)
 
         return self.resources.get(name)
-
-
-@logit(level=INFO1)
-def GetChapter(timer: Timer):
-    """在出征界面获取当前章节(远征界面也可获取)
-
-    Raises:
-        TimeoutError: 无法获取当前章节
-
-    Returns:
-        int: 当前章节
-    """
-    for try_times in range(5):
-        time.sleep(0.15 * 2 ** try_times)
-        UpdateScreen(timer)
-        for i in range(1, len(ChapterImage)):
-            if (ImagesExist(timer, ChapterImage[i], 0)):
-                return i
-    raise TimeoutError("can't vertify chapter")
-
-
-@logit(level=INFO1)
-def GetNode(timer: Timer, need_screen_shot=True):
-    """不够完善"""
-    """出征界面获取当前显示地图节点编号
-    例如在出征界面显示的地图 2-5,则返回 5
-    
-    Returns:
-        int: 节点编号
-    """
-
-    # TODO（已修复）: 你改了循环变量的名字，但没改下面
-    for try_times in range(5):
-        time.sleep(.15 * 2 ** try_times)
-        if (need_screen_shot):
-            UpdateScreen(timer)
-        for try_times in range(1, 7):
-            if (ImagesExist(timer, NumberImage[try_times], 0, confidence=0.95)):
-                return try_times
-    raise TimeoutError("can't vertify map")
 
 
 @logit(level=INFO1)
@@ -270,7 +182,7 @@ def DetectShipStatu(timer: Timer, type='prepare'):
     血量检测精确到数值,相对误差少于 3%
     """
 
-    UpdateScreen(timer)
+    timer.UpdateScreen()
     result = [-1, 0, 0, 0, 0, 0, 0]
     if type == 'prepare':
         for i in range(1, 7):
@@ -305,26 +217,6 @@ def DetectShipType(timer: Timer):
 
 
 @logit(level=INFO1)
-def UpdateShipPosition(timer: Timer):
-    """在战斗移动界面(有一个黄色小船在地图上跑)更新黄色小船的位置
-
-    Args:
-        timer (Timer): 记录器
-    """
-    pos = GetImagePosition(timer, FightImage[7], 0, 0.8)
-    if pos is None:
-        pos = GetImagePosition(timer, FightImage[8], 0, 0.8)
-    if pos is None:
-        return
-    timer.ship_position = pos
-
-
-@logit(level=INFO1)
-def UpdateShipPoint(timer: Timer):
-    timer.update_ship_point()
-
-
-@logit(level=INFO1)
 def get_exercise_status(timer: Timer):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
@@ -334,15 +226,15 @@ def get_exercise_status(timer: Timer):
     Returns:
         bool: 如果可挑战,返回 True ,否则为 False,1-based
     """
-    swipe(timer, 800, 200, 800, 400)
-    UpdateScreen(timer)
+    timer.Android.swipe(800, 200, 800, 400)
+    timer.UpdateScreen()
     result = [None, ]
     for position in range(1, 5):
         result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
-    swipe(timer, 800, 400, 800, 200)
-    UpdateScreen(timer)
+    timer.Android.swipe(800, 400, 800, 200)
+    timer.UpdateScreen()
     result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
-    swipe(timer, 800, 200, 800, 400)
+    timer.Android.swipe(800, 200, 800, 400)
     return result
 
 
@@ -353,7 +245,7 @@ def CheckSupportStatu(timer: Timer):
     Returns:
         bool: 如果开启了返回 True,否则返回 False
     """
-    UpdateScreen(timer)
+    timer.UpdateScreen()
     pixel = timer.get_pixel(623, 75)
     d1 = CalcDis(pixel, SUPPORT_ENALBE)
     d2 = CalcDis(pixel, SUPPOER_DISABLE)

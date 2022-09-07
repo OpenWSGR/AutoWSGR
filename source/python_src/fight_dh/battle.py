@@ -1,11 +1,9 @@
 import time
 
 import yaml
-from utils.api_image import ImagesExist, WaitImages
-from utils.api_android import UpdateScreen, click
 from constants.image_templates import FightImage, SymbolImage, IdentifyImages
 from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network
-from timer.run_timer import Timer
+from controller.run_timer import Timer, ImagesExist, WaitImages
 from utils.io import recursive_dict_update
 
 from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
@@ -56,8 +54,8 @@ class BattleInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed", "fight_condition"]:
-            p = click(self.timer, 380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
-        UpdateScreen(self.timer)
+            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
+        self.timer.UpdateScreen()
 
     def _after_match(self):
         pass  # 战役的敌方信息固定，不用获取
@@ -87,14 +85,14 @@ class BattlePlan(FightPlan):
         now_hard = WaitImages(self.timer, [FightImage[9], FightImage[15]])
         hard = self.map > 5
         if now_hard != hard:
-            click(self.timer, 800, 80, delay=1)
-        click(self.timer, 180 * (self.map - hard * 5), 200)
+            self.timer.Android.click(800, 80, delay=1)
+        self.timer.Android.click(180 * (self.map - hard * 5), 200)
         QuickRepair(self.timer, self.repair_mode)
 
         start_time = time.time()
         while True:
-            click(self.timer, 900, 500, delay=0)    # 点“开始出征”
-            UpdateScreen(self.timer)
+            self.timer.Android.click(900, 500, delay=0)    # 点“开始出征”
+            self.timer.UpdateScreen()
             if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
                 return "dock is full"
             if ImagesExist(self.timer, SymbolImage[9], need_screen_shot=0):

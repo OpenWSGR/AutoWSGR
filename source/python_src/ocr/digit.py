@@ -1,11 +1,9 @@
 import numpy as np
-from utils.api_android import UpdateScreen
 from game.switch_page import goto_game_page
-from utils.image_position import crop_image
+from utils.api_image import crop_image
 from utils.io import yaml_to_dict
 
-
-POS = yaml_to_dict('./source/python_src/ocr_dh/relative_location.yaml')
+POS = yaml_to_dict('./source/python_src/ocr/relative_location.yaml')
 
 
 def image_to_number(image: np.ndarray):
@@ -18,14 +16,14 @@ def image_to_number(image: np.ndarray):
         int, None: 存在则返回数字,否则为 None
     """
     result = pytesseract.image_to_string(image).strip()
-    if(len(result) == 0):
+    if (len(result) == 0):
         return None
     scale = 1
 
-    if('K' in result):
+    if ('K' in result):
         result = result[:-2]
         scale = 1000
-    if('M' in result):
+    if ('M' in result):
         result = result[:-2]
         scale = 10 ** 6
 
@@ -68,7 +66,7 @@ def get_loot_and_ship(timer):
     """ 获取掉落数据     
     """
     goto_game_page(timer, 'map_page')
-    UpdateScreen(timer)
+    timer.UpdateScreen()
     image = timer.screen
 
     ret = {}

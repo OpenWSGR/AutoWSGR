@@ -1,5 +1,5 @@
 from constants.other_constants import ASDG, BB, BC, BG, CA, CL, DD, SAP, SS
-from timer.run_timer import Timer
+from controller.run_timer import Timer
 
 
 class DecisionBlock():

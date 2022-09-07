@@ -1,14 +1,11 @@
 import time
 
 import constants.settings as S
-from utils.api_android import click
-from utils.api_image import GetImagePosition, ImagesExist, WaitImages
-from utils.api_windows import CheckNetWork
 from constants.image_templates import (BackImage, ErrorImages, GameUI,
                                        SymbolImage)
 from constants.other_constants import INFO1, INFO2
 from utils.logger import logit
-from timer.run_timer import Timer
+from controller.run_timer import Timer, GetImagePosition, ImagesExist, WaitImages
 
 from game.identify_pages import get_now_page, wait_pages
 
@@ -212,7 +209,7 @@ def GoMainPage(timer: Timer, QuitOperationTime=0, List=[], ExList=[]):
             return
 
     pos = GetImagePosition(timer, List[type], 0, 0.8)
-    click(timer, pos[0], pos[1])
+    timer.Android.click(pos[0], pos[1])
 
     NewList = List[1:] + [List[0]]
     GoMainPage(timer, QuitOperationTime + 1, NewList, no_log=True)
@@ -250,7 +247,7 @@ def process_bad_network(timer: Timer, extra_info=""):
         while True:
             if (time.time() - start_time >= 180):
                 raise TimeoutError("Process bad network timeout")
-            if CheckNetWork() != False:
+            if timer.Windows.CheckNetWork() != False:
                 break
 
         start_time2 = time.time()
@@ -259,7 +256,7 @@ def process_bad_network(timer: Timer, extra_info=""):
             if (time.time() - start_time2 >= 60):
                 break
             if (ImagesExist(timer, ErrorImages['bad_network'])):
-                click(timer, 476, 298, delay=2)
+                timer.Android.click(476, 298, delay=2)
 
         if (time.time() - start_time2 < 60):
             if (S.DEBUG):
@@ -328,7 +325,7 @@ def construct_node(timer: Timer, name: str, father):
 
 
 def construct_clicks_method(timer: Timer, click_position_args):
-    operations = [lambda oper=operation: click(timer, *oper) for operation in click_position_args]
+    operations = [lambda oper=operation: timer.Android.click(*oper) for operation in click_position_args]
 
     return SwitchMethod(operations)
 

@@ -1,11 +1,9 @@
 import time
 
-from utils.api_android import click
-from utils.api_image import WaitImage
 from constants.image_templates import DecisiveObjectImage, GameUI
 from game.game_operation import QuickRepair
 from game.identify_pages import wait_pages
-from timer.run_timer import Timer
+from controller.run_timer import Timer, WaitImage
 
 from fight.apis import fight, fight_end
 from fight.data_structures import DecisionBlock
@@ -62,22 +60,22 @@ def tmp_fight(timer: Timer, formation=2, night=0, join_fun=None, wait_timeout=10
     """
     timer.ammo = timer.oil = 10
     WaitImage(timer, GameUI[17], timeout=wait_timeout)
-    click(timer, 613, 494, delay=1)
+    timer.Android.click(613, 494, delay=1)
     if(1 in timer.ship_status or 2 in timer.ship_status):
-        click(timer, 714, 500, delay=0)
+        timer.Android.click(714, 500, delay=0)
         wait_pages(timer, 'fight_prepare_page')
         QuickRepair(timer)
-    click(timer, 900, 500)
+    timer.Android.click(900, 500)
     fight(timer, 'fight', DecisionBlock(formation=formation, night=night, ))
     WaitImage(timer, GameUI[16])
 
 def choose_path(timer:Timer, count=3):
     if(count == 2):
-        click(timer, 230, 270)  #
+        timer.Android.click(230, 270)  #
     if(count == 3):
-        click(timer, 300, 250)  #
+        timer.Android.click(300, 250)  #
     
-    click(timer, 450, 450)  #
+    timer.Android.click(450, 450)  #
 
 def decisive_fight(timer:Timer, start="2A"):
     
@@ -87,7 +85,7 @@ def decisive_fight(timer:Timer, start="2A"):
         timer (Timer): _description_
     """
     if(start<="2J"):
-        click(timer, 500, 500)  #进入第二张图
+        timer.Android.click(500, 500)  #进入第二张图
         if(start <= "2A"):
             choose_path(timer)
             tmp_fight(timer, 2)  #2-A
@@ -115,12 +113,12 @@ def decisive_fight(timer:Timer, start="2A"):
             tmp_fight(timer, 4, 1)  # 2-J1 
         
         time.sleep(2)
-        click(timer, 500, 450, delay=.5)
-        click(timer, 500, 300, delay=.5)
+        timer.Android.click(500, 450, delay=.5)
+        timer.Android.click(500, 300, delay=.5)
         fight_end(timer, end_page="decisive_map_entrance", begin=0)  #结算并领取舰船
     
     if(start<="3J"):
-        click(timer, 500, 500)  #进入第三张图
+        timer.Android.click(500, 500)  #进入第三张图
         if(start<="3A"):
             choose_path(timer)
             tmp_fight(timer, 4)  #3-A
@@ -149,8 +147,8 @@ def decisive_fight(timer:Timer, start="2A"):
         
         # 结算并领取舰船
         time.sleep(2)
-        click(timer, 500, 450, delay=.5)
-        click(timer, 500, 300, delay=.5)
+        timer.Android.click(500, 450, delay=.5)
+        timer.Android.click(500, 300, delay=.5)
         fight_end(timer, end_page="decisive_map_entrance", begin=0)
     
     

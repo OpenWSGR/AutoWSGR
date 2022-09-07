@@ -2,11 +2,14 @@ import copy
 import time
 from abc import ABC, abstractmethod
 
-from utils.api_android import click
-from utils.api_image import GetImagePosition
-from constants.other_constants import ALL_SHIP_TYPES, SAP
+from constants.custom_expections import ImageNotFoundErr
+from constants.image_templates import FightImage, FightResultImage
+from constants.keypoint_info import BLOODLIST_POSITION
+from constants.other_constants import ALL_SHIP_TYPES, INFO1, SAP
 from fight.apis import SL
-from timer.run_timer import ImageNotFoundErr, Timer
+from controller.run_timer import Timer, GetImagePosition, ImagesExist, WaitImages
+from utils.logger import logit
+from utils.math_functions import get_nearest
 
 
 # TODO: 完成
@@ -26,7 +29,53 @@ class Ship():
         self.friendliness = 0  # 舰船好感度
 
 
+class FightResult():
+    def __init__(self, timer: Timer):
+        self.timer = timer
+        self.result = 'D'
+        self.mvp = 0
+        self.experiences = [None, 0, 0, 0, 0, 0, 0]
+
+    @logit(level=INFO1)
+    def detect_result(self):
+        mvp_pos = GetImagePosition(self.timer, FightImage[14])
+        self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
+        self.result = WaitImages(self.timer, FightResultImage)
+        if (ImagesExist(self.timer, FightResultImage['SS'])):
+            self.result = 'SS'
+        return self
+
+    # TODO：获得经验
+    def detect_experiences(self):
+        pass
+
+    def __str__(self):
+        return "mvp:{mvp},result:{result}".format(mvp=str(self.mvp), result=str(self.result))
+
+    def __lt__(self, other):    # <
+        order = ["D", "C", "B", "A", "S", "SS"]
+        if (isinstance(other, FightResult)):
+            other = other.result
+
+        order.index(self.result) < order.index(other)
+
+    def __le__(self, other):    # <=
+        order = ["D", "C", "B", "A", "S", "SS"]
+        if (isinstance(other, FightResult)):
+            other = other.result
+
+        order.index(self.result) <= order.index(other)
+
+    def __gt__(self, other):    # >
+        return not (self <= other)
+
+    def __ge__(self, other):    # >=
+        return not (self < other)
+
+
 class FightInfo(ABC):
+    """ 存储战斗中需要用到的所有状态信息, 以及更新逻辑 """
+
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
         self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
@@ -34,6 +83,8 @@ class FightInfo(ABC):
         self.last_state = ""
         self.last_action = ""
         self.state = ""
+
+        self.fight_result = FightResult(self.timer) # 战斗结果记录器
 
     def update_state(self):
 
@@ -159,12 +210,12 @@ class NodeLevelDecisionBlock():
                         self.set_formation_by_rule = True
                         self.formation_by_rule = act
             if retreat:
-                click(self.timer, 677, 492, delay=0)
+                self.timer.Android.click(677, 492, delay=0)
                 return "retreat", "fight end"
             elif detour:
-                click(self.timer, 540, 500, delay=0)
+                self.timer.Android.click(540, 500, delay=0)
                 return "detour", "fight continue"
-            click(self.timer, 855, 501, delay=0)
+            self.timer.Android.click(855, 501, delay=0)
             return "fight", "fight continue"
         elif state == "formation":
             spot_enemy = last_state == "spot_enemy_success"
@@ -180,22 +231,22 @@ class NodeLevelDecisionBlock():
                     return None, "need SL"
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
-            click(self.timer, 573, value * 100 - 20, delay=2)
+            self.timer.Android.click(573, value * 100 - 20, delay=2)
             return value, "fight continue"
         elif state == "night":
             is_night = self.night
             if is_night:
-                click(self.timer, 325, 350, delay=2)
+                self.timer.Android.click(325, 350, delay=2)
                 return "yes", "fight continue"
             else:
-                click(self.timer, 615, 350, delay=2)
+                self.timer.Android.click(615, 350, delay=2)
                 return "no", "fight continue"
         elif state == "result":
             time.sleep(1.5)
-            click(self.timer, 900, 500, 2, 0.16)
+            self.timer.Android.click(900, 500, 2, 0.16)
             return None, "fight continue"
         elif state == "get_ship":
-            click(self.timer, 900, 500, 1, 0.25)
+            self.timer.Android.click(900, 500, 1, 0.25)
             return None, "fight continue"
         else:
             print("===========Unknown State==============")
