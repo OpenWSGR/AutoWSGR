@@ -8,14 +8,35 @@ from airtest.core.cv import (MATCHING_METHODS, ST, InvalidMatchingMethodError,
                              TargetPos, Template)
 from airtest.core.helper import G
 from constants.other_constants import INFO1
-from supports.logger import logit
-from supports.math_functions import CalcDis
-from supports.run_timer import ImageNotFoundErr, Timer
+from utils.logger import logit
+from utils.math_functions import CalcDis
+from timer.run_timer import ImageNotFoundErr, Timer
 
-from api.api_android import UpdateScreen, click
+from utils.api_android import UpdateScreen, click
 
-__all__ = ["MyTemplate", "GetImagePosition", "ImagesExist", "WaitImage", "ClickImage",
-           "WaitImages", "UpdateScreen", "PixelChecker"]
+
+def relative_to_absolute(record_pos, resolution=(960, 540)):
+    """ 将相对坐标转换为绝对坐标 """
+    delta_x, delta_y = record_pos
+    _w, _h = resolution
+    target_x = _w * (0.5 + delta_x)
+    target_y = _h * (0.5 + delta_y)
+    return target_x, target_y
+
+
+def absolute_to_relative(absolute_pos, resolution=(960, 540)):
+    """ 将绝对坐标转换为相对坐标 """
+    _w, _h = resolution
+    delta_x = (absolute_pos[0] - _w * 0.5) / _w
+    delta_y = (absolute_pos[1] - _h * 0.5) / _h
+    return delta_x, delta_y
+
+
+def crop_image(image, pos1, pos2, resolution=(960, 540)):
+    """ 按照给定的位置裁剪图片, pos1 左下角, pos2 右上角 """
+    x1, y2 = map(int, relative_to_absolute(pos1, resolution))
+    x2, y1 = map(int, relative_to_absolute(pos2, resolution))
+    return image[y1:y2, x1:x2]
 
 
 class MyTemplate(Template):
@@ -197,7 +218,7 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
     images = copy.copy(images)
     if (isinstance(images, MyTemplate)):
         images = [images]
-    if (isinstance(images, list) or isinstance(images, Tuple)):
+    if isinstance(images, (list, Tuple)):
         for i in range(len(images)):
             images[i] = (i, images[i])
     if (isinstance(images, dict)):

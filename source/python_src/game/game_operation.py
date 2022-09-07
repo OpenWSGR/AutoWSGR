@@ -2,32 +2,27 @@ import threading as th
 import time
 
 from airtest.core.api import start_app, text
-from api.api_android import (ShellCmd, UpdateScreen, click, is_game_running,
-                             swipe)
-from api.api_image import (ClickImage, GetImagePosition, ImagesExist,
-                           PixelChecker, WaitImage, WaitImages)
-from api.api_windows import CheckNetWork, ConnectAndroid, is_android_online
+from utils.api_android import (ShellCmd, UpdateScreen, click, is_game_running,
+                               swipe)
+from utils.api_image import (ClickImage, GetImagePosition, ImagesExist,
+                             PixelChecker, WaitImage, WaitImages)
+from utils.api_windows import CheckNetWork, ConnectAndroid, is_android_online
 from constants.image_templates import (ChapterImage, ChooseShipImages,
                                        ConfirmImage, FightImage, GameUI,
                                        NumberImage, RepairImage, StartImage,
                                        SymbolImage)
 from constants.keypoint_info import BLOODLIST_POSITION
 from constants.other_constants import INFO2, INFO3, NODE_LIST
-from save_load.load_data import load_all_data
+from constants.load_data import load_all_data
 from save_load.logger import log_info
-from supports.logger import logit
-from supports.run_timer import CriticalErr, ImageNotFoundErr, NetworkErr, Timer
+from utils.logger import logit
+from timer.run_timer import CriticalErr, ImageNotFoundErr, NetworkErr, Timer
 
 from game.get_game_info import (CheckSupportStatu, DetectShipStatu,
                                 ExpeditionStatus, GetChapter, GetNode)
 from game.identify_pages import get_now_page, identify_page, wait_pages
 from game.switch_page import (GoMainPage, goto_game_page, is_bad_network,
                               load_game_ui, process_bad_network)
-
-__all__ = ['ConfirmOperation', 'restart', 'expedition',
-           'DestoryShip', 'change_fight_map', 'MoveTeam', 'SetSupport',
-           'QuickRepair', 'GainBounds', 'RepairByBath', 'SetAutoSupply', 'Supply',
-           'ChangeShip', 'ChangeShips', 'start_game']
 
 
 @logit(level=INFO2)
@@ -475,18 +470,16 @@ def GainBounds(timer: Timer):
         timer (Timer): _description_
     """
     goto_game_page(timer, 'main_page')
-    if (bool(PixelChecker(timer, (694, 457), bgr_color=(45, 89, 255))) == False):
+    if not bool(PixelChecker(timer, (694, 457), bgr_color=(45, 89, 255))):
         return 'no'
-
     goto_game_page(timer, 'mission_page')
     goto_game_page(timer, 'mission_page')
-    if (ClickImage(timer, GameUI[15])):
+    if ClickImage(timer, GameUI[15]):
         ConfirmOperation(timer, must_confirm=1)
         return 'ok'
-    elif (ClickImage(timer, GameUI[12])):
+    elif ClickImage(timer, GameUI[12]):
         ConfirmOperation(timer, must_confirm=1)
         return 'ok'
-
     return 'no'
     #click(timer, 774, 502)
 

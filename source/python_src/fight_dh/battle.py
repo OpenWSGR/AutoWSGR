@@ -1,11 +1,11 @@
 import time
 
 import yaml
-from api.api_image import ImagesExist, WaitImages
-from api.api_android import UpdateScreen, click
+from utils.api_image import ImagesExist, WaitImages
+from utils.api_android import UpdateScreen, click
 from constants.image_templates import FightImage, SymbolImage, IdentifyImages
 from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network
-from supports.run_timer import Timer
+from timer.run_timer import Timer
 from utils.io import recursive_dict_update
 
 from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock

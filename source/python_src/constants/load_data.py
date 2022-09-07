@@ -1,13 +1,16 @@
 
-from api.api_image import MyTemplate
-from constants.image_templates import BackImage, ChapterImage, ChooseShipImages, ConfirmImage, ErrorImages, FightImage, FightResultImage, GameUI, IdentifyImages, NumberImage, RepairImage, StartImage, SymbolImage, TeamImage
+from utils.api_image import MyTemplate, relative_to_absolute
+from utils.io import get_all_files
+
+from constants.image_templates import (BackImage, ChapterImage,
+                                       ChooseShipImages, ConfirmImage,
+                                       ErrorImages, FightImage,
+                                       FightResultImage, GameUI,
+                                       IdentifyImages, NumberImage,
+                                       RepairImage, StartImage, SymbolImage,
+                                       TeamImage)
 from constants.keypoint_info import POINT_POSITION
 from constants.other_constants import ALL_UI, FIGHT_RESULTS
-from supports.run_timer import Timer
-from utils.image_position import relative_to_absolute
-from supports.io import get_all_files
-
-__all__ = ["load_all_data"]
 
 all_images = get_all_files('./data/images', must='')
 
@@ -543,7 +546,7 @@ def load_point_positions():
     POINT_POSITION[(9, 1, 'O')] = relative_to_absolute((0.264, 0.157))
 
 
-def load_all_data(timer: Timer):
+def load_all_data():
     load_point_positions()
     load_images()
     # load_decisive_data()

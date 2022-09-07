@@ -1,10 +1,9 @@
 import numpy as np
-from api.api_android import UpdateScreen
+from utils.api_android import UpdateScreen
 from game.switch_page import goto_game_page
 from utils.image_position import crop_image
 from utils.io import yaml_to_dict
 
-__all__ = ['get_resources', 'get_loot_and_ship']
 
 POS = yaml_to_dict('./source/python_src/ocr_dh/relative_location.yaml')
 

@@ -1,11 +1,9 @@
-from ocr_dh.digit import get_resources
-
-from game.switch_page import goto_game_page, is_bad_network
 import math
-from supports.run_timer import Timer
+import os
+import time
+
 import constants.settings as S
-
-
+import numpy as np
 from constants.color_info import (BLOOD_COLORS, CHALLENGE_BLUE,
                                   SUPPOER_DISABLE, SUPPORT_ENALBE)
 from constants.image_templates import (ChapterImage, FightImage,
@@ -14,26 +12,18 @@ from constants.keypoint_info import BLOODLIST_POSITION, TYPE_SCAN_AREA
 from constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC, BG, BM, CA,
                                        CAV, CBG, CL, CLT, CV, CVL, DD, INFO1,
                                        NAP, NO, RESOURCE_NAME, SAP, SC, SS)
-
-from supports.logger import logit
-from api.api_image import (GetImagePosition, ImagesExist, PixelChecker,
-                           WaitImages)
-from supports.math_functions import (CalcDis, CheckColor, get_nearest,
-            matri_to_str)
+from ocr_dh.digit import get_resources
 from PIL import Image as PIM
-import os
-import time
-from supports.io import delete_file, read_file, save_image, write_file
-import numpy as np
-from api.api_android import UpdateScreen, swipe
+from utils.logger import logit
+from utils.math_functions import (CalcDis, CheckColor, get_nearest,
+                                  matri_to_str)
+from timer.run_timer import Timer
+from utils.api_android import UpdateScreen, swipe
+from utils.api_image import (GetImagePosition, ImagesExist, PixelChecker,
+                             WaitImages)
+from utils.io import delete_file, read_file, save_image, write_file
 
-
-# 获取游戏信息
-
-__all__ = ["GetChapter", "GetNode", "GetEnemyCondition", "DetectShipStatu", "DetectShipType",
-           "UpdateShipPosition", "UpdateShipPoint", "CheckSupportStatu", "is_bad_network",
-           "ExpeditionStatus", 'get_exercise_status', 'FightResult', "Resources"
-           ]
+from game.switch_page import goto_game_page
 
 
 class ExpeditionStatus():

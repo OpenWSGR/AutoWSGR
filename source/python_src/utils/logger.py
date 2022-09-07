@@ -6,10 +6,9 @@ from functools import wraps
 import constants.global_attributes as Globals
 import constants.settings as S
 from constants.other_constants import INFO1, INFO2, INFO3
+from utils.io import create_file_with_path
 
-from supports.io import create_file_with_path
 
-__all__ = ['logit', 'logit_time']
 time_path = os.path.join(S.LOG_PATH, time.strftime("%Y-%m-%d %H-%M-%S", time.localtime()))
 log_debug_path = os.path.join(time_path, 'debug.txt')
 log_info1_path = os.path.join(time_path, 'info1.txt')

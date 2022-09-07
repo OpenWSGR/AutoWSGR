@@ -1,22 +1,20 @@
 import time
 
 import constants.settings as S
-from api.api_android import click
-from api.api_image import GetImagePosition, ImagesExist, WaitImages
-from api.api_windows import CheckNetWork
+from utils.api_android import click
+from utils.api_image import GetImagePosition, ImagesExist, WaitImages
+from utils.api_windows import CheckNetWork
 from constants.image_templates import (BackImage, ErrorImages, GameUI,
                                        SymbolImage)
 from constants.other_constants import INFO1, INFO2
-from supports.logger import logit
-from supports.run_timer import Timer
+from utils.logger import logit
+from timer.run_timer import Timer
 
 from game.identify_pages import get_now_page, wait_pages
 
 """用于切换界面的数据结构和操作
 整个游戏 UI 将被构建为一颗以主页为根的有向树,该有向树带横插边
 """
-
-__all__ = ['GoMainPage', "is_bad_network",  'goto_game_page', 'load_game_ui', 'process_bad_network']
 
 
 page_count = 0

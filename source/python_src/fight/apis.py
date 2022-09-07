@@ -1,9 +1,9 @@
 import time
 
-from api.api_android import UpdateScreen, click, is_game_running
-from api.api_image import ClickImage, ImagesExist, WaitImage, WaitImages
-from api.api_windows import (ConnectAndroid, RestartAndroid, is_android_online,
-                             wait_network)
+from utils.api_android import UpdateScreen, click, is_game_running
+from utils.api_image import ClickImage, ImagesExist, WaitImage, WaitImages
+from utils.api_windows import (ConnectAndroid, RestartAndroid, is_android_online,
+                               wait_network)
 from constants.image_templates import FightImage, SymbolImage
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON
 from constants.other_constants import INFO2, INFO3
@@ -13,49 +13,44 @@ from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
                                 UpdateShipPoint, UpdateShipPosition)
 from game.identify_pages import get_now_page, identify_page
 from game.switch_page import GoMainPage, goto_game_page, process_bad_network
-from supports.logger import logit
-from supports.run_timer import ImageNotFoundErr, NetworkErr, Timer
+from utils.logger import logit
+from timer.run_timer import ImageNotFoundErr, NetworkErr, Timer
 
 from fight.data_structures import DecisionBlock, RepairBlock
 
-__all__ = ['fight', 'normal_fight', 'choose_decision', 'work', 'SL', 'fight_end', 'wait_until_decision']
-
 
 def work(timer: Timer, fun, times=1, end=False):
-    while (times):
+    while times:
         print("Round", times)
         try:
             res = fun()
-            if (res == 'retry'):
+            if res == 'retry':
                 continue
-            if (res is not None):
+            if res is not None:
                 print(res)
                 time.sleep(1)
-            if (end and timer.is_fight_end() == False):
+            if end and timer.is_fight_end() == False:
                 print("The Fight isn't end, retrying")
                 continue
-
-        except (BaseException, Exception) as e:
+        except BaseException as e:
             print(e)
-            # TODO: 有bug，模拟器闪退
-            if (time.time() - timer.last_error_time < 2000 or is_android_online(timer, 5) == False):
+            if time.time() - timer.last_error_time < 2000 or is_android_online(timer, 5) == False:
                 RestartAndroid(timer)
                 ConnectAndroid(timer)
                 start_game(timer)
-            else:
-                if (is_game_running(timer)):
-                    if (wait_network() == False):
-                        raise NetworkErr("Network error, please check your hardware or network configuration")
-                    if (process_bad_network(timer)):
-                        if (get_now_page(timer) is not None):
-                            goto_game_page(timer, 'main_page')
-                        else:
-                            restart(timer)
-                    else:
+            elif is_game_running(timer):
+                if wait_network() == False:
+                    raise NetworkErr("Network error, please check your hardware or network configuration")
+
+                if process_bad_network(timer):
+                    if get_now_page(timer) is None:
                         restart(timer)
+                    else:
+                        goto_game_page(timer, 'main_page')
                 else:
                     restart(timer)
-
+            else:
+                restart(timer)
         times -= 1
 
 
@@ -75,7 +70,7 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
         'dock is full':船坞已满
         'SL': 进行了 SL 操作
     """
-    if (decision_maker is None):
+    if decision_maker is None:
         decision_maker = timer.defaul_decision_maker
     timer.oil = timer.ammo = 10
     goto_game_page(timer, 'map_page')
@@ -85,26 +80,23 @@ def normal_fight(timer: Timer, chapter, node, team, decision_maker: DecisionBloc
     QuickRepair(timer, repair)
     click(timer, 900, 500, 1, delay=0)
     start_time = time.time()
-    while (identify_page(timer, 'fight_prepare_page')):
+    while identify_page(timer, 'fight_prepare_page'):
         UpdateScreen(timer)
-        if (ImagesExist(timer, SymbolImage[3], need_screen_shot=0)):
+        if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
             return "dock is full"
-        if (False):
+        if False:
             """大破出征确认
             """
-        if (False):
             """补给为空
             """
             return 'supply is empty'
-        if (time.time() - start_time > 15):
-            if (process_bad_network(timer)):
-                if (identify_page(timer, 'fight_prepare_page')):
+        if time.time() - start_time > 15:
+            if process_bad_network(timer):
+                if identify_page(timer, 'fight_prepare_page'):
                     return normal_fight(timer, chapter, node, team, decision_maker, repair, *args, **kwargs)
-                else:
-                    pass
+
             else:
                 raise TimeoutError("map_fight prepare timeout")
-
     return map_fight(timer, decision_maker, 'normal', 'map_page', *args, **kwargs)
 
 
@@ -142,7 +134,7 @@ def fight_during(timer: Timer, decision_maker: DecisionBlock = None, *args, **kw
 
 
 @logit(level=INFO2)
-def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True, try_times=0, *args, **kwargs):
+def fight_end(timer: Timer, type='map_fight', end_page=None, gap=0.15, begin=True, try_times=0, *args, **kwargs):
     """战斗结算,到领取舰船结束(可能没有)为止
     Todo:
         锁定获取的新船
@@ -161,50 +153,42 @@ def fight_end(timer: Timer, type='map_fight', end_page=None, gap=.15, begin=True
     Rasie:
         TimeoutError:未知原因导致了战斗无法结算
     """
-    if (try_times > 75):
-        if (process_bad_network(timer)):
+    if try_times > 75:
+        if process_bad_network(timer):
             try_times = 0
         else:
             raise TimeoutError("unknown error lead to fight_end timeout")
-
-    if (type == 'map_fight'):
+    if type == 'map_fight':
         kwargs['oil_check'] = True
     if type in ['exercise', 'battle']:
         kwargs['no_ship_get'] = True
         kwargs['no_flagship_check'] = True
         kwargs['no_proceed'] = True
-
     time.sleep(gap)
-    if (begin):
+    if begin:
         """点击继续部分
         """
         time.sleep(1.5)
         DetectShipStatu(timer, 'sumup')
         timer.fight_result.detect_result()
         print(timer.fight_result)
-        click(timer, 900, 500, 2, .16)
-        if ('no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0)):
-            click(timer, 900, 500, 1, .25)
-
-    if (type != 'map_fight'):
+        click(timer, 900, 500, 2, 0.16)
+        if 'no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0):
+            click(timer, 900, 500, 1, 0.25)
+    if type != 'map_fight':
         time.sleep(1)
         return 'fight_end'
-
     UpdateScreen(timer)
-    if (end_page is not None and identify_page(timer, end_page, 0)):
+    if end_page is not None and identify_page(timer, end_page, 0):
         return 'map_end'
-    if ('no_flagship_check' not in kwargs and ImagesExist(timer, FightImage[4], need_screen_shot=0)):
+    if 'no_flagship_check' not in kwargs and ImagesExist(timer, FightImage[4], need_screen_shot=0):
         """旗舰大破"""
-        ClickImage(timer, FightImage[4], must_click=True, delay=.25)
+        ClickImage(timer, FightImage[4], must_click=True, delay=0.25)
         return 'map_end'
-    if ('no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0)):
-        click(timer, 900, 500, 1, .25)
-    if ('no_proceed' not in kwargs and ImagesExist(timer, FightImage[5], need_screen_shot=0)):
+    if 'no_ship_get' not in kwargs and ImagesExist(timer, SymbolImage[8], need_screen_shot=0):
+        click(timer, 900, 500, 1, 0.25)
+    if 'no_proceed' not in kwargs and ImagesExist(timer, FightImage[5], need_screen_shot=0):
         return 'proceed'
-    if ('oil_check' in kwargs):
-        # 检查燃油
-        pass
-
     return fight_end(timer, type, end_page, gap, False, try_times + 1, *args, **kwargs)
 
 
@@ -314,82 +298,70 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
         ImageNorFoundErr:当前不存在该操作
         TimeoutError:不能完成该操作
     """
-    if (try_times > 3):
+    if try_times > 3:
         raise TimeoutError("can't do this operaion")
-
     try:
-        if (type == 'fight'):
-            if (extra_check and not ImagesExist(timer, FightImage[2])):
+        if type == 'fight':
+            if extra_check and not ImagesExist(timer, FightImage[2]):
                 raise ImageNotFoundErr("no fight choose options")
-
-            if (value == 1):
+            if value == 1:
                 click(timer, 855, 501, delay=0)
-                res = WaitImages(timer, [FightImage[1], SymbolImage[4]], .8)
-                if (res == None):
+                res = WaitImages(timer, [FightImage[1], SymbolImage[4]], 0.8)
+                if res is None:
                     raise BaseException()
                 print("decision done:", type, value)
-
-            elif (value == 0):
+            elif value == 0:
                 click(timer, 677, 492, delay=0)
                 print("decision done:", type, value)
                 return
-
-            elif (value == 2):
-                if (not ImagesExist(timer, FightImage[13])):
+            elif value == 2:
+                if not ImagesExist(timer, FightImage[13]):
                     raise ImageNotFoundErr("no detour option")
-
                 click(timer, 540, 500, delay=0)
                 res = WaitImages(timer, [FightImage[1], FightImage[7], FightImage[8]], gap=0)
-                if (res == 0):
+                if res == 0:
                     return False
-                elif (res == 1 or res == 2):
+                elif res in [1, 2]:
                     print("decision done:", type, value)
                     return True
                 else:
                     raise BaseException
-
-        if (type == 'formation'):
-            if (extra_check and not ImagesExist(timer, FightImage[1], 0, .8)):
+        if type == 'formation':
+            if extra_check and not ImagesExist(timer, FightImage[1], 0, 0.8):
                 raise ImageNotFoundErr("no formation choose options")
-            if (value == 0):
+            if value == 0:
                 SL(timer)
                 print("decision done:", type, 'SL')
                 return 'SL'
-
             click(timer, 573, value * 100 - 20, delay=2)
             res = WaitImage(timer, SymbolImage[4])
-            if (res == False):
+            if res == False:
                 raise BaseException()
             print("decision done:", type, value)
-
-        if (type == 'night'):
-            if (not bool(value)):
+        if type == 'night':
+            if not bool(value):
                 click(timer, 615, 350, delay=2)
-                if (WaitImage(timer, FightImage[3], confidence=0.85) == False):
+                if WaitImage(timer, FightImage[3], confidence=0.85) == False:
                     raise BaseException()
                 print("decision done:", type, value)
             else:
                 click(timer, 325, 350, delay=2)
-                if (WaitImage(timer, FightImage[6], 0, .8) == False):
+                if WaitImage(timer, FightImage[6], 0, 0.8) == False:
                     raise BaseException()
             print("decision done:", type, value)
-
-        if (type == 'proceed'):
-            if (not bool(value)):
-                # TODO：回港需要结束战斗
-                click(timer, 615, 350)
-            else:
+        if type == 'proceed':
+            if bool(value):
                 click(timer, 325, 350)
-
-        if (type == 'fight_condition'):
-            if (ImagesExist(timer, FightImage[10])):
+            else:
+                click(timer, 615, 350)
+        if type == 'fight_condition':
+            if ImagesExist(timer, FightImage[10]):
                 click(timer, *FIGHT_CONDITIONS_POSITON[value])
             else:
                 raise ImageNotFoundErr("no fight condition options")
-
     except:
         print("can't do this opeation,checking")
-        if (process_bad_network(timer)):
+        if process_bad_network(timer):
             return choose_decision(timer, type, value, extra_check, try_times + 1)
         else:
             raise TimeoutError("can't do this operation" + type + str(value))

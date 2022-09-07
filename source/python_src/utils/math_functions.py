@@ -1,11 +1,7 @@
 import numpy as np
 
-__all__ = ["CalcDis", "CheckColor", "matri_to_str", "get_nearest"]
-
-
 def CalcDis(p1, p2):
     """计算两个点的欧几里得距离的平方
-
     Args:
         p1 : 第一个点的坐标
         p2 : 第二个点的坐标

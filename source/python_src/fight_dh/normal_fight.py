@@ -2,8 +2,8 @@ import copy
 import time
 
 import yaml
-from api.api_android import UpdateScreen, click
-from api.api_image import ClickImage, ImagesExist
+from utils.api_android import UpdateScreen, click
+from utils.api_image import ClickImage, ImagesExist
 from constants.image_templates import FightImage, IdentifyImages, SymbolImage
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON
 from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
@@ -12,7 +12,7 @@ from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
                                 UpdateShipPoint, UpdateShipPosition)
 from game.identify_pages import identify_page
 from game.switch_page import goto_game_page, process_bad_network
-from supports.run_timer import Timer
+from timer.run_timer import Timer
 from utils.io import recursive_dict_update
 
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship

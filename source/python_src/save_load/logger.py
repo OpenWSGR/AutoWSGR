@@ -1,11 +1,11 @@
 import os
 from distutils.file_util import write_file
 
-from api.api_android import UpdateScreen
+from utils.api_android import UpdateScreen
 from constants import settings as S
 from PIL import Image as PIM
-from supports.io import save_image
-from supports.run_timer import Timer, get_time_as_string
+from utils.io import save_image
+from timer.run_timer import Timer, get_time_as_string
 
 
 def log_image(timer: Timer, image, name, ndarray_mode="BGR", ignore_existed_image=False, *args, **kwargs):

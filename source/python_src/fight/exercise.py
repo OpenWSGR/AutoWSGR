@@ -1,16 +1,14 @@
-from api.api_android import click, swipe
+from utils.api_android import click, swipe
 from constants.other_constants import INFO3
 from game.game_operation import MoveTeam
 from game.get_game_info import GetEnemyCondition, get_exercise_status
 from game.identify_pages import wait_pages
 from game.switch_page import goto_game_page
-from supports.logger import logit
-from supports.run_timer import Timer
+from utils.logger import logit
+from timer.run_timer import Timer
 
 from fight.apis import fight
 from fight.data_structures import DecisionBlock
-
-__all__ = ['normal_exercise', 'friend_exercise']
 
 
 @logit(level=INFO3)

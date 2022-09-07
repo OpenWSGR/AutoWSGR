@@ -2,11 +2,11 @@ import copy
 import time
 from abc import ABC, abstractmethod
 
-from api.api_android import click
-from api.api_image import GetImagePosition
+from utils.api_android import click
+from utils.api_image import GetImagePosition
 from constants.other_constants import ALL_SHIP_TYPES, SAP
 from fight.apis import SL
-from supports.run_timer import ImageNotFoundErr, Timer
+from timer.run_timer import ImageNotFoundErr, Timer
 
 
 # TODO: 完成

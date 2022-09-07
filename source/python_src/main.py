@@ -5,8 +5,8 @@ import keyboard as kd
 
 import constants.global_attributes as Globals
 import constants.settings as S
-from api.api_android import UpdateScreen, is_game_running
-from api.api_windows import ConnectAndroid
+from utils.api_android import UpdateScreen, is_game_running
+from utils.api_windows import ConnectAndroid
 from fight.data_structures import DecisionBlock, RepairBlock
 from fight.decisive_battle import init_decisive
 from fight_dh.battle import BattlePlan
@@ -17,8 +17,8 @@ from game.get_game_info import ExpeditionStatus, FightResult, Resources
 from game.identify_pages import get_now_page
 from game.switch_page import load_game_ui
 from ocr_dh.ship_name import recognize_ship
-from save_load.load_data import load_all_data
-from supports.run_timer import Timer
+from constants.load_data import load_all_data
+from timer.run_timer import Timer
 
 
 def start_script(device_name="emulator-5554", account=None, password=None):
@@ -29,13 +29,13 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     """
     timer = Timer()
     timer.device_name = device_name
-    load_all_data(timer)
+    load_all_data()
     load_game_ui(timer)
     init_decisive()
     ConnectAndroid(timer)
     UpdateScreen(timer)
     timer.resolution = timer.screen.shape[:2]
-    from supports.logger import time_path
+    from utils.logger import time_path
     timer.log_filepre = time_path
     if account != None and password != None:
         restart(timer, account=account, password=password)

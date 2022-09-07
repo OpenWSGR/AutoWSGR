@@ -1,17 +1,15 @@
 import os
 import shutil
 import time
-from api.api_android import click
+
+import constants.settings as S
 from airtest.core.api import auto_setup
 from constants.other_constants import INFO2
+from utils.logger import logit
+from timer.run_timer import CriticalErr, Timer, try_for_times
 
-from supports.logger import logit
-from supports.run_timer import CriticalErr, Timer, try_for_times
-import constants.settings as S
+from utils.api_android import click
 
-__all__ = ["GetAndroidInfo", "CopyRequirements", 'wait_network',
-           "ConnectAndroid", "RestartAndroid", "CheckNetWork", "is_android_online"
-           ]
 
 # Win 和 Android 的通信
 # Win 向系统写入数据
@@ -81,7 +79,7 @@ def ConnectAndroid(timer: Timer):
     if (is_android_online(timer, 5) == False):
         RestartAndroid(timer)
 
-    from logging import getLogger, ERROR
+    from logging import ERROR, getLogger
     getLogger("airtest").setLevel(ERROR)
     auto_setup(__file__, devices=[
         f"android://127.0.0.1:5037//{timer.device_name}?cap_method=MINICAP&&ori_method=MINICAPORI&&touch_method=MINITOUCH"])

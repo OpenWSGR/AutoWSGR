@@ -1,5 +1,5 @@
 import easyocr
-from api.api_android import UpdateScreen
+from utils.api_android import UpdateScreen
 from utils.image_position import crop_image
 
 from utils.image_position import relative_to_absolute

@@ -1,13 +1,11 @@
 import time
 
-from api.api_android import UpdateScreen
-from api.api_image import ImagesExist, PixelChecker
+from utils.api_android import UpdateScreen
+from utils.api_image import ImagesExist, PixelChecker
 from constants.image_templates import IdentifyImages
 from constants.other_constants import ALL_UI, INFO1
-from supports.logger import logit
-from supports.run_timer import Timer
-
-__all__ = ["identify_page", "wait_pages", "get_now_page", "check_now_page"]
+from utils.logger import logit
+from timer.run_timer import Timer
 
 
 @logit()
