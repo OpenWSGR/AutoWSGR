@@ -199,8 +199,16 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        if(start_march(self.timer) != "ok"):
-            return self._enter_fight()
+        ret = start_march(self.timer)
+        if ret == "ok":
+            return "success"
+        elif ret == "dock is full":
+            print("船坞已满")
+            return "dock is full"
+        else:
+            print("====================================")
+            print("unknow statu:", ret)
+            raise BaseException()
 
         return "success"
 

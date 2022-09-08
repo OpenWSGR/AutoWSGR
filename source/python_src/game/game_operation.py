@@ -37,7 +37,7 @@ def start_march(timer:Timer):
         if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
             return "dock is full"
         if ImagesExist(timer, SymbolImage[9], need_screen_shot=0):
-            return "out of battle times"
+            return "out of times"
         if False:  # TODO: 大破出征确认
             pass
         if False:  # TODO: 补给为空
@@ -45,7 +45,9 @@ def start_march(timer:Timer):
         if time.time() - start_time > 15:
             if process_bad_network(timer):
                 if identify_page(timer, 'fight_prepare_page'):
-                    return "bad_network"
+                    return start_march(timer)
+                else:
+                    return 'failed'
             else:
                 raise TimeoutError("map_fight prepare timeout")
     return "ok"

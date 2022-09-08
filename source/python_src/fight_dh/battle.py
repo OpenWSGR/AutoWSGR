@@ -93,10 +93,16 @@ class BattlePlan(FightPlan):
         wait_pages(self.timer, 'fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
 
-        if(start_march(self.timer) != "ok"):
-            return self._enter_fight()
-        
-        return 'success'
+        ret = start_march(self.timer)
+        if ret == "ok":
+            return "success"
+        elif ret == "out of times":
+            print("战役次数已经用尽")
+            return "out of times"
+        else:
+            print("====================================")
+            print("unknow statu:", ret)
+            raise BaseException()
 
     def _make_decision(self) -> str:
 
