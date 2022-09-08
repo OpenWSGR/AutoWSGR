@@ -205,27 +205,21 @@ class FightPlan(ABC):
         """ 主函数，负责一次完整的战斗. """
         self.fight_recorder.reset()
         # 战斗前逻辑
-        while True:
-            ret = self._enter_fight()
-            if ret == "success":
-                break
-
-            elif ret == "need SL":
-                SL(self.timer)
-                return self.run()
-            elif ret == "dock is full":
-                return ret  # TODO：加入分解逻辑
-            elif ret == "fight end":
-                self.timer.set_page(self.Info.start_page)
-                break
-            
-            elif ret == "out of times":
-                return ret
-            else:
-                print("\n==========================================")
-                print('enter fight error,screen logged')
-                self.timer.log_screen()
-                raise BaseException(str(time.time()) + "enter fight error")
+        ret = self._enter_fight()
+        if ret == "success":
+            pass
+        elif ret == "dock is full":
+            return ret  # TODO：加入分解逻辑
+        elif ret == "fight end":
+            self.timer.set_page(self.Info.end_page)
+            return ret
+        elif ret == "out of times":
+            return ret
+        else:
+            print("\n==========================================")
+            print('enter fight error,screen logged')
+            self.timer.log_screen()
+            raise BaseException(str(time.time()) + "enter fight error")
 
         # 战斗中逻辑
         self.Info.reset()  # 初始化战斗信息
@@ -237,7 +231,7 @@ class FightPlan(ABC):
                 SL(self.timer)
                 return self.run()
             elif ret == "fight end":
-                self.timer.set_page(self.Info.start_page)
+                self.timer.set_page(self.Info.end_page)
                 break
 
         return "success"
@@ -265,18 +259,15 @@ class DecisionBlock():
             condition, act = rule
             rcondition = ""
             last = 0
-            for (i, ch) in enumerate(condition):
-                if(ord(ch) <= ord ("Z") and ord(ch) >= ord("A")):
-                    pass
-                else:
-                    if(last != i):
-                        if(condition[last:i] in ALL_SHIP_TYPES):
+            for i, ch in enumerate(condition):
+                if ord(ch) > ord("Z") or ord(ch) < ord("A"):
+                    if last != i:
+                        if condition[last:i] in ALL_SHIP_TYPES:
                             rcondition += f"self.timer.enemy_type_count['{condition[last:i]}']"
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch
                     last = i + 1
-                    
             print(rcondition)
             if eval(rcondition):
                 return act

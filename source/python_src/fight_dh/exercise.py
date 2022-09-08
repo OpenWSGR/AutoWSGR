@@ -66,7 +66,7 @@ class NormalExerciseInfo(FightInfo):
 
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
-        self.start_page = "exercise_page"
+        self.end_page = "exercise_page"
         self.robot = True
         self.successor_states = {
             "exercise_page": ["rival_info"],
@@ -128,13 +128,18 @@ class NormalExercisePlan(FightPlan):
     def __init__(self, timer: Timer, plan_path, default_path):
         super().__init__(timer)
         
+        # 加载默认配置
         default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        exercise_defaults, node_defaults = default_args["exercise_defaults"], default_args["node_defaults"]
-        # 加载地图计划
+        plan_defaults = default_args["exercise_defaults"]
+        plan_defaults.update({"node_defaults": default_args["node_defaults"]})
+
+        # 加载计划配置
         plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        args = recursive_dict_update(exercise_defaults, plan_args, skip=['node_args'])
+        args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
-        # 加载各节点计划
+
+        # 加载节点配置
+        node_defaults = self.node_defaults
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)

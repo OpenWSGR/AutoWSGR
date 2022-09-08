@@ -10,16 +10,31 @@ selected_nodes: [A, B, D, H, I, M] # 选择要打的节点，白名单模式，�
 fight_condition: 4 # 战况选择
 repair_mode: 1
 
+node_defaults:
+  # 索敌成功阶段
+  detour: False # 是否迂回
+  enemy_rules: 
+    - [DD + CL <= 1, 4]
+    - [CVL == 1 and CV == 0, 4]
+  # 阵型选择阶段
+  SL_when_spot_enemy_fails: False # 索敌失败时是否SL
+  SL_when_detour_fails: False # 是否迂回失败后退出
+  formation: 2 # 正常情况阵型选择，1-5
+  formation_when_spot_enemy_fails: False # 启用时改为数字，索敌失败时阵型选择，1-5
+  # 夜战选择阶段
+  night: False # 是否夜战
+  # 前进选择阶段
+  proceed: True # 结束后是否继续
+  proceed_stop: [2,2,2,2,2,2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
+  # 特殊情况
+  supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退
+
 # ToDo:
 # 对每个节点指定战况选择
-
-# NodeLevel
-default:
-  plans/6SS-U1206-map_fight.yaml
 
 node_args:
   M:
     formation: 4
-    night: 1
+    night: True
   
 

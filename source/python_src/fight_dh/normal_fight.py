@@ -8,7 +8,6 @@ import time
 import yaml
 
 
-
 from utils.io import recursive_dict_update
 
 from constants.custom_expections import ImageNotFoundErr
@@ -27,7 +26,6 @@ from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRec
 
 """
 常规战决策模块
-TODO: 1.资源点
 """
 
 
@@ -36,7 +34,7 @@ class NormalFightInfo(FightInfo):
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
 
-        self.start_page = "map_page"
+        self.end_page = "map_page"
         self.chapter = 1  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = 1  # 节点名
         self.ship_position = (0, 0)
@@ -100,8 +98,7 @@ class NormalFightInfo(FightInfo):
             self._update_ship_position()
             self._update_ship_point()
 
-        # 1. proceed, 资源点 (OK)
-        # 2. get_ship, 锁定新船 (OK)
+        # 1. proceed: 资源点  2. get_ship: 锁定新船
         if self.state in ["proceed", "get_ship"]:
             ConfirmOperation(self.timer, delay=0)
 
@@ -109,7 +106,7 @@ class NormalFightInfo(FightInfo):
         # 在某些State下可以记录额外信息
         if self.state == "spot_enemy_success":
             GetEnemyCondition(self.timer, 'fight')
-            
+
         elif self.state == "result":
             DetectShipStatu(self.timer, 'sumup')
             self.fight_result.detect_result()
@@ -151,7 +148,7 @@ class NormalFightInfo(FightInfo):
 class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
 
-    def __init__(self, timer: Timer, plan_path, default_path=None):
+    def __init__(self, timer: Timer, plan_path, default_path='plans/default.yaml'):
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
@@ -161,30 +158,27 @@ class NormalFightPlan(FightPlan):
             BaseException: _description_
         """
         super().__init__(timer)
-        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        
-        if("default" in plan_args and default_path is None):
-            default_path = plan_args["default"]
-        if(default_path == None):
-            raise BaseException("No Defaulf Rules")
-        
+
+        # 加载默认配置
         default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        plan_defaults, node_defaults = default_args["normal_fight_defaults"], default_args["node_defaults"]
-        # 加载地图计划
-        
+        plan_defaults = default_args["normal_fight_defaults"]
+        plan_defaults.update({"node_defaults": default_args["node_defaults"]})
+
+        # 加载计划配置
+        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
-        # 加载各节点计划
+
+        # 加载节点配置
+        node_defaults = self.node_defaults
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)
-            if(('node_args' not in plan_args) or (plan_args['node_args'] is None) or (node_name not in plan_args['node_args'])):
-                pass
-            else: 
+            if 'node_args' in plan_args and plan_args['node_args'] is not None and node_name in plan_args['node_args']:
                 node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
 
-        # 构建信息存储结构
+        # 信息记录器
         self.Info = NormalFightInfo(self.timer)
 
     def _enter_fight(self):
@@ -199,10 +193,7 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        if(start_march(self.timer) != "ok"):
-            return self._enter_fight()
-
-        return "success"
+        return self._enter_fight()
 
     def _make_decision(self):
 
@@ -228,11 +219,11 @@ class NormalFightPlan(FightPlan):
                 return "fight end"
 
         elif state == "proceed":
-            
+
             def check_blood(blood, rule):
                 """检查血量状态是否满足前进条件
                     >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
-                    
+
                     >>>True
                 Args:
                     blood (list): 1-based
@@ -240,15 +231,15 @@ class NormalFightPlan(FightPlan):
                 """
                 l = max(len(blood) - 1, len(rule))
                 for i in range(l):
-                    if(blood[i + 1] == -1 or rule[i] == -1):
+                    if (blood[i + 1] == -1 or rule[i] == -1):
                         continue
-                    if(blood[i + 1] >= rule[i]):
+                    if (blood[i + 1] >= rule[i]):
                         return False
                 return True
-                
+
             is_proceed = self.nodes[self.Info.node].proceed and \
-                         check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
-            
+                check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
+
             if is_proceed:
                 self.timer.Android.click(325, 350)
                 self.Info.last_action = "yes"
@@ -266,7 +257,7 @@ class NormalFightPlan(FightPlan):
             return 'fight end'
 
         # 进行通用NodeLevel决策
-        
+
         action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)
         self.Info.last_action = action
         self.fight_recorder.append(StageRecorder(self.Info.state, action, self.timer))

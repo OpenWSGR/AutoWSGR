@@ -18,7 +18,7 @@ class BattleInfo(FightInfo):
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
 
-        self.start_page = "battle_page"
+        self.end_page = "battle_page"
 
         self.successor_states = {
             "proceed": ["spot_enemy_success", "formation", "fight_period"],
@@ -63,19 +63,22 @@ class BattleInfo(FightInfo):
 
 
 class BattlePlan(FightPlan):
-    
+
     def __init__(self, timer, plan_path, default_path) -> None:
         super().__init__(timer)
 
+        # 加载默认配置
         default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        plan_defaults, node_defaults = default_args["battle_defaults"], default_args["node_defaults"]
-        # 加载战役计划
+        plan_defaults = default_args["battle_defaults"]
+        plan_defaults.update({"node_defaults": default_args["node_defaults"]})
+
+        # 加载计划配置
         plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
-        self.timer.chapter = 'battle'
-        self.timer.node = self.map
-        # 加载战役节点计划
+
+        # 加载节点配置
+        node_defaults = self.node_defaults
         node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
         self.node = NodeLevelDecisionBlock(timer, node_args)
 
@@ -88,15 +91,12 @@ class BattlePlan(FightPlan):
         hard = self.map > 5
         if now_hard != hard:
             self.timer.Android.click(800, 80, delay=1)
-            
+
         self.timer.Android.click(180 * (self.map - hard * 5), 200)
         wait_pages(self.timer, 'fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
 
-        if(start_march(self.timer) != "ok"):
-            return self._enter_fight()
-        
-        return 'success'
+        return start_march(self.timer)
 
     def _make_decision(self) -> str:
 
