@@ -224,8 +224,119 @@ def DestoryShip(timer, reserve=1, amount=1):
     # timer.Android.click(870, 480, delay=1)
     # if(ImagesExist(timer, GameUI[8])):
     #     click(807, 346)
-    # timer.Android.click(364, 304, delay=0.66)
 
+
+@logit(level=INFO2)
+def MoveChapter(timer: Timer, target, chapter_now=None):
+    """移动地图章节到 target
+    含错误检查
+
+    Args:
+        timer (Timer): _description_
+        target (int): 目标
+        chapter_now (_type_, optional): 现在的章节. Defaults to None.
+    Raise:
+        ImageNotFoundErr:如果没有找到章节标志或地图界面标志
+    """
+    if(identify_page(timer, 'map_page') == False):
+        raise ImageNotFoundErr("not on page 'map_page' now")
+
+    if(chapter_now == target):
+        return
+    try:
+        if chapter_now is None:
+            chapter_now = GetChapter(timer)
+        print("NowChapter:", chapter_now)
+        if (chapter_now > target):
+            if(chapter_now - target >= 3):
+                chapter_now -= 3
+                click(timer, 95, 97, delay=0)
+            elif(chapter_now - target == 2):
+                chapter_now -= 2
+                click(timer, 95, 170, delay=0)
+            elif(chapter_now - target == 1):
+                chapter_now -= 1
+                click(timer, 95, 229, delay=0)
+
+        elif (chapter_now - target <= -3):
+            chapter_now += 3
+            click(timer, 95, 485, delay=0)
+        elif(chapter_now - target == -2):
+            chapter_now += 2
+            click(timer, 95, 416, delay=0)
+        elif(chapter_now - target == -1):
+            chapter_now += 1
+            click(timer, 95, 366, delay=0)
+
+            if(WaitImage(timer, ChapterImage[chapter_now]) == False):
+                raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+            time.sleep(0.15)
+            MoveChapter(timer, target, chapter_now)
+    except:
+        print("can't move chapter, time now is", time.time())
+        if process_bad_network(timer, 'move_chapter'):
+            MoveChapter(timer, target)
+        else:
+            raise ImageNotFoundErr("unknow reason can't find chapter image")
+
+
+@logit(level=INFO2)
+def MoveNode(timer: Timer, target):
+    """改变地图节点,不检查是否有该节点
+    含网络错误检查
+    Args:
+        timer (Timer): _description_
+        target (_type_): 目标节点
+
+    """
+    if(identify_page(timer, 'map_page') == False):
+        raise ImageNotFoundErr("not on page 'map_page' now")
+
+    NowNode = GetNode(timer)
+    try:
+        print("NowNode:", NowNode)
+        if(target > NowNode):
+            for i in range(1, target - NowNode + 1):
+                swipe(timer, 715, 147, 552, 147, duration=0.25)
+                if(WaitImage(timer, NumberImage[NowNode + i]) == False):
+                    raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+                time.sleep(0.15)
+        else:
+            for i in range(1, NowNode - target + 1):
+                swipe(timer, 552, 147, 715, 147, duration=0.25)
+                if(WaitImage(timer, NumberImage[NowNode - i]) == False):
+                    raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+                time.sleep(0.15)
+    except:
+        print("can't move chapter, time now is", time.time)
+        if(process_bad_network(timer)):
+            MoveNode(timer, target)
+        else:
+            raise ImageNotFoundErr("unknow reason can't find number image" + str(target))
+
+
+@logit(level=INFO3)
+def change_fight_map(timer: Timer, chapter, node):
+    """在地图界面改变战斗地图(通常是为了出征)
+    可以处理网络错误
+    Args:
+        timer (Timer): _description_
+        chapter (int): 目标章节
+        node (int): 目标节点
+
+    Raises:
+        ValueError: 不在地图界面
+        ValueError: 不存在的节点
+    """
+    if(timer.now_page.name != 'map_page'):
+        raise ValueError("can't change_fight_map at page:", timer.now_page.name)
+    if node not in NODE_LIST[chapter]:
+        raise ValueError('node' + str(node) + 'not in the list of chapter' + str(chapter))
+
+    MoveChapter(timer, chapter)
+    MoveNode(timer, node)
+    timer.chapter = chapter
+    timer.node = node
 
 @logit(level=INFO2)
 def verify_team(timer: Timer):
@@ -244,7 +355,6 @@ def verify_team(timer: Timer):
     if (identify_page(timer, 'fight_prepare_page') == False):
         raise ImageNotFoundErr("not on fight_prepare_page")
     
-    log_image(timer, timer.screen, str(time.time()))
     for _ in range(5):
         for i, position in enumerate([(64, 83), (186, 83), (310, 83), (430, 83)]):
             # if(S.DEBUG):print(timer.screen[83][64])

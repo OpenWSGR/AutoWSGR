@@ -155,13 +155,9 @@ class NormalExercisePlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-
-        goto_game_page(self.timer, 'exercise_page')
-        self.status = get_exercise_status(self.timer)
-        if(not(any(self.status))):       
-            print("当前没有可以进行的演习")
-            return "out of times"
-        
+        goto_game_page(self.timer, 'exercise_page') 
+        self._exercise_times = self.exercise_times
+        self.exercise_status = [None, None]
         return "success"
 
     @logit(level=INFO2)
@@ -169,21 +165,23 @@ class NormalExercisePlan(FightPlan):
 
         self.Info.update_state()
         state = self.Info.state
-
         # 进行MapLevel的决策
         if state == "exercise_page":
-            if(not(any(self.status))):
-                return "fight end"
-            else:
-                pos = self.status.index(True)
-                self.status[pos] = False
-                if(pos == 1):self.rival = "robot"
-                else:self.rival = "player" 
-                if(pos == 5):
-                    swipe(self.timer, 800, 400, 800, 200)
-                    pos = 4
-                click(self.timer, 770, pos * 110 - 10)
+            self.exercise_status = get_exercise_status(self.timer, self.exercise_status[1])
+            if(self._exercise_times > 0 and any(self.exercise_status[2:])):
+                pos = self.exercise_status[2:].index(True)
+                self.rival = 'player'
+                click(self.timer, 770, (pos + 1) * 110 - 10)
+                return 'fight continue'
+            elif(self.robot and self.exercise_status[1]):
+                swipe(self.timer, 800, 200, 800, 400) #上滑
+                click(self.timer, 770, 100)
+                self.rival = 'robot'
+                self.exercise_status[1] = False
                 return "fight continue"
+
+            else:
+                return "fight end"
 
         # 进行通用NodeLevel决策
         action, fight_stage = self.nodes[self.rival].make_decision(state, self.Info.last_state, self.Info.last_action)

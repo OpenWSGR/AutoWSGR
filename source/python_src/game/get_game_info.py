@@ -235,7 +235,7 @@ def DetectShipType(timer: Timer):
 
 
 @logit(level=INFO1)
-def get_exercise_status(timer: Timer):
+def get_exercise_status(timer: Timer, robot=None):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
     Args:
@@ -244,16 +244,35 @@ def get_exercise_status(timer: Timer):
     Returns:
         bool: 如果可挑战,返回 True ,否则为 False,1-based
     """
-    timer.Android.swipe(800, 200, 800, 400)
-    timer.UpdateScreen()
+    UpdateScreen(timer)
+    up = bool(PixelChecker(timer, (933, 59), (177, 171, 176), distance=60))
+    down = bool(PixelChecker(timer, (933, 489), (177, 171, 176), distance=60))
+    assert((up and down) == False)
+    
     result = [None, ]
-    for position in range(1, 5):
-        result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
-    timer.Android.swipe(800, 400, 800, 200)
-    timer.UpdateScreen()
-    result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
-    timer.Android.swipe(800, 200, 800, 400)
-    return result
+    if(up == False and down == False):
+        swipe(timer, 800, 200, 800, 400) #上滑
+        UpdateScreen(timer)
+        up = True
+    if(up):
+        for position in range(1, 5):
+            result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
+        swipe(timer, 800, 400, 800, 200) #下滑
+        UpdateScreen(timer)
+        result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
+        return result
+    if(down):
+        for position in range(1, 5):
+            result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
+        if(robot is not None):
+            result.insert(1, robot)
+            return result
+        else:
+            swipe(timer, 800, 200, 800, 400) #上滑
+            UpdateScreen(timer)
+            result.insert(1, bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
+            swipe(timer, 800, 400, 800, 200) #下滑
+            return result
 
 
 @logit(level=INFO1)

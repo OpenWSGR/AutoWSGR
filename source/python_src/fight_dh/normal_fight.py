@@ -28,6 +28,8 @@ from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from game.identify_pages import identify_page
 from game.switch_page import goto_game_page, process_bad_network
 from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
+from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRecorder, FightRecorder
+
 
 """
 常规战决策模块
@@ -182,7 +184,7 @@ class NormalFightPlan(FightPlan):
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)
-            if(node_name not in plan_args['node_args']):
+            if(('node_args' not in plan_args) or (plan_args['node_args'] is None) or (node_name not in plan_args['node_args'])):
                 pass
             else: 
                 node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
@@ -221,12 +223,14 @@ class NormalFightPlan(FightPlan):
             value = self.fight_condition
             self.timer.Android.click(*FIGHT_CONDITIONS_POSITON[value])
             self.Info.last_action = value
+            self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
             return "fight continue"
 
         elif state == "spot_enemy_success":
             if self.Info.node not in self.selected_nodes:  # 不在白名单之内直接SL
                 self.timer.Android.click(677, 492, delay=0)
                 self.Info.last_action = "retreat"
+                self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
                 return "fight end"
 
         elif state == "proceed":
@@ -254,19 +258,24 @@ class NormalFightPlan(FightPlan):
             if is_proceed:
                 self.timer.Android.click(325, 350)
                 self.Info.last_action = "yes"
+                self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
                 return "fight continue"
             else:
                 self.timer.Android.click(615, 350)
                 self.Info.last_action = "no"
+                self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
                 return "fight end"
 
         elif state == "flagship_severe_damage":
             ClickImage(self.timer, FightImage[4], must_click=True, delay=0.25)
+            self.fight_recorder.append(StageRecorder(self.Info.state, None, self.timer))
             return 'fight end'
 
         # 进行通用NodeLevel决策
+        
         action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)
         self.Info.last_action = action
+        self.fight_recorder.append(StageRecorder(self.Info.state, action, self.timer))
         return fight_stage
 
     # ======================== Functions ========================

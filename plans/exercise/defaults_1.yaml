@@ -1,4 +1,6 @@
 # 功能: 演习默认模块
+exercise_times: 4
+robot: True
 
 # NodeLevel
 node_args:
@@ -12,4 +14,5 @@ node_args:
     max_refresh_times: 2
   robot:
     formation: 1
+    enemy_rules: []
 

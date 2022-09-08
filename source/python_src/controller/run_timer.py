@@ -185,7 +185,6 @@ class PixelChecker():
 
     def __bool__(self):
         color = self.timer.screen[self.position[1]][self.position[0]]
-        print(color, self.color)
         return bool(CalcDis(color, self.color) < self.distance ** 2)
 
 

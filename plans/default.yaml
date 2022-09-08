@@ -11,7 +11,7 @@ battle_defaults:
   map: 1 # 简单1-5 困难6-10
   fleet_ships: [] # TODO: 舰队船只，未实现
   repair_mode: 1 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案
-
+  # repair_mode: [1, 1, 1, 1, 1, 1]
 node_defaults:
   # 索敌成功阶段
   detour: False # 是否迂回
@@ -28,7 +28,7 @@ node_defaults:
   night: False # 是否夜战
   # 前进选择阶段
   proceed: False # 结束后是否继续
-  proceed_stop: [2,2,2,2,2,2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
+  proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
                    # [1,2,2,2,2,-1]: 旗舰中破回家, 2-5 号位大破回家,忽略 6 号位的状态
 
   # 特殊情况

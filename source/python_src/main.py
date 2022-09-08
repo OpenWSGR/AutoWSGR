@@ -1,3 +1,4 @@
+
 import datetime
 import time
 
@@ -109,21 +110,23 @@ def main_function():
     #friend_exercise(timer, 1)
     #battle(timer, 9, 8)
 if __name__ == "__main__":    
-
-    # timer = start_script(account=1558718963, password=1558718963)
+    # timer = start_script(account="1558718963", password=1558718963)
     timer = start_script()
+    battleship_plan = BattlePlan(timer, 'plans/battle/hard_Battleship.yaml', 'plans/default.yaml')
+    aircraftcarrier_plan = BattlePlan(timer, 'plans/battle/hard_aircraftcarrier.yaml', 'plans/default.yaml')
+    destroyer_plan = BattlePlan(timer, 'plans/battle/hard_destroyer.yaml', 'plans/default.yaml')
+    submarine_plan = BattlePlan(timer, 'plans/battle/hard_submarine.yaml', 'plans/default.yaml')
+    cruiser_plan = BattlePlan(timer, 'plans/battle/hard_cruiser.yaml', 'plans/default.yaml')
     # start_time = time.time()
     exercise_plan = NormalExercisePlan(timer, "plans/exercise/defaults_1.yaml", "plans/exercise/basics.yaml")
     # exercise_plan.run()
     battle_plan = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
     battle_plan.run()
 
-    # start_time = time.time()
-    # main_function()
-    # plan2 = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
-    # ret = "success"
-    # while ret == "success":
-    #     ret = plan2.run()
+    fight_plan = NormalFightPlan(timer, "plans/normal_fight/8-4-6SSweek.yaml")
+    battleship_plan.run()
+    cruiser_plan.run()
+
 
     # # 9-1BF
     # plan = NormalFightPlan(timer, "plans/normal_fight/8-2B.yaml", "plans/default.yaml")

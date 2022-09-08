@@ -3,24 +3,23 @@
 # 推荐配置：1号位轻巡，3号位航母（建议72工程），其他四个位置任意4船即可
 
 # MapLevel
-chapter: 7 # 章节
+chapter: 8 # 章节
 map: 4 # 地图
 fleet_id: 4 # 舰队编号
-selected_nodes: [B, E, D, L, M, K] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
+selected_nodes: [A, B, D, H, I, M] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
 fight_condition: 4 # 战况选择
 repair_mode: 1
 
+# ToDo:
+# 对每个节点指定战况选择
 
 # NodeLevel
 default:
   plans/6SS-U1206-map_fight.yaml
 
 node_args:
-  B:
-    enemy_rules:
-      - [SS != 2, retreat]
-    formation: 4
   M:
-    formation: 4 # 阵型选择，1-5
-    night: True
+    formation: 4
+    night: 1
+  
 
