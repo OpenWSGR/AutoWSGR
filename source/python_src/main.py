@@ -6,12 +6,11 @@ import keyboard as kd
 
 import constants.global_attributes as Globals
 import constants.settings as S
-from fight.data_structures import DecisionBlock, RepairBlock
-from fight.decisive_battle import init_decisive
 from fight_dh.battle import BattlePlan
 from fight_dh.normal_fight import NormalFightPlan
+from fight_dh.exercise import NormalExercisePlan
 from game.game_operation import (GainBounds, RepairByBath, expedition, restart,
-                                 start_game)
+                                 start_game, GoMainPage)
 from game.get_game_info import ExpeditionStatus, Resources
 from game.identify_pages import get_now_page
 from game.switch_page import load_game_ui
@@ -19,6 +18,7 @@ from ocr.ship_name import recognize_ship
 from constants.load_data import load_all_data
 from controller.run_timer import Timer
 
+import os, sys
 
 sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(__file__))
@@ -33,7 +33,6 @@ def load_data_start():
     timer = Timer()
     load_all_data(timer)
     load_game_ui(timer)
-    init_decisive()
 
 def lencmp(s1, s2):
     if(len(s1) < len(s2)):
@@ -53,7 +52,6 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     timer.device_name = device_name
     load_all_data()
     load_game_ui(timer)
-    init_decisive()
     timer.Windows.ConnectAndroid()
     timer.UpdateScreen()
     timer.resolution = timer.screen.shape[:2]
@@ -66,8 +64,6 @@ def start_script(device_name="emulator-5554", account=None, password=None):
         start_game(timer)
     print("resolution:", timer.resolution)
     timer.ammo = 10
-    timer.defaul_repair_logic = RepairBlock()
-    timer.defaul_decision_maker = DecisionBlock()
     timer.expedition_status = ExpeditionStatus(timer)
     # timer.fight_result = FightResult(timer)
     timer.resources = Resources(timer)
@@ -103,7 +99,6 @@ def listener(event: kd.KeyboardEvent):
 def main_function():
     global timer
     timer = start_script()
-    decisive_fight(timer, '2A')
 
     #weekliy()
     #normal_exercise(timer, 1)
@@ -120,12 +115,12 @@ if __name__ == "__main__":
     # start_time = time.time()
     exercise_plan = NormalExercisePlan(timer, "plans/exercise/defaults_1.yaml", "plans/exercise/basics.yaml")
     # exercise_plan.run()
-    battle_plan = BattlePlan(timer, "plans/battle/hard_Battleship.yaml", "plans/default.yaml")
-    battle_plan.run()
 
     fight_plan = NormalFightPlan(timer, "plans/normal_fight/8-4-6SSweek.yaml")
-    battleship_plan.run()
-    cruiser_plan.run()
+    fight_plan.run()
+    print(fight_plan.fight_recorder)
+    # battleship_plan.run()
+    # cruiser_plan.run()
 
 
     # # 9-1BF

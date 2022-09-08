@@ -1,19 +1,16 @@
-import copy
-from operator import index
-import time
 
-import yaml
-from api import ClickImage, ImagesExist, UpdateScreen, click, swipe
-from constants import *
-from game import (ConfirmOperation, DetectShipStatu, GetEnemyCondition,
-                  MoveTeam, QuickRepair, UpdateShipPoint, UpdateShipPosition,
-                  change_fight_map, goto_game_page, identify_page,
-                  process_bad_network, get_exercise_status)
-from fight import start_fight
-from supports import SymbolImage, Timer
+from .common import FightInfo, FightPlan, Ship
+from utils.logger import logit
 from utils.io import recursive_dict_update
-from supports import logit
-from .common import FightInfo, FightPlan, DecisionBlock, Ship
+import copy
+import yaml
+from constants.image_templates import (FightImage, SymbolImage, IdentifyImages, ExerciseImages)
+from constants.other_constants import INFO2
+from game.game_operation import MoveTeam, start_march
+from game.get_game_info import DetectShipStatu, GetEnemyCondition, get_exercise_status
+from game.switch_page import goto_game_page
+from controller.run_timer import Timer
+from .common import FightInfo, FightPlan, Ship, DecisionBlock
 
 """
 常规战决策模块
@@ -32,10 +29,10 @@ class ExerciseDecisionBlock(DecisionBlock):
                 if act == "refresh":
                     if max_times > 0:
                         max_times -= 1
-                        click(self.timer, 665, 400, delay=0.75)
+                        self.timer.Android.click(665, 400, delay=0.75)
                     else:
                         if self.discard:
-                            click(self.timer, 878, 136, delay=1)
+                            self.timer.Android.click(878, 136, delay=1)
                             return "discard", "fight continue" 
                         else:
                             break
@@ -44,22 +41,22 @@ class ExerciseDecisionBlock(DecisionBlock):
                 elif act == None:
                     break
                     
-            click(self.timer, 804, 390, delay=0)
+            self.timer.Android.click(804, 390, delay=0)
             return "fight", "fight continue"
                 
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
             print("OK")
-            if(start_fight(self.timer) != 'ok'):
+            if(start_march(self.timer) != 'ok'):
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
         
         elif state == "spot_enemy_success":
-            click(self.timer, 900, 500, delay=0)
+            self.timer.Android.click(900, 500, delay=0)
             return None, "fight continue"
         
         elif state == "formation":
-            click(self.timer, 573, self.formation_chosen * 100 - 20, delay=2)
+            self.timer.Android.click(573, self.formation_chosen * 100 - 20, delay=2)
             return None, "fight continue"
             
         return super().make_decision(state, last_state, last_action)
@@ -91,9 +88,9 @@ class NormalExerciseInfo(FightInfo):
         }
 
         self.state2image = {
-            "exercise_page": [identify_images['exercise_page'], 5],
-            "rival_info": [exercise_images["rival_info"], 5],
-            "fight_prepare_page": [identify_images["fight_prepare_page"], 5],
+            "exercise_page": [IdentifyImages['exercise_page'], 5],
+            "rival_info": [ExerciseImages["rival_info"], 5],
+            "fight_prepare_page": [IdentifyImages["fight_prepare_page"], 5],
             "spot_enemy_success": [FightImage[2], 15],
             "formation": [FightImage[1], 15],
             "fight_period": [SymbolImage[4], 3],
@@ -112,14 +109,14 @@ class NormalExerciseInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["fight_prepare_page"]:
-            p = click(self.timer, 380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
+            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
 
-        UpdateScreen(self.timer)
+        self.timer.UpdateScreen()
 
     def _after_match(self):
         if self.state == "result":
             DetectShipStatu(self.timer, 'sumup')
-            self.timer.fight_result.detect_result()
+            self.fight_result.detect_result()
 
     @property
     def node(self):
@@ -171,11 +168,11 @@ class NormalExercisePlan(FightPlan):
             if(self._exercise_times > 0 and any(self.exercise_status[2:])):
                 pos = self.exercise_status[2:].index(True)
                 self.rival = 'player'
-                click(self.timer, 770, (pos + 1) * 110 - 10)
+                self.timer.Android.click(770, (pos + 1) * 110 - 10)
                 return 'fight continue'
             elif(self.robot and self.exercise_status[1]):
-                swipe(self.timer, 800, 200, 800, 400) #上滑
-                click(self.timer, 770, 100)
+                self.timer.Android.swipe(800, 200, 800, 400) #上滑
+                self.timer.Android.click(770, 100)
                 self.rival = 'robot'
                 self.exercise_status[1] = False
                 return "fight continue"

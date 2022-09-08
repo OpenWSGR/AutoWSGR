@@ -2,10 +2,10 @@ import time
 
 import yaml
 from constants.image_templates import FightImage, SymbolImage, IdentifyImages
-from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network
+from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network, start_march
+from game.switch_page import wait_pages
 from controller.run_timer import Timer, ImagesExist, WaitImages
 from utils.io import recursive_dict_update
-from fight import start_fight
 
 from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
 
@@ -90,25 +90,12 @@ class BattlePlan(FightPlan):
             self.timer.Android.click(800, 80, delay=1)
             
         self.timer.Android.click(180 * (self.map - hard * 5), 200)
+        wait_pages(self.timer, 'fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
 
-        start_time = time.time()
-        while True:
-            self.timer.Android.click(900, 500, delay=0)    # 点“开始出征”
-            self.timer.UpdateScreen()
-            if ImagesExist(self.timer, SymbolImage[3], need_screen_shot=0):
-                return "dock is full"
-            if ImagesExist(self.timer, SymbolImage[9], need_screen_shot=0):
-                return 'out of times'
-            if not identify_page(self.timer, 'fight_prepare_page', need_screen_shot=False):
-                break
-            if time.time() - start_time > 15:
-                if process_bad_network(self.timer):
-                    if identify_page(self.timer, 'fight_prepare_page'):
-                        return self._enter_fight(self.timer)
-                else:
-                    raise TimeoutError("map_fight prepare timeout")
-
+        if(start_march(self.timer) != "ok"):
+            return self._enter_fight()
+        
         return 'success'
 
     def _make_decision(self) -> str:

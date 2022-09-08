@@ -133,7 +133,7 @@ class Timer():
             info (str): 要记录的信息
 
         """
-        write_file(filename=os.path.join(S.LOG_PATH, "log.txt"), contents=info+'\n')
+        write_file(path=os.path.join(S.LOG_PATH, "log.txt"), contents=info+'\n')
 
     def log_debug_info(self, info):
         """当调试时向默认信息记录文件记录信息自带换行

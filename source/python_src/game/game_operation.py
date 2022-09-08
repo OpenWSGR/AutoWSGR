@@ -6,7 +6,7 @@ from constants.custom_expections import (CriticalErr, ImageNotFoundErr,
                                          NetworkErr)
 from constants.image_templates import (ChooseShipImages, ConfirmImage,
                                        FightImage, GameUI, RepairImage,
-                                       StartImage, SymbolImage)
+                                       StartImage, SymbolImage, ChapterImage)
 from constants.keypoint_info import BLOODLIST_POSITION
 from constants.load_data import load_all_data
 from constants.other_constants import INFO2, INFO3
@@ -20,6 +20,35 @@ from game.identify_pages import get_now_page, identify_page, wait_pages
 from game.switch_page import (GoMainPage, goto_game_page, is_bad_network,
                               load_game_ui, process_bad_network)
 
+
+@logit(level=INFO2)
+def SL(timer: Timer):
+    restart(timer)
+    GoMainPage(timer)
+    timer.set_page('main_page')
+
+@logit(level=INFO2)
+def start_march(timer:Timer):
+    timer.Android.click(900, 500, 1, delay=0)  # 点击：开始出征
+    start_time = time.time()
+    while identify_page(timer, 'fight_prepare_page'):
+        if(time.time() - start_time > 3):
+            timer.Android.click( 900, 500, 1, delay=0)
+        if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
+            return "dock is full"
+        if ImagesExist(timer, SymbolImage[9], need_screen_shot=0):
+            return "out of battle times"
+        if False:  # TODO: 大破出征确认
+            pass
+        if False:  # TODO: 补给为空
+            pass
+        if time.time() - start_time > 15:
+            if process_bad_network(timer):
+                if identify_page(timer, 'fight_prepare_page'):
+                    return "bad_network"
+            else:
+                raise TimeoutError("map_fight prepare timeout")
+    return "ok"
 
 @logit(level=INFO2)
 def ConfirmOperation(timer: Timer, must_confirm=0, delay=0.5, confidence=.9, timeout=0):
@@ -166,9 +195,7 @@ def expedition(timer: Timer, force=False):
             timer.expedition_status.update()
         else:
             break
-        # except:
-        #     if(not process_bad_network(timer, 'expedition')):
-        #         raise ImageNotFoundErr("Unknown error led to this error")
+
 
 
 @logit(level=INFO3)
@@ -203,7 +230,7 @@ def DestoryShip(timer, reserve=1, amount=1):
         timer.Android.click(807, 346)
     timer.Android.click(870, 480, delay=1)
     timer.Android.click(364, 304, delay=0.66)  # TODO：需要容错，如果没有选中任何船咋办？
-    # 清理第一波
+    """# 清理第一波
 
     # TODO：跟上面一样
     # timer.Android.click(90, 206, delay=1)
@@ -223,120 +250,8 @@ def DestoryShip(timer, reserve=1, amount=1):
     # timer.Android.click(860, 480, delay=0.66)
     # timer.Android.click(870, 480, delay=1)
     # if(ImagesExist(timer, GameUI[8])):
-    #     click(807, 346)
+    #     click(807, 346)"""
 
-
-@logit(level=INFO2)
-def MoveChapter(timer: Timer, target, chapter_now=None):
-    """移动地图章节到 target
-    含错误检查
-
-    Args:
-        timer (Timer): _description_
-        target (int): 目标
-        chapter_now (_type_, optional): 现在的章节. Defaults to None.
-    Raise:
-        ImageNotFoundErr:如果没有找到章节标志或地图界面标志
-    """
-    if(identify_page(timer, 'map_page') == False):
-        raise ImageNotFoundErr("not on page 'map_page' now")
-
-    if(chapter_now == target):
-        return
-    try:
-        if chapter_now is None:
-            chapter_now = GetChapter(timer)
-        print("NowChapter:", chapter_now)
-        if (chapter_now > target):
-            if(chapter_now - target >= 3):
-                chapter_now -= 3
-                click(timer, 95, 97, delay=0)
-            elif(chapter_now - target == 2):
-                chapter_now -= 2
-                click(timer, 95, 170, delay=0)
-            elif(chapter_now - target == 1):
-                chapter_now -= 1
-                click(timer, 95, 229, delay=0)
-
-        elif (chapter_now - target <= -3):
-            chapter_now += 3
-            click(timer, 95, 485, delay=0)
-        elif(chapter_now - target == -2):
-            chapter_now += 2
-            click(timer, 95, 416, delay=0)
-        elif(chapter_now - target == -1):
-            chapter_now += 1
-            click(timer, 95, 366, delay=0)
-
-            if(WaitImage(timer, ChapterImage[chapter_now]) == False):
-                raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
-            time.sleep(0.15)
-            MoveChapter(timer, target, chapter_now)
-    except:
-        print("can't move chapter, time now is", time.time())
-        if process_bad_network(timer, 'move_chapter'):
-            MoveChapter(timer, target)
-        else:
-            raise ImageNotFoundErr("unknow reason can't find chapter image")
-
-
-@logit(level=INFO2)
-def MoveNode(timer: Timer, target):
-    """改变地图节点,不检查是否有该节点
-    含网络错误检查
-    Args:
-        timer (Timer): _description_
-        target (_type_): 目标节点
-
-    """
-    if(identify_page(timer, 'map_page') == False):
-        raise ImageNotFoundErr("not on page 'map_page' now")
-
-    NowNode = GetNode(timer)
-    try:
-        print("NowNode:", NowNode)
-        if(target > NowNode):
-            for i in range(1, target - NowNode + 1):
-                swipe(timer, 715, 147, 552, 147, duration=0.25)
-                if(WaitImage(timer, NumberImage[NowNode + i]) == False):
-                    raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
-                time.sleep(0.15)
-        else:
-            for i in range(1, NowNode - target + 1):
-                swipe(timer, 552, 147, 715, 147, duration=0.25)
-                if(WaitImage(timer, NumberImage[NowNode - i]) == False):
-                    raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
-                time.sleep(0.15)
-    except:
-        print("can't move chapter, time now is", time.time)
-        if(process_bad_network(timer)):
-            MoveNode(timer, target)
-        else:
-            raise ImageNotFoundErr("unknow reason can't find number image" + str(target))
-
-
-@logit(level=INFO3)
-def change_fight_map(timer: Timer, chapter, node):
-    """在地图界面改变战斗地图(通常是为了出征)
-    可以处理网络错误
-    Args:
-        timer (Timer): _description_
-        chapter (int): 目标章节
-        node (int): 目标节点
-
-    Raises:
-        ValueError: 不在地图界面
-        ValueError: 不存在的节点
-    """
-    if(timer.now_page.name != 'map_page'):
-        raise ValueError("can't change_fight_map at page:", timer.now_page.name)
-    if node not in NODE_LIST[chapter]:
-        raise ValueError('node' + str(node) + 'not in the list of chapter' + str(chapter))
-
-    MoveChapter(timer, chapter)
-    MoveNode(timer, node)
-    timer.chapter = chapter
-    timer.node = node
 
 @logit(level=INFO2)
 def verify_team(timer: Timer):
@@ -360,13 +275,13 @@ def verify_team(timer: Timer):
             # if(S.DEBUG):print(timer.screen[83][64])
             if(PixelChecker(timer, position, bgr_color=(228, 132, 16))):
                 return i + 1
-        UpdateScreen(timer)
+        timer.UpdateScreen()
         
         
     if(process_bad_network(timer)):
         return verify_team(timer)
-
-    log_screen(timer)
+    
+    timer.log_screen()
     raise ImageNotFoundErr()
 
 
@@ -385,14 +300,14 @@ def MoveTeam(timer: Timer, target, try_times=0):
         raise ValueError("can't change team sucessfully")
 
     if(identify_page(timer, 'fight_prepare_page') == False):
-        log_screen(timer)
+        timer.log_screen()
         raise ImageNotFoundErr("not on 'fight_prepare_page' ")
 
-    if (vertify_team(timer) == target):
+    if (verify_team(timer) == target):
         return
     print("正在切换队伍到:", target)
     timer.Android.click(110 * target, 81)
-    if (vertify_team(timer) != target):
+    if (verify_team(timer) != target):
         MoveTeam(timer, target, try_times + 1)
 
 
@@ -613,14 +528,3 @@ def get_new_things(timer: Timer, lock=0):
     pass
 
 
-if (__name__ == '__main__'):
-    timer = Timer()
-    load_all_data(timer)
-    load_game_ui(timer)
-
-    ConnectAndroid(timer)
-    timer.expedition_status = ExpeditionStatus(timer)
-    timer.UpdateScreen()
-    timer.set_page(get_now_page(timer))
-    print(timer.now_page.name)
-    ChangeShips(timer, 4, ['U-47', 'U-81'])

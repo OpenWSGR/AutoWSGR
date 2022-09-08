@@ -3,10 +3,12 @@ import time
 from abc import ABC, abstractmethod
 
 from constants.custom_expections import ImageNotFoundErr
-from constants.image_templates import FightImage, FightResultImage
+from constants.image_templates import FightImage, FightResultImage, SymbolImage
 from constants.keypoint_info import BLOODLIST_POSITION
 from constants.other_constants import ALL_SHIP_TYPES, INFO1, SAP
-from fight.apis import SL
+from game.identify_pages import identify_page
+from game.switch_page import process_bad_network
+from game.game_operation import SL
 from controller.run_timer import Timer, GetImagePosition, ImagesExist, WaitImages
 from utils.logger import logit
 from utils.math_functions import get_nearest
@@ -19,10 +21,10 @@ class StageRecorder():
     def __str__(self):
         return f"(stage:{self.stage_name},action:{self.action_name},point:{self.point},info:" + str(self.info) + ")"
     
-    def __init__(self, stage, action, timer:Timer):
+    def __init__(self, stage, action, timer:Timer, ship_point=None):
         self.stage_name = str(stage)
         self.action_name = str(action)
-        self.point = timer.ship_point
+        self.point = ship_point
         self.info = "no info"
         if(stage == 'spot_enemy_success' and action == 'retreat'):
             self.info = remove_0_value_from_dict(timer.enemy_type_count)
@@ -32,6 +34,7 @@ class StageRecorder():
             self.info = timer.fight_result
         if(stage == 'proceed'):
             self.info = timer.ship_status
+
 
 class FightRecorder():
     def __init__(self):
@@ -62,6 +65,7 @@ class FightRecorder():
         for x in self.sr:
             res += str(x) + "\n"
         return res
+    
     
 class Ship():
     """ 用于表示一艘船的数据结构, 注意友方与敌方所独有的field """
@@ -134,8 +138,8 @@ class FightInfo(ABC):
         self.last_action = ""
         self.state = ""
         self.fight_result = FightResult(self.timer) # 战斗结果记录器
-
-    @logit(level=INFO3)
+    
+    
     def update_state(self):
 
         self.last_state = self.state
@@ -220,7 +224,7 @@ class FightPlan(ABC):
             else:
                 print("\n==========================================")
                 print('enter fight error,screen logged')
-                log_screen(self.timer)
+                self.timer.log_screen()
                 raise BaseException(str(time.time()) + "enter fight error")
 
         # 战斗中逻辑
@@ -267,13 +271,13 @@ class DecisionBlock():
                 else:
                     if(last != i):
                         if(condition[last:i] in ALL_SHIP_TYPES):
-                            rcondition += f"self.timer.enemy_type_count[{condition[last:i]}]"
+                            rcondition += f"self.timer.enemy_type_count['{condition[last:i]}']"
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch
                     last = i + 1
                     
-            # print(rcondition)
+            print(rcondition)
             if eval(rcondition):
                 return act
         
@@ -353,4 +357,3 @@ class NodeLevelDecisionBlock(DecisionBlock):
         """
         return super().make_decision(state, last_state, last_action)
         
-

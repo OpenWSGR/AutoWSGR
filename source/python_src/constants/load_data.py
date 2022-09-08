@@ -5,7 +5,7 @@ from utils.io import get_all_files
 
 from constants.image_templates import (BackImage, ChapterImage,
                                        ChooseShipImages, ConfirmImage,
-                                       ErrorImages, FightImage,
+                                       ErrorImages, FightImage, ExerciseImages,
                                        FightResultImage, GameUI,
                                        IdentifyImages, NumberImage,
                                        RepairImage, StartImage, SymbolImage,
@@ -33,9 +33,6 @@ def load_IdentifyImages():
 def load_ErrorImages():
     ErrorImages['bad_network'] = make_tmplate("bad_network")
 
-def load_exercise_images():
-    for image in exercise_image_list:
-        exercise_images[image] = make_tmplate(name=image)
 
 def load_other_images():
     PrePath = "./data/images/"
@@ -141,18 +138,13 @@ def load_fightresult_images():
         FightResultImage[result] = make_tmplate('fight_result/' + result)
 
 
-"""def load_decisive_data():
-    global all_images
-    images = [image for image in all_images if("decisive_images" in image)]
-    for image in images:
-        DecisiveObjectImage"""
-
+def load_ExerciseImages():
+    ExerciseImages['rival_info'] = make_tmplate(path='data/images/exercise/rival_info.PNG')
 
 def load_images():
-
-    load_exercise_images()
-    load_error_images()
-    load_identify_images()
+    load_ExerciseImages()
+    load_ErrorImages()
+    load_IdentifyImages()
     load_fightresult_images()
     load_other_images()
 

@@ -7,14 +7,8 @@ import time
 
 import yaml
 
-from api import ClickImage, ImagesExist, UpdateScreen, click
-from constants import FIGHT_CONDITIONS_POSITON, FightImage, identify_images
-from game import (ConfirmOperation, DetectShipStatu, GetEnemyCondition,
-                  MoveTeam, QuickRepair, UpdateShipPoint, UpdateShipPosition,
-                  change_fight_map, goto_game_page, identify_page,
-                  process_bad_network)
-from fight import start_fight
-from supports import SymbolImage, Timer
+
+
 from utils.io import recursive_dict_update
 
 from constants.custom_expections import ImageNotFoundErr
@@ -23,7 +17,7 @@ from constants.image_templates import (ChapterImage, FightImage,
                                        SymbolImage)
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
-from game.game_operation import ConfirmOperation, MoveTeam, QuickRepair
+from game.game_operation import ConfirmOperation, MoveTeam, QuickRepair, start_march
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from game.identify_pages import identify_page
 from game.switch_page import goto_game_page, process_bad_network
@@ -103,8 +97,8 @@ class NormalFightInfo(FightInfo):
 
         # 在地图上走的过程中获取舰船位置
         if self.state in ["proceed"]:
-            self._update_ship_position(self.timer)
-            self._update_ship_point(self.timer)
+            self._update_ship_position()
+            self._update_ship_point()
 
         # 1. proceed, 资源点 (OK)
         # 2. get_ship, 锁定新船 (OK)
@@ -205,7 +199,7 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        if(start_fight(self.timer) != "ok"):
+        if(start_march(self.timer) != "ok"):
             return self._enter_fight()
 
         return "success"

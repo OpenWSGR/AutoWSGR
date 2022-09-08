@@ -411,12 +411,6 @@ def choose_decision(timer: Timer, type, value=1, extra_check=False, try_times=0,
             raise TimeoutError("can't do this operation" + type + str(value))
 
 
-@logit(level=INFO2)
-def SL(timer: Timer):
-    restart(timer)
-    GoMainPage(timer)
-    timer.set_page('main_page')
-
 
 @logit(level=INFO3)
 def map_fight(timer: Timer, decision_maker: DecisionBlock = None, type='normal', end_page='map_page', *args, **kwargs):

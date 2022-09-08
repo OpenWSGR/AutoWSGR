@@ -6,7 +6,7 @@ import constants.settings as S
 import numpy as np
 from constants.color_info import (BLOOD_COLORS, CHALLENGE_BLUE,
                                   SUPPOER_DISABLE, SUPPORT_ENALBE)
-from constants.image_templates import FightImage
+from constants.image_templates import FightImage, ChapterImage
 from constants.keypoint_info import BLOODLIST_POSITION, TYPE_SCAN_AREA
 from constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC, BG, BM, CA,
                                        CAV, CBG, CL, CLT, CV, CVL, DD, INFO1,
@@ -90,24 +90,6 @@ class Resources():
             self.detect_resources(name)
         
         return self.resources.get(name)
-
-@logit(level=INFO1)
-def GetChapter(timer: Timer):
-    """在出征界面获取当前章节(远征界面也可获取)
-
-    Raises:
-        TimeoutError: 无法获取当前章节
-
-    Returns:
-        int: 当前章节
-    """
-    for try_times in range(5):
-        time.sleep(0.15 * 2 ** try_times)
-        UpdateScreen(timer)
-        for i in range(1, len(ChapterImage)):
-            if(ImagesExist(timer, ChapterImage[i], 0)):
-                return i
-    raise TimeoutError("can't vertify chapter")
 
 
 @logit(level=INFO1)
@@ -244,21 +226,21 @@ def get_exercise_status(timer: Timer, robot=None):
     Returns:
         bool: 如果可挑战,返回 True ,否则为 False,1-based
     """
-    UpdateScreen(timer)
+    timer.UpdateScreen()
     up = bool(PixelChecker(timer, (933, 59), (177, 171, 176), distance=60))
     down = bool(PixelChecker(timer, (933, 489), (177, 171, 176), distance=60))
     assert((up and down) == False)
     
     result = [None, ]
     if(up == False and down == False):
-        swipe(timer, 800, 200, 800, 400) #上滑
-        UpdateScreen(timer)
+        timer.Android.swipe(800, 200, 800, 400) #上滑
+        timer.UpdateScreen()
         up = True
     if(up):
         for position in range(1, 5):
             result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
-        swipe(timer, 800, 400, 800, 200) #下滑
-        UpdateScreen(timer)
+        timer.Android.swipe(800, 400, 800, 200) #下滑
+        timer.UpdateScreen()
         result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
         return result
     if(down):
@@ -268,10 +250,10 @@ def get_exercise_status(timer: Timer, robot=None):
             result.insert(1, robot)
             return result
         else:
-            swipe(timer, 800, 200, 800, 400) #上滑
-            UpdateScreen(timer)
+            timer.Android.swipe(800, 200, 800, 400) #上滑
+            timer.UpdateScreen()
             result.insert(1, bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
-            swipe(timer, 800, 400, 800, 200) #下滑
+            timer.Android.swipe(800, 400, 800, 200) #下滑
             return result
 
 
