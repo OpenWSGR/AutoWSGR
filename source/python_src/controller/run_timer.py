@@ -123,8 +123,7 @@ class Timer():
         """
         if (need_screen_shot):
             self.UpdateScreen()
-        image = PIM.fromarray(self.screen)
-        self.log_image(image=image, name=get_time_as_string(accuracy='second')+'screen')
+        self.log_image(image=self.screen, name=get_time_as_string(accuracy='second')+'screen')
 
     def log_info(self, info):
         """向默认信息记录文件记录信息自带换行
@@ -133,7 +132,7 @@ class Timer():
             info (str): 要记录的信息
 
         """
-        write_file(path=os.path.join(S.LOG_PATH, "log.txt"), contents=info+'\n')
+        write_file(filename=os.path.join(S.LOG_PATH, "log.txt"), contents=info+'\n')
 
     def log_debug_info(self, info):
         """当调试时向默认信息记录文件记录信息自带换行

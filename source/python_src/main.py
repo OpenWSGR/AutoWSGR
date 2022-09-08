@@ -13,7 +13,7 @@ from game.game_operation import (GainBounds, RepairByBath, expedition, restart,
                                  start_game, GoMainPage)
 from game.get_game_info import ExpeditionStatus, Resources
 from game.identify_pages import get_now_page
-from game.switch_page import load_game_ui
+from game.switch_page import load_game_ui, goto_game_page
 from ocr.ship_name import recognize_ship
 from constants.load_data import load_all_data
 from controller.run_timer import Timer
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     # start_time = time.time()
     exercise_plan = NormalExercisePlan(timer, "plans/exercise/defaults_1.yaml", "plans/exercise/basics.yaml")
     # exercise_plan.run()
-
+    # goto_game_page(timer, 'exercise_page')
     fight_plan = NormalFightPlan(timer, "plans/normal_fight/8-4-6SSweek.yaml")
     fight_plan.run()
     print(fight_plan.fight_recorder)

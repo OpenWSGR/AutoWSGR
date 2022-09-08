@@ -4,8 +4,8 @@ from utils.logger import logit
 from utils.io import recursive_dict_update
 import copy
 import time
-
 import yaml
+import constants.settings as S
 
 
 
@@ -252,24 +252,24 @@ class NormalFightPlan(FightPlan):
             if is_proceed:
                 self.timer.Android.click(325, 350)
                 self.Info.last_action = "yes"
-                self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
+                self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
                 return "fight continue"
             else:
                 self.timer.Android.click(615, 350)
                 self.Info.last_action = "no"
-                self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
+                self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
                 return "fight end"
 
         elif state == "flagship_severe_damage":
             ClickImage(self.timer, FightImage[4], must_click=True, delay=0.25)
-            self.fight_recorder.append(StageRecorder(self.Info.state, None, self.timer))
+            self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
             return 'fight end'
 
         # 进行通用NodeLevel决策
         
         action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)
         self.Info.last_action = action
-        self.fight_recorder.append(StageRecorder(self.Info.state, action, self.timer))
+        self.fight_recorder.append(StageRecorder(self.Info, self.timer))
         return fight_stage
 
     # ======================== Functions ========================
@@ -331,32 +331,38 @@ class NormalFightPlan(FightPlan):
         try:
             if chapter_now is None:
                 chapter_now = self._get_chapter()
-            print("NowChapter:", chapter_now)
+            if(S.DEBUG):print("NowChapter:", chapter_now)
             if (chapter_now > target):
                 if (chapter_now - target >= 3):
                     chapter_now -= 3
                     self.timer.Android.click(95, 97, delay=0)
+                    
                 elif (chapter_now - target == 2):
                     chapter_now -= 2
                     self.timer.Android.click(95, 170, delay=0)
+                    
                 elif (chapter_now - target == 1):
                     chapter_now -= 1
                     self.timer.Android.click(95, 229, delay=0)
 
-            elif (chapter_now - target <= -3):
-                chapter_now += 3
-                self.timer.Android.click(95, 485, delay=0)
-            elif (chapter_now - target == -2):
-                chapter_now += 2
-                self.timer.Android.click(95, 416, delay=0)
-            elif (chapter_now - target == -1):
-                chapter_now += 1
-                self.timer.Android.click(95, 366, delay=0)
+            else:
+                if chapter_now - target <= -3:
+                    chapter_now += 3
+                    self.timer.Android.click(95, 485, delay=0)
+                    
+                elif (chapter_now - target == -2):
+                    chapter_now += 2
+                    self.timer.Android.click(95, 416, delay=0)
+                    
+                elif (chapter_now - target == -1):
+                    chapter_now += 1
+                    self.timer.Android.click(95, 366, delay=0)
 
-                if (WaitImage(self.timer, ChapterImage[chapter_now]) == False):
-                    raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
-                time.sleep(0.15)
-                self._move_chapter(target, chapter_now)
+            if (WaitImage(self.timer, ChapterImage[chapter_now]) == False):
+                raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+           
+            time.sleep(0.15)
+            self._move_chapter(target, chapter_now)
         except:
             print("can't move chapter, time now is", time.time)
             if process_bad_network(self.timer, 'move_chapter'):

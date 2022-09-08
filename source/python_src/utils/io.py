@@ -90,17 +90,17 @@ def delete_file(path):
     os.system("del " + path)
 
 
-def write_file(path, info):
+def write_file(filename, contents):
     """给定文件的路径和需要添加的信息，向文件中添加写入信息。
 
     Args:
         path (str): 文件路径
         info (str): 需要添加的信息 
     """
-    if (os.path.exists(path) == False):
-        create_file_with_path(path)
-    with open(path, mode='a') as f:
-        f.write(info)
+    if (os.path.exists(filename) == False):
+        create_file_with_path(filename)
+    with open(filename, mode='a') as f:
+        f.write(contents)
 
 
 def save_image(path, image, ignore_existed_image=False, *args, **kwargs):

@@ -1,13 +1,12 @@
 import copy
 import time
+import constants.settings as S
 from abc import ABC, abstractmethod
 
 from constants.custom_expections import ImageNotFoundErr
-from constants.image_templates import FightImage, FightResultImage, SymbolImage
+from constants.image_templates import FightImage, FightResultImage
 from constants.keypoint_info import BLOODLIST_POSITION
 from constants.other_constants import ALL_SHIP_TYPES, INFO1, SAP
-from game.identify_pages import identify_page
-from game.switch_page import process_bad_network
 from game.game_operation import SL
 from controller.run_timer import Timer, GetImagePosition, ImagesExist, WaitImages
 from utils.logger import logit
@@ -17,54 +16,7 @@ from utils import remove_0_value_from_dict
 
 
 # TODO: 完成
-class StageRecorder():
-    def __str__(self):
-        return f"(stage:{self.stage_name},action:{self.action_name},point:{self.point},info:" + str(self.info) + ")"
-    
-    def __init__(self, stage, action, timer:Timer, ship_point=None):
-        self.stage_name = str(stage)
-        self.action_name = str(action)
-        self.point = ship_point
-        self.info = "no info"
-        if(stage == 'spot_enemy_success' and action == 'retreat'):
-            self.info = remove_0_value_from_dict(timer.enemy_type_count)
-        if(stage == 'fight_period'):
-            self.info = remove_0_value_from_dict(timer.enemy_type_count)
-        if(stage == "result"):
-            self.info = timer.fight_result
-        if(stage == 'proceed'):
-            self.info = timer.ship_status
 
-
-class FightRecorder():
-    def __init__(self):
-        self.sr = []
-        
-    def reset(self):
-       self.sr = []   
-        
-    def add_stage(self, stage, action, timer:Timer):
-        self.append(StageRecorder(stage, action, timer))
-    
-    def append(self, stage:StageRecorder):
-        self.sr.append(stage)
-    
-    def get_fight_infos(self, stage):
-        return [x.info for x in self.sr if x.stage_name == stage]
-    
-    @property
-    def fight_results(self):
-        return self.get_fight_infos("result")
-    
-    @property
-    def enemys(self):
-        return self.get_fight_infos("fight_period")
-    
-    def __str__(self):
-        res = ""
-        for x in self.sr:
-            res += str(x) + "\n"
-        return res
     
     
 class Ship():
@@ -137,7 +89,7 @@ class FightInfo(ABC):
         self.last_state = ""
         self.last_action = ""
         self.state = ""
-        self.fight_result = FightResult(self.timer) # 战斗结果记录器
+        self.fight_result = FightResult(self.timer) # 战斗结果记录
     
     
     def update_state(self):
@@ -194,6 +146,58 @@ class FightInfo(ABC):
         """ 匹配到状态后执行的操作 """
         pass
 
+
+class StageRecorder():
+    def __str__(self):
+        return f"(stage:{self.stage_name},action:{self.action_name},point:{self.point},info:" + str(self.info) + ")"
+    
+    def __init__(self, Info:FightInfo, timer:Timer, no_action=False):
+        self.stage_name = str(Info.state)
+        if(no_action):
+            self.action_name = 'None'
+        else:
+            self.action_name = str(Info.last_action)
+        self.point = Info.node
+        self.info = "no info"
+        if(self.stage_name == 'spot_enemy_success' and self.action_name == 'retreat'):
+            self.info = remove_0_value_from_dict(timer.enemy_type_count)
+        if(self.stage_name == 'fight_period'):
+            self.info = remove_0_value_from_dict(timer.enemy_type_count)
+        if(self.stage_name == "result"):
+            self.info = timer.fight_result
+        if(self.stage_name == 'proceed'):
+            self.info = timer.ship_status
+
+
+class FightRecorder():
+    def __init__(self):
+        self.sr = []
+        
+    def reset(self):
+       self.sr = []   
+        
+    def add_stage(self, stage, action, timer:Timer):
+        self.append(StageRecorder(stage, action, timer))
+    
+    def append(self, stage:StageRecorder):
+        self.sr.append(stage)
+    
+    def get_fight_infos(self, stage):
+        return [x.info for x in self.sr if x.stage_name == stage]
+    
+    @property
+    def fight_results(self):
+        return self.get_fight_infos("result")
+    
+    @property
+    def enemys(self):
+        return self.get_fight_infos("fight_period")
+    
+    def __str__(self):
+        res = ""
+        for x in self.sr:
+            res += str(x) + "\n"
+        return res
 
 class FightPlan(ABC):
     def __init__(self, timer:Timer):
@@ -277,7 +281,7 @@ class DecisionBlock():
                     rcondition += ch
                     last = i + 1
                     
-            print(rcondition)
+            if(S.DEBUG):print(rcondition)
             if eval(rcondition):
                 return act
         
