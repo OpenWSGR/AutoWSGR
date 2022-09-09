@@ -45,7 +45,9 @@ def start_march(timer:Timer):
         if time.time() - start_time > 15:
             if process_bad_network(timer):
                 if identify_page(timer, 'fight_prepare_page'):
-                    return "bad_network"
+                    return start_march(timer)
+                else:
+                    return 'failed'
             else:
                 raise TimeoutError("map_fight prepare timeout")
     return "success"
