@@ -1,10 +1,10 @@
-from run_timer import Timer
 from constants.ui import load_game_ui
 from constants.ui import Node
 from constants.other_constants import INFO2, INFO1, ALL_UI
 from constants.image_templates import BackImage, GameUI, IdentifyImages
-from controller.run_timer import WaitImages, GetImagePosition, is_bad_network, process_bad_network, ImagesExist
-from controller.run_timer import Timer, PixelChecker
+from constants.custom_expections import ImageNotFoundErr
+from .run_timer import WaitImages, GetImagePosition, is_bad_network, process_bad_network, ImagesExist
+from .run_timer import Timer, PixelChecker
 from utils.logger import logit
 
 import constants.settings as S
@@ -106,19 +106,31 @@ class GameController():
                 wait_pages(names=[self.now_page.name])
             time.sleep(.25)
     
-    
     def set_page(self, page_name=None, page=None):
-        if (page is not None):
+        
+        if(page_name is None and page is None):
+            now_page = get_now_page(self.timer)
+            if(now_page == None):
+                raise ImageNotFoundErr("Can't identify the page")
+            else:
+                self.now_page = self.ui.get_node_by_name(now_page)
+            
+        elif(page is not None):
+            if(not isinstance(page, Node)):
+                print("==============================")
+                print("arg:page must be an controller.ui.Node object")
+                raise ValueError
+            
             if (self.ui.page_exist(page)):
                 self.now_page = page
-                return
+            
             raise ValueError('give page do not exist')
+        
         page = self.ui.get_node_by_name(page_name)
         if (page is None):
             raise ValueError("can't find the page:", page_name)
         self.now_page = page
     
-
     def walk_to(self, end, try_times=0):
         try:
             if (isinstance(end, Node)):
@@ -155,7 +167,6 @@ class GameController():
                         raise ValueError('unknown error')
                 self.walk_to(end)
 
-    
     @logit(level=INFO2)
     def GoMainPage(self, QuitOperationTime=0, List=[], ExList=[]):
         """回退到游戏主页

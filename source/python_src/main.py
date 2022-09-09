@@ -12,8 +12,6 @@ from fight_dh.exercise import NormalExercisePlan
 from game.game_operation import (GainBounds, RepairByBath, expedition, restart,
                                  start_game, GoMainPage)
 from game.get_game_info import ExpeditionStatus, Resources
-from game.identify_pages import get_now_page
-from game.switch_page import load_game_ui, goto_game_page
 from ocr.ship_name import recognize_ship
 from constants.load_data import load_all_data
 from controller.run_timer import Timer
@@ -32,7 +30,6 @@ def load_data_start():
     global timer
     timer = Timer()
     load_all_data(timer)
-    load_game_ui(timer)
 
 def lencmp(s1, s2):
     if(len(s1) < len(s2)):
@@ -47,11 +44,9 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     Returns:
         Timer: 该模拟器的记录器
     """
-    global ALL_SHIP_TYPES
     timer = Timer()
     timer.device_name = device_name
     load_all_data()
-    load_game_ui(timer)
     timer.Windows.ConnectAndroid()
     timer.UpdateScreen()
     timer.resolution = timer.screen.shape[:2]
@@ -69,14 +64,14 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     timer.resources = Resources(timer)
     GoMainPage(timer)
     try:
-        timer.set_page(page_name=get_now_page(timer))
+        timer.Game.set_page()
     except Exception:
         if S.DEBUG:
-            timer.set_page('main_page')
+            timer.Game.set_page('main_page')
         else:
             restart(timer)
-            timer.set_page(page_name=get_now_page(timer))
-    print(timer.now_page.name)
+            timer.Game.set_page()
+    print(timer.Game.now_page)
     return timer
 
 
