@@ -6,9 +6,8 @@ import copy
 import yaml
 from constants.image_templates import (FightImage, SymbolImage, IdentifyImages, ExerciseImages)
 from constants.other_constants import INFO2
-from game.game_operation import MoveTeam, start_march
+from game.game_operation import MoveTeam, start_march, goto_game_page
 from game.get_game_info import DetectShipStatu, GetEnemyCondition, get_exercise_status
-from game.switch_page import goto_game_page
 from controller.run_timer import Timer
 from .common import FightInfo, FightPlan, Ship, DecisionBlock
 

@@ -18,7 +18,7 @@ from utils.io import delete_file, read_file, save_image, write_file
 from utils.logger import logit
 from utils.math_functions import CalcDis, CheckColor, matri_to_str
 
-from game.switch_page import goto_game_page
+from controller.game_controller import goto_game_page
 
 
 class ExpeditionStatus():

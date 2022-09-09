@@ -16,9 +16,7 @@ from utils.logger import logit
 
 from game.get_game_info import (CheckSupportStatu, DetectShipStatu,
                                 ExpeditionStatus)
-from game.identify_pages import get_now_page, identify_page, wait_pages
-from game.switch_page import (GoMainPage, goto_game_page, is_bad_network,
-                              load_game_ui, process_bad_network)
+from controller.game_controller import get_now_page, identify_page, wait_pages, is_bad_network, process_bad_network, goto_game_page, GoMainPage
 
 
 @logit(level=INFO2)

@@ -106,3 +106,5 @@ class AndroidController:
         if (duration <= 0.2):
             raise ValueError("duration time too short,arg 'duration' should greater than 0.2")
         self.swipe(x, y, x, y, duration=duration, delay=delay, *args, **kwargs)
+        
+    

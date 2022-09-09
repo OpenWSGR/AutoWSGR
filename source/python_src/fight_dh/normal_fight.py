@@ -19,8 +19,7 @@ from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
 from game.game_operation import ConfirmOperation, MoveTeam, QuickRepair, start_march
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
-from game.identify_pages import identify_page
-from game.switch_page import goto_game_page, process_bad_network
+from controller.game_controller import identify_page, goto_game_page, process_bad_network
 from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRecorder, FightRecorder
 

@@ -10,7 +10,8 @@ from airtest.core.helper import G
 from airtest.core.settings import Settings as ST
 from constants import settings as S
 from constants.custom_expections import ImageNotFoundErr
-from constants.other_constants import INFO1, NO
+from constants.image_templates import ErrorImages, SymbolImage
+from constants.other_constants import INFO1, INFO2, NO
 from PIL import Image as PIM
 from utils.api_image import convert_position
 from utils.io import save_image, write_file
@@ -19,6 +20,7 @@ from utils.math_functions import CalcDis
 
 from .android_controller import AndroidController
 from .windows_controller import WindowsController
+from .game_controller import GameController
 
 
 class Timer():
@@ -66,6 +68,7 @@ class Timer():
         # DH新增，模块化
         self.Android = AndroidController(self.resolution)
         self.Windows = WindowsController(self.device_name)
+        self.Game = GameController(self)
 
     def get_pixel(self, x, y):
         """获取当前屏幕相对坐标 (x,y) 处的像素值
@@ -80,20 +83,6 @@ class Timer():
 
         (x, y) = convert_position(x, y, self.resolution)
         return (self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0])
-
-    def set_page(self, page_name=None, page=None):
-        if (page is not None):
-            if (self.ui.page_exist(page)):
-                self.now_page = page
-                return
-            raise ValueError('give page do not exist')
-        page = self.ui.get_node_by_name(page_name)
-        if (page is None):
-            raise ValueError("can't find the page:", page_name)
-        self.now_page = page
-
-    def get_ui_page_by_name(self, name):
-        return self.ui.get_node_by_name(name)
 
     def __str__(self):
         return "this is a timer"
@@ -142,6 +131,8 @@ class Timer():
         if (S.DEBUG):
             self.log_info(info)
 
+    def goto_game_page(self, name):
+        self.Game.goto_game_page(name)
 
 class MyTemplate(Template):
     def match_in(self, screen, this_methods=None):
@@ -341,3 +332,48 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
         time.sleep(gap)
         if (time.time() - StartTime > timeout):
             return None
+
+
+@logit(level=INFO1)
+def is_bad_network(timeout=10):
+    return WaitImages([ErrorImages['bad_network'][0], SymbolImage[10]], timeout=timeout) != None
+
+
+@logit(level=INFO2)
+def process_bad_network(timer:Timer, extra_info=""):
+    """判断并处理网络状况问题
+
+    Args:
+        timer (Timer): _description_
+        extra_info (_type_): 额外的输出信息
+
+    Returns:
+        bool: 如果为 True 则表示为网络状况问题,并已经成功处理,否则表示并非网络问题或者处理超时.
+    Raise:
+        TimeoutError:处理超时
+    """
+    start_time = time.time()
+    while (is_bad_network(timer)):
+        print("bad network at", time.time())
+        print('extra info:', extra_info)
+        while True:
+            if (time.time() - start_time >= 180):
+                raise TimeoutError("Process bad network timeout")
+            if timer.Windows.CheckNetWork() != False:
+                break
+
+        start_time2 = time.time()
+        while (ImagesExist([SymbolImage[10]] + ErrorImages['bad_network'])):
+            time.sleep(.5)
+            if (time.time() - start_time2 >= 60):
+                break
+            if (ImagesExist(ErrorImages['bad_network'])):
+                timer.Android.click(476, 298, delay=2)
+
+        if (time.time() - start_time2 < 60):
+            if (S.DEBUG):
+                print("ok network problem solved, at", time.time())
+            return True
+
+    return False
+
