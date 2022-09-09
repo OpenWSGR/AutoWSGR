@@ -1,20 +1,25 @@
 
-from .common import FightInfo, FightPlan, Ship
-from utils.logger import logit
-from utils.io import recursive_dict_update
 import copy
+
 import yaml
-from constants.image_templates import (FightImage, SymbolImage, IdentifyImages, ExerciseImages)
+from constants.image_templates import (ExerciseImages, FightImage,
+                                       IdentifyImages, SymbolImage)
 from constants.other_constants import INFO2
 from game.game_operation import MoveTeam, start_march, goto_game_page
 from game.get_game_info import DetectShipStatu, GetEnemyCondition, get_exercise_status
 from controller.run_timer import Timer
 from .common import FightInfo, FightPlan, Ship, DecisionBlock
+from controller.run_timer import Timer
+from utils.io import recursive_dict_update, yaml_to_dict
+from utils.logger import logit
+
 
 """
 常规战决策模块
 TODO: 1.资源点 2.依据敌方选择阵型
 """
+
+
 class ExerciseDecisionBlock(DecisionBlock):
 
     @logit(level=INFO2)
@@ -32,50 +37,51 @@ class ExerciseDecisionBlock(DecisionBlock):
                     else:
                         if self.discard:
                             self.timer.Android.click(878, 136, delay=1)
-                            return "discard", "fight continue" 
+                            return "discard", "fight continue"
                         else:
                             break
                 elif isinstance(act, int):
                     self.formation_chosen = act
                 elif act == None:
                     break
-                    
+
             self.timer.Android.click(804, 390, delay=0)
             return "fight", "fight continue"
-                
+
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
             print("OK")
-            if(start_march(self.timer) != 'ok'):
+            if (start_march(self.timer) != 'ok'):
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
-        
+
         elif state == "spot_enemy_success":
             self.timer.Android.click(900, 500, delay=0)
             return None, "fight continue"
-        
+
         elif state == "formation":
             self.timer.Android.click(573, self.formation_chosen * 100 - 20, delay=2)
             return None, "fight continue"
-            
+
         return super().make_decision(state, last_state, last_action)
+
 
 class NormalExerciseInfo(FightInfo):
     """ 存储战斗中需要用到的所有状态信息 """
 
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
-        self.start_page = "exercise_page"
+        self.end_page = "exercise_page"
         self.robot = True
         self.successor_states = {
             "exercise_page": ["rival_info"],
             "rival_info":  {
                 "fight": ["fight_prepare_page"],
-                "discard": ["exercise_page"], 
+                "discard": ["exercise_page"],
             },
             "fight_prepare_page": ["spot_enemy_success", "formation", "fight_period"],
             "spot_enemy_success": ["formation"],
-            
+
             "formation": ["fight_period"],
             "fight_period": ["night", "result"],
             "night": {
@@ -121,19 +127,25 @@ class NormalExerciseInfo(FightInfo):
     def node(self):
         return self.timer.ship_point
 
+
 class NormalExercisePlan(FightPlan):
     """" 常规战斗的决策模块 """
 
     def __init__(self, timer: Timer, plan_path, default_path):
         super().__init__(timer)
-        
-        default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        exercise_defaults, node_defaults = default_args["exercise_defaults"], default_args["node_defaults"]
-        # 加载地图计划
-        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        args = recursive_dict_update(exercise_defaults, plan_args, skip=['node_args'])
+
+        # 加载默认配置
+        default_args = yaml_to_dict(default_path)
+        plan_defaults = default_args["exercise_defaults"]
+        plan_defaults.update({"node_defaults": default_args["node_defaults"]})
+
+        # 加载计划配置
+        plan_args = yaml_to_dict(plan_path)
+        args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
-        # 加载各节点计划
+
+        # 加载节点配置
+        node_defaults = self.node_defaults
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)
@@ -151,7 +163,7 @@ class NormalExercisePlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-        goto_game_page(self.timer, 'exercise_page') 
+        goto_game_page(self.timer, 'exercise_page')
         self._exercise_times = self.exercise_times
         self.exercise_status = [None, None]
         return "success"
@@ -164,13 +176,13 @@ class NormalExercisePlan(FightPlan):
         # 进行MapLevel的决策
         if state == "exercise_page":
             self.exercise_status = get_exercise_status(self.timer, self.exercise_status[1])
-            if(self._exercise_times > 0 and any(self.exercise_status[2:])):
+            if (self._exercise_times > 0 and any(self.exercise_status[2:])):
                 pos = self.exercise_status[2:].index(True)
                 self.rival = 'player'
                 self.timer.Android.click(770, (pos + 1) * 110 - 10)
                 return 'fight continue'
-            elif(self.robot and self.exercise_status[1]):
-                self.timer.Android.swipe(800, 200, 800, 400) #上滑
+            elif (self.robot and self.exercise_status[1]):
+                self.timer.Android.swipe(800, 200, 800, 400)  # 上滑
                 self.timer.Android.click(770, 100)
                 self.rival = 'robot'
                 self.exercise_status[1] = False

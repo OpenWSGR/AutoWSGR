@@ -14,11 +14,9 @@ from utils.math_functions import get_nearest
 from utils import remove_0_value_from_dict
 
 
-
 # TODO: 完成
 
-    
-    
+
 class Ship():
     """ 用于表示一艘船的数据结构, 注意友方与敌方所独有的field """
 
@@ -89,9 +87,8 @@ class FightInfo(ABC):
         self.last_state = ""
         self.last_action = ""
         self.state = ""
-        self.fight_result = FightResult(self.timer) # 战斗结果记录
-    
-    
+        self.fight_result = FightResult(self.timer)  # 战斗结果记录
+
     def update_state(self):
 
         self.last_state = self.state
@@ -150,86 +147,76 @@ class FightInfo(ABC):
 class StageRecorder():
     def __str__(self):
         return f"(stage:{self.stage_name},action:{self.action_name},point:{self.point},info:" + str(self.info) + ")"
-    
-    def __init__(self, Info:FightInfo, timer:Timer, no_action=False):
+
+    def __init__(self, Info: FightInfo, timer: Timer, no_action=False):
         self.stage_name = str(Info.state)
-        if(no_action):
-            self.action_name = 'None'
-        else:
-            self.action_name = str(Info.last_action)
+        self.action_name = 'None' if no_action else str(Info.last_action)
         self.point = Info.node
         self.info = "no info"
-        if(self.stage_name == 'spot_enemy_success' and self.action_name == 'retreat'):
+        if self.stage_name == 'spot_enemy_success' and self.action_name == 'retreat':
             self.info = remove_0_value_from_dict(timer.enemy_type_count)
-        if(self.stage_name == 'fight_period'):
+        if self.stage_name == 'fight_period':
             self.info = remove_0_value_from_dict(timer.enemy_type_count)
-        if(self.stage_name == "result"):
+        if self.stage_name == "result":
             self.info = timer.fight_result
-        if(self.stage_name == 'proceed'):
+        if self.stage_name == 'proceed':
             self.info = timer.ship_status
 
 
 class FightRecorder():
     def __init__(self):
         self.sr = []
-        
+
     def reset(self):
-       self.sr = []   
-        
-    def add_stage(self, stage, action, timer:Timer):
+        self.sr = []
+
+    def add_stage(self, stage, action, timer: Timer):
         self.append(StageRecorder(stage, action, timer))
-    
-    def append(self, stage:StageRecorder):
+
+    def append(self, stage: StageRecorder):
         self.sr.append(stage)
-    
+
     def get_fight_infos(self, stage):
         return [x.info for x in self.sr if x.stage_name == stage]
-    
+
     @property
     def fight_results(self):
         return self.get_fight_infos("result")
-    
+
     @property
     def enemys(self):
         return self.get_fight_infos("fight_period")
-    
+
     def __str__(self):
-        res = ""
-        for x in self.sr:
-            res += str(x) + "\n"
+        res = "".join(str(x) + "\n" for x in self.sr)
         return res
 
+
 class FightPlan(ABC):
-    def __init__(self, timer:Timer):
+    def __init__(self, timer: Timer):
         # 把timer引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
         self.fight_recorder = FightRecorder()
-    
+
     def run(self):
         """ 主函数，负责一次完整的战斗. """
         self.fight_recorder.reset()
         # 战斗前逻辑
-        while True:
-            ret = self._enter_fight()
-            if ret == "success":
-                break
-
-            elif ret == "need SL":
-                SL(self.timer)
-                return self.run()
-            elif ret == "dock is full":
-                return ret  # TODO：加入分解逻辑
-            elif ret == "fight end":
-                self.timer.set_page(self.Info.start_page)
-                break
-            
-            elif ret == "out of times":
-                return ret
-            else:
-                print("\n==========================================")
-                print('enter fight error,screen logged')
-                self.timer.log_screen()
-                raise BaseException(str(time.time()) + "enter fight error")
+        ret = self._enter_fight()
+        if ret == "success":
+            pass
+        elif ret == "dock is full":
+            return ret  # TODO：加入分解逻辑
+        elif ret == "fight end":
+            self.timer.set_page(self.Info.end_page)
+            return ret
+        elif ret == "out of times":
+            return ret
+        else:
+            print("\n==========================================")
+            print('enter fight error,screen logged')
+            self.timer.log_screen()
+            raise BaseException(str(time.time()) + "enter fight error")
 
         # 战斗中逻辑
         self.Info.reset()  # 初始化战斗信息
@@ -241,11 +228,11 @@ class FightPlan(ABC):
                 SL(self.timer)
                 return self.run()
             elif ret == "fight end":
-                self.timer.set_page(self.Info.start_page)
+                self.timer.set_page(self.Info.end_page)
                 break
 
         return "success"
-    
+
     @abstractmethod
     def _enter_fight(self) -> str:
         pass
@@ -256,35 +243,34 @@ class FightPlan(ABC):
 
 
 class DecisionBlock():
-    def __init__(self, timer:Timer, args):
+    def __init__(self, timer: Timer, args):
         self.timer = timer
         self.__dict__.update(args)
 
         # 用于根据规则设置阵型
         self.set_formation_by_rule = False
         self.formation_by_rule = 0
-        
+
     def check_rules(self):
         for rule in self.enemy_rules:
             condition, act = rule
             rcondition = ""
             last = 0
-            for (i, ch) in enumerate(condition):
-                if(ord(ch) <= ord ("Z") and ord(ch) >= ord("A")):
-                    pass
-                else:
-                    if(last != i):
-                        if(condition[last:i] in ALL_SHIP_TYPES):
+            for i, ch in enumerate(condition):
+                if ord(ch) > ord("Z") or ord(ch) < ord("A"):
+                    if last != i:
+                        if condition[last:i] in ALL_SHIP_TYPES:
                             rcondition += f"self.timer.enemy_type_count['{condition[last:i]}']"
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch
                     last = i + 1
-                    
-            if(S.DEBUG):print(rcondition)
+
+            if (S.DEBUG):
+                print(rcondition)
             if eval(rcondition):
                 return act
-        
+
     def make_decision(self, state, last_state, last_action):
 
         if state in ["fight_period", "night_fight_period"]:
@@ -318,11 +304,11 @@ class DecisionBlock():
             if spot_enemy:
                 if self.SL_when_detour_fails and last_action == "detour":
                     return None, "need SL"
-                
+
                 if self.set_formation_by_rule:
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
-                    
+
             else:
                 if self.SL_when_spot_enemy_fails:
                     return None, "need SL"
@@ -356,8 +342,8 @@ class DecisionBlock():
 
 class NodeLevelDecisionBlock(DecisionBlock):
     """ 地图上一个节点的决策模块 """
+
     def make_decision(self, state, last_state, last_action):
         """进行决策并执行
         """
         return super().make_decision(state, last_state, last_action)
-        

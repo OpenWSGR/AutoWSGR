@@ -1,32 +1,31 @@
-from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship
-from utils.math_functions import CalcDis
-from utils.logger import logit
-from utils.io import recursive_dict_update
 import copy
 import time
-import yaml
+
 import constants.settings as S
-
-
-
-from utils.io import recursive_dict_update
-
+import yaml
 from constants.custom_expections import ImageNotFoundErr
 from constants.image_templates import (ChapterImage, FightImage,
                                        IdentifyImages, NumberImage,
                                        SymbolImage)
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
-from game.game_operation import ConfirmOperation, MoveTeam, QuickRepair, start_march
+from controller.run_timer import (ClickImage, GetImagePosition, ImagesExist,
+                                  Timer, WaitImage)
+from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
+                                 start_march)
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from controller.game_controller import identify_page, goto_game_page, process_bad_network
 from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRecorder, FightRecorder
+from utils.io import recursive_dict_update, yaml_to_dict
+from utils.logger import logit
+from utils.math_functions import CalcDis
 
+from .common import (FightInfo, FightPlan, FightRecorder,
+                     NodeLevelDecisionBlock, Ship, StageRecorder)
 
 """
 常规战决策模块
-TODO: 1.资源点
 """
 
 
@@ -35,7 +34,7 @@ class NormalFightInfo(FightInfo):
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
 
-        self.start_page = "map_page"
+        self.end_page = "map_page"
         self.chapter = 1  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = 1  # 节点名
         self.ship_position = (0, 0)
@@ -99,8 +98,7 @@ class NormalFightInfo(FightInfo):
             self._update_ship_position()
             self._update_ship_point()
 
-        # 1. proceed, 资源点 (OK)
-        # 2. get_ship, 锁定新船 (OK)
+        # 1. proceed: 资源点  2. get_ship: 锁定新船
         if self.state in ["proceed", "get_ship"]:
             ConfirmOperation(self.timer, delay=0)
 
@@ -108,7 +106,7 @@ class NormalFightInfo(FightInfo):
         # 在某些State下可以记录额外信息
         if self.state == "spot_enemy_success":
             GetEnemyCondition(self.timer, 'fight')
-            
+
         elif self.state == "result":
             DetectShipStatu(self.timer, 'sumup')
             self.fight_result.detect_result()
@@ -150,7 +148,7 @@ class NormalFightInfo(FightInfo):
 class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
 
-    def __init__(self, timer: Timer, plan_path, default_path=None):
+    def __init__(self, timer: Timer, plan_path, default_path='plans/default.yaml'):
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
@@ -160,30 +158,27 @@ class NormalFightPlan(FightPlan):
             BaseException: _description_
         """
         super().__init__(timer)
-        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        
-        if("default" in plan_args and default_path is None):
-            default_path = plan_args["default"]
-        if(default_path == None):
-            raise BaseException("No Defaulf Rules")
-        
-        default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
-        plan_defaults, node_defaults = default_args["normal_fight_defaults"], default_args["node_defaults"]
-        # 加载地图计划
-        
+
+        # 加载默认配置
+        default_args = yaml_to_dict(default_path)
+        plan_defaults = default_args["normal_fight_defaults"]
+        plan_defaults.update({"node_defaults": default_args["node_defaults"]})
+
+        # 加载计划配置
+        plan_args = yaml_to_dict(plan_path)
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
-        # 加载各节点计划
+
+        # 加载节点配置
+        node_defaults = self.node_defaults
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)
-            if(('node_args' not in plan_args) or (plan_args['node_args'] is None) or (node_name not in plan_args['node_args'])):
-                pass
-            else: 
+            if 'node_args' in plan_args and plan_args['node_args'] is not None and node_name in plan_args['node_args']:
                 node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
 
-        # 构建信息存储结构
+        # 信息记录器
         self.Info = NormalFightInfo(self.timer)
 
     def _enter_fight(self):
@@ -198,10 +193,7 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        if(start_march(self.timer) != "ok"):
-            return self._enter_fight()
-
-        return "success"
+        return start_march(self.timer)
 
     def _make_decision(self):
 
@@ -227,27 +219,9 @@ class NormalFightPlan(FightPlan):
                 return "fight end"
 
         elif state == "proceed":
-            
-            def check_blood(blood, rule):
-                """检查血量状态是否满足前进条件
-                    >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
-                    
-                    >>>True
-                Args:
-                    blood (list): 1-based
-                    rule (list): 0-based
-                """
-                l = max(len(blood) - 1, len(rule))
-                for i in range(l):
-                    if(blood[i + 1] == -1 or rule[i] == -1):
-                        continue
-                    if(blood[i + 1] >= rule[i]):
-                        return False
-                return True
-                
             is_proceed = self.nodes[self.Info.node].proceed and \
-                         check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
-            
+                self._check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
+
             if is_proceed:
                 self.timer.Android.click(325, 350)
                 self.Info.last_action = "yes"
@@ -265,7 +239,7 @@ class NormalFightPlan(FightPlan):
             return 'fight end'
 
         # 进行通用NodeLevel决策
-        
+
         action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)
         self.Info.last_action = action
         self.fight_recorder.append(StageRecorder(self.Info, self.timer))
@@ -330,16 +304,17 @@ class NormalFightPlan(FightPlan):
         try:
             if chapter_now is None:
                 chapter_now = self._get_chapter()
-            if(S.DEBUG):print("NowChapter:", chapter_now)
+            if (S.DEBUG):
+                print("NowChapter:", chapter_now)
             if (chapter_now > target):
                 if (chapter_now - target >= 3):
                     chapter_now -= 3
                     self.timer.Android.click(95, 97, delay=0)
-                    
+
                 elif (chapter_now - target == 2):
                     chapter_now -= 2
                     self.timer.Android.click(95, 170, delay=0)
-                    
+
                 elif (chapter_now - target == 1):
                     chapter_now -= 1
                     self.timer.Android.click(95, 229, delay=0)
@@ -348,18 +323,18 @@ class NormalFightPlan(FightPlan):
                 if chapter_now - target <= -3:
                     chapter_now += 3
                     self.timer.Android.click(95, 485, delay=0)
-                    
+
                 elif (chapter_now - target == -2):
                     chapter_now += 2
                     self.timer.Android.click(95, 416, delay=0)
-                    
+
                 elif (chapter_now - target == -1):
                     chapter_now += 1
                     self.timer.Android.click(95, 366, delay=0)
 
             if (WaitImage(self.timer, ChapterImage[chapter_now]) == False):
                 raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
-           
+
             time.sleep(0.15)
             self._move_chapter(target, chapter_now)
         except:
@@ -425,3 +400,20 @@ class NormalFightPlan(FightPlan):
         self._move_node(map)
         self.Info.chapter = self.chapter
         self.Info.map = self.map
+
+    def _check_blood(self, blood, rule):
+        """检查血量状态是否满足前进条件
+            >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
+
+            >>>True
+        Args:
+            blood (list): 1-based
+            rule (list): 0-based
+        """
+        l = max(len(blood) - 1, len(rule))
+        for i in range(l):
+            if (blood[i + 1] == -1 or rule[i] == -1):
+                continue
+            if (blood[i + 1] >= rule[i]):
+                return False
+        return True
