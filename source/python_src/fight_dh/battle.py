@@ -1,11 +1,12 @@
 import time
 
 import yaml
-from constants.image_templates import FightImage, SymbolImage, IdentifyImages
-from game.game_operation import QuickRepair, goto_game_page, identify_page, process_bad_network, start_march
+from constants.image_templates import FightImage, IdentifyImages, SymbolImage
+from controller.run_timer import ImagesExist, Timer, WaitImages
+from game.game_operation import (QuickRepair, goto_game_page, identify_page,
+                                 process_bad_network, start_march)
 from game.switch_page import wait_pages
-from controller.run_timer import Timer, ImagesExist, WaitImages
-from utils.io import recursive_dict_update
+from utils.io import recursive_dict_update, yaml_to_dict
 
 from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
 
@@ -54,7 +55,7 @@ class BattleInfo(FightInfo):
 
     def _before_match(self):
         # 点击加速
-        if self.state in ["proceed", "fight_condition"]:
+        if self.state in ["proceed"]:
             p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
         self.timer.UpdateScreen()
 
@@ -68,12 +69,12 @@ class BattlePlan(FightPlan):
         super().__init__(timer)
 
         # 加载默认配置
-        default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        default_args = yaml_to_dict(default_path)
         plan_defaults = default_args["battle_defaults"]
         plan_defaults.update({"node_defaults": default_args["node_defaults"]})
 
         # 加载计划配置
-        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        plan_args = yaml_to_dict(plan_path)
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
 

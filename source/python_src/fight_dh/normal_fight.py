@@ -1,28 +1,27 @@
-from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship
-from utils.math_functions import CalcDis
-from utils.logger import logit
-from utils.io import recursive_dict_update
 import copy
 import time
-import yaml
+
 import constants.settings as S
-
-
-from utils.io import recursive_dict_update
-
+import yaml
 from constants.custom_expections import ImageNotFoundErr
 from constants.image_templates import (ChapterImage, FightImage,
                                        IdentifyImages, NumberImage,
                                        SymbolImage)
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
-from game.game_operation import ConfirmOperation, MoveTeam, QuickRepair, start_march
+from controller.run_timer import (ClickImage, GetImagePosition, ImagesExist,
+                                  Timer, WaitImage)
+from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
+                                 start_march)
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from game.identify_pages import identify_page
 from game.switch_page import goto_game_page, process_bad_network
-from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
-from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRecorder, FightRecorder
+from utils.io import recursive_dict_update, yaml_to_dict
+from utils.logger import logit
+from utils.math_functions import CalcDis
 
+from .common import (FightInfo, FightPlan, FightRecorder,
+                     NodeLevelDecisionBlock, Ship, StageRecorder)
 
 """
 常规战决策模块
@@ -160,12 +159,12 @@ class NormalFightPlan(FightPlan):
         super().__init__(timer)
 
         # 加载默认配置
-        default_args = yaml.load(open(default_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        default_args = yaml_to_dict(default_path)
         plan_defaults = default_args["normal_fight_defaults"]
         plan_defaults.update({"node_defaults": default_args["node_defaults"]})
 
         # 加载计划配置
-        plan_args = yaml.load(open(plan_path, 'r', encoding='utf-8'), Loader=yaml.FullLoader)
+        plan_args = yaml_to_dict(plan_path)
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
 
@@ -193,7 +192,7 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        return self._enter_fight()
+        return start_march(self.timer)
 
     def _make_decision(self):
 
@@ -219,26 +218,8 @@ class NormalFightPlan(FightPlan):
                 return "fight end"
 
         elif state == "proceed":
-
-            def check_blood(blood, rule):
-                """检查血量状态是否满足前进条件
-                    >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
-
-                    >>>True
-                Args:
-                    blood (list): 1-based
-                    rule (list): 0-based
-                """
-                l = max(len(blood) - 1, len(rule))
-                for i in range(l):
-                    if (blood[i + 1] == -1 or rule[i] == -1):
-                        continue
-                    if (blood[i + 1] >= rule[i]):
-                        return False
-                return True
-
             is_proceed = self.nodes[self.Info.node].proceed and \
-                check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
+                self._check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
 
             if is_proceed:
                 self.timer.Android.click(325, 350)
@@ -322,16 +303,17 @@ class NormalFightPlan(FightPlan):
         try:
             if chapter_now is None:
                 chapter_now = self._get_chapter()
-            if(S.DEBUG):print("NowChapter:", chapter_now)
+            if (S.DEBUG):
+                print("NowChapter:", chapter_now)
             if (chapter_now > target):
                 if (chapter_now - target >= 3):
                     chapter_now -= 3
                     self.timer.Android.click(95, 97, delay=0)
-                    
+
                 elif (chapter_now - target == 2):
                     chapter_now -= 2
                     self.timer.Android.click(95, 170, delay=0)
-                    
+
                 elif (chapter_now - target == 1):
                     chapter_now -= 1
                     self.timer.Android.click(95, 229, delay=0)
@@ -340,18 +322,18 @@ class NormalFightPlan(FightPlan):
                 if chapter_now - target <= -3:
                     chapter_now += 3
                     self.timer.Android.click(95, 485, delay=0)
-                    
+
                 elif (chapter_now - target == -2):
                     chapter_now += 2
                     self.timer.Android.click(95, 416, delay=0)
-                    
+
                 elif (chapter_now - target == -1):
                     chapter_now += 1
                     self.timer.Android.click(95, 366, delay=0)
 
             if (WaitImage(self.timer, ChapterImage[chapter_now]) == False):
                 raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
-           
+
             time.sleep(0.15)
             self._move_chapter(target, chapter_now)
         except:
@@ -417,3 +399,20 @@ class NormalFightPlan(FightPlan):
         self._move_node(map)
         self.Info.chapter = self.chapter
         self.Info.map = self.map
+
+    def _check_blood(self, blood, rule):
+        """检查血量状态是否满足前进条件
+            >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
+
+            >>>True
+        Args:
+            blood (list): 1-based
+            rule (list): 0-based
+        """
+        l = max(len(blood) - 1, len(rule))
+        for i in range(l):
+            if (blood[i + 1] == -1 or rule[i] == -1):
+                continue
+            if (blood[i + 1] >= rule[i]):
+                return False
+        return True
