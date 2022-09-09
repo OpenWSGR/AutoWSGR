@@ -1,5 +1,4 @@
 import numpy as np
-from game.switch_page import goto_game_page
 from utils.api_image import crop_image
 from utils.io import yaml_to_dict
 

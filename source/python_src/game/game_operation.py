@@ -10,26 +10,24 @@ from constants.image_templates import (ChooseShipImages, ConfirmImage,
 from constants.keypoint_info import BLOODLIST_POSITION
 from constants.load_data import load_all_data
 from constants.other_constants import INFO2, INFO3
-from controller.run_timer import (ClickImage, GetImagePosition, ImagesExist,
+from controller.run_timer import (ClickImage, GetImagePosition, ImagesExist, process_bad_network, is_bad_network, 
                              PixelChecker, Timer, WaitImage, WaitImages)
 from utils.logger import logit
 
 from game.get_game_info import (CheckSupportStatu, DetectShipStatu,
                                 ExpeditionStatus)
-from controller.game_controller import get_now_page, identify_page, wait_pages, is_bad_network, process_bad_network, goto_game_page, GoMainPage
-
 
 @logit(level=INFO2)
 def SL(timer: Timer):
     restart(timer)
-    GoMainPage(timer)
+    timer.GoMainPage()
     timer.set_page('main_page')
 
 @logit(level=INFO2)
 def start_march(timer:Timer):
     timer.Android.click(900, 500, 1, delay=0)  # 点击：开始出征
     start_time = time.time()
-    while identify_page(timer, 'fight_prepare_page'):
+    while timer.identify_page('fight_prepare_page'):
         if(time.time() - start_time > 3):
             timer.Android.click( 900, 500, 1, delay=0)
         if ImagesExist(timer, SymbolImage[3], need_screen_shot=0):
@@ -42,10 +40,10 @@ def start_march(timer:Timer):
             pass
         if time.time() - start_time > 15:
             if process_bad_network(timer):
-                if identify_page(timer, 'fight_prepare_page'):
+                if timer.identify_page('fight_prepare_page'):
                     return start_march(timer)
                 else:
-                    return 'failed'
+                    NetworkErr("status unknow")
             else:
                 raise TimeoutError("map_fight prepare timeout")
     return "success"
@@ -140,7 +138,7 @@ def start_game(timer: Timer, account=None, password=None, delay=1.0):
     while ImagesExist(timer, StartImage[2]):
         ClickImage(timer, StartImage[2])
     try:
-        GoMainPage(timer)
+        timer.GoMainPage()
     except:
         raise BaseException("fail to start game")
 
@@ -184,7 +182,7 @@ def expedition(timer: Timer, force=False):
     timer.expedition_status.update(force=force)
     while (timer.expedition_status.is_ready()):
         # try:
-        goto_game_page(timer, 'expedition_page')
+        timer.goto_game_page('expedition_page')
         pos = WaitImage(timer, GameUI[6], timeout=2)
         # TODO: 暂时修复远征按钮的位置，需要更好的解决方案
         if pos:
@@ -199,10 +197,10 @@ def expedition(timer: Timer, force=False):
 
 
 @logit(level=INFO3)
-def DestoryShip(timer, reserve=1, amount=1):
+def DestoryShip(timer:Timer, reserve=1, amount=1):
     # amount:重要舰船的个数
     # 解装舰船
-    goto_game_page(timer, 'destroy_page')
+    timer.goto_game_page('destroy_page')
 
     WaitImage(timer, SymbolImage[5], after_get_delay=.33)
     timer.Android.click(301, 25)  # 这里动态延迟，点解装
@@ -267,7 +265,7 @@ def verify_team(timer: Timer):
     Returns:
         int: 队伍编号(1~4)
     """
-    if (identify_page(timer, 'fight_prepare_page') == False):
+    if (timer.identify_page('fight_prepare_page') == False):
         raise ImageNotFoundErr("not on fight_prepare_page")
     
     for _ in range(5):
@@ -299,7 +297,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
     if (try_times > 3):
         raise ValueError("can't change team sucessfully")
 
-    if(identify_page(timer, 'fight_prepare_page') == False):
+    if(timer.identify_page('fight_prepare_page') == False):
         timer.log_screen()
         raise ImageNotFoundErr("not on 'fight_prepare_page' ")
 
@@ -322,7 +320,7 @@ def SetSupport(timer: Timer, target, try_times=0):
         ValueError: 未能成功切换战役支援状态
     """
     target = bool(target)
-    goto_game_page(timer, "fight_prepare_page")
+    timer.goto_game_page("fight_prepare_page")
     # if(bool(PixelChecker(timer, (623, 75), )) == ):
     #
     # 支援次数已用尽
@@ -386,11 +384,11 @@ def GainBounds(timer: Timer):
     Args:
         timer (Timer): _description_
     """
-    goto_game_page(timer, 'main_page')
+    timer.goto_game_page('main_page')
     if not bool(PixelChecker(timer, (694, 457), bgr_color=(45, 89, 255))):
         return 'no'
-    goto_game_page(timer, 'mission_page')
-    goto_game_page(timer, 'mission_page')
+    timer.goto_game_page('mission_page')
+    timer.goto_game_page('mission_page')
     if ClickImage(timer, GameUI[15]):
         ConfirmOperation(timer, must_confirm=1)
         return 'ok'
@@ -408,13 +406,13 @@ def RepairByBath(timer: Timer):
     Args:
         timer (Timer): _description_
     """
-    goto_game_page(timer, 'choose_repair_page')
+    timer.goto_game_page('choose_repair_page')
     timer.Android.click(115, 233)
-    if (not identify_page(timer, 'choose_repair_page')):
-        if (identify_page(timer, 'bath_page')):
+    if (not timer.identify_page('choose_repair_page')):
+        if (timer.identify_page('bath_page')):
             timer.set_page('bath_page')
         else:
-            timer.set_page(get_now_page(timer))
+            timer.set_page()
 
 
 @logit(level=INFO2)
@@ -461,7 +459,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
 
     """
     if (team is not None):
-        goto_game_page(timer, 'fight_prepare_page')
+        timer.goto_game_page('fight_prepare_page')
         MoveTeam(timer, team)
         if (team >= 5):
             # 切换为预设编队
@@ -481,7 +479,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
 
     if name is None:
         timer.Android.click(83, 167, delay=0)
-        wait_pages(timer, 'fight_prepare_page', gap=0)
+        timer.wait_pages('fight_prepare_page', gap=0)
         return
 
     timer.Android.click(700, 30, delay=0)
@@ -494,7 +492,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
     else:
         timer.Android.click(183, 167, delay=0)
 
-    wait_pages(timer, 'fight_prepare_page', gap=0)
+    timer.wait_pages('fight_prepare_page', gap=0)
 
 
 @logit(level=INFO3)
@@ -510,7 +508,7 @@ def ChangeShips(timer: Timer, team, list):
 
     """
     if (team is not None):
-        goto_game_page(timer, 'fight_prepare_page')
+        timer.goto_game_page('fight_prepare_page')
         MoveTeam(timer, team)
 
     DetectShipStatu(timer)

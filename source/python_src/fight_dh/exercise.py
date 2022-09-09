@@ -5,7 +5,7 @@ import yaml
 from constants.image_templates import (ExerciseImages, FightImage,
                                        IdentifyImages, SymbolImage)
 from constants.other_constants import INFO2
-from game.game_operation import MoveTeam, start_march, goto_game_page
+from game.game_operation import MoveTeam, start_march
 from game.get_game_info import DetectShipStatu, GetEnemyCondition, get_exercise_status
 from controller.run_timer import Timer
 from .common import FightInfo, FightPlan, Ship, DecisionBlock
@@ -51,7 +51,7 @@ class ExerciseDecisionBlock(DecisionBlock):
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
             print("OK")
-            if (start_march(self.timer) != 'ok'):
+            if (start_march(self.timer) != 'success'):
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
 
@@ -163,7 +163,7 @@ class NormalExercisePlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-        goto_game_page(self.timer, 'exercise_page')
+        self.timer.goto_game_page('exercise_page')
         self._exercise_times = self.exercise_times
         self.exercise_status = [None, None]
         return "success"

@@ -10,11 +10,10 @@ from constants.image_templates import (ChapterImage, FightImage,
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
 from controller.run_timer import (ClickImage, GetImagePosition, ImagesExist,
-                                  Timer, WaitImage)
+                                  Timer, WaitImage, process_bad_network, is_bad_network)
 from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
                                  start_march)
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
-from controller.game_controller import identify_page, goto_game_page, process_bad_network
 from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRecorder, FightRecorder
 from utils.io import recursive_dict_update, yaml_to_dict
@@ -187,9 +186,9 @@ class NormalFightPlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-        goto_game_page(self.timer, 'map_page')
+        self.timer.goto_game_page('map_page')
         self._change_fight_map(self.chapter, self.map)
-        goto_game_page(self.timer, 'fight_prepare_page')
+        self.timer.goto_game_page('fight_prepare_page')
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
@@ -208,14 +207,14 @@ class NormalFightPlan(FightPlan):
             value = self.fight_condition
             self.timer.Android.click(*FIGHT_CONDITIONS_POSITON[value])
             self.Info.last_action = value
-            self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
+            self.fight_recorder.append(StageRecorder(self.Info, self.timer))
             return "fight continue"
 
         elif state == "spot_enemy_success":
             if self.Info.node not in self.selected_nodes:  # 不在白名单之内直接SL
                 self.timer.Android.click(677, 492, delay=0)
                 self.Info.last_action = "retreat"
-                self.fight_recorder.append(StageRecorder(self.Info.state, self.Info.last_action, self.timer))
+                self.fight_recorder.append(StageRecorder(self.Info, self.timer))
                 return "fight end"
 
         elif state == "proceed":
@@ -296,7 +295,7 @@ class NormalFightPlan(FightPlan):
         Raise:
             ImageNotFoundErr:如果没有找到章节标志或地图界面标志
         """
-        if (identify_page(self.timer, 'map_page') == False):
+        if (self.timer.identify_page('map_page') == False):
             raise ImageNotFoundErr("not on page 'map_page' now")
 
         if (chapter_now == target):
@@ -353,7 +352,7 @@ class NormalFightPlan(FightPlan):
             target (_type_): 目标节点
 
         """
-        if (identify_page(self.timer, 'map_page') == False):
+        if (self.timer.identify_page('map_page') == False):
             raise ImageNotFoundErr("not on page 'map_page' now")
 
         NowNode = self._get_node()

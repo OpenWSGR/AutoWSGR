@@ -18,8 +18,6 @@ from utils.io import delete_file, read_file, save_image, write_file
 from utils.logger import logit
 from utils.math_functions import CalcDis, CheckColor, matri_to_str
 
-from controller.game_controller import goto_game_page
-
 
 class ExpeditionStatus():
     def __init__(self, timer: Timer):
@@ -37,7 +35,7 @@ class ExpeditionStatus():
             self.exist_ready = bool(PixelChecker(self.timer, (464, 11), bgr_color=(45, 89, 255)))
         else:
             if (force or time.time() - self.last_check > 1800):
-                goto_game_page(self.timer, 'main_page')
+                self.timer.goto_game_page('main_page')
             if (self.timer.now_page.name == 'main_page'):
                 self.exist_ready = bool(PixelChecker(self.timer, (933, 454), bgr_color=(45, 89, 255)))
 
@@ -52,19 +50,19 @@ class Resources():
         timer = self.timer
         if name is not None:
             if name in ('normal', 'oil', 'ammo', 'steel', 'aluminum'):
-                goto_game_page(timer, 'main_page')
+                self.timer.goto_game_page('main_page')
                 self.detect_resources()
             if name == 'quick_repair':
-                goto_game_page(timer, 'choose_repair_page')
+                self.timer.goto_game_page('choose_repair_page')
                 self.detect_resources()
             if name == 'quick_build':
-                goto_game_page(timer, 'build_page')
+                self.timer.goto_game_page('build_page')
                 self.detect_resources()
             if name == 'ship_blueprint':
-                goto_game_page(timer, 'build_page')
+                self.timer.goto_game_page('build_page')
                 self.detect_resources()
             if name == 'equipment_blueprint':
-                goto_game_page(timer, 'develop_page')
+                self.timer.goto_game_page('develop_page')
                 self.detect_resources()
         else:
             result = get_resources(timer)

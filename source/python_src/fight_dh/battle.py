@@ -2,8 +2,7 @@ import time
 import yaml
 
 from constants.image_templates import FightImage, SymbolImage, IdentifyImages
-from game.game_operation import QuickRepair, goto_game_page, start_march
-from controller.game_controller import wait_pages
+from game.game_operation import QuickRepair, start_march
 from controller.run_timer import Timer, ImagesExist, WaitImages
 from utils.io import recursive_dict_update, yaml_to_dict
 from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
@@ -84,7 +83,7 @@ class BattlePlan(FightPlan):
         self.Info = BattleInfo(timer)
 
     def _enter_fight(self) -> str:
-        goto_game_page(self.timer, "battle_page")
+        self.timer.goto_game_page("battle_page")
         # 切换正确难度
         now_hard = WaitImages(self.timer, [FightImage[9], FightImage[15]])
         hard = self.map > 5
@@ -92,7 +91,7 @@ class BattlePlan(FightPlan):
             self.timer.Android.click(800, 80, delay=1)
 
         self.timer.Android.click(180 * (self.map - hard * 5), 200)
-        wait_pages(self.timer, 'fight_prepare_page', after_wait=.15)
+        self.timer.wait_pages('fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
 
         return start_march(self.timer)

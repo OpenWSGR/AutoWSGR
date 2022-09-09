@@ -10,8 +10,9 @@ from airtest.core.helper import G
 from airtest.core.settings import Settings as ST
 from constants import settings as S
 from constants.custom_expections import ImageNotFoundErr
-from constants.image_templates import ErrorImages, SymbolImage
-from constants.other_constants import INFO1, INFO2, NO
+from constants.image_templates import ErrorImages, SymbolImage, BackImage, GameUI, IdentifyImages
+from constants.other_constants import INFO1, INFO2, NO, ALL_UI
+from constants.ui import Node, load_game_ui
 from PIL import Image as PIM
 from utils.api_image import convert_position
 from utils.io import save_image, write_file
@@ -20,7 +21,6 @@ from utils.math_functions import CalcDis
 
 from .android_controller import AndroidController
 from .windows_controller import WindowsController
-from .game_controller import GameController
 
 
 class Timer():
@@ -34,6 +34,8 @@ class Timer():
         self.log_filepre = get_time_as_string()
         self.screen = None
         self.resolution = (960, 540)
+        self.now_page = None
+        self.ui = load_game_ui()
         # self.ship_position = (0, 0)
         # self.ship_point = "A"  # 常规地图战斗中,当前战斗点位的编号
         # self.chapter = 1  # 章节名,战役为 'battle', 演习为 'exercise'
@@ -41,7 +43,6 @@ class Timer():
         self.ship_status = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
         self.enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
         self.now_page = None  # 当前所在节点名
-        self.ui = None  # ui 树
         self.device_name = 'emulator-5554'  # 设备名,雷电模拟器默认值
         self.expedition_status = None  # 远征状态记录器
         self.team = 1  # 当前队伍名
@@ -68,7 +69,6 @@ class Timer():
         # DH新增，模块化
         self.Android = AndroidController(self.resolution)
         self.Windows = WindowsController(self.device_name)
-        self.Game = GameController(self)
 
     def get_pixel(self, x, y):
         """获取当前屏幕相对坐标 (x,y) 处的像素值
@@ -131,8 +131,200 @@ class Timer():
         if (S.DEBUG):
             self.log_info(info)
 
-    def goto_game_page(self, name):
-        self.Game.goto_game_page(name)
+    @logit()
+    def intergrative_page_identify(self):
+        positions = [(171, 47), (300, 47), (393, 47), (504, 47), (659, 47)]
+        for i, position in enumerate(positions):
+            if (PixelChecker(self, position, (225, 130, 16))):
+                return i + 1
+
+    @logit()
+    def identify_page(self, name, need_screen_shot=True):
+        if need_screen_shot:
+            self.UpdateScreen()
+
+        if (name == 'main_page') and (self.identify_page('options_page', 0)):
+            return False
+        if (name == 'map_page') and ((self.intergrative_page_identify() != 1 or PixelChecker(self, (35, 297), (47, 253, 226)))):
+            return False
+        if (name == 'build_page') and (self.intergrative_page_identify() != 1):
+            return False
+        if (name == 'develop_page') and (self.intergrative_page_identify() != 3):
+            return False
+
+        return any(ImagesExist(self, template, 0) for template in IdentifyImages[name])
+
+    @logit()
+    def wait_pages(self, names, timeout=5, gap=.1, after_wait=0.1):
+        start_time = time.time()
+        if (isinstance(names, str)):
+            names = [names]
+        while (True):
+            self.UpdateScreen()
+            for i, name in enumerate(names):
+                if(self.identify_page(name, 0)):
+                    time.sleep(after_wait)
+                    return i + 1
+
+            if (time.time() - start_time > timeout):
+                break
+            time.sleep(gap)
+
+        raise TimeoutError("identify timeout of" + str(names))
+
+    @logit(level=INFO1)
+    def get_now_page(self):
+        self.UpdateScreen()
+        for page in ALL_UI:
+            if (self.identify_page(page, need_screen_shot=False, no_log=True)):
+                return page
+        return None
+
+    @logit()
+    def check_now_page(self):
+        return self.identify_page(name=self.now_page.name, no_log=True)
+    
+    def operate(self, end: Node):
+        ui_list = self.ui.find_path(self.now_page, end)
+        for next in ui_list[1:]:
+            edge = self.now_page.find_edge(next)
+            opers = edge.operate()
+            self.now_page = next
+            for oper in opers:
+                fun, args = oper
+                if(fun == "click"):
+                    self.Android.click(*args)
+                else:
+                    print("==================================")
+                    print("unknown function name:", fun)
+                    raise BaseException()
+                
+            if (edge.other_dst is not None):
+                dst = self.wait_pages(names=[self.now_page.name, edge.other_dst.name])
+                if (dst == 1):
+                    continue
+                if S.DEBUG:
+                    print(f"Go page {self.now_page.name} but arrive ", edge.other_dst.name)
+                self.now_page = self.ui.get_node_by_name([self.now_page.name, edge.other_dst.name][dst - 1])
+                if S.DEBUG:
+                    print(self.now_page.name)
+
+                self.operate(end)
+                return
+            else:
+                self.wait_pages(names=[self.now_page.name])
+            time.sleep(.25)
+    
+    def set_page(self, page_name=None, page=None):
+        
+        if(page_name is None and page is None):
+            now_page = self.get_now_page(self.timer)
+            if(now_page == None):
+                raise ImageNotFoundErr("Can't identify the page")
+            else:
+                self.now_page = self.ui.get_node_by_name(now_page)
+            
+        elif(page is not None):
+            if(not isinstance(page, Node)):
+                print("==============================")
+                print("arg:page must be an controller.ui.Node object")
+                raise ValueError
+            
+            if (self.ui.page_exist(page)):
+                self.now_page = page
+            
+            raise ValueError('give page do not exist')
+        
+        page = self.ui.get_node_by_name(page_name)
+        if (page is None):
+            raise ValueError("can't find the page:", page_name)
+        self.now_page = page
+    
+    def walk_to(self, end, try_times=0):
+        try:
+            if (isinstance(end, Node)):
+                self.operate(end)
+                self.wait_pages(end.name)
+                return
+            if (isinstance(end, str)):
+                self.walk_to(self.ui.get_node_by_name(end))
+
+        except TimeoutError as exception:
+            if try_times > 3:
+                raise TimeoutError("can't access the page")
+            if is_bad_network(timeout=0) == False:
+                print("wrong path is operated,anyway we find a way to solve,processing")
+                print('wrong info is:', exception)
+                self.GoMainPage()
+                self.walk_to(end, try_times + 1)
+            else:
+                while True:
+                    if process_bad_network("can't walk to the position because a TimeoutError"):
+                        try:
+                            if not self.wait_pages(names=self.now_page.name, timeout=1):
+                                self.set_page(self.get_now_page(self.timer))
+                        except:
+                            try:
+                                self.GoMainPage()
+                            except:
+                                pass
+                            else:
+                                break
+                        else:
+                            break
+                    else:
+                        raise ValueError('unknown error')
+                self.walk_to(end)
+
+    @logit(level=INFO2)
+    def GoMainPage(self, QuitOperationTime=0, List=[], ExList=[]):
+        """回退到游戏主页
+
+        Args:
+            timer (Timer): _description_
+            QuitOperationTime (int, optional): _description_. Defaults to 0.
+            List (list, optional): _description_. Defaults to [].
+            ExList (list, optional): _description_. Defaults to [].
+
+        Raises:
+            ValueError: _description_
+        """
+        if (QuitOperationTime > 200):
+            raise ValueError("Error,Couldn't go main page")
+
+        self.now_page = self.ui.get_node_by_name('main_page')
+        if (len(List) == 0):
+            List = BackImage[1:] + ExList
+        type = WaitImages(self, List + [GameUI[3]], 0.8, timeout=0)
+
+        if type is None:
+            self.GoMainPage(QuitOperationTime + 1, List, no_log=True)
+            return
+
+        if (type >= len(List)):
+            type = WaitImages(self, List, timeout=0)
+            if type is None:
+                return
+
+        pos = GetImagePosition(self, List[type], 0, 0.8)
+        self.Android.click(pos[0], pos[1])
+
+        NewList = List[1:] + [List[0]]
+        self.GoMainPage(QuitOperationTime + 1, NewList, no_log=True)
+    
+    @logit(level=INFO2)
+    def goto_game_page(self, target='main'):
+        """到某一个游戏界面
+
+        Args:
+            timer (Timer): _description_
+            target (str, str): 目标章节名(见 ./constants/other_constants). Defaults to 'main'.
+        """
+        self.walk_to(target)
+        # wait_pages(names=[timer.now_page.name])
+        
+
+
 
 class MyTemplate(Template):
     def match_in(self, screen, this_methods=None):
@@ -335,8 +527,8 @@ def WaitImages(timer: Timer, images=[], confidence=0.85, gap=.15, after_get_dela
 
 
 @logit(level=INFO1)
-def is_bad_network(timeout=10):
-    return WaitImages([ErrorImages['bad_network'][0], SymbolImage[10]], timeout=timeout) != None
+def is_bad_network(timer:Timer, timeout=10):
+    return WaitImages(timer, [ErrorImages['bad_network'][0], SymbolImage[10]], timeout=timeout) != None
 
 
 @logit(level=INFO2)
@@ -363,11 +555,11 @@ def process_bad_network(timer:Timer, extra_info=""):
                 break
 
         start_time2 = time.time()
-        while (ImagesExist([SymbolImage[10]] + ErrorImages['bad_network'])):
+        while (ImagesExist(timer, [SymbolImage[10]] + ErrorImages['bad_network'])):
             time.sleep(.5)
             if (time.time() - start_time2 >= 60):
                 break
-            if (ImagesExist(ErrorImages['bad_network'])):
+            if (ImagesExist(timer, ErrorImages['bad_network'])):
                 timer.Android.click(476, 298, delay=2)
 
         if (time.time() - start_time2 < 60):
@@ -377,3 +569,10 @@ def process_bad_network(timer:Timer, extra_info=""):
 
     return False
 
+
+def GoMainPage(timer:Timer, *args, **kwargs):
+    timer.Game.GoMainPage(*args, **kwargs)
+
+
+def goto_game_page(timer:Timer, *args, **kwargs):
+    timer.goto_game_page(*args, **kwargs)

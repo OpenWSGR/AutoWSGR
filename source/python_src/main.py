@@ -10,7 +10,7 @@ from fight_dh.battle import BattlePlan
 from fight_dh.normal_fight import NormalFightPlan
 from fight_dh.exercise import NormalExercisePlan
 from game.game_operation import (GainBounds, RepairByBath, expedition, restart,
-                                 start_game, GoMainPage)
+                                 start_game)
 from game.get_game_info import ExpeditionStatus, Resources
 from ocr.ship_name import recognize_ship
 from constants.load_data import load_all_data
@@ -31,12 +31,14 @@ def load_data_start():
     timer = Timer()
     load_all_data(timer)
 
+
 def lencmp(s1, s2):
     if(len(s1) < len(s2)):
         return 1
     if(len(s1) > len(s2)):
         return -1
     return 0
+
 
 def start_script(device_name="emulator-5554", account=None, password=None):
     """启动脚本,返回一个 Timer 记录器
@@ -62,16 +64,16 @@ def start_script(device_name="emulator-5554", account=None, password=None):
     timer.expedition_status = ExpeditionStatus(timer)
     # timer.fight_result = FightResult(timer)
     timer.resources = Resources(timer)
-    GoMainPage(timer)
+    timer.GoMainPage()
     try:
-        timer.Game.set_page()
+        timer.set_page()
     except Exception:
         if S.DEBUG:
-            timer.Game.set_page('main_page')
+            timer.set_page('main_page')
         else:
             restart(timer)
-            timer.Game.set_page()
-    print(timer.Game.now_page)
+            timer.set_page()
+    print(timer.now_page)
     return timer
 
 
@@ -90,35 +92,3 @@ def listener(event: kd.KeyboardEvent):
         print("Script end by user request")
         quit()
 
-
-def main_function():
-    global timer
-    timer = start_script()
-
-    #weekliy()
-    #normal_exercise(timer, 1)
-    #friend_exercise(timer, 1)
-    #battle(timer, 9, 8)
-if __name__ == "__main__":    
-    # timer = start_script(account="1558718963", password=1558718963)
-    timer = start_script()
-    battleship_plan = BattlePlan(timer, 'plans/battle/hard_Battleship.yaml', 'plans/default.yaml')
-    aircraftcarrier_plan = BattlePlan(timer, 'plans/battle/hard_aircraftcarrier.yaml', 'plans/default.yaml')
-    destroyer_plan = BattlePlan(timer, 'plans/battle/hard_destroyer.yaml', 'plans/default.yaml')
-    submarine_plan = BattlePlan(timer, 'plans/battle/hard_submarine.yaml', 'plans/default.yaml')
-    cruiser_plan = BattlePlan(timer, 'plans/battle/hard_cruiser.yaml', 'plans/default.yaml')
-    start_time = time.time()
-    exercise_plan = NormalExercisePlan(timer, "plans/exercise/defaults_1.yaml", "plans/exercise/basics.yaml")
-    # exercise_plan.run()
-    # goto_game_page(timer, 'exercise_page')
-    fight_plan = NormalFightPlan(timer, "plans/normal_fight/8-5AI.yaml")
-    fight_plan.run()
-    print(fight_plan.fight_recorder)
-    # battleship_plan.run()
-    # cruiser_plan.run()
-
-
-    # # 9-1BF
-    # plan = NormalFightPlan(timer, "plans/normal_fight/8-2B.yaml", "plans/default.yaml")
-    # total_time = 0
-    # each_time = 10
