@@ -252,14 +252,14 @@ class Timer():
         except TimeoutError as exception:
             if try_times > 3:
                 raise TimeoutError("can't access the page")
-            if is_bad_network(timeout=0) == False:
+            if is_bad_network(self, timeout=0) == False:
                 print("wrong path is operated,anyway we find a way to solve,processing")
                 print('wrong info is:', exception)
                 self.GoMainPage()
                 self.walk_to(end, try_times + 1)
             else:
                 while True:
-                    if process_bad_network("can't walk to the position because a TimeoutError"):
+                    if process_bad_network(self, "can't walk to the position because a TimeoutError"):
                         try:
                             if not self.wait_pages(names=self.now_page.name, timeout=1):
                                 self.set_page(self.get_now_page(self.timer))

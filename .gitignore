@@ -1,4 +1,5 @@
 data/log
+source/python_src/test.py
 .vscode/
 test/
 test.py
