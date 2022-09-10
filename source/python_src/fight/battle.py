@@ -2,10 +2,10 @@ import time
 import yaml
 
 from constants.image_templates import FightImage, SymbolImage, IdentifyImages
-from game.game_operation import QuickRepair, start_march
-from controller.run_timer import Timer, ImagesExist, WaitImages
+from game.game_operation import QuickRepair
+from controller.run_timer import Timer
 from utils.io import recursive_dict_update, yaml_to_dict
-from fight_dh.common import FightInfo, FightPlan, NodeLevelDecisionBlock
+from fight.common import FightInfo, FightPlan, NodeLevelDecisionBlock
 
 """
 战役模块
@@ -54,7 +54,7 @@ class BattleInfo(FightInfo):
         # 点击加速
         if self.state in ["proceed"]:
             p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
-        self.timer.UpdateScreen()
+        self.timer.update_screen()
 
     def _after_match(self):
         pass  # 战役的敌方信息固定，不用获取
@@ -85,7 +85,7 @@ class BattlePlan(FightPlan):
     def _enter_fight(self) -> str:
         self.timer.goto_game_page("battle_page")
         # 切换正确难度
-        now_hard = WaitImages(self.timer, [FightImage[9], FightImage[15]])
+        now_hard = self.timer.wait_images([FightImage[9], FightImage[15]])
         hard = self.map > 5
         if now_hard != hard:
             self.timer.Android.click(800, 80, delay=1)
@@ -94,7 +94,7 @@ class BattlePlan(FightPlan):
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
 
-        return start_march(self.timer)
+        return self.start_march()
 
     def _make_decision(self) -> str:
 

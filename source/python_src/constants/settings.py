@@ -7,7 +7,6 @@ UNISTALL_EQUIPMENT = 1
 PATH1 = 0
 PATH2 = 0
 DEVICE = 0
-UI = {}
 FightTimeLimit = 120
 DEBUG = 0
 LONGUSED = 0

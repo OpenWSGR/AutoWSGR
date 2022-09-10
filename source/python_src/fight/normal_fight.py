@@ -2,26 +2,21 @@ import copy
 import time
 
 import constants.settings as S
-import yaml
 from constants.custom_expections import ImageNotFoundErr
 from constants.image_templates import (ChapterImage, FightImage,
                                        IdentifyImages, NumberImage,
                                        SymbolImage)
 from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
-from controller.run_timer import (ClickImage, GetImagePosition, ImagesExist,
-                                  Timer, WaitImage, process_bad_network, is_bad_network)
-from game.game_operation import (ConfirmOperation, MoveTeam, QuickRepair,
-                                 start_march)
+from controller.run_timer import Timer
+from game.game_operation import MoveTeam, QuickRepair
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
-from controller.run_timer import Timer, ClickImage, GetImagePosition, ImagesExist, WaitImage
-from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, Ship, StageRecorder, FightRecorder
 from utils.io import recursive_dict_update, yaml_to_dict
 from utils.logger import logit
 from utils.math_functions import CalcDis
 
-from .common import (FightInfo, FightPlan, FightRecorder,
-                     NodeLevelDecisionBlock, Ship, StageRecorder)
+from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
+                     StageRecorder)
 
 """
 常规战决策模块
@@ -90,7 +85,7 @@ class NormalFightInfo(FightInfo):
         if self.state in ["proceed", "fight_condition"]:
             p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
 
-        self.timer.UpdateScreen()
+        self.timer.update_screen()
 
         # 在地图上走的过程中获取舰船位置
         if self.state in ["proceed"]:
@@ -99,7 +94,7 @@ class NormalFightInfo(FightInfo):
 
         # 1. proceed: 资源点  2. get_ship: 锁定新船
         if self.state in ["proceed", "get_ship"]:
-            ConfirmOperation(self.timer, delay=0)
+            self.timer.ConfirmOperation(delay=0)
 
     def _after_match(self):
         # 在某些State下可以记录额外信息
@@ -118,9 +113,9 @@ class NormalFightInfo(FightInfo):
         Args:
             timer (Timer): 记录器
         """
-        pos = GetImagePosition(self.timer, FightImage[7], 0, 0.8)
+        pos = self.timer.get_image_position(FightImage[7], 0, 0.8)
         if pos is None:
-            pos = GetImagePosition(self.timer, FightImage[8], 0, 0.8)
+            pos = self.timer.get_image_position(FightImage[8], 0, 0.8)
         if pos is None:
             return
         self.ship_position = pos
@@ -192,7 +187,7 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        return start_march(self.timer)
+        return self.start_march()
 
     def _make_decision(self):
 
@@ -233,7 +228,7 @@ class NormalFightPlan(FightPlan):
                 return "fight end"
 
         elif state == "flagship_severe_damage":
-            ClickImage(self.timer, FightImage[4], must_click=True, delay=0.25)
+            self.timer.click_image(FightImage[4], must_click=True, delay=0.25)
             self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
             return 'fight end'
 
@@ -257,9 +252,9 @@ class NormalFightPlan(FightPlan):
         """
         for try_times in range(5):
             time.sleep(0.15 * 2 ** try_times)
-            self.timer.UpdateScreen()
+            self.timer.update_screen()
             for i in range(1, len(ChapterImage)):
-                if (ImagesExist(self.timer, ChapterImage[i], 0)):
+                if (self.timer.image_exist(ChapterImage[i], 0)):
                     return i
         raise TimeoutError("can't vertify chapter")
 
@@ -277,9 +272,9 @@ class NormalFightPlan(FightPlan):
         for try_times in range(5):
             time.sleep(.15 * 2 ** try_times)
             if (need_screen_shot):
-                self.timer.UpdateScreen()
+                self.timer.update_screen()
             for try_times in range(1, 7):
-                if (ImagesExist(self.timer, NumberImage[try_times], 0, confidence=0.95)):
+                if (self.timer.image_exist(NumberImage[try_times], 0, confidence=0.95)):
                     return try_times
         raise TimeoutError("can't vertify map")
 
@@ -331,14 +326,14 @@ class NormalFightPlan(FightPlan):
                     chapter_now += 1
                     self.timer.Android.click(95, 366, delay=0)
 
-            if (WaitImage(self.timer, ChapterImage[chapter_now]) == False):
+            if (self.timer.wait_image(ChapterImage[chapter_now]) == False):
                 raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
 
             time.sleep(0.15)
             self._move_chapter(target, chapter_now)
         except:
             print("can't move chapter, time now is", time.time)
-            if process_bad_network(self.timer, 'move_chapter'):
+            if self.timer.process_bad_network('move_chapter'):
                 self._move_chapter(target)
             else:
                 raise ImageNotFoundErr("unknow reason can't find chapter image")
@@ -361,18 +356,18 @@ class NormalFightPlan(FightPlan):
             if (target > NowNode):
                 for i in range(1, target - NowNode + 1):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)
-                    if (WaitImage(self.timer, NumberImage[NowNode + i]) == False):
+                    if (self.timer.wait_image(NumberImage[NowNode + i]) == False):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
             else:
                 for i in range(1, NowNode - target + 1):
                     self.timer.Android.swipe(552, 147, 715, 147, duration=0.25)
-                    if (WaitImage(self.timer, NumberImage[NowNode - i]) == False):
+                    if (self.timer.wait_image(NumberImage[NowNode - i]) == False):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
         except:
             print("can't move chapter, time now is", time.time)
-            if (process_bad_network(self.timer)):
+            if self.timer.process_bad_network():
                 self._move_node(target)
             else:
                 raise ImageNotFoundErr("unknow reason can't find number image" + str(target))

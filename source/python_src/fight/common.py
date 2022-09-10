@@ -1,18 +1,16 @@
 import copy
 import time
-import constants.settings as S
 from abc import ABC, abstractmethod
 
-from constants.custom_expections import ImageNotFoundErr
-from constants.image_templates import FightImage, FightResultImage
+import constants.settings as S
+from constants.custom_expections import ImageNotFoundErr, NetworkErr
+from constants.image_templates import FightImage, FightResultImage, SymbolImage
 from constants.keypoint_info import BLOODLIST_POSITION
-from constants.other_constants import ALL_SHIP_TYPES, INFO1, SAP
-from game.game_operation import SL
-from controller.run_timer import Timer, GetImagePosition, ImagesExist, WaitImages
+from constants.other_constants import ALL_SHIP_TYPES, INFO1, INFO2, SAP
+from controller.run_timer import Timer
+from utils import remove_0_value_from_dict
 from utils.logger import logit
 from utils.math_functions import get_nearest
-from utils import remove_0_value_from_dict
-
 
 # TODO: 完成
 
@@ -42,10 +40,10 @@ class FightResult():
 
     @logit(level=INFO1)
     def detect_result(self):
-        mvp_pos = GetImagePosition(self.timer, FightImage[14])
+        mvp_pos = self.timer.get_image_position(FightImage[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
-        self.result = WaitImages(self.timer, FightResultImage)
-        if (ImagesExist(self.timer, FightResultImage['SS'])):
+        self.result = self.timer.wait_images(FightResultImage)
+        if (self.timer.image_exist(FightResultImage['SS'])):
             self.result = 'SS'
         return self
 
@@ -115,7 +113,7 @@ class FightInfo(ABC):
             self._before_match()
 
             # 尝试匹配
-            ret = [ImagesExist(self.timer, image, 0, no_log=True) for image in images]
+            ret = [self.timer.image_exist(image, 0, no_log=True) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
                 print("matched:", self.state)
@@ -225,7 +223,7 @@ class FightPlan(ABC):
             if ret == "fight continue":
                 continue
             elif ret == "need SL":
-                SL(self.timer)
+                self.SL()
                 return self.run()
             elif ret == "fight end":
                 self.timer.set_page(self.Info.end_page)
@@ -240,6 +238,34 @@ class FightPlan(ABC):
     @abstractmethod
     def _make_decision(self) -> str:
         pass
+    
+    # =============== 战斗中通用的操作 ===============
+    @logit(level=INFO2)
+    def SL(self):
+        self.timer.restart()
+        self.timer.go_main_page()
+        self.timer.set_page('main_page')
+
+    @logit(level=INFO2)
+    def start_march(self):
+        self.timer.Android.click(900, 500, 1, delay=0)
+        start_time = time.time()
+        while self.timer.identify_page('fight_prepare_page'):
+            if time.time() - start_time > 3:
+                self.timer.Android.click(900, 500, 1, delay=0)
+            if self.timer.image_exist(SymbolImage[3], need_screen_shot=0):
+                return "dock is full"
+            if self.timer.image_exist(SymbolImage[9], need_screen_shot=0):
+                return "out of times"
+            if time.time() - start_time > 15:
+                if self.timer.process_bad_network():
+                    if self.timer.identify_page('fight_prepare_page'):
+                        return self.start_march()
+                    else:
+                        NetworkErr("status unknow")
+                else:
+                    raise TimeoutError("map_fight prepare timeout")
+        return "success"
 
 
 class DecisionBlock():

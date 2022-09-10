@@ -6,38 +6,18 @@ import constants.settings as S
 import numpy as np
 from constants.color_info import (BLOOD_COLORS, CHALLENGE_BLUE,
                                   SUPPOER_DISABLE, SUPPORT_ENALBE)
-from constants.image_templates import FightImage, ChapterImage
+from constants.image_templates import FightImage
 from constants.keypoint_info import BLOODLIST_POSITION, TYPE_SCAN_AREA
 from constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC, BG, BM, CA,
                                        CAV, CBG, CL, CLT, CV, CVL, DD, INFO1,
                                        NAP, NO, RESOURCE_NAME, SAP, SC, SS)
 from ocr.digit import get_resources
 from PIL import Image as PIM
-from controller.run_timer import Timer, ImagesExist, PixelChecker
+from controller.run_timer import Timer
 from utils.io import delete_file, read_file, save_image, write_file
 from utils.logger import logit
 from utils.math_functions import CalcDis, CheckColor, matri_to_str
 
-
-class ExpeditionStatus():
-    def __init__(self, timer: Timer):
-        self.exist_ready = False
-        self.timer = timer
-        self.last_check = time.time()
-
-    def is_ready(self):
-        return self.exist_ready
-
-    @logit(level=INFO1)
-    def update(self, force=False):
-        self.timer.UpdateScreen()
-        if self.timer.now_page.name in ['expedition_page', 'map_page', 'battle_page', 'exercise_page', 'decisive_battle_entrance']:
-            self.exist_ready = bool(PixelChecker(self.timer, (464, 11), bgr_color=(45, 89, 255)))
-        else:
-            if (force or time.time() - self.last_check > 1800):
-                self.timer.goto_game_page('main_page')
-            if (self.timer.now_page.name == 'main_page'):
-                self.exist_ready = bool(PixelChecker(self.timer, (933, 454), bgr_color=(45, 89, 255)))
 
 
 class Resources():
@@ -111,7 +91,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     if (type == 'fight'):
         type = 1
 
-    if (ImagesExist(timer, FightImage[12])):
+    if (timer.image_exist(FightImage[12])):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
 
@@ -180,7 +160,7 @@ def DetectShipStatu(timer: Timer, type='prepare'):
     血量检测精确到数值,相对误差少于 3%
     """
 
-    timer.UpdateScreen()
+    timer.update_screen()
     result = [-1, 0, 0, 0, 0, 0, 0]
     if type == 'prepare':
         for i in range(1, 7):
@@ -224,32 +204,32 @@ def get_exercise_status(timer: Timer, robot=None):
     Returns:
         bool: 如果可挑战,返回 True ,否则为 False,1-based
     """
-    timer.UpdateScreen()
-    up = bool(PixelChecker(timer, (933, 59), (177, 171, 176), distance=60))
-    down = bool(PixelChecker(timer, (933, 489), (177, 171, 176), distance=60))
+    timer.update_screen()
+    up = timer.check_pixel((933, 59), (177, 171, 176), distance=60)
+    down = timer.check_pixel((933, 489), (177, 171, 176), distance=60)
     assert((up and down) == False)
     
     result = [None, ]
     if(up == False and down == False):
         timer.Android.swipe(800, 200, 800, 400) #上滑
-        timer.UpdateScreen()
+        timer.update_screen()
         up = True
     if(up):
         for position in range(1, 5):
-            result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
+            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
         timer.Android.swipe(800, 400, 800, 200) #下滑
-        timer.UpdateScreen()
-        result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
+        timer.update_screen()
+        result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50)
         return result
     if(down):
         for position in range(1, 5):
-            result.append(bool(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50))
+            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
         if(robot is not None):
             result.insert(1, robot)
             return result
         else:
             timer.Android.swipe(800, 200, 800, 400) #上滑
-            timer.UpdateScreen()
+            timer.update_screen()
             result.insert(1, bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
             timer.Android.swipe(800, 400, 800, 200) #下滑
             return result
@@ -262,7 +242,7 @@ def CheckSupportStatu(timer: Timer):
     Returns:
         bool: 如果开启了返回 True,否则返回 False
     """
-    timer.UpdateScreen()
+    timer.update_screen()
     pixel = timer.get_pixel(623, 75)
     d1 = CalcDis(pixel, SUPPORT_ENALBE)
     d2 = CalcDis(pixel, SUPPOER_DISABLE)
