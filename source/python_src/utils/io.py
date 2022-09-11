@@ -122,14 +122,9 @@ def save_image(path, image, ignore_existed_image=False, *args, **kwargs):
         imwrite(path, image)
 
 
-def get_all_files(dir, must='/'):
-    files = os.listdir(dir)
+def get_all_files(dir):
     res = []
-    for x in files:
-        if (os.path.isdir(dir + "/" + x)):
-            res += get_all_files(dir + "/" + x, must)
-            continue
-        if (must not in dir + "/" + x):
-            continue
-        res.append(dir + "/" + x)
+    for r, d, f in os.walk(dir):
+        for file in f:
+            res.append(os.path.join(r, file))
     return res

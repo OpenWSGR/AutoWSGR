@@ -1,8 +1,7 @@
 
 import copy
 
-from constants.image_templates import (ExerciseImages, FightImage,
-                                       IdentifyImages, SymbolImage)
+from constants import IMG
 from constants.other_constants import INFO2
 from controller.run_timer import Timer
 from game.game_operation import MoveTeam
@@ -91,15 +90,15 @@ class NormalExerciseInfo(FightInfo):
         }
 
         self.state2image = {
-            "exercise_page": [IdentifyImages['exercise_page'], 5],
-            "rival_info": [ExerciseImages["rival_info"], 5],
-            "fight_prepare_page": [IdentifyImages["fight_prepare_page"], 5],
-            "spot_enemy_success": [FightImage[2], 15],
-            "formation": [FightImage[1], 15],
-            "fight_period": [SymbolImage[4], 3],
-            "night": [FightImage[6], .85, 180],
-            "night_fight_period": [SymbolImage[4], 3],
-            "result": [FightImage[3], 90],
+            "exercise_page": [IMG.IdentifyImages['exercise_page'], 5],
+            "rival_info": [IMG.ExerciseImages["rival_info"], 5],
+            "fight_prepare_page": [IMG.IdentifyImages["fight_prepare_page"], 5],
+            "spot_enemy_success": [IMG.FightImage[2], 15],
+            "formation": [IMG.FightImage[1], 15],
+            "fight_period": [IMG.SymbolImage[4], 3],
+            "night": [IMG.FightImage[6], .85, 180],
+            "night_fight_period": [IMG.SymbolImage[4], 3],
+            "result": [IMG.FightImage[3], 90],
         }
 
     def reset(self):

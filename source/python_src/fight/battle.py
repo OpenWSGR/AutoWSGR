@@ -1,7 +1,7 @@
 import time
 import yaml
 
-from constants.image_templates import FightImage, SymbolImage, IdentifyImages
+from constants import IMG
 from game.game_operation import QuickRepair
 from controller.run_timer import Timer
 from utils.io import recursive_dict_update, yaml_to_dict
@@ -35,14 +35,14 @@ class BattleInfo(FightInfo):
         }
 
         self.state2image = {
-            "proceed": [FightImage[5], 5],
-            "spot_enemy_success": [FightImage[2], 15],
-            "formation": [FightImage[1], 15],
-            "fight_period": [SymbolImage[4], 3],
-            "night": [FightImage[6], 120],
-            "night_fight_period": [SymbolImage[4], 3],
-            "result": [FightImage[16], 60],
-            "battle_page": [IdentifyImages["battle_page"][0], 5]
+            "proceed": [IMG.FightImage[5], 5],
+            "spot_enemy_success": [IMG.FightImage[2], 15],
+            "formation": [IMG.FightImage[1], 15],
+            "fight_period": [IMG.SymbolImage[4], 3],
+            "night": [IMG.FightImage[6], 120],
+            "night_fight_period": [IMG.SymbolImage[4], 3],
+            "result": [IMG.FightImage[16], 60],
+            "battle_page": [IMG.IdentifyImages["battle_page"][0], 5]
         }
 
     def reset(self):
@@ -85,7 +85,7 @@ class BattlePlan(FightPlan):
     def _enter_fight(self) -> str:
         self.timer.goto_game_page("battle_page")
         # 切换正确难度
-        now_hard = self.timer.wait_images([FightImage[9], FightImage[15]])
+        now_hard = self.timer.wait_images([IMG.FightImage[9], IMG.FightImage[15]])
         hard = self.map > 5
         if now_hard != hard:
             self.timer.Android.click(800, 80, delay=1)

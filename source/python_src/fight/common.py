@@ -3,16 +3,14 @@ import time
 from abc import ABC, abstractmethod
 
 import constants.settings as S
+from constants import IMG
 from constants.custom_expections import ImageNotFoundErr, NetworkErr
-from constants.image_templates import FightImage, FightResultImage, SymbolImage
-from constants.keypoint_info import BLOODLIST_POSITION
+from constants.positions import BLOODLIST_POSITION
 from constants.other_constants import ALL_SHIP_TYPES, INFO1, INFO2, SAP
 from controller.run_timer import Timer
 from utils import remove_0_value_from_dict
 from utils.logger import logit
 from utils.math_functions import get_nearest
-
-# TODO: 完成
 
 
 class Ship():
@@ -40,10 +38,10 @@ class FightResult():
 
     @logit(level=INFO1)
     def detect_result(self):
-        mvp_pos = self.timer.get_image_position(FightImage[14])
+        mvp_pos = self.timer.get_image_position(IMG.FightImage[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
-        self.result = self.timer.wait_images(FightResultImage)
-        if (self.timer.image_exist(FightResultImage['SS'])):
+        self.result = self.timer.wait_images(IMG.FightResultImage)
+        if (self.timer.image_exist(IMG.FightResultImage['SS'])):
             self.result = 'SS'
         return self
 
@@ -238,7 +236,7 @@ class FightPlan(ABC):
     @abstractmethod
     def _make_decision(self) -> str:
         pass
-    
+
     # =============== 战斗中通用的操作 ===============
     @logit(level=INFO2)
     def SL(self):
@@ -253,9 +251,9 @@ class FightPlan(ABC):
         while self.timer.identify_page('fight_prepare_page'):
             if time.time() - start_time > 3:
                 self.timer.Android.click(900, 500, 1, delay=0)
-            if self.timer.image_exist(SymbolImage[3], need_screen_shot=0):
+            if self.timer.image_exist(IMG.SymbolImage[3], need_screen_shot=0):
                 return "dock is full"
-            if self.timer.image_exist(SymbolImage[9], need_screen_shot=0):
+            if self.timer.image_exist(IMG.SymbolImage[9], need_screen_shot=0):
                 return "out of times"
             if time.time() - start_time > 15:
                 if self.timer.process_bad_network():
@@ -301,7 +299,6 @@ class DecisionBlock():
 
         if state in ["fight_period", "night_fight_period"]:
             return None, "fight continue"
-
         elif state == "spot_enemy_success":
             retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
             detour = self.detour  # 由Node指定是否要迂回
@@ -357,10 +354,6 @@ class DecisionBlock():
         elif state == "get_ship":
             self.timer.Android.click(900, 500, 1, 0.25)
             return None, "fight continue"
-
-        elif state == "lock_ship":
-            pass    # TODO: 锁定舰船
-
         else:
             print("===========Unknown State==============")
             raise BaseException()

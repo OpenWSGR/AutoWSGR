@@ -1,12 +1,12 @@
 from functools import wraps
+from constants.global_attribute import script_end
 
-import constants.global_attributes as Globals
 
 
 def try_for_times(fun):
     @wraps(fun)
     def imtemplate(*arg, **kwargs):
-        if (Globals.script_end == 1):
+        if (script_end == 1):
             return
         for i in range(2):
             try:
@@ -21,6 +21,6 @@ def try_for_times(fun):
 def stopper(fun):
     @wraps(fun)
     def imtemplate(*arg, **kwargs):
-        return 'end' if (Globals.script_end == 1) else fun(*arg, **kwargs)
+        return 'end' if (script_end == 1) else fun(*arg, **kwargs)
 
     return imtemplate

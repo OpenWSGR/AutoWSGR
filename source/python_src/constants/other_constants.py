@@ -32,7 +32,7 @@ SAP = "SAP"
     NO:该位置不存在舰船
 """
 
-ALL_UI = {'map_page', 'main_page', 'decisive_battle_entrance', 'exercise_page', 'battle_page', 'expedition_page',
+ALL_PAGES = {'map_page', 'main_page', 'decisive_battle_entrance', 'exercise_page', 'battle_page', 'expedition_page',
           'fight_prepare_page', 'bath_page', 'choose_repair_page', 'backyard_page', 'canteen_page',
           'options_page', 'build_page', 'destroy_page', 'develop_page', 'discard_page',
           'intensify_page', 'remake_page', 'skill_page', 'mission_page', 'support_set_page',
@@ -46,8 +46,6 @@ exercise_image_list = {"rival_info"}
 
 FIGHT_RESULTS = {"SS", "S", "A", "B", "C", "D"}
 
-NODE_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),
-             range(1, 6), range(1, 5), range(1, 6), range(1, 6), range(1, 2)]
 
 RESOURCE_NAME = {'oil', 'ammo', 'steel', 'aluminum', 'diamond', 'quick_repair', 'quick_build',
                  'ship_blueprint', 'equipment_builprint', }
@@ -61,3 +59,5 @@ PORT_FACILITIES = {'ship_limit', 'ship_ammount', 'equipment_limit', 'equipment_a
 INFO1 = 13
 INFO2 = 16
 INFO3 = 19
+
+ALL_ERRORS = {'bad_network'}

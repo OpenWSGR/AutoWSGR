@@ -4,10 +4,10 @@ import time
 
 import constants.settings as S
 import numpy as np
-from constants.color_info import (BLOOD_COLORS, CHALLENGE_BLUE,
+from constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
                                   SUPPOER_DISABLE, SUPPORT_ENALBE)
-from constants.image_templates import FightImage
-from constants.keypoint_info import BLOODLIST_POSITION, TYPE_SCAN_AREA
+from constants import IMG
+from constants.positions import BLOODLIST_POSITION, TYPE_SCAN_AREA
 from constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC, BG, BM, CA,
                                        CAV, CBG, CL, CLT, CV, CVL, DD, INFO1,
                                        NAP, NO, RESOURCE_NAME, SAP, SC, SS)
@@ -91,7 +91,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     if (type == 'fight'):
         type = 1
 
-    if (timer.image_exist(FightImage[12])):
+    if (timer.image_exist(IMG.FightImage[12])):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
 

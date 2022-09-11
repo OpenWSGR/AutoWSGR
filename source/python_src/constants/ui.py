@@ -242,3 +242,6 @@ class UI():
                 x, y = edge.get('pos')
                 self._add_edge(node, dst, self._construct_clicks_method([(x, y)]))
         return nodes
+
+
+WSGR_UI = UI()

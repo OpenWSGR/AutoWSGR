@@ -2,12 +2,10 @@ import copy
 import time
 
 import constants.settings as S
+from constants import IMG
 from constants.custom_expections import ImageNotFoundErr
-from constants.image_templates import (ChapterImage, FightImage,
-                                       IdentifyImages, NumberImage,
-                                       SymbolImage)
-from constants.keypoint_info import FIGHT_CONDITIONS_POSITON, POINT_POSITION
-from constants.other_constants import INFO1, INFO2, INFO3, NODE_LIST
+from constants.positions import FIGHT_CONDITIONS_POSITON, MAP_NODE_POSITION
+from constants.other_constants import INFO1, INFO2, INFO3
 from controller.run_timer import Timer
 from game.game_operation import MoveTeam, QuickRepair
 from game.get_game_info import DetectShipStatu, GetEnemyCondition
@@ -22,6 +20,8 @@ from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
 常规战决策模块
 """
 
+MAP_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),
+             range(1, 6), range(1, 5), range(1, 6), range(1, 6), range(1, 2)]
 
 class NormalFightInfo(FightInfo):
     # ==================== Unified Interface ====================
@@ -58,17 +58,17 @@ class NormalFightInfo(FightInfo):
         }
 
         self.state2image = {
-            "proceed": [FightImage[5], 5],
-            "fight_condition": [FightImage[10], 15],
-            "spot_enemy_success": [FightImage[2], 15],
-            "formation": [FightImage[1], 15],
-            "fight_period": [SymbolImage[4], 3],
-            "night": [FightImage[6], 120],
-            "night_fight_period": [SymbolImage[4], 3],
-            "result": [FightImage[3], 60],
-            "get_ship": [SymbolImage[8], 5],
-            "flagship_severe_damage": [FightImage[4], 5],
-            "map_page": [IdentifyImages["map_page"][0], 5]
+            "proceed": [IMG.FightImage[5], 5],
+            "fight_condition": [IMG.FightImage[10], 15],
+            "spot_enemy_success": [IMG.FightImage[2], 15],
+            "formation": [IMG.FightImage[1], 15],
+            "fight_period": [IMG.SymbolImage[4], 3],
+            "night": [IMG.FightImage[6], 120],
+            "night_fight_period": [IMG.SymbolImage[4], 3],
+            "result": [IMG.FightImage[3], 60],
+            "get_ship": [IMG.SymbolImage[8], 5],
+            "flagship_severe_damage": [IMG.FightImage[4], 5],
+            "map_page": [IMG.IdentifyImages["map_page"][0], 5]
         }
 
     def reset(self):
@@ -113,9 +113,9 @@ class NormalFightInfo(FightInfo):
         Args:
             timer (Timer): 记录器
         """
-        pos = self.timer.get_image_position(FightImage[7], 0, 0.8)
+        pos = self.timer.get_image_position(IMG.FightImage[7], 0, 0.8)
         if pos is None:
-            pos = self.timer.get_image_position(FightImage[8], 0, 0.8)
+            pos = self.timer.get_image_position(IMG.FightImage[8], 0, 0.8)
         if pos is None:
             return
         self.ship_position = pos
@@ -133,9 +133,9 @@ class NormalFightInfo(FightInfo):
             ch = chr(ord('A') + i)
             node1 = (self.chapter, self.map, ch)
             node2 = (self.chapter, self.map, self.node)
-            if node1 not in POINT_POSITION:
+            if node1 not in MAP_NODE_POSITION:
                 break
-            if (CalcDis(POINT_POSITION[node1], self.ship_position) < CalcDis(POINT_POSITION[node2], self.ship_position)):
+            if (CalcDis(MAP_NODE_POSITION[node1], self.ship_position) < CalcDis(MAP_NODE_POSITION[node2], self.ship_position)):
                 self.node = ch
 
 
@@ -228,7 +228,7 @@ class NormalFightPlan(FightPlan):
                 return "fight end"
 
         elif state == "flagship_severe_damage":
-            self.timer.click_image(FightImage[4], must_click=True, delay=0.25)
+            self.timer.click_image(IMG.FightImage[4], must_click=True, delay=0.25)
             self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
             return 'fight end'
 
@@ -253,8 +253,8 @@ class NormalFightPlan(FightPlan):
         for try_times in range(5):
             time.sleep(0.15 * 2 ** try_times)
             self.timer.update_screen()
-            for i in range(1, len(ChapterImage)):
-                if (self.timer.image_exist(ChapterImage[i], 0)):
+            for i in range(1, len(IMG.ChapterImage)):
+                if (self.timer.image_exist(IMG.ChapterImage[i], 0)):
                     return i
         raise TimeoutError("can't vertify chapter")
 
@@ -274,7 +274,7 @@ class NormalFightPlan(FightPlan):
             if (need_screen_shot):
                 self.timer.update_screen()
             for try_times in range(1, 7):
-                if (self.timer.image_exist(NumberImage[try_times], 0, confidence=0.95)):
+                if (self.timer.image_exist(IMG.NumberImage[try_times], 0, confidence=0.95)):
                     return try_times
         raise TimeoutError("can't vertify map")
 
@@ -326,7 +326,7 @@ class NormalFightPlan(FightPlan):
                     chapter_now += 1
                     self.timer.Android.click(95, 366, delay=0)
 
-            if (self.timer.wait_image(ChapterImage[chapter_now]) == False):
+            if (self.timer.wait_image(IMG.ChapterImage[chapter_now]) == False):
                 raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
 
             time.sleep(0.15)
@@ -356,13 +356,13 @@ class NormalFightPlan(FightPlan):
             if (target > NowNode):
                 for i in range(1, target - NowNode + 1):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)
-                    if (self.timer.wait_image(NumberImage[NowNode + i]) == False):
+                    if (self.timer.wait_image(IMG.NumberImage[NowNode + i]) == False):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
             else:
                 for i in range(1, NowNode - target + 1):
                     self.timer.Android.swipe(552, 147, 715, 147, duration=0.25)
-                    if (self.timer.wait_image(NumberImage[NowNode - i]) == False):
+                    if (self.timer.wait_image(IMG.NumberImage[NowNode - i]) == False):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
         except:
@@ -387,7 +387,7 @@ class NormalFightPlan(FightPlan):
         """
         if (self.timer.now_page.name != 'map_page'):
             raise ValueError("can't _change_fight_map at page:", self.timer.now_page.name)
-        if map not in NODE_LIST[chapter]:
+        if map not in MAP_LIST[chapter]:
             raise ValueError('map' + str(map) + 'not in the list of chapter' + str(chapter))
 
         self._move_chapter(chapter)
