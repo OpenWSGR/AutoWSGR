@@ -4,7 +4,7 @@ import os
 import time
 from functools import wraps
 
-import constants.settings as S
+from constants.settings import S
 from constants.global_attribute import script_end
 from constants.other_constants import INFO1, INFO2, INFO3
 

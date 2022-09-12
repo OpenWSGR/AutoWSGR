@@ -1,6 +1,6 @@
-TUNNEL_PATH = "data\\tunnel\\"
-LOG_PATH = "data\\log"
-DELAY = 2
-RESTART_PATH = "C:\\leidian\\LDPlayer4"
-DEBUG = 0
-WORK_PATH = "./"
+from types import SimpleNamespace
+from utils.io import yaml_to_dict
+
+S = SimpleNamespace()
+user_settings = yaml_to_dict("data/settings/settings.yaml")
+S.__dict__.update(user_settings)

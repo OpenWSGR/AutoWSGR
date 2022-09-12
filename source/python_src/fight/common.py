@@ -2,7 +2,7 @@ import copy
 import time
 from abc import ABC, abstractmethod
 
-import constants.settings as S
+from constants.settings import S
 from constants import IMG
 from constants.custom_expections import ImageNotFoundErr, NetworkErr
 from constants.positions import BLOODLIST_POSITION

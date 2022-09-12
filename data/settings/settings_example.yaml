@@ -1,0 +1,5 @@
+LDPLAYER_ROOT: C:\leidian\LDPlayer9
+TUNNEL_PATH: data\tunnel
+LOG_PATH: data\log
+DELAY: 2
+DEBUG: 0

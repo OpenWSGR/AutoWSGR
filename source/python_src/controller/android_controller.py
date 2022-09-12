@@ -1,7 +1,7 @@
 import threading as th
 import time
 
-import constants.settings as S
+from constants.settings import S
 from airtest.core.api import shell, start_app
 from constants.other_constants import INFO1
 

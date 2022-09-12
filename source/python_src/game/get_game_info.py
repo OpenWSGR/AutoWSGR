@@ -2,7 +2,7 @@ import math
 import os
 import time
 
-import constants.settings as S
+from constants.settings import S
 import numpy as np
 from constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
                                   SUPPOER_DISABLE, SUPPORT_ENALBE)
@@ -17,7 +17,6 @@ from controller.run_timer import Timer
 from utils.io import delete_file, read_file, save_image, write_file
 from utils.logger import logit
 from utils.math_functions import CalcDis, CheckColor, matri_to_str
-
 
 
 class Resources():
@@ -54,7 +53,7 @@ class Resources():
         如果游戏脱离程序监控,可能会不准确，需要先 detect
 
         Args:
-            name (资源名称): 
+            name (资源名称):
                 values:
                     refer to constants.other_constants.RESOURCE_NAME
             detect (bool, optional): 是否从游戏中重新探查(如果否，则使用由程序维护的数据)
@@ -66,7 +65,7 @@ class Resources():
             raise ValueError("Unsupported resource name")
         if (detect or name not in self.resources.keys()):
             self.detect_resources(name)
-        
+
         return self.resources.get(name)
 
 
@@ -115,12 +114,12 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     os.system(".\Source.exe")
     os.chdir("..\\..\\")
 
-    res = read_file(S.WORK_PATH + "Data\\Tunnel\\res.out").split()
-    timer.enemy_type_count["ALL"] = 0
+    res = read_file(os.path.join("Data", "Tunnel", "res.out")).split()
+    timer.enemy_type_count["ALL"]=0
     for i, x in enumerate(res):
-        timer.enemy_ship_type[i] = x
+        timer.enemy_ship_type[i]=x
         timer.enemy_type_count[x] += 1
-        timer.enemy_ship_type[i] = x
+        timer.enemy_ship_type[i]=x
         if (x != NO):
             timer.enemy_type_count["ALL"] += 1
 
@@ -133,7 +132,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         print("")
 
 
-@logit(level=INFO1)
+@ logit(level=INFO1)
 def DetectShipStatu(timer: Timer, type='prepare'):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_status
 
@@ -161,40 +160,40 @@ def DetectShipStatu(timer: Timer, type='prepare'):
     """
 
     timer.update_screen()
-    result = [-1, 0, 0, 0, 0, 0, 0]
+    result=[-1, 0, 0, 0, 0, 0, 0]
     if type == 'prepare':
         for i in range(1, 7):
-            pixel = timer.get_pixel(*BLOODLIST_POSITION[0][i])
-            result[i] = CheckColor(pixel, BLOOD_COLORS[0])
+            pixel=timer.get_pixel(*BLOODLIST_POSITION[0][i])
+            result[i]=CheckColor(pixel, BLOOD_COLORS[0])
             if result[i] in [3, 2]:
-                result[i] = 2
+                result[i]=2
             elif result[i] == 0:
-                result[i] = 0
+                result[i]=0
             elif result[i] == 4:
-                result[i] = -1
+                result[i]=-1
             else:
-                result[i] = 1
+                result[i]=1
     if type == 'sumup':
         for i in range(1, 7):
             if timer.ship_status[i] == -1:
-                result[i] = -1
+                result[i]=-1
                 continue
-            pixel = timer.get_pixel(*BLOODLIST_POSITION[1][i])
-            result[i] = CheckColor(pixel, BLOOD_COLORS[1])
-    timer.ship_status = result
+            pixel=timer.get_pixel(*BLOODLIST_POSITION[1][i])
+            result[i]=CheckColor(pixel, BLOOD_COLORS[1])
+    timer.ship_status=result
     if S.DEBUG:
         print(type, ":ship_status =", result)
     return result
 
 
-@logit(level=INFO1)
+@ logit(level=INFO1)
 def DetectShipType(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
 
 
-@logit(level=INFO1)
+@ logit(level=INFO1)
 def get_exercise_status(timer: Timer, robot=None):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
@@ -205,37 +204,37 @@ def get_exercise_status(timer: Timer, robot=None):
         bool: 如果可挑战,返回 True ,否则为 False,1-based
     """
     timer.update_screen()
-    up = timer.check_pixel((933, 59), (177, 171, 176), distance=60)
-    down = timer.check_pixel((933, 489), (177, 171, 176), distance=60)
-    assert((up and down) == False)
-    
-    result = [None, ]
-    if(up == False and down == False):
-        timer.Android.swipe(800, 200, 800, 400) #上滑
+    up=timer.check_pixel((933, 59), (177, 171, 176), distance=60)
+    down=timer.check_pixel((933, 489), (177, 171, 176), distance=60)
+    assert ((up and down) == False)
+
+    result=[None, ]
+    if (up == False and down == False):
+        timer.Android.swipe(800, 200, 800, 400)  # 上滑
         timer.update_screen()
-        up = True
-    if(up):
+        up=True
+    if (up):
         for position in range(1, 5):
             result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
-        timer.Android.swipe(800, 400, 800, 200) #下滑
+        timer.Android.swipe(800, 400, 800, 200)  # 下滑
         timer.update_screen()
         result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50)
         return result
-    if(down):
+    if (down):
         for position in range(1, 5):
             result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
-        if(robot is not None):
+        if (robot is not None):
             result.insert(1, robot)
             return result
         else:
-            timer.Android.swipe(800, 200, 800, 400) #上滑
+            timer.Android.swipe(800, 200, 800, 400)  # 上滑
             timer.update_screen()
             result.insert(1, bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
-            timer.Android.swipe(800, 400, 800, 200) #下滑
+            timer.Android.swipe(800, 400, 800, 200)  # 下滑
             return result
 
 
-@logit(level=INFO1)
+@ logit(level=INFO1)
 def CheckSupportStatu(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 
@@ -243,7 +242,7 @@ def CheckSupportStatu(timer: Timer):
         bool: 如果开启了返回 True,否则返回 False
     """
     timer.update_screen()
-    pixel = timer.get_pixel(623, 75)
-    d1 = CalcDis(pixel, SUPPORT_ENALBE)
-    d2 = CalcDis(pixel, SUPPOER_DISABLE)
+    pixel=timer.get_pixel(623, 75)
+    d1=CalcDis(pixel, SUPPORT_ENALBE)
+    d2=CalcDis(pixel, SUPPOER_DISABLE)
     return d1 < d2
