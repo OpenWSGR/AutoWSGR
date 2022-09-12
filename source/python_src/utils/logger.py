@@ -4,8 +4,8 @@ import os
 import time
 from functools import wraps
 
-import constants.global_attributes as Globals
 import constants.settings as S
+from constants.global_attribute import script_end
 from constants.other_constants import INFO1, INFO2, INFO3
 
 from utils.io import create_file_with_path
@@ -87,7 +87,7 @@ def logit(acc='str', level=logging.DEBUG, time_rec=True):
     def logger(fun):
         @wraps(fun)
         def log_info(*args, **kwargs):
-            if (Globals.script_end == 1):
+            if (script_end == 1):
                 return 'end'
 
             no_log = kwargs.get('no_log')

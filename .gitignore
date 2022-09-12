@@ -9,6 +9,7 @@ data/tunnel/*.PNG
 data/tunnel/*.in
 data/tunnel/*.out
 dh_main.py
+release/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

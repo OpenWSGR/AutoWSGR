@@ -65,7 +65,7 @@ def get_loot_and_ship(timer):
     """ 获取掉落数据     
     """
     goto_game_page(timer, 'map_page')
-    timer.UpdateScreen()
+    timer.update_screen()
     image = timer.screen
 
     ret = {}

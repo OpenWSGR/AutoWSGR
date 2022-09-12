@@ -1,22 +1,19 @@
 
 import copy
 
-import yaml
-from constants.image_templates import (ExerciseImages, FightImage,
-                                       IdentifyImages, SymbolImage)
+from constants import IMG
 from constants.other_constants import INFO2
-from game.game_operation import MoveTeam, start_march
-from game.get_game_info import DetectShipStatu, GetEnemyCondition, get_exercise_status
 from controller.run_timer import Timer
-from .common import FightInfo, FightPlan, Ship, DecisionBlock
-from controller.run_timer import Timer
+from game.game_operation import MoveTeam
+from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
+                                get_exercise_status)
 from utils.io import recursive_dict_update, yaml_to_dict
 from utils.logger import logit
 
+from .common import DecisionBlock, FightInfo, FightPlan, Ship
 
 """
-常规战决策模块
-TODO: 1.资源点 2.依据敌方选择阵型
+演习决策模块
 """
 
 
@@ -51,7 +48,7 @@ class ExerciseDecisionBlock(DecisionBlock):
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
             print("OK")
-            if (start_march(self.timer) != 'success'):
+            if self.start_march() != 'success':
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
 
@@ -93,15 +90,15 @@ class NormalExerciseInfo(FightInfo):
         }
 
         self.state2image = {
-            "exercise_page": [IdentifyImages['exercise_page'], 5],
-            "rival_info": [ExerciseImages["rival_info"], 5],
-            "fight_prepare_page": [IdentifyImages["fight_prepare_page"], 5],
-            "spot_enemy_success": [FightImage[2], 15],
-            "formation": [FightImage[1], 15],
-            "fight_period": [SymbolImage[4], 3],
-            "night": [FightImage[6], .85, 180],
-            "night_fight_period": [SymbolImage[4], 3],
-            "result": [FightImage[3], 90],
+            "exercise_page": [IMG.IdentifyImages['exercise_page'], 5],
+            "rival_info": [IMG.ExerciseImages["rival_info"], 5],
+            "fight_prepare_page": [IMG.IdentifyImages["fight_prepare_page"], 5],
+            "spot_enemy_success": [IMG.FightImage[2], 15],
+            "formation": [IMG.FightImage[1], 15],
+            "fight_period": [IMG.SymbolImage[4], 3],
+            "night": [IMG.FightImage[6], .85, 180],
+            "night_fight_period": [IMG.SymbolImage[4], 3],
+            "result": [IMG.FightImage[3], 90],
         }
 
     def reset(self):
@@ -116,7 +113,7 @@ class NormalExerciseInfo(FightInfo):
         if self.state in ["fight_prepare_page"]:
             p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
 
-        self.timer.UpdateScreen()
+        self.timer.update_screen()
 
     def _after_match(self):
         if self.state == "result":

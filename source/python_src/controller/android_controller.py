@@ -84,8 +84,9 @@ class AndroidController:
         x2, y2 = convert_position(x2, y2, self.resolution)
         duration = int(duration * 1000)
         input_str = f"input swipe {str(x1)} {str(y1)} {str(x2)} {str(y2)} {duration}"
-        print("Time:", time.time(), input_str)
-        self.ShellCmd(f"input swipe {str(x1)} {str(y1)} {str(x2)} {str(y2)} {duration}")
+        if S.DEBUG:
+            print("Time:", time.time(), input_str)
+        self.ShellCmd(input_str)
 
         time.sleep(delay)
 

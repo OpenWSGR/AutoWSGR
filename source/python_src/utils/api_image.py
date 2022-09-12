@@ -1,3 +1,7 @@
+import numpy as np
+from constants.image_templates import MyTemplate
+
+
 def relative_to_absolute(record_pos, resolution=(960, 540)):
     """ 将相对坐标转换为绝对坐标 """
     delta_x, delta_y = record_pos
@@ -64,3 +68,22 @@ def convert_area(area, resolution, mode='960_to_this'):
     left, top = convert_position(area[0], area[1], resolution, mode)
     right, buttom = convert_position(area[2], area[3], resolution, mode)
     return (left, top, right, buttom)
+
+
+def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, this_mehods=['tpl']):
+    """从原图像中尝试找出一个置信度相对于模板图像最高的矩阵区域的中心坐标
+
+    Args:
+        image (np.ndarray): 原图像
+        query (MyTemplate): 模板图像
+        confidence (float, optional): 置信度阈值. Defaults to 0.85.
+        this_mehods (list, optional): 匹配方式. Defaults to ['tpl'].
+
+    Returns:
+        如果匹配结果中有超过阈值的,返回置信度最高的结果的中心绝对坐标:Tuple(int,int)
+
+        否则返回 None 
+    """
+    query.threshold = confidence
+    match_pos = query.match_in(image, this_methods=this_mehods)
+    return match_pos or None
