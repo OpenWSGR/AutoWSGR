@@ -90,15 +90,15 @@ class NormalExerciseInfo(FightInfo):
         }
 
         self.state2image = {
-            "exercise_page": [IMG.IdentifyImages['exercise_page'], 5],
-            "rival_info": [IMG.ExerciseImages["rival_info"], 5],
-            "fight_prepare_page": [IMG.IdentifyImages["fight_prepare_page"], 5],
-            "spot_enemy_success": [IMG.FightImage[2], 15],
-            "formation": [IMG.FightImage[1], 15],
-            "fight_period": [IMG.SymbolImage[4], 3],
-            "night": [IMG.FightImage[6], .85, 180],
-            "night_fight_period": [IMG.SymbolImage[4], 3],
-            "result": [IMG.FightImage[3], 90],
+            "exercise_page": [IMG.identify_images['exercise_page'], 5],
+            "rival_info": [IMG.exercise_image["rival_info"], 5],
+            "fight_prepare_page": [IMG.identify_images["fight_prepare_page"], 5],
+            "spot_enemy_success": [IMG.fight_image[2], 15],
+            "formation": [IMG.fight_image[1], 15],
+            "fight_period": [IMG.symbol_image[4], 3],
+            "night": [IMG.fight_image[6], .85, 180],
+            "night_fight_period": [IMG.symbol_image[4], 3],
+            "result": [IMG.fight_image[3], 90],
         }
 
     def reset(self):

@@ -2,5 +2,25 @@ TUNNEL_PATH = "data\\tunnel\\"
 LOG_PATH = "data\\log"
 DELAY = 2
 RESTART_PATH = "C:\\leidian\\LDPlayer4"
-DEBUG = 0
 WORK_PATH = "./"
+
+DEBUG = False
+SHOW_MAP_NODE = False
+SHOW_ANDROID_INPUT = False
+SHOW_ENEMY_RUELS = False
+SHOW_FIGHT_STAGE = False
+SHOW_CHAPTER_INFO = False
+SHOW_MATCH_FIGHT_STAGE = False
+
+def show_all_debug_info():
+    global SHOW_MAP_NODE, SHOW_ANDROID_INPUT, DEBUG, SHOW_ENEMY_RUELS, \
+        SHOW_FIGHT_STAGE, SHOW_CHAPTER_INFO, SHOW_MATCH_FIGHT_STAGE
+
+    SHOW_MATCH_FIGHT_STAGE = True
+    SHOW_MAP_NODE = True
+    SHOW_ANDROID_INPUT = True
+    SHOW_ENEMY_RUELS = True
+    SHOW_FIGHT_STAGE = True
+    SHOW_CHAPTER_INFO = True
+    DEBUG = True
+    

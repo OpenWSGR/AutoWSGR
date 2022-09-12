@@ -28,7 +28,7 @@ class AndroidController:
 
     @logit(level=INFO1)
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
-        if S.DEBUG:
+        if S.SHOW_ANDROID_INPUT:
             if 'print' in kwargs:
                 is_print = kwargs.get('print')
             else:
@@ -84,7 +84,7 @@ class AndroidController:
         x2, y2 = convert_position(x2, y2, self.resolution)
         duration = int(duration * 1000)
         input_str = f"input swipe {str(x1)} {str(y1)} {str(x2)} {str(y2)} {duration}"
-        if S.DEBUG:
+        if S.SHOW_ANDROID_INPUT:
             print("Time:", time.time(), input_str)
         self.ShellCmd(input_str)
 

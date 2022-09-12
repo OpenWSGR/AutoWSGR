@@ -10,12 +10,12 @@ chapter: 8
 map: 5
 fleet_id: 4
 selected_nodes: [A, I]
-repair_mode: [1, 2, 2, 2, 1, 2]
+repair_mode: [1, 2, 1, 2, 2, 2]
 
 # NodeLevel
 node_args:
   A:
-    formation: 2
+    formation: 1
     night: False
     enemy_rules:
       - [DD + CL > 1, retreat]
