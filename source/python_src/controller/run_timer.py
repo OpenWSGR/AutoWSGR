@@ -119,20 +119,20 @@ class Timer():
             NetworkErr: _description_
         """
         start_app("com.huanmeng.zhanjian2")
-        res = self.wait_images([IMG.StartImage[2]] + IMG.ConfirmImage[1:], 0.85, timeout=60 * delay)
+        res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, timeout=60 * delay)
 
         if res is None:
             raise TimeoutError("start_app timeout")
         if res != 0:
             self.ConfirmOperation()
-            if self.wait_image(IMG.StartImage[2], timeout=200) == False:
+            if self.wait_image(IMG.start_image[2], timeout=200) == False:
                 raise TimeoutError("resource downloading timeout")
         if account != None and password != None:
             self.Android.click(75, 450)
-            if self.wait_image(IMG.StartImage[3]) == False:
+            if self.wait_image(IMG.start_image[3]) == False:
                 raise TimeoutError("can't enter account manage page")
             self.Android.click(460, 380)
-            if self.wait_image(IMG.StartImage[4]) == False:
+            if self.wait_image(IMG.start_image[4]) == False:
                 raise TimeoutError("can't logout successfully")
             self.Android.click(540, 180)
             for _ in range(20):
@@ -148,13 +148,13 @@ class Timer():
             time.sleep(0.5)
             text(str(password))
             self.Android.click(400, 330)
-            res = self.wait_images([IMG.StartImage[5], IMG.StartImage[2]])
+            res = self.wait_images([IMG.start_image[5], IMG.start_image[2]])
             if res is None:
                 raise TimeoutError("login timeout")
             if res == 0:
                 raise BaseException("password or account is wrong")
-        while self.image_exist(IMG.StartImage[2]):
-            self.click_image(IMG.StartImage[2])
+        while self.image_exist(IMG.start_image[2]):
+            self.click_image(IMG.start_image[2])
         try:
             self.go_main_page()
         except:
@@ -202,19 +202,19 @@ class Timer():
         Returns:
             bool:True 为成功,False 为失败
         """
-        pos = self.wait_images(IMG.ConfirmImage[1:], confidence, timeout=timeout)
+        pos = self.wait_images(IMG.confirm_image[1:], confidence, timeout=timeout)
         if pos is None:
             if (must_confirm == 1):
                 raise ImageNotFoundErr("no confirm image found")
             else:
                 return False
-        res = self.get_image_position(IMG.ConfirmImage[pos + 1], 0)
+        res = self.get_image_position(IMG.confirm_image[pos + 1], 0)
         self.Android.click(res[0], res[1], delay=delay)
         return True
 
     @logit(level=INFO1)
     def is_bad_network(self, timeout=10):
-        return self.wait_images([IMG.ErrorImages['bad_network'][0], IMG.SymbolImage[10]], timeout=timeout) != None
+        return self.wait_images([IMG.error_image['bad_network'][0], IMG.symbol_image[10]], timeout=timeout) != None
 
     @logit(level=INFO2)
     def process_bad_network(self, extra_info=""):
@@ -240,11 +240,11 @@ class Timer():
                     break
 
             start_time2 = time.time()
-            while (self.image_exist([IMG.SymbolImage[10]] + IMG.ErrorImages['bad_network'])):
+            while (self.image_exist([IMG.symbol_image[10]] + IMG.error_image['bad_network'])):
                 time.sleep(.5)
                 if (time.time() - start_time2 >= 60):
                     break
-                if (self.image_exist(IMG.ErrorImages['bad_network'])):
+                if (self.image_exist(IMG.error_image['bad_network'])):
                     self.Android.click(476, 298, delay=2)
 
             if (time.time() - start_time2 < 60):
@@ -431,7 +431,7 @@ class Timer():
         if (name == 'develop_page') and (self._intergrative_page_identify() != 3):
             return False
 
-        return any(self.image_exist(template, 0) for template in IMG.IdentifyImages[name])
+        return any(self.image_exist(template, 0) for template in IMG.identify_images[name])
 
     @logit()
     def wait_pages(self, names, timeout=5, gap=.1, after_wait=0.1):
@@ -506,6 +506,7 @@ class Timer():
 
         elif (page is not None):
             if (not isinstance(page, Node)):
+
                 print("==============================")
                 print("arg:page must be an controller.ui.Node object")
                 raise ValueError
@@ -542,7 +543,7 @@ class Timer():
                     if self.process_bad_network("can't walk to the position because a TimeoutError"):
                         try:
                             if not self.wait_pages(names=self.now_page.name, timeout=1):
-                                self.set_page(self.get_now_page(self.timer))
+                                self.set_page(self.get_now_page())
                         except:
                             try:
                                 self.go_main_page()
@@ -574,8 +575,8 @@ class Timer():
 
         self.now_page = self.ui.get_node_by_name('main_page')
         if (len(List) == 0):
-            List = IMG.BackImage[1:] + ExList
-        type = self.wait_images(List + [IMG.GameUI[3]], 0.8, timeout=0)
+            List = IMG.back_buttons[1:] + ExList
+        type = self.wait_images(List + [IMG.game_ui[3]], 0.8, timeout=0)
 
         if type is None:
             self.go_main_page(QuitOperationTime + 1, List, no_log=True)

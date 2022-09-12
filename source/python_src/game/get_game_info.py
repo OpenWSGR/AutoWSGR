@@ -90,7 +90,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     if (type == 'fight'):
         type = 1
 
-    if (timer.image_exist(IMG.FightImage[12])):
+    if (timer.image_exist(IMG.fight_image[12])):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
 

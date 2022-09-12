@@ -7,6 +7,7 @@ from airtest.core.settings import Settings as ST
 from utils.io import get_all_files
 
 from .other_constants import ALL_PAGES, ALL_ERRORS, FIGHT_RESULTS
+all_images = get_all_files('./data/images')
 
 
 class MyTemplate(Template):
@@ -49,45 +50,30 @@ def make_tmplate(name=None, path=None, *args, **kwargs):
     return [MyTemplate(path, 0.9, resolution=(960, 540))]
 
 
-def load_IdentifyImages():
-    IMG.IdentifyImages = {}
-    for page in ALL_PAGES:
-        IMG.IdentifyImages[page] = make_tmplate(name=page)
+class ImageSet():
+    def __init__(self):
+        self.fight_result_image = {}
+        for result in FIGHT_RESULTS:
+            self.fight_result_image[result] = make_tmplate(path='data/images/fight_result/' + result + '.PNG')
+
+        self.exercise_image = {'rival_info': make_tmplate(path='data/images/exercise/rival_info.PNG')}
+        
+        self.error_image = {}
+        for error in ALL_ERRORS:
+            self.error_image[error] = make_tmplate(name=error)
+        
+        self.identify_images = {}
+        for page in ALL_PAGES:
+            self.identify_images[page] = make_tmplate(name=page)
+        
+        PrePath = "./data/images/"
+        for sub_folder in os.listdir(PrePath):
+            if sub_folder not in ["identify_images", "errors", "fight_result", "exercise"]:
+                if not hasattr(self, sub_folder):
+                    exec(f"self.{sub_folder} = ['', ]")
+                for i in range(1, 1 + len(os.listdir(os.path.join(PrePath, sub_folder)))):
+                    eval(f"self.{sub_folder}").append(
+                        MyTemplate(os.path.join(PrePath, sub_folder, f"{i}.PNG"), resolution=(960, 540)))
 
 
-def load_ErrorImages():
-    IMG.ErrorImages = {}
-    for error in ALL_ERRORS:
-        IMG.ErrorImages[error] = make_tmplate(name=error)
-
-
-def load_fightresult_images():
-    IMG.FightResultImage = {}
-    for result in FIGHT_RESULTS:
-        IMG.FightResultImage[result] = make_tmplate('fight_result/' + result)
-
-
-def load_ExerciseImages():
-    IMG.ExerciseImages = {'rival_info': make_tmplate(path='data/images/exercise/rival_info.PNG')}
-
-
-def load_other_images():
-    PrePath = "./data/images/"
-
-    for sub_folder in os.listdir(PrePath):
-        if sub_folder not in ["identify", "errors", "fight_result", "exercise"]:
-            if not hasattr(IMG, sub_folder):
-                exec(f"IMG.{sub_folder} = ['', ]")
-            for i in range(1, 1 + len(os.listdir(os.path.join(PrePath, sub_folder)))):
-                eval(f"IMG.{sub_folder}").append(
-                    MyTemplate(os.path.join(PrePath, sub_folder, f"{i}.PNG"), resolution=(960, 540)))
-
-
-IMG = SimpleNamespace()
-all_images = get_all_files('./data/images')
-
-load_ExerciseImages()
-load_ErrorImages()
-load_IdentifyImages()
-load_fightresult_images()
-load_other_images()
+IMG = ImageSet()

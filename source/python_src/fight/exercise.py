@@ -10,7 +10,7 @@ from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
 from utils.io import recursive_dict_update, yaml_to_dict
 from utils.logger import logit
 
-from .common import DecisionBlock, FightInfo, FightPlan, Ship
+from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
 
 """
 演习决策模块
@@ -48,7 +48,7 @@ class ExerciseDecisionBlock(DecisionBlock):
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
             print("OK")
-            if self.start_march() != 'success':
+            if start_march(self.timer) != 'success':
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
 
@@ -90,15 +90,15 @@ class NormalExerciseInfo(FightInfo):
         }
 
         self.state2image = {
-            "exercise_page": [IMG.IdentifyImages['exercise_page'], 5],
-            "rival_info": [IMG.ExerciseImages["rival_info"], 5],
-            "fight_prepare_page": [IMG.IdentifyImages["fight_prepare_page"], 5],
-            "spot_enemy_success": [IMG.FightImage[2], 15],
-            "formation": [IMG.FightImage[1], 15],
-            "fight_period": [IMG.SymbolImage[4], 3],
-            "night": [IMG.FightImage[6], .85, 180],
-            "night_fight_period": [IMG.SymbolImage[4], 3],
-            "result": [IMG.FightImage[3], 90],
+            "exercise_page": [IMG.identify_images['exercise_page'], 5],
+            "rival_info": [IMG.exercise_image["rival_info"], 5],
+            "fight_prepare_page": [IMG.identify_images["fight_prepare_page"], 5],
+            "spot_enemy_success": [IMG.fight_image[2], 15],
+            "formation": [IMG.fight_image[1], 15],
+            "fight_period": [IMG.symbol_image[4], 3],
+            "night": [IMG.fight_image[6], .85, 180],
+            "night_fight_period": [IMG.symbol_image[4], 3],
+            "result": [IMG.fight_image[3], 90],
         }
 
     def reset(self):

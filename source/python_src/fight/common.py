@@ -12,6 +12,27 @@ from utils import remove_0_value_from_dict
 from utils.logger import logit
 from utils.math_functions import get_nearest
 
+@logit(level=INFO2)
+def start_march(timer:Timer):
+    timer.Android.click(900, 500, 1, delay=0)
+    start_time = time.time()
+    while timer.identify_page('fight_prepare_page'):
+        if time.time() - start_time > 3:
+            timer.Android.click(900, 500, 1, delay=0)
+        if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
+            return "dock is full"
+        if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0):
+            return "out of times"
+        if time.time() - start_time > 15:
+            if timer.process_bad_network():
+                if timer.identify_page('fight_prepare_page'):
+                    return start_march()
+                else:
+                    NetworkErr("status unknow")
+            else:
+                raise TimeoutError("map_fight prepare timeout")
+    return "success"
+
 
 class Ship():
     """ 用于表示一艘船的数据结构, 注意友方与敌方所独有的field """
@@ -38,11 +59,14 @@ class FightResult():
 
     @logit(level=INFO1)
     def detect_result(self):
-        mvp_pos = self.timer.get_image_position(IMG.FightImage[14])
+        mvp_pos = self.timer.get_image_position(IMG.fight_image[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
-        self.result = self.timer.wait_images(IMG.FightResultImage)
-        if (self.timer.image_exist(IMG.FightResultImage['SS'])):
+        self.result = self.timer.wait_images(IMG.fight_result_image, timeout=5)
+        if (self.timer.image_exist(IMG.fight_result_image['SS'], need_screen_shot=False)):
             self.result = 'SS'
+        if self.result == None:
+            self.timer.log_screen()
+            raise ImageNotFoundErr("can't identify fight result")
         return self
 
     # TODO：获得经验
@@ -99,7 +123,7 @@ class FightInfo(ABC):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        print("waiting:", possible_states, end="  ")
+        if(S.SHOW_MATCH_FIGHT_STAGE):print("waiting:", possible_states, end="  ")
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
         timeout = [timeout[i] if modified_timeout[i] == -1 else modified_timeout[i] for i in range(len(timeout))]
@@ -114,7 +138,7 @@ class FightInfo(ABC):
             ret = [self.timer.image_exist(image, 0, no_log=True) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
-                print("matched:", self.state)
+                if(S.SHOW_MATCH_FIGHT_STAGE):print("matched:", self.state)
                 self._after_match()
 
                 return self.state
@@ -183,6 +207,12 @@ class FightRecorder():
     def enemys(self):
         return self.get_fight_infos("fight_period")
 
+    @property
+    def last_stage(self):
+        if(len(self.sr) == 0):
+            return None
+        return self.sr[-1]
+    
     def __str__(self):
         res = "".join(str(x) + "\n" for x in self.sr)
         return res
@@ -244,27 +274,6 @@ class FightPlan(ABC):
         self.timer.go_main_page()
         self.timer.set_page('main_page')
 
-    @logit(level=INFO2)
-    def start_march(self):
-        self.timer.Android.click(900, 500, 1, delay=0)
-        start_time = time.time()
-        while self.timer.identify_page('fight_prepare_page'):
-            if time.time() - start_time > 3:
-                self.timer.Android.click(900, 500, 1, delay=0)
-            if self.timer.image_exist(IMG.SymbolImage[3], need_screen_shot=0):
-                return "dock is full"
-            if self.timer.image_exist(IMG.SymbolImage[9], need_screen_shot=0):
-                return "out of times"
-            if time.time() - start_time > 15:
-                if self.timer.process_bad_network():
-                    if self.timer.identify_page('fight_prepare_page'):
-                        return self.start_march()
-                    else:
-                        NetworkErr("status unknow")
-                else:
-                    raise TimeoutError("map_fight prepare timeout")
-        return "success"
-
 
 class DecisionBlock():
     def __init__(self, timer: Timer, args):
@@ -290,7 +299,7 @@ class DecisionBlock():
                     rcondition += ch
                     last = i + 1
 
-            if (S.DEBUG):
+            if (S.SHOW_ENEMY_RUELS):
                 print(rcondition)
             if eval(rcondition):
                 return act
@@ -329,6 +338,7 @@ class DecisionBlock():
                     return None, "need SL"
 
                 if self.set_formation_by_rule:
+                    if(S.DEBUG):print("set formation by rule:", self.formation_by_rule)
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
 
@@ -366,3 +376,4 @@ class NodeLevelDecisionBlock(DecisionBlock):
         """进行决策并执行
         """
         return super().make_decision(state, last_state, last_action)
+

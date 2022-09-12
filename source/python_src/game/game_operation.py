@@ -1,3 +1,5 @@
+
+import constants.settings as S
 import time
 
 from airtest.core.api import text
@@ -38,10 +40,10 @@ class Expedition:
         self.update(force=force)
         while self.is_ready:
             self.timer.goto_game_page('expedition_page')
-            pos = self.timer.wait_image(IMG.GameUI[6], timeout=2)
+            pos = self.timer.wait_image(IMG.game_ui[6], timeout=2)
             if pos:
                 self.timer.Android.click(pos[0], pos[1], delay=1)
-                self.timer.wait_image(IMG.FightImage[3], after_get_delay=.25)
+                self.timer.wait_image(IMG.fight_image[3], after_get_delay=.25)
                 self.timer.Android.click(900, 500, delay=1)
                 self.timer.ConfirmOperation(must_confirm=1, delay=.5, confidence=.9)
                 self.update()
@@ -55,11 +57,11 @@ def DestoryShip(timer: Timer, reserve=1, amount=1):
     # 解装舰船
     timer.goto_game_page('destroy_page')
 
-    timer.wait_image(IMG.SymbolImage[5], after_get_delay=.33)
+    timer.wait_image(IMG.symbol_image[5], after_get_delay=.33)
     timer.Android.click(301, 25)  # 这里动态延迟，点解装
-    timer.wait_image(IMG.SymbolImage[6], after_get_delay=.33)
+    timer.wait_image(IMG.symbol_image[6], after_get_delay=.33)
     timer.Android.click(90, 206)  # 点添加
-    timer.wait_image(IMG.SymbolImage[7], after_get_delay=.33)
+    timer.wait_image(IMG.symbol_image[7], after_get_delay=.33)
     # TODO：有bug，先注释 # 进去
     # timer.Android.click(877, 378, delay=1)
 
@@ -77,7 +79,7 @@ def DestoryShip(timer: Timer, reserve=1, amount=1):
 
     timer.Android.click(860, 480, delay=1)
 
-    if (timer.image_exist(IMG.GameUI[8])):
+    if (timer.image_exist(IMG.game_ui[8])):
         timer.Android.click(807, 346)
     timer.Android.click(870, 480, delay=1)
     timer.Android.click(364, 304, delay=0.66)  # TODO：需要容错，如果没有选中任何船咋办？
@@ -85,7 +87,7 @@ def DestoryShip(timer: Timer, reserve=1, amount=1):
 
     # TODO：跟上面一样
     # timer.Android.click(90, 206, delay=1)
-    # timer.wait_image(IMG.SymbolImage[7], after_get_delay=.5)
+    # timer.wait_image(IMG.symbol_image[7], after_get_delay=.5)
     # timer.Android.click(877, 378, delay=1)  # 点“类型”
     # timer.Android.click(536, 62, delay=0.33)
     # timer.Android.click(851, 459, delay=0.33)
@@ -100,7 +102,7 @@ def DestoryShip(timer: Timer, reserve=1, amount=1):
 
     # timer.Android.click(860, 480, delay=0.66)
     # timer.Android.click(870, 480, delay=1)
-    # if(timer.image_exist(IMG.GameUI[8])):
+    # if(timer.image_exist(IMG.game_ui[8])):
     #     click(807, 346)"""
 
 
@@ -212,14 +214,15 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         elif x == 2:
             need_repair[i] = ShipStatus[i+1] not in [-1, 0, 1]
 
-    print("ShipStatus:", ShipStatus)
-    if any(need_repair) or timer.image_exist(IMG.RepairImage[1]):
+    if(S.DEBUG):print("ShipStatus:", ShipStatus)
+    if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
+
         timer.Android.click(420, 420, delay=1.5)   # 进入修理页面
         # 快修已经开始泡澡的船
-        pos = timer.get_image_position(IMG.RepairImage[1])
+        pos = timer.get_image_position(IMG.repair_image[1])
         while (pos != None):
             timer.Android.click(pos[0], pos[1], delay=1)
-            pos = timer.get_image_position(IMG.RepairImage[1])
+            pos = timer.get_image_position(IMG.repair_image[1])
         # 按逻辑修理
         for i in range(1, 7):
             if need_repair[i-1]:
@@ -240,10 +243,10 @@ def GainBounds(timer: Timer):
         return 'no'
     timer.goto_game_page('mission_page')
     timer.goto_game_page('mission_page')
-    if timer.click_image(IMG.GameUI[15]):
+    if timer.click_image(IMG.game_ui[15]):
         timer.ConfirmOperation(must_confirm=1)
         return 'ok'
-    elif timer.click_image(IMG.GameUI[12]):
+    elif timer.click_image(IMG.game_ui[12]):
         timer.ConfirmOperation(must_confirm=1)
         return 'ok'
     return 'no'
@@ -324,7 +327,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
     if name is None and timer.ship_status[pos] == -1:
         return
     timer.Android.click(110 * pos, 250, delay=0)
-    res = timer.wait_images([IMG.ChooseShipImage[1], IMG.ChooseShipImage[2]], after_get_delay=.4, gap=0)
+    res = timer.wait_images([IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=.4, gap=0)
     if (res == 1):
         timer.Android.click(839, 113)
 
@@ -334,7 +337,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
         return
 
     timer.Android.click(700, 30, delay=0)
-    timer.wait_image(IMG.ChooseShipImage[3], gap=0, after_get_delay=.1)
+    timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=.1)
 
     text(name)
     timer.Android.click(50, 50, delay=.5)
