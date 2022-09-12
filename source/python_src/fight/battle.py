@@ -5,7 +5,7 @@ from constants import IMG
 from game.game_operation import QuickRepair
 from controller.run_timer import Timer
 from utils.io import recursive_dict_update, yaml_to_dict
-from fight.common import FightInfo, FightPlan, NodeLevelDecisionBlock
+from fight.common import FightInfo, FightPlan, NodeLevelDecisionBlock, start_march
 
 """
 战役模块
@@ -94,7 +94,7 @@ class BattlePlan(FightPlan):
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
 
-        return self.start_march()
+        return start_march(self.timer)
 
     def _make_decision(self) -> str:
 

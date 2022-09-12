@@ -12,6 +12,27 @@ from utils import remove_0_value_from_dict
 from utils.logger import logit
 from utils.math_functions import get_nearest
 
+@logit(level=INFO2)
+def start_march(timer:Timer):
+    timer.Android.click(900, 500, 1, delay=0)
+    start_time = time.time()
+    while timer.identify_page('fight_prepare_page'):
+        if time.time() - start_time > 3:
+            timer.Android.click(900, 500, 1, delay=0)
+        if timer.image_exist(IMG.SymbolImage[3], need_screen_shot=0):
+            return "dock is full"
+        if timer.image_exist(IMG.SymbolImage[9], need_screen_shot=0):
+            return "out of times"
+        if time.time() - start_time > 15:
+            if timer.process_bad_network():
+                if timer.identify_page('fight_prepare_page'):
+                    return start_march()
+                else:
+                    NetworkErr("status unknow")
+            else:
+                raise TimeoutError("map_fight prepare timeout")
+    return "success"
+
 
 class Ship():
     """ 用于表示一艘船的数据结构, 注意友方与敌方所独有的field """
@@ -244,27 +265,6 @@ class FightPlan(ABC):
         self.timer.go_main_page()
         self.timer.set_page('main_page')
 
-    @logit(level=INFO2)
-    def start_march(self):
-        self.timer.Android.click(900, 500, 1, delay=0)
-        start_time = time.time()
-        while self.timer.identify_page('fight_prepare_page'):
-            if time.time() - start_time > 3:
-                self.timer.Android.click(900, 500, 1, delay=0)
-            if self.timer.image_exist(IMG.SymbolImage[3], need_screen_shot=0):
-                return "dock is full"
-            if self.timer.image_exist(IMG.SymbolImage[9], need_screen_shot=0):
-                return "out of times"
-            if time.time() - start_time > 15:
-                if self.timer.process_bad_network():
-                    if self.timer.identify_page('fight_prepare_page'):
-                        return self.start_march()
-                    else:
-                        NetworkErr("status unknow")
-                else:
-                    raise TimeoutError("map_fight prepare timeout")
-        return "success"
-
 
 class DecisionBlock():
     def __init__(self, timer: Timer, args):
@@ -366,3 +366,4 @@ class NodeLevelDecisionBlock(DecisionBlock):
         """进行决策并执行
         """
         return super().make_decision(state, last_state, last_action)
+

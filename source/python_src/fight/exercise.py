@@ -10,7 +10,7 @@ from game.get_game_info import (DetectShipStatu, GetEnemyCondition,
 from utils.io import recursive_dict_update, yaml_to_dict
 from utils.logger import logit
 
-from .common import DecisionBlock, FightInfo, FightPlan, Ship
+from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
 
 """
 演习决策模块
@@ -48,7 +48,7 @@ class ExerciseDecisionBlock(DecisionBlock):
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
             print("OK")
-            if self.start_march() != 'success':
+            if start_march(self.timer) != 'success':
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
 

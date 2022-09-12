@@ -14,7 +14,7 @@ from utils.logger import logit
 from utils.math_functions import CalcDis
 
 from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
-                     StageRecorder)
+                     StageRecorder, start_march)
 
 """
 常规战决策模块
@@ -187,7 +187,7 @@ class NormalFightPlan(FightPlan):
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
-        return self.start_march()
+        return start_march(self.timer)
 
     def _make_decision(self):
 
