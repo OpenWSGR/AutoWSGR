@@ -1,4 +1,5 @@
 import threading as th
+import constants.settings as S
 import time
 
 from airtest.core.api import start_app, text
@@ -360,7 +361,7 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         elif x == 2:
             need_repair[i] = ShipStatus[i+1] not in [-1, 0, 1]
 
-    print("ShipStatus:", ShipStatus)
+    if(S.DEBUG):print("ShipStatus:", ShipStatus)
     if any(need_repair) or ImagesExist(timer, RepairImage[1]):
         timer.Android.click(420, 420, delay=1.5)   # 进入修理页面
         # 快修已经开始泡澡的船

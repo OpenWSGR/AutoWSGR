@@ -357,7 +357,7 @@ class NormalFightPlan(FightPlan):
 
         NowNode = self._get_node()
         try:
-            print("NowNode:", NowNode)
+            if(S.DEBUG):print("NowNode:", NowNode)
             if (target > NowNode):
                 for i in range(1, target - NowNode + 1):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)

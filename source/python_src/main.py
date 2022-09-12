@@ -24,7 +24,7 @@ sys.path.append(os.path.dirname(__file__))
 
 finished = 1
 timer = None
-S.DEBUG = True
+S.DEBUG = False
 
 def load_data_start():
     global timer

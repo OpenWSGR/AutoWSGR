@@ -218,11 +218,12 @@ class Timer():
     def set_page(self, page_name=None, page=None):
         
         if(page_name is None and page is None):
-            now_page = self.get_now_page(self.timer)
+            now_page = self.get_now_page()
             if(now_page == None):
                 raise ImageNotFoundErr("Can't identify the page")
             else:
                 self.now_page = self.ui.get_node_by_name(now_page)
+            return 
             
         elif(page is not None):
             if(not isinstance(page, Node)):
@@ -262,7 +263,7 @@ class Timer():
                     if process_bad_network(self, "can't walk to the position because a TimeoutError"):
                         try:
                             if not self.wait_pages(names=self.now_page.name, timeout=1):
-                                self.set_page(self.get_now_page(self.timer))
+                                self.set_page(self.get_now_page())
                         except:
                             try:
                                 self.GoMainPage()

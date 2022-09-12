@@ -103,7 +103,7 @@ class FightInfo(ABC):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        print("waiting:", possible_states, end="  ")
+        if(S.DEBUG):print("waiting:", possible_states, end="  ")
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
         timeout = [timeout[i] if modified_timeout[i] == -1 else modified_timeout[i] for i in range(len(timeout))]
@@ -118,7 +118,7 @@ class FightInfo(ABC):
             ret = [ImagesExist(self.timer, image, 0, no_log=True) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
-                print("matched:", self.state)
+                if(S.DEBUG):print("matched:", self.state)
                 self._after_match()
 
                 return self.state
