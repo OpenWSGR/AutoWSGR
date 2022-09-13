@@ -6,7 +6,7 @@ import time
 
 import keyboard as kd
 
-import constants.settings as S
+from constants.settings import S
 from controller.run_timer import Timer
 # from ocr.ship_name import recognize_ship
 

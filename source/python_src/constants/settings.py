@@ -1,26 +1,17 @@
-TUNNEL_PATH = "data\\tunnel\\"
-LOG_PATH = "data\\log"
-DELAY = 2
-RESTART_PATH = "D:\\leidian\\LDPlayer4"
-WORK_PATH = "./"
+from types import SimpleNamespace
+from utils.io import yaml_to_dict
 
-DEBUG = False
-SHOW_MAP_NODE = False
-SHOW_ANDROID_INPUT = False
-SHOW_ENEMY_RUELS = False
-SHOW_FIGHT_STAGE = False
-SHOW_CHAPTER_INFO = False
-SHOW_MATCH_FIGHT_STAGE = False
+S = SimpleNamespace()
+user_settings = yaml_to_dict("data/settings/settings.yaml")
+S.__dict__.update(user_settings)
 
 def show_all_debug_info():
-    global SHOW_MAP_NODE, SHOW_ANDROID_INPUT, DEBUG, SHOW_ENEMY_RUELS, \
-        SHOW_FIGHT_STAGE, SHOW_CHAPTER_INFO, SHOW_MATCH_FIGHT_STAGE
 
-    SHOW_MATCH_FIGHT_STAGE = True
-    SHOW_MAP_NODE = True
-    SHOW_ANDROID_INPUT = True
-    SHOW_ENEMY_RUELS = True
-    SHOW_FIGHT_STAGE = True
-    SHOW_CHAPTER_INFO = True
-    DEBUG = True
+    S.SHOW_MATCH_FIGHT_STAGE = True
+    S.SHOW_MAP_NODE = True
+    S.SHOW_ANDROID_INPUT = True
+    S.SHOW_ENEMY_RUELS = True
+    S.SHOW_FIGHT_STAGE = True
+    S.SHOW_CHAPTER_INFO = True
+    S.DEBUG = True
     

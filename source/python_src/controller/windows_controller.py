@@ -2,7 +2,7 @@ import os
 import shutil
 import time
 
-import constants.settings as S
+from constants.settings import S
 from airtest.core.api import auto_setup
 from constants.custom_expections import CriticalErr
 from constants.other_constants import INFO2
@@ -119,7 +119,7 @@ class WindowsController:
                 os.system("taskkill -f -im dnplayer.exe")
             except:
                 pass
-            os.chdir(S.RESTART_PATH)
+            os.chdir(S.LDPLAYER_ROOT)
             os.popen(r".\dnplayer.exe")
             os.chdir(cwd)
             time.sleep(3)

@@ -1,12 +1,11 @@
-
-import constants.settings as S
 import time
 
 from airtest.core.api import text
 from constants import IMG
 from constants.custom_expections import ImageNotFoundErr, NetworkErr
-from constants.positions import BLOODLIST_POSITION
 from constants.other_constants import INFO1, INFO2, INFO3
+from constants.positions import BLOODLIST_POSITION
+from constants.settings import S
 from controller.run_timer import Timer
 from utils.logger import logit
 
@@ -214,7 +213,8 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         elif x == 2:
             need_repair[i] = ShipStatus[i+1] not in [-1, 0, 1]
 
-    if(S.DEBUG):print("ShipStatus:", ShipStatus)
+    if (S.DEBUG):
+        print("ShipStatus:", ShipStatus)
     if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
 
         timer.Android.click(420, 420, delay=1.5)   # 进入修理页面

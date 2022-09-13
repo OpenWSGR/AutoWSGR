@@ -1,7 +1,7 @@
 import copy
 import time
 
-import constants.settings as S
+from constants.settings import S
 from constants import IMG
 from constants.custom_expections import ImageNotFoundErr
 from constants.positions import FIGHT_CONDITIONS_POSITON, MAP_NODE_POSITION

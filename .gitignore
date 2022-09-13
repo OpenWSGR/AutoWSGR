@@ -11,6 +11,7 @@ data/tunnel/*.in
 data/tunnel/*.out
 dh_main.py
 release/
+data/settings/settings.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
