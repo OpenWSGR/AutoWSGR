@@ -1,7 +1,7 @@
 TUNNEL_PATH = "data\\tunnel\\"
 LOG_PATH = "data\\log"
 DELAY = 2
-RESTART_PATH = "C:\\leidian\\LDPlayer4"
+RESTART_PATH = "D:\\leidian\\LDPlayer4"
 WORK_PATH = "./"
 
 DEBUG = False

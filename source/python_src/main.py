@@ -8,19 +8,12 @@ import keyboard as kd
 
 import constants.settings as S
 from controller.run_timer import Timer
-from fight.battle import BattlePlan
-from fight.exercise import NormalExercisePlan
-from fight.normal_fight import NormalFightPlan
-from game.game_operation import GainBounds, RepairByBath
 # from ocr.ship_name import recognize_ship
 
 sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(__file__))
-
-
 event_pressed = set()
 script_end = 0
-S.DEBUG = True
 
 def lencmp(s1, s2):
     if(len(s1) < len(s2)):

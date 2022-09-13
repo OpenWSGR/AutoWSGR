@@ -66,6 +66,7 @@ class Timer():
         self.Windows = WindowsController(self.device_name)
 
     def setup(self, device_name, account, password):
+        if(not self.Windows.is_android_online()):self.Windows.RestartAndroid()
         self.device_name = device_name
         self.Windows.ConnectAndroid()
         self.update_screen()
@@ -507,7 +508,7 @@ class Timer():
         elif (page is not None):
             if (not isinstance(page, Node)):
 
-                print("==============================")
+                print("============================================")
                 print("arg:page must be an controller.ui.Node object")
                 raise ValueError
 
@@ -643,3 +644,18 @@ class Timer():
         """
         if (S.DEBUG):
             self.log_info(info)
+
+
+def process_error(timer:Timer):
+    print("processing errors")
+    if(timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False):
+        timer.Windows.RestartAndroid()
+        timer.Windows.ConnectAndroid()
+
+        return "Andoird Restarted"
+    
+    if(timer.process_bad_network()):
+        return "ok,bad network"
+    
+    return "ok,unknown error"    
+        

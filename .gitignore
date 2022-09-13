@@ -1,5 +1,6 @@
 data/log
 source/python_src/test.py
+source/python_src/constants/settings.py
 .vscode/
 test/
 test.py

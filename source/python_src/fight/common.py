@@ -3,13 +3,15 @@ import time
 from abc import ABC, abstractmethod
 
 import constants.settings as S
+
 from constants import IMG
 from constants.custom_expections import ImageNotFoundErr, NetworkErr
 from constants.positions import BLOODLIST_POSITION
 from constants.other_constants import ALL_SHIP_TYPES, INFO1, INFO2, SAP
-from controller.run_timer import Timer
+from controller.run_timer import Timer, process_error
 from utils import remove_0_value_from_dict
 from utils.logger import logit
+from utils.function_wrapper import try_for_times
 from utils.math_functions import get_nearest
 
 @logit(level=INFO2)
@@ -109,6 +111,7 @@ class FightInfo(ABC):
         self.state = ""
         self.fight_result = FightResult(self.timer)  # 战斗结果记录
 
+    @try_for_times(process_error)
     def update_state(self):
 
         self.last_state = self.state

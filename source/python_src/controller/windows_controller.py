@@ -70,7 +70,7 @@ class WindowsController:
         os.system(f"xcopy req {path} /E/H/C/I")
         time.sleep(5)
 
-    @try_for_times
+    @try_for_times()
     def ConnectAndroid(self):
         """连接指定安卓设备
         Args:
@@ -86,7 +86,7 @@ class WindowsController:
 
         print("Hello,I am WSGR auto commanding system")
 
-    def is_android_online(self, times=1):
+    def is_android_online(self, times=4):
         """判断 timer 给定的设备是否在线
 
         Args:
@@ -127,7 +127,8 @@ class WindowsController:
                 time.sleep(1)
                 if (time.time() - restart_time > 120):
                     raise TimeoutError("can't start the emulator")
-        except:
+        except BaseException as E:
+            print(E)
             raise CriticalErr("on Restart Android")
 
     def CheckNetWork(self):
