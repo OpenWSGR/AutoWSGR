@@ -110,7 +110,7 @@ SHOW_MATCH_FIGHT_STAGE: False
 AttributeError: module 'cv2' has no attribute 'gapi_wip_gst_GStreamerPipeline'
 ```
 `pip uninstall opencv-python`  
-`opencv-python==4.5.4.60`  
+`pip install opencv-python==4.5.4.60`  
 ### 找不到文件的报错
 ```
 FileNotFoundError: [Errno 2] No such file or directory: '.\\Data\\Tmp\\screen.PNG'
