@@ -1,7 +1,6 @@
 ## 项目简介
 
 一个战舰少女R的自动化脚本，整合了收集数据的功能。  
-[开发笔记](https://www.notion.so/WSR-4bce2f550be14711a576465e72f41c12)
 
 ### Current Work
 
