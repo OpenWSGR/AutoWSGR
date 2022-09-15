@@ -135,5 +135,9 @@ AttributeError: module 'cv2' has no attribute 'gapi_wip_gst_GStreamerPipeline'
 ```
 `pip uninstall opencv-python`  
 `opencv-python==4.5.4.60`  
-
+### 找不到文件的报错
+```
+FileNotFoundError: [Errno 2] No such file or directory: '.\\Data\\Tmp\\screen.PNG'
+```
+请在 `data` 目录下创建一个 `tmp` 文件夹，不需要其它任何操作，这个 `bug` 将在不久后修复。
 
