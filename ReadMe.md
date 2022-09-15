@@ -107,30 +107,6 @@ SHOW_MATCH_FIGHT_STAGE: False
 ### OpenCv 相关的一些报错：
 如果出现以下报错，请将 `opencv` 降级为 `4.5.4` 版本。  
 ```
-Traceback (most recent call last):
-  File "c:/Users/Administrator/Desktop/V0.0.1/example.py", line 1, in <module>
-    from wsgr import *
-  File "c:\Users\Administrator\Desktop\V0.0.1\wsgr.py", line 1, in <module>
-    from source.python_src.main import start_script   
-  File "c:\Users\Administrator\Desktop\V0.0.1\source\python_src\main.py", line 11, in <module>
-    from constants.settings import S
-  File "c:\Users\Administrator\Desktop\V0.0.1\source\python_src\constants\__init__.py", line 1, in <module> 
-    from constants.settings import S
-  File "c:\Users\Administrator\Desktop\V0.0.1\source\python_src\constants\settings.py", line 2, in <module> 
-    from utils.io import yaml_to_dict
-  File "c:\Users\Administrator\Desktop\V0.0.1\source\python_src\utils\__init__.py", line 3, in <module>     
-    from utils.io import *
-  File "c:\Users\Administrator\Desktop\V0.0.1\source\python_src\utils\io.py", line 5, in <module>
-    from cv2 import imwrite
-  File "C:\Users\Administrator\Desktop\V0.0.1\venv\lib\site-packages\cv2\__init__.py", line 181, in <module>    bootstrap()
-  File "C:\Users\Administrator\Desktop\V0.0.1\venv\lib\site-packages\cv2\__init__.py", line 175, in bootstrap
-    if __load_extra_py_code_for_module("cv2", submodule, DEBUG):
-  File "C:\Users\Administrator\Desktop\V0.0.1\venv\lib\site-packages\cv2\__init__.py", line 28, in __load_extra_py_code_for_module
-    py_module = importlib.import_module(module_name)  
-  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python37\lib\importlib\__init__.py", line 127, in import_module
-    return _bootstrap._gcd_import(name[level:], package, level)
-  File "C:\Users\Administrator\Desktop\V0.0.1\venv\lib\site-packages\cv2\gapi\__init__.py", line 290, in <module>
-    cv.gapi.wip.GStreamerPipeline = cv.gapi_wip_gst_GStreamerPipeline
 AttributeError: module 'cv2' has no attribute 'gapi_wip_gst_GStreamerPipeline'
 ```
 `pip uninstall opencv-python`  
