@@ -16,10 +16,10 @@ for _ in range(10):
         print(result)
     print(fight_plan_85.fight_recorder)
     """NormalFightPlan 模块中的 fight_recorder 成员记录了所有战斗过程
-       可以通过该成员查看战斗状态以便进行下一步操作
-    """
-expedition_recorder = Expedition # 远征记录模块
+       可以通过该成员查看战斗状态以便进行下一步操作"""
+    
+expedition_recorder = Expedition(timer) # 远征记录模块
 for t in range(3600):
     time.sleep(1)
     if(t % 900 == 0): # 900s 检查一次远征
-        Expedition.run(force=True) # 进行远征检查并收获
+        expedition_recorder.run(force=True) # 进行远征检查并收获
