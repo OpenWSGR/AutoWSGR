@@ -1,4 +1,4 @@
-normal_fight_defaults:
+normal_fight_defaults: # 常规战斗的默认参数
   chapter: 1 # 章节
   map: 1 # 地图
   fleet_id: 1 # 舰队编号
@@ -7,12 +7,15 @@ normal_fight_defaults:
   selected_nodes: [] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
   fight_condition: 1 # 战况选择
   
-battle_defaults:
+battle_defaults: # 战役的默认参数
   map: 1 # 简单1-5 困难6-10
   fleet_ships: [] # TODO: 舰队船只，未实现
   repair_mode: 1 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案 [1, 1, 1, 1, 1, 1]
 
-node_defaults:
+node_defaults: # 
+  # 演习特有的参数
+  fleet_id: 1 # 队伍编号,可以在自己的方案中设置,机器人和玩家独立
+  max_refresh_times: 2 # 默认最大刷新次数,可以分别对玩家和机器人设置
   # 索敌成功阶段
   detour: False # 是否迂回
   enemy_rules: [] # 每条按照 ["(类型 符号 数量) and/or ()", "操作"] 的字符串形式给出，从上到下执行第一条符合的命令。
@@ -34,3 +37,8 @@ node_defaults:
   # 特殊情况
   supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退
   
+exercise_defaults:
+  chapter: 'exercise' # 不要改动
+  selected_nodes: [player, robot] # 不要改动
+  exercise_times: 4 # 最大玩家演习次数
+  robot: True # 是否打机器人

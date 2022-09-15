@@ -192,10 +192,10 @@ class NormalFightPlan(FightPlan):
         return start_march(self.timer)
 
     def _make_decision(self):
-
+        
+        if(S.SHOW_FIGHT_STAGE):print(self.fight_recorder.last_stage)
         self.Info.update_state()
         state = self.Info.state
-
         # 进行MapLevel的决策
         if state == "map_page":
             return "fight end"
@@ -235,11 +235,10 @@ class NormalFightPlan(FightPlan):
             return 'fight end'
 
         # 进行通用NodeLevel决策
-        if(S.SHOW_FIGHT_STAGE):print(self.fight_recorder.last_stage)
+        
         action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)
         self.Info.last_action = action
         self.fight_recorder.append(StageRecorder(self.Info, self.timer))
-        if(S.SHOW_FIGHT_STAGE):print(self.fight_recorder.last_stage)
         return fight_stage
 
     # ======================== Functions ========================

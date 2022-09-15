@@ -180,7 +180,7 @@ class StageRecorder():
         if self.stage_name == 'fight_period':
             self.info = remove_0_value_from_dict(timer.enemy_type_count)
         if self.stage_name == "result":
-            self.info = timer.fight_result
+            self.info = copy.deepcopy(Info.fight_result)
         if self.stage_name == 'proceed':
             self.info = timer.ship_status
 

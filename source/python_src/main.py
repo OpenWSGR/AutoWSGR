@@ -3,15 +3,15 @@ import datetime
 import os
 import sys
 import time
-
 import keyboard as kd
+
+sys.path.append(os.getcwd())
+sys.path.append(os.path.dirname(__file__))
 
 from constants.settings import S
 from controller.run_timer import Timer
 # from ocr.ship_name import recognize_ship
 
-sys.path.append(os.getcwd())
-sys.path.append(os.path.dirname(__file__))
 event_pressed = set()
 script_end = 0
 
