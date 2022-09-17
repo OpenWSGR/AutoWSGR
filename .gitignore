@@ -1,17 +1,19 @@
 data/log
-source/python_src/test.py
-source/python_src/constants/settings.py
-.vscode/
-test/
-test.py
-test.ipynb
-tmp/
 data/tunnel/*.PNG
 data/tunnel/*.in
 data/tunnel/*.out
-dh_main.py
-release/
 data/settings/settings.yaml
+
+test/
+test.py
+test.ipynb
+test_main.py
+
+.vscode/
+tmp/
+
+release/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
