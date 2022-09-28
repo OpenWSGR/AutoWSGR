@@ -65,7 +65,7 @@ class Timer():
         self.Android = AndroidController(self.resolution)
         self.Windows = WindowsController(self.device_name)
 
-    def setup(self, device_name, account, password):
+    def setup(self, device_name, account, password, to_main_page):
         if(not self.Windows.is_android_online()):self.Windows.RestartAndroid()
         self.device_name = device_name
         self.Windows.ConnectAndroid()
@@ -81,7 +81,8 @@ class Timer():
         print("resolution:", self.resolution)
         self.ammo = 10
         # self.resources = Resources(self)
-        self.go_main_page()
+        if(to_main_page):
+            self.go_main_page()
         try:
             self.set_page()
         except Exception:

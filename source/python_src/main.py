@@ -23,14 +23,14 @@ def lencmp(s1, s2):
     return 0
 
 
-def start_script(device_name="emulator-5554", account=None, password=None):
+def start_script(device_name="emulator-5554", account=None, password=None, to_main_page=True):
     """启动脚本,返回一个 Timer 记录器
 
     Returns:
         Timer: 该模拟器的记录器
     """
     timer = Timer()
-    timer.setup(device_name, account, password)
+    timer.setup(device_name, account, password, to_main_page)
     
     return timer
 
