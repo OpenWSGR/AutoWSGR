@@ -4,7 +4,8 @@
 
 ### Current Work
 
-见开发笔记。  
+舰船精确识别功能。  
+活动练级/战术。
 
 ### 提示
 
@@ -110,11 +111,6 @@ AttributeError: module 'cv2' has no attribute 'gapi_wip_gst_GStreamerPipeline'
 ```
 `pip uninstall opencv-python`  
 `pip install opencv-python==4.5.4.60`  
-### 找不到文件的报错
-```
-FileNotFoundError: [Errno 2] No such file or directory: '.\\Data\\Tmp\\screen.PNG'
-```
-请在 `data` 目录下创建一个 `tmp` 文件夹，不需要其它任何操作，这个 `bug` 将在不久后修复。
 ### 高级功能介绍
 目前基于 `easyocr` 写了舰船精确识别,  **无法支持一些太过生僻的字，比如和谐动物园**，如果你的日系船还是动物园，请自行想办法更改，尽量避免笔画复杂的生僻字。
 
