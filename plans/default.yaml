@@ -1,4 +1,4 @@
-normal_fight_defaults: # 常规战斗的默认参数
+normal_fight_defaults: # 常规战斗的默认参数(包括活动)
   chapter: 1 # 章节
   map: 1 # 地图
   fleet_id: 1 # 舰队编号

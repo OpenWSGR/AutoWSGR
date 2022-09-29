@@ -1,10 +1,9 @@
-import copy
-import time
+import copy, time, os
 
 from constants.settings import S
 from constants import IMG
 from constants.custom_expections import ImageNotFoundErr
-from constants.positions import FIGHT_CONDITIONS_POSITON, MAP_NODE_POSITION
+from constants.positions import FIGHT_CONDITIONS_POSITON
 from constants.other_constants import INFO1, INFO2, INFO3
 from controller.run_timer import Timer
 from game.game_operation import MoveTeam, QuickRepair
@@ -12,7 +11,7 @@ from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from utils.io import recursive_dict_update, yaml_to_dict
 from utils.logger import logit
 from utils.math_functions import CalcDis
-
+from utils import print_err
 from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
                      StageRecorder, start_march)
 
@@ -25,15 +24,14 @@ MAP_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),
 
 class NormalFightInfo(FightInfo):
     # ==================== Unified Interface ====================
-    def __init__(self, timer: Timer) -> None:
+    def __init__(self, timer: Timer, chapter, map) -> None:
         super().__init__(timer)
 
         self.end_page = "map_page"
-        self.chapter = 1  # 章节名,战役为 'battle', 演习为 'exercise'
-        self.map = 1  # 节点名
+        self.chapter = chapter  # 章节名,战役为 'battle', 演习为 'exercise'
+        self.map = map  # 节点名
         self.ship_position = (0, 0)
         self.node = "A"  # 常规地图战斗中,当前战斗点位的编号
-
         self.successor_states = {
             "proceed": {
                 "yes": ["fight_condition", "spot_enemy_success", "formation", "fight_period"],
@@ -70,7 +68,7 @@ class NormalFightInfo(FightInfo):
             "flagship_severe_damage": [IMG.fight_image[4], 5],
             "map_page": [IMG.identify_images["map_page"][0], 5]
         }
-
+        
     def reset(self):
         self.last_state = "proceed"
         self.last_action = "yes"
@@ -132,15 +130,16 @@ class NormalFightInfo(FightInfo):
         self.node = "A"
         for i in range(26):
             ch = chr(ord('A') + i)
-            node1 = (self.chapter, self.map, ch)
-            node2 = (self.chapter, self.map, self.node)
-            if node1 not in MAP_NODE_POSITION:
+            if ch not in self.point_positions.keys():
                 break
-            if (CalcDis(MAP_NODE_POSITION[node1], self.ship_position) < CalcDis(MAP_NODE_POSITION[node2], self.ship_position)):
+            if (CalcDis(self.point_positions[ch], self.ship_position) < CalcDis(self.point_positions[self.node], self.ship_position)):
                 self.node = ch
                 
         if(S.SHOW_MAP_NODE):print(self.node)
 
+    def load_point_positions(self, map_path):
+        self.point_positions = yaml_to_dict(os.path.join(map_path, str(self.chapter) + "-" + str(self.map) + ".yaml"))
+        
 class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
 
@@ -175,17 +174,29 @@ class NormalFightPlan(FightPlan):
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
 
         # 信息记录器
-        self.Info = NormalFightInfo(self.timer)
+        self.Info = NormalFightInfo(self.timer, self.chapter, self.map)
+        self.Info.load_point_positions(r'data\map\normal')
 
-    def _enter_fight(self):
+    def go_map_page(self):
+        """进入选择战斗地图的页面
+        """
+        self.timer.goto_game_page('map_page')
+
+    def go_fight_prepare_page(self):
+        """(从当前战斗结束后跳转到的页面)进入准备战斗的页面"""
+        self.timer.goto_game_page('fight_prepare_page')
+
+    def _enter_fight(self, same_work=False):
         """
         从任意界面进入战斗.
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-        self.timer.goto_game_page('map_page')
-        self._change_fight_map(self.chapter, self.map)
-        self.timer.goto_game_page('fight_prepare_page')
+        if(same_work == False):
+            self.go_map_page()
+            self._change_fight_map(self.chapter, self.map)
+            
+        self.go_fight_prepare_page()
         MoveTeam(self.timer, self.fleet_id)
         QuickRepair(self.timer, self.repair_mode)
 
@@ -334,7 +345,7 @@ class NormalFightPlan(FightPlan):
             time.sleep(0.15)
             self._move_chapter(target, chapter_now)
         except:
-            print("can't move chapter, time now is", time.time)
+            print_err("切换章节失败", ex_info="时间戳:" + str(time.time()))
             if self.timer.process_bad_network('move_chapter'):
                 self._move_chapter(target)
             else:
@@ -368,7 +379,7 @@ class NormalFightPlan(FightPlan):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
         except:
-            print("can't move chapter, time now is", time.time)
+            print_err("切换地图失败", "时间戳:" + str(time.time()))
             if self.timer.process_bad_network():
                 self._move_node(target)
             else:

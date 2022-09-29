@@ -8,12 +8,13 @@ import keyboard as kd
 sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(__file__))
 
-from constants.settings import S
+from constants import S
 from controller.run_timer import Timer
 # from ocr.ship_name import recognize_ship
 
 event_pressed = set()
 script_end = 0
+print("main is imported")
 
 def lencmp(s1, s2):
     if(len(s1) < len(s2)):

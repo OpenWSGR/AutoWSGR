@@ -3,6 +3,7 @@ data/tunnel/*.PNG
 data/tunnel/*.in
 data/tunnel/*.out
 data/settings/settings.yaml
+source/python_src/test
 
 test/
 test.py

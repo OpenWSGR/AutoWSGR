@@ -2,7 +2,7 @@ import copy
 import os
 import threading as th
 import time
-from typing import Tuple
+from typing import Iterable, Tuple
 
 from airtest.core.api import start_app, text
 from airtest.core.cv import ST
@@ -85,7 +85,7 @@ class Timer():
             self.go_main_page()
         try:
             self.set_page()
-        except Exception:
+        except (BaseException, Exception):
             if S.DEBUG:
                 self.set_page('main_page')
             else:
@@ -269,7 +269,7 @@ class Timer():
     def update_screen(self, *args, **kwargs):
         """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 RD.screen
         """
-        self.screen = G.DEVICE.snapshot(filename=None, quality=ST.SNAPSHOT_QUALITY)
+        self.screen = G.DEVICE.snapshot(filename=None, quality=99)
 
     def get_pixel(self, x, y):
         """获取当前屏幕相对坐标 (x,y) 处的像素值
@@ -300,7 +300,7 @@ class Timer():
         return locateCenterOnImage(self.screen, query, confidence, this_mehods)
 
     @logit()
-    def get_image_position(self, image: MyTemplate, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
+    def get_image_position(self, image, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
         """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
             参考 locateCenterOnScreen
         Args:
@@ -310,12 +310,28 @@ class Timer():
 
             否则返回 None
         """
+        images = image
+        if(not isinstance(images, Iterable)):
+            images = [images]
         if (need_screen_shot == 1):
             self.update_screen()
-        res = self.locateCenterOnScreen(image, confidence, this_methods)
-        if res is None:
-            return None
-        return convert_position(res[0], res[1], self.resolution, mode='this_to_960')
+        for image in images:
+            res = self.locateCenterOnScreen(image, confidence, this_methods)
+            if(res is not None):
+                return convert_position(res[0], res[1], self.resolution, mode='this_to_960')
+        return None
+
+    def get_images_position(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
+        """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
+            参考 locateCenterOnScreen
+        Args:
+            need_screen_shot (int, optional): 是否重新截取屏幕. Defaults to 1.
+        Returns:
+            如果找到:返回一个二元组表示相对坐标 (相对 960x540 屏幕)
+
+            否则返回 None
+        """
+        return self.get_image_position(images, need_screen_shot, confidence, this_methods)
 
     @logit()
     def image_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
@@ -328,7 +344,14 @@ class Timer():
         if need_screen_shot:
             self.update_screen()
         return any(self.get_image_position(image, 0, confidence, this_methods, no_log=True) is not None for image in images)
-
+    
+    def images_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
+        """判断图像是否存在于屏幕中
+        Returns:
+            bool:如果存在为 True 否则为 False 
+        """
+        return self.image_exist(images, need_screen_shot, confidence, this_methods)
+    
     @logit()
     def wait_image(self, image: MyTemplate, confidence=0.85, timeout=10, gap=.15, after_get_delay=0, this_methods=["tpl"]):
         """等待一张图片出现在屏幕中,置信度超过一定阈值
@@ -368,7 +391,7 @@ class Timer():
         Returns:
             None: 未找到任何图片
             a number of int: 第一个出现的图片的下标(0-based) if images is a list
-            the key of the value if images is a dict
+            the key of the value: if images is a dict
         """
         images = copy.copy(images)
         if (isinstance(images, MyTemplate)):
@@ -393,7 +416,38 @@ class Timer():
             if (time.time() - StartTime > timeout):
                 return None
 
+    def wait_images_position(self, images=[], confidence=0.85, gap=.15, after_get_delay=0, timeout=10, *args, **kwargs):
+        """等待一些图片,并返回第一个匹配结果的位置
+        
+        参考 wait_images     
+        """
+        rank = self.wait_images(images, confidence, gap, after_get_delay, timeout, *args, **kwargs)
+        if(rank == None):
+            return None
+        return self.get_image_position(images[rank], 0, confidence)
+    
     @logit(level=INFO1)
+    def click_image(self, image, must_click=False, timeout=0, delay=0.5):
+        """点击一张图片的中心位置
+        Args:
+            image (MyTemplate): 目标图片
+            must_click (bool, optional): 如果为 True,点击失败则抛出异常. Defaults to False.
+            timeout (int, optional): 等待延时. Defaults to 0.
+            delay (float, optional): 点击后延时. Defaults to 0.5.
+
+        Raises:
+            NotFoundErr: 如果在 timeout 时间内未找到则抛出该异常
+        """
+        pos = self.wait_images_position(image, gap=.03, timeout=timeout)
+        if (pos == False):
+            if (must_click == False):
+                return False
+            else:
+                raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
+
+        self.Android.click(pos[0], pos[1], delay=delay)
+        return True
+
     def click_image(self, image: MyTemplate, must_click=False, timeout=0, delay=0.5):
         """点击一张图片的中心位置
         Args:
@@ -410,14 +464,20 @@ class Timer():
         if (delay < 0):
             raise ValueError("arg 'delay' should at least be 0 but is ", str(delay))
         pos = self.wait_image(image, timeout=timeout)
-        if (pos == False):
+        if (pos == None):
             if (must_click == False):
                 return False
             else:
                 raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
 
-        self.Android.click(pos[0], pos[1], delay=delay)
+        self.Android.click(*pos, delay=delay)
         return True
+    
+    def click_image(self, images, must_click=False, timeout=0, delay=0.5):
+        """点击一些图片中第一张出现的,如果有多个,点击第一个
+        """
+        self.click_image(images, must_click, timeout)
+        
 
     # ========================= 维护当前所在游戏界面 =========================
     @logit()
@@ -463,11 +523,13 @@ class Timer():
 
     @logit(level=INFO1)
     def get_now_page(self):
+        """获取并返回当前页面名称
+        """
         self.update_screen()
         for page in ALL_PAGES:
             if (self.identify_page(page, need_screen_shot=False, no_log=True)):
                 return page
-        return None
+        return 'unknown_page'
 
     @logit()
     def check_now_page(self):
@@ -512,8 +574,10 @@ class Timer():
             if now_page is None:
                 raise ImageNotFoundErr("Can't identify the page")
             else:
-                self.now_page = self.ui.get_node_by_name(now_page)
-
+                if(now_page != 'unknown_page'):
+                    self.now_page = self.ui.get_node_by_name(now_page)
+                else:
+                    self.now_page = now_page
         elif (page is not None):
             if (not isinstance(page, Node)):
 
@@ -523,16 +587,19 @@ class Timer():
 
             if (self.ui.page_exist(page)):
                 self.now_page = page
-
-            raise ValueError('give page do not exist')
+            else:
+                self.now_page = 'unknown_page'
         else:
             page = self.ui.get_node_by_name(page_name)
             if (page is None):
-                raise ValueError("can't find the page:", page_name)
+                page = "unknown_page"
+                
             self.now_page = page
 
     def walk_to(self, end, try_times=0):
         try:
+            if(isinstance(self.now_page, str) and "unknow" in self.now_page):
+                self.go_main_page()
             if (isinstance(end, Node)):
                 self.operate(end)
                 self.wait_pages(end.name)

@@ -82,13 +82,14 @@ class BattlePlan(FightPlan):
 
         self.Info = BattleInfo(timer)
 
-    def _enter_fight(self) -> str:
-        self.timer.goto_game_page("battle_page")
-        # 切换正确难度
-        now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
-        hard = self.map > 5
-        if now_hard != hard:
-            self.timer.Android.click(800, 80, delay=1)
+    def _enter_fight(self, same_work=False) -> str:
+        if(same_work == False):
+            self.timer.goto_game_page("battle_page")
+            # 切换正确难度
+            now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
+            hard = self.map > 5
+            if now_hard != hard:
+                self.timer.Android.click(800, 80, delay=1)
 
         self.timer.Android.click(180 * (self.map - hard * 5), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)

@@ -47,7 +47,6 @@ class ExerciseDecisionBlock(DecisionBlock):
 
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
-            print("OK")
             if start_march(self.timer) != 'success':
                 return self.make_decision(state, last_state, last_action)
             return None, "fight continue"
@@ -154,13 +153,15 @@ class NormalExercisePlan(FightPlan):
         self.Info = NormalExerciseInfo(self.timer)
 
     @logit(level=INFO2)
-    def _enter_fight(self) -> str:
+    def _enter_fight(self, same_work=False) -> str:
         """
         从任意界面进入战斗.
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-        self.timer.goto_game_page('exercise_page')
+        if(same_work == False):
+            self.timer.goto_game_page('exercise_page')
+            
         self._exercise_times = self.exercise_times
         self.exercise_status = [None, None]
         return "success"

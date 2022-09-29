@@ -5,6 +5,16 @@ import yaml
 from cv2 import imwrite
 from PIL import Image as PIM
 
+def listdir(path):
+    return [os.path.join(path, file) for file in os.listdir(path)]
+
+
+def all_in(elements, set):
+    for element in elements:
+        if element not in set:
+            return False
+    return True
+
 
 def yaml_to_dict(yaml_file):
     """ 将yaml文件转换为字典 """
