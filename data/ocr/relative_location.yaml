@@ -1,0 +1,83 @@
+# 记录每个元素对应的相对位置，分别用【“左下角”，“右上角”】两个坐标表示
+
+# =================== 数字 ===================
+main_page:
+  resources:
+    oil: [[-0.013, -0.249], [0.054, -0.274]]
+    ammo: [[0.093, -0.241], [0.161, -0.281]]
+    steel: [[0.199, -0.252], [0.263, -0.274]]
+    aluminum: [[0.303, -0.252], [0.366, -0.274]]
+    diamond: [[0.407, -0.249], [0.459, -0.273]]
+
+#建造界面(选资源那一个界面)
+build_page:
+  resources:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+    quick_build:
+    ship_blueprint:
+
+  port_facilities:
+    ship_limit:
+    ship_ammount:
+
+  #建造界面用的资源
+  resources_use:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+
+#解装界面
+destroy_page:
+  resources:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+
+#开发界面(选资源那一个界面)
+develop_page:
+  resources:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+    quick_build:
+    equipment_blueprint:
+
+  resources_use:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+
+  port_facilities:
+    equipment_limit:
+    equipment_amount:
+
+#resources 位置和 build_page 一样的
+discard_page:
+  resources:
+    oil:
+    ammo:
+    steel:
+    aluminum:
+  port_facilities:
+    equipment_limit:
+    equipment_amount:
+
+#任何一个选择舰船的界面(需识别船舱容量数据)
+choose_ship_page:
+  port_facilities:
+    ship_limit:
+    ship_amount:
+
+map_page:
+  loot: [[0.296, -0.23], [0.369, -0.281]]
+  ship: [[0.4, -0.232], [0.475, -0.28]]
+
+
+# =================== 中文 ===================

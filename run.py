@@ -39,13 +39,11 @@ exercise_plan.run()
 
 
 # ===========TEST NORMALFIGHT============
-
+expedition_recorder = Expedition(timer)
 fight_plan_85 = NormalFightPlan(timer, 'plans\\normal_fight\\8-5AI-only1DD.yaml', 'plans\\default.yaml')
-for _ in range(10):
+for _ in range(210):
     fight_plan_85.run()
-    for result in fight_plan_85.fight_recorder.fight_results:
-        print(result)
-    print(fight_plan_85.fight_recorder)
+    expedition_recorder.run()
     
 """NormalFightPlan 模块中的 fight_recorder 成员记录了所有战斗过程
     可以通过该成员查看战斗状态以便进行下一步操作"""
@@ -55,10 +53,9 @@ for _ in range(10):
 
 # ===========TEST EXPEDITION============
 
-"""expedition_recorder = Expedition(timer) # 远征记录模块
 for t in range(3600):
     time.sleep(1)
     if(t % 900 == 0): # 900s 检查一次远征
         expedition_recorder.run(force=True) # 进行远征检查并收获
-"""
+
 # ===========END============
