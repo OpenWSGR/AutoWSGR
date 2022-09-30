@@ -1,0 +1,8 @@
+chapter: H
+map: 4
+fleet_id: 2
+target: BB # 战术敌人对象,不可缺省
+node_args:
+  proceed: True
+  formation: 4
+  SL_when_enter_fight: True

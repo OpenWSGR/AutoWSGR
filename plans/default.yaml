@@ -25,6 +25,7 @@ node_defaults: #
   # 阵型选择阶段
   SL_when_spot_enemy_fails: False # 索敌失败时是否SL
   SL_when_detour_fails: False # 是否迂回失败后退出
+  SL_when_enter_fight: False # 进入战斗后是否大退
   formation: 2 # 正常情况阵型选择，1-5
   formation_when_spot_enemy_fails: False # 启用时改为数字，索敌失败时阵型选择，1-5
   # 夜战选择阶段

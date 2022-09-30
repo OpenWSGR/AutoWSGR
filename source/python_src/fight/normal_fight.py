@@ -16,7 +16,7 @@ from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
                      StageRecorder, start_march)
 
 """
-常规战决策模块
+常规战决策模块/地图战斗用模板
 """
 
 MAP_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),

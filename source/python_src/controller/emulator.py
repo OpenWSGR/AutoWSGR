@@ -78,7 +78,7 @@ class Emulator():
 
     @logit()
     def get_image_position(self, image, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
-        """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
+        """从屏幕中找出和多张模板图像匹配度超过阈值的矩阵区域的中心坐标,如果有多个,返回第一个
             参考 locateCenterOnScreen
         Args:
             need_screen_shot (int, optional): 是否重新截取屏幕. Defaults to 1.
@@ -99,14 +99,7 @@ class Emulator():
         return None
 
     def get_images_position(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
-        """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
-            参考 locateCenterOnScreen
-        Args:
-            need_screen_shot (int, optional): 是否重新截取屏幕. Defaults to 1.
-        Returns:
-            如果找到:返回一个二元组表示相对坐标 (相对 960x540 屏幕)
-
-            否则返回 None
+        """同 get_image_position
         """
         return self.get_image_position(images, need_screen_shot, confidence, this_methods)
 

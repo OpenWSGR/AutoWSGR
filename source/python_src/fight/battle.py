@@ -8,7 +8,7 @@ from utils.io import recursive_dict_update, yaml_to_dict
 from fight.common import FightInfo, FightPlan, NodeLevelDecisionBlock, start_march
 
 """
-战役模块
+战役模块/单点战斗模板
 """
 
 
@@ -82,19 +82,19 @@ class BattlePlan(FightPlan):
 
         self.Info = BattleInfo(timer)
 
+    def go_fight_prepare_page(self):
+        self.timer.goto_game_page("battle_page")
+        now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
+        hard = self.map > 5
+        if now_hard != hard:
+            self.timer.Android.click(800, 80, delay=1)
+
     def _enter_fight(self, same_work=False) -> str:
         if(same_work == False):
-            self.timer.goto_game_page("battle_page")
-            # 切换正确难度
-            now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
-            hard = self.map > 5
-            if now_hard != hard:
-                self.timer.Android.click(800, 80, delay=1)
-
-        self.timer.Android.click(180 * (self.map - hard * 5), 200)
+            self.go_fight_prepare_page()
+        self.timer.Android.click(180 * ((self.map - 1) % 5 +1), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
         QuickRepair(self.timer, self.repair_mode)
-
         return start_march(self.timer)
 
     def _make_decision(self) -> str:

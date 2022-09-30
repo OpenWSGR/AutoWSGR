@@ -252,7 +252,7 @@ class FightPlan(ABC):
                 continue
             elif ret == "need SL":
                 self.SL()
-                return self.run()
+                return "SL"
             elif ret == "fight end":
                 self.timer.set_page(self.Info.end_page)
                 break
@@ -348,6 +348,9 @@ class DecisionBlock():
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
             self.timer.Android.click(573, value * 100 - 20, delay=2)
+            if(self.SL_when_enter_fight == True):
+                return None, "need SL"
+            
             return value, "fight continue"
         elif state == "night":
             is_night = self.night
