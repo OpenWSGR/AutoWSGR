@@ -250,7 +250,7 @@ class Emulator():
         self.Android.click(*pos, delay=delay)
         return True
     
-    def click_image(self, images, must_click=False, timeout=0, delay=0.5):
+    def click_images(self, images, must_click=False, timeout=0, delay=0.5):
         """点击一些图片中第一张出现的,如果有多个,点击第一个
         """
         self.click_image(images, must_click, timeout)

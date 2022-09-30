@@ -11,7 +11,7 @@ from game.get_game_info import DetectShipStatu, GetEnemyCondition
 from utils.io import recursive_dict_update, yaml_to_dict
 from utils.logger import logit
 from utils.math_functions import CalcDis
-from utils import print_err
+from utils import print_err, print_war
 from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
                      StageRecorder, start_march)
 
@@ -28,6 +28,7 @@ class NormalFightInfo(FightInfo):
         super().__init__(timer)
 
         self.end_page = "map_page"
+        self.map_image = IMG.identify_images["map_page"][0]
         self.chapter = chapter  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map  # 节点名
         self.ship_position = (0, 0)
@@ -66,7 +67,7 @@ class NormalFightInfo(FightInfo):
             "result": [IMG.fight_image[3], 60],
             "get_ship": [IMG.symbol_image[8], 5],
             "flagship_severe_damage": [IMG.fight_image[4], 5],
-            "map_page": [IMG.identify_images["map_page"][0], 5]
+            "map_page": [self.map_image, 5]
         }
         
     def reset(self):
@@ -174,9 +175,12 @@ class NormalFightPlan(FightPlan):
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
 
         # 信息记录器
+        self.load_fight_info()
+
+    def load_fight_info(self):
         self.Info = NormalFightInfo(self.timer, self.chapter, self.map)
         self.Info.load_point_positions(r'data\map\normal')
-
+        
     def go_map_page(self):
         """进入选择战斗地图的页面
         """
@@ -186,7 +190,7 @@ class NormalFightPlan(FightPlan):
         """(从当前战斗结束后跳转到的页面)进入准备战斗的页面"""
         self.timer.goto_game_page('fight_prepare_page')
 
-    def _enter_fight(self, same_work=False):
+    def _enter_fight(self, same_work=False, *args, **kwargs):
         """
         从任意界面进入战斗.
 
@@ -195,11 +199,18 @@ class NormalFightPlan(FightPlan):
         if(same_work == False):
             self.go_map_page()
             self._change_fight_map(self.chapter, self.map)
+        try:
+            assert(self.timer.wait_image(self.Info.map_image) != False)
+            self.go_fight_prepare_page()
+            MoveTeam(self.timer, self.fleet_id)
+            QuickRepair(self.timer, self.repair_mode)
+        except AssertionError as e:
+            if("process_err" in kwargs and kwargs["process_err"] == False):
+                raise ImageNotFoundErr("进入战斗前置界面错误")
+            print_war("进入战斗前置界面不正确")
+            self.timer.process_bad_network()
+            return self._enter_fight(process_err = False)
             
-        self.go_fight_prepare_page()
-        MoveTeam(self.timer, self.fleet_id)
-        QuickRepair(self.timer, self.repair_mode)
-
         return start_march(self.timer)
 
     def _make_decision(self):

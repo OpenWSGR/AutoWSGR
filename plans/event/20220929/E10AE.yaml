@@ -1,3 +1,7 @@
 chapter: H
-node: 10
+map: 4
 selected_nodes: [A, E]
+fleet_id: 2
+node_defaults:
+  proceed: True
+  formation: 4

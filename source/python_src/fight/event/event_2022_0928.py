@@ -1,19 +1,24 @@
-from asyncio import TimerHandle
+
 from fight.normal_fight import NormalFightInfo, NormalFightPlan
 from controller.run_timer import Timer
-from utils.io import get_all_files
 from utils.math_functions import CalcDis
 from constants.image_templates import make_tmplate, IMG
 from ..event import Event
 
+import os
+
 class EventFightPlan20220928(Event, NormalFightPlan):
     
     def __init__(self, timer: Timer, plan_path, default_path='plans/default.yaml', event="20220928"):
+        self.event_name = event
         NormalFightPlan.__init__(self, timer, plan_path, default_path)
         Event.__init__(self, timer, event)
         self.MAP_POSITIONS = [None, (275, 118), (364, 383), (578, 147), (522, 337), (445, 158), (791, 157)]
-        self.Info = EventFightInfo20220928(timer)
 
+    def load_fight_info(self):
+        self.Info = EventFightInfo20220928(self.timer, self.chapter, self.map)
+        self.Info.load_point_positions(os.path.join('data/map/event', self.event_name))
+    
     def _change_fight_map(self, chapter, map):
         assert(chapter in 'HEhe')
         assert(map in range(1, 7))
@@ -63,10 +68,12 @@ class EventFightPlan20220928(Event, NormalFightPlan):
         
 
 class EventFightInfo20220928(Event, NormalFightInfo):
-    def __init__(self, timer: TimerHandle, event="20220928") -> None:
-        NormalFightInfo.__init__(self, timer)
+    
+    def __init__(self, timer: Timer, chapter, map, event="20220928") -> None:
+        NormalFightInfo.__init__(self, timer, chapter, map)
         Event.__init__(self, timer, event)
+        self.map_image = self.event_image[1]
         self.end_page = 'unknown_page'
-        self.state2image["map_page"] = self.event_image[1]
+        self.state2image["map_page"] = [self.map_image, 5]
         
     

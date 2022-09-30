@@ -1,20 +1,19 @@
 from wsgr import *
 import time
 
-
-timer = start_script() # 启动模拟器和游戏，得到一个游戏控制器
+timer = start_script(to_main_page=True) # 启动模拟器和游戏，得到一个游戏控制器
 
 # ============TEST EVENT=============
-"""event_plan = EventFightPlan20220928(timer, r'plans\event\20220929\E10AE.yaml')
-event_plan.go_map_page()
-event_plan._change_fight_map('H', 4)
-event_plan.go_fight_prepare_page()
+event_plan = EventFightPlan20220928(timer, r'plans\event\20220929\E10A.yaml')
+event_plan.run(same_work=False)
+for i in range(100):
+    event_plan.run(same_work=True)
 
 
 
 
 
-quit()"""
+quit()
 
 # ============END=============
 
