@@ -1,10 +1,10 @@
-import os
+import os, re
 from types import SimpleNamespace
 from airtest.core.cv import (MATCHING_METHODS, ST, InvalidMatchingMethodError,
                              TargetPos, Template)
 from airtest.core.helper import G
 from airtest.core.settings import Settings as ST
-from utils.io import get_all_files
+from utils.io import get_all_files, all_in, get_file_suffixname, listdir
 
 from .other_constants import ALL_PAGES, ALL_ERRORS, FIGHT_RESULTS
 all_images = get_all_files('./data/images')
@@ -42,10 +42,60 @@ class MyTemplate(Template):
         return ret
 
 
-def make_tmplate(name=None, path=None, *args, **kwargs):
+def make_dir_templates(path):
+    """给定路径,返回一个字典    
+    
+    字典的键为路径下所有图片的文件名(不含后缀)
+    
+    字典的值为对应图片的 MyTemplate 类
+    
+    如果文件名是纯数字,再创建一个数字下标映射
+    """
+    res = {}
+    files = listdir(path)
+    for file in files:
+        if(os.path.isdir(file) or get_file_suffixname(file) != "PNG"):
+            continue
+        filename = os.path.basename(file).split('.')[0]
+        res[filename] = make_tmplate(path=file)[0]
+        if(filename.isdecimal()):
+            res[int(filename)] = make_tmplate(path=file)[0]
+    return res
+
+def make_dir_templates_without_number(path):
+    """给定路径,返回一个字典    
+    
+    字典的键为路径下所有图片的英文字母文件名(不含后缀)
+    
+    字典的值为对应图片的 MyTemplate 类列表,所有英文名相同的图片会被放入同一个列表(仅忽略数字)
+    """
+    files = listdir(path)
+    res = {}
+    for file in files:
+        filename = os.path.basename(file).split('.')[0]
+        alpha = re.findall(r'[^0-9]*', filename)[0]
+        if(alpha not in res.keys()):
+            res[alpha] = []
+        res[alpha] += make_tmplate(path=file)
+    return res
+
+
+def make_tmplate(name=None, path=None, all_image=all_images, *args, **kwargs):
+    """给定路径，或者给定关键字和图片库返回一个图像模板列表。
+    
+    Args:
+        name (list): 关键字组
+    
+    Returns:
+        如果给定了关键字和图像列表，则返回图像列表中，路径字符串含关键字的图片列表
+        
+        否则返回给定路径的图片模板,(单个元素以列表形式)
+    """
     if (name is not None):
+        if (not isinstance(name, list)):
+            name = [name]
         rec_pos = kwargs['rec_pos'] if "rec_pos" in kwargs else None
-        return [MyTemplate(image, 0.9, resolution=(960, 540), record_pos=rec_pos) for image in all_images if (name in image)]
+        return [MyTemplate(image, 0.9, resolution=(960, 540), record_pos=rec_pos) for image in all_image if (all_in(name, image))]
 
     return [MyTemplate(path, 0.9, resolution=(960, 540))]
 

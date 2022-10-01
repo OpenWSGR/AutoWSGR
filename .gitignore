@@ -3,6 +3,18 @@ data/tunnel/*.PNG
 data/tunnel/*.in
 data/tunnel/*.out
 data/settings/settings.yaml
+source/python_src/test
+
+test/
+test.py
+test.ipynb
+test_main.py
+
+.vscode/
+tmp/
+
+release/
+
 
 test/
 test.py

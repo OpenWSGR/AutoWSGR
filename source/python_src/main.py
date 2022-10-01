@@ -8,12 +8,13 @@ import keyboard as kd
 sys.path.append(os.getcwd())
 sys.path.append(os.path.dirname(__file__))
 
-from constants.settings import S
+from constants import S
 from controller.run_timer import Timer
 # from ocr.ship_name import recognize_ship
 
 event_pressed = set()
 script_end = 0
+print("main is imported")
 
 def lencmp(s1, s2):
     if(len(s1) < len(s2)):
@@ -23,14 +24,14 @@ def lencmp(s1, s2):
     return 0
 
 
-def start_script(device_name="emulator-5554", account=None, password=None):
+def start_script(device_name="emulator-5554", account=None, password=None, to_main_page=True):
     """启动脚本,返回一个 Timer 记录器
 
     Returns:
         Timer: 该模拟器的记录器
     """
     timer = Timer()
-    timer.setup(device_name, account, password)
+    timer.setup(device_name, account, password, to_main_page)
     
     return timer
 

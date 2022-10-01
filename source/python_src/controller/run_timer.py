@@ -1,47 +1,33 @@
-import copy
-import os
+import os, copy
 import threading as th
 import time
-from typing import Tuple
 
 from airtest.core.api import start_app, text
-from airtest.core.cv import ST
-from airtest.core.helper import G
-from airtest.core.settings import Settings as ST
-from constants import IMG, MyTemplate, S
+from constants import IMG, S
 from constants.custom_expections import (CriticalErr, ImageNotFoundErr,
                                          NetworkErr)
 from constants.other_constants import ALL_PAGES, INFO1, INFO2, INFO3, NO
 from constants.ui import WSGR_UI, Node
-from utils.api_image import convert_position, locateCenterOnImage
-from utils.io import save_image, write_file
-from utils.logger import get_time_as_string, logit
-from utils.math_functions import CalcDis
+from utils.logger import logit
+from utils.debug import print_err
 
-from .android_controller import AndroidController
-from .windows_controller import WindowsController
+from .emulator import Emulator
 
-
-class Timer():
+class Timer(Emulator):
     """ 程序运行记录器,用于记录和传递部分数据,同时用于区分多开 """
 
     def __init__(self):
         """Todo
         参考银河远征的战斗模拟写一个 Ship 类,更好的保存信息
         """
-        self.start_time = time.time()
-        self.log_filepre = get_time_as_string()
-        self.screen = None
-        self.resolution = (960, 540)
+        super().__init__()
         self.now_page = None
         self.ui = WSGR_UI
         self.ship_status = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
         self.enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
         self.now_page = None  # 当前所在节点名
-        self.device_name = 'emulator-5554'  # 设备名,雷电模拟器默认值
         self.expedition_status = None  # 远征状态记录器
         self.team = 1  # 当前队伍名
-        self.defaul_decision_maker = None  # 默认决策模块
         self.ammo = 10
         self.oil = 10
         self.resources = None
@@ -59,21 +45,10 @@ class Timer():
         self.defaul_repair_logic = None
         self.fight_result = None
         self.last_mission_compelted = 0
-        self.last_expedition_checktime = time.time()
+        self.last_expedition_checktime = time.time()     
 
-        # DH新增，模块化
-        self.Android = AndroidController(self.resolution)
-        self.Windows = WindowsController(self.device_name)
-
-    def setup(self, device_name, account, password):
-        if(not self.Windows.is_android_online()):self.Windows.RestartAndroid()
-        self.device_name = device_name
-        self.Windows.ConnectAndroid()
-        self.update_screen()
-        self.resolution = self.screen.shape[:2]
-        self.resolution = self.resolution[::-1]
-        from utils.logger import time_path
-        self.log_filepre = time_path
+    def setup(self, device_name, account, password, to_main_page):
+        self.connect(device_name)
         if account != None and password != None:
             self.restart(account=account, password=password)
         if self.Android.is_game_running() == False:
@@ -81,10 +56,11 @@ class Timer():
         print("resolution:", self.resolution)
         self.ammo = 10
         # self.resources = Resources(self)
-        self.go_main_page()
+        if(to_main_page):
+            self.go_main_page()
         try:
             self.set_page()
-        except Exception:
+        except (BaseException, Exception):
             if S.DEBUG:
                 self.set_page('main_page')
             else:
@@ -100,11 +76,6 @@ class Timer():
     @logit(level=INFO3)
     def log_out(self, account, password):
         """在登录界面登出账号
-
-        Args:
-            timer (Timer): _description_
-            account (_type_): _description_
-            password (_type_): _description_
         """
         pass
 
@@ -171,7 +142,6 @@ class Timer():
 
     @logit(level=INFO3)
     def restart(self, times=0, *args, **kwargs):
-
         try:
             self.Android.ShellCmd("am force-stop com.huanmeng.zhanjian2")
             self.Android.ShellCmd("input keyevent 3")
@@ -197,30 +167,6 @@ class Timer():
             self.Windows.ConnectAndroid()
             self.restart(times + 1, *args, **kwargs)
 
-    @logit(level=INFO2)
-    def ConfirmOperation(self, must_confirm=0, delay=0.5, confidence=.9, timeout=0):
-        """等待并点击弹出在屏幕中央的各种确认按钮
-
-        Args:
-            must_confirm (int, optional): 是否必须按. Defaults to 0.
-            delay (float, optional): 点击后延时(秒). Defaults to 0.5.
-            timeout (int, optional): 等待延时(秒),负数或 0 不等待. Defaults to 0.
-
-        Raises:
-            ImageNotFoundErr: 如果 must_confirm = True 但是 timeout 之内没找到确认按钮排除该异常
-        Returns:
-            bool:True 为成功,False 为失败
-        """
-        pos = self.wait_images(IMG.confirm_image[1:], confidence, timeout=timeout)
-        if pos is None:
-            if (must_confirm == 1):
-                raise ImageNotFoundErr("no confirm image found")
-            else:
-                return False
-        res = self.get_image_position(IMG.confirm_image[pos + 1], 0)
-        self.Android.click(res[0], res[1], delay=delay)
-        return True
-
     @logit(level=INFO1)
     def is_bad_network(self, timeout=10):
         return self.wait_images([IMG.error_image['bad_network'][0], IMG.symbol_image[10]], timeout=timeout) != None
@@ -228,11 +174,6 @@ class Timer():
     @logit(level=INFO2)
     def process_bad_network(self, extra_info=""):
         """判断并处理网络状况问题
-
-        Args:
-            timer (Timer): _description_
-            extra_info (_type_): 额外的输出信息
-
         Returns:
             bool: 如果为 True 则表示为网络状况问题,并已经成功处理,否则表示并非网络问题或者处理超时.
         Raise:
@@ -240,8 +181,7 @@ class Timer():
         """
         start_time = time.time()
         while self.is_bad_network():
-            print("bad network at", time.time())
-            print('extra info:', extra_info)
+            print_err("bad network at" + str(time.time()), extra_info)
             while True:
                 if (time.time() - start_time >= 180):
                     raise TimeoutError("Process bad network timeout")
@@ -262,161 +202,6 @@ class Timer():
                 return True
 
         return False
-
-    # ========================= 当前屏幕与图片搜索 =========================
-    @logit()
-    def update_screen(self, *args, **kwargs):
-        """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 RD.screen
-        """
-        self.screen = G.DEVICE.snapshot(filename=None, quality=ST.SNAPSHOT_QUALITY)
-
-    def get_pixel(self, x, y):
-        """获取当前屏幕相对坐标 (x,y) 处的像素值
-
-        Args:
-            x (int): [0, 960)
-            y (int): [0, 549)
-
-        Returns:
-            Tuple(int,int,int): RGB 格式的像素值
-        """
-
-        (x, y) = convert_position(x, y, self.resolution)
-        return (self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0])
-
-    def check_pixel(self, position, bgr_color, distance=30):
-        color = self.screen[position[1]][position[0]]
-        return CalcDis(color, bgr_color) < distance ** 2
-
-    def locateCenterOnScreen(self, query: MyTemplate, confidence=0.85, this_mehods=["tpl"]):
-        """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
-            参考 locateCenterOnImage
-        Returns:
-            如果找到返回一个二元组表示绝对坐标
-
-            否则返回 None
-        """
-        return locateCenterOnImage(self.screen, query, confidence, this_mehods)
-
-    @logit()
-    def get_image_position(self, image: MyTemplate, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
-        """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
-            参考 locateCenterOnScreen
-        Args:
-            need_screen_shot (int, optional): 是否重新截取屏幕. Defaults to 1.
-        Returns:
-            如果找到:返回一个二元组表示相对坐标 (相对 960x540 屏幕)
-
-            否则返回 None
-        """
-        if (need_screen_shot == 1):
-            self.update_screen()
-        res = self.locateCenterOnScreen(image, confidence, this_methods)
-        if res is None:
-            return None
-        return convert_position(res[0], res[1], self.resolution, mode='this_to_960')
-
-    @logit()
-    def image_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
-        """判断图像是否存在于屏幕中
-        Returns:
-            bool:如果存在为 True 否则为 False 
-        """
-        if not isinstance(images, list):
-            images = [images]
-        if need_screen_shot:
-            self.update_screen()
-        return any(self.get_image_position(image, 0, confidence, this_methods, no_log=True) is not None for image in images)
-
-    @logit()
-    def wait_image(self, image: MyTemplate, confidence=0.85, timeout=10, gap=.15, after_get_delay=0, this_methods=["tpl"]):
-        """等待一张图片出现在屏幕中,置信度超过一定阈值
-
-        Args:
-            timeout (int, optional): 最大等待时间. Defaults to 10.
-        Returns:
-            如果在 timeout 秒内发现,返回一个二元组表示其相对(960x540 屏幕)位置
-
-            否则返回 False
-        """
-        if (timeout < 0):
-            raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
-        StartTime = time.time()
-        while (True):
-            x = self.get_image_position(image, 1, confidence, this_methods, no_log=True)
-            if (x != None):
-                time.sleep(after_get_delay)
-                return x
-            if (time.time()-StartTime > timeout):
-                time.sleep(gap)
-                return False
-            time.sleep(gap)
-
-    @logit()
-    def wait_images(self, images=[], confidence=0.85, gap=.15, after_get_delay=0, timeout=10, *args, **kwargs):
-        """等待一系列图片中的一个在屏幕中出现
-
-        Args:
-            images (list, optional): 很多图片,可以是列表或字典. Defaults to [].
-            confidence (_type_, optional): 置信度. Defaults to 0.85.
-            timeout (int, optional): 最长等待时间. Defaults to 10.
-
-        Raises:
-            TypeError: image_list 中有不合法参数
-
-        Returns:
-            None: 未找到任何图片
-            a number of int: 第一个出现的图片的下标(0-based) if images is a list
-            the key of the value if images is a dict
-        """
-        images = copy.copy(images)
-        if (isinstance(images, MyTemplate)):
-            images = [images]
-        if isinstance(images, (list, Tuple)):
-            for i in range(len(images)):
-                images[i] = (i, images[i])
-        if (isinstance(images, dict)):
-            images = images.items()
-
-        if (timeout < 0):
-            raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
-
-        StartTime = time.time()
-        while (True):
-            self.update_screen(no_log=True)
-            for res, image in images:
-                if (self.image_exist(image, 0, confidence, no_log=True)):
-                    time.sleep(after_get_delay)
-                    return res
-            time.sleep(gap)
-            if (time.time() - StartTime > timeout):
-                return None
-
-    @logit(level=INFO1)
-    def click_image(self, image: MyTemplate, must_click=False, timeout=0, delay=0.5):
-        """点击一张图片的中心位置
-        Args:
-            image (MyTemplate): 目标图片
-            must_click (bool, optional): 如果为 True,点击失败则抛出异常. Defaults to False.
-            timeout (int, optional): 等待延时. Defaults to 0.
-            delay (float, optional): 点击后延时. Defaults to 0.5.
-
-        Raises:
-            NotFoundErr: 如果在 timeout 时间内未找到则抛出该异常
-        """
-        if (timeout < 0):
-            raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
-        if (delay < 0):
-            raise ValueError("arg 'delay' should at least be 0 but is ", str(delay))
-        pos = self.wait_image(image, timeout=timeout)
-        if (pos == False):
-            if (must_click == False):
-                return False
-            else:
-                raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
-
-        self.Android.click(pos[0], pos[1], delay=delay)
-        return True
 
     # ========================= 维护当前所在游戏界面 =========================
     @logit()
@@ -462,11 +247,13 @@ class Timer():
 
     @logit(level=INFO1)
     def get_now_page(self):
+        """获取并返回当前页面名称
+        """
         self.update_screen()
         for page in ALL_PAGES:
             if (self.identify_page(page, need_screen_shot=False, no_log=True)):
                 return page
-        return None
+        return 'unknown_page'
 
     @logit()
     def check_now_page(self):
@@ -483,8 +270,7 @@ class Timer():
                 if (fun == "click"):
                     self.Android.click(*args)
                 else:
-                    print("==================================")
-                    print("unknown function name:", fun)
+                    print_err("unknown function name:" + str(fun))
                     raise BaseException()
 
             if (edge.other_dst is not None):
@@ -511,27 +297,32 @@ class Timer():
             if now_page is None:
                 raise ImageNotFoundErr("Can't identify the page")
             else:
-                self.now_page = self.ui.get_node_by_name(now_page)
-
+                if(now_page != 'unknown_page'):
+                    self.now_page = self.ui.get_node_by_name(now_page)
+                else:
+                    self.now_page = now_page
         elif (page is not None):
             if (not isinstance(page, Node)):
-
+                
                 print("============================================")
                 print("arg:page must be an controller.ui.Node object")
-                raise ValueError
+                raise ValueError()
 
             if (self.ui.page_exist(page)):
                 self.now_page = page
-
-            raise ValueError('give page do not exist')
+            else:
+                self.now_page = 'unknown_page'
         else:
             page = self.ui.get_node_by_name(page_name)
             if (page is None):
-                raise ValueError("can't find the page:", page_name)
+                page = "unknown_page"
+                
             self.now_page = page
 
     def walk_to(self, end, try_times=0):
         try:
+            if(isinstance(self.now_page, str) and "unknow" in self.now_page):
+                self.go_main_page()
             if (isinstance(end, Node)):
                 self.operate(end)
                 self.wait_pages(end.name)
@@ -554,12 +345,7 @@ class Timer():
                             if not self.wait_pages(names=self.now_page.name, timeout=1):
                                 self.set_page(self.get_now_page())
                         except:
-                            try:
-                                self.go_main_page()
-                            except:
-                                pass
-                            else:
-                                break
+                            self.go_main_page()
                         else:
                             break
                     else:
@@ -605,53 +391,13 @@ class Timer():
     @logit(level=INFO2)
     def goto_game_page(self, target='main', extra_check=False):
         """到某一个游戏界面
-
+        
         Args:
-            timer (Timer): _description_
             target (str, str): 目标章节名(见 ./constants/other_constants). Defaults to 'main'.
         """
         self.walk_to(target)
         if extra_check:
             self.wait_pages(names=[self.now_page.name])
-
-    # ========================= 记录 =========================
-    def log_image(self, image, name, ndarray_mode="BGR", ignore_existed_image=False, *args, **kwargs):
-        """向默认数据记录路径记录图片
-        Args:
-            image: 图片,PIL.Image.Image 格式或者 numpy.ndarray 格式
-            name (str): 图片文件名
-        """
-        if ('png' not in name and 'PNG' not in name):
-            name += '.PNG'
-        path = os.path.join(self.log_filepre, name)
-
-        save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
-
-    def log_screen(self, need_screen_shot=False):
-        """向默认数据记录路径记录当前屏幕数据,带时间戳保存
-        Args:
-            need_screen_shot (bool, optional): 是否新截取一张图片. Defaults to False.
-        """
-        if (need_screen_shot):
-            self.update_screen()
-        self.log_image(image=self.screen, name=get_time_as_string(accuracy='second')+'screen')
-
-    def log_info(self, info):
-        """向默认信息记录文件记录信息自带换行
-
-        Args:
-            info (str): 要记录的信息
-
-        """
-        write_file(filename=os.path.join(S.LOG_PATH, "log.txt"), contents=info+'\n')
-
-    def log_debug_info(self, info):
-        """当调试时向默认信息记录文件记录信息自带换行
-        Args:
-            info (str): 需要记录的信息
-        """
-        if (S.DEBUG):
-            self.log_info(info)
 
 
 def process_error(timer:Timer):
@@ -666,4 +412,5 @@ def process_error(timer:Timer):
         return "ok,bad network"
     
     return "ok,unknown error"    
+        
         

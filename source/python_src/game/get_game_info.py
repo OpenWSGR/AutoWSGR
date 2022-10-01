@@ -94,6 +94,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
 
+    os.makedirs('.\\Data\\Tmp', exist_ok=True)
     PIM.fromarray(timer.screen).convert("L").resize((960, 540)).save(".\\Data\\Tmp\\screen.PNG")
     img = PIM.open(".\\Data\\Tmp\\screen.PNG")
     input_path = os.path.join(S.TUNNEL_PATH, "args.in")

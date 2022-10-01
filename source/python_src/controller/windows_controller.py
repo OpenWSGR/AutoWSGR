@@ -9,6 +9,7 @@ from constants.other_constants import INFO2
 
 from utils.function_wrapper import try_for_times
 from utils.logger import logit
+from utils import print_err
 
 
 # Win 和 Android 的通信
@@ -128,7 +129,7 @@ class WindowsController:
                 if (time.time() - restart_time > 120):
                     raise TimeoutError("can't start the emulator")
         except BaseException as E:
-            print(E)
+            print_err(E, "请检查模拟器路径!")
             raise CriticalErr("on Restart Android")
 
     def CheckNetWork(self):

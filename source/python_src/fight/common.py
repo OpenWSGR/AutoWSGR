@@ -8,7 +8,7 @@ from constants.custom_expections import ImageNotFoundErr, NetworkErr
 from constants.positions import BLOODLIST_POSITION
 from constants.other_constants import ALL_SHIP_TYPES, INFO1, INFO2, SAP
 from controller.run_timer import Timer, process_error
-from utils import remove_0_value_from_dict
+from utils import remove_0_value_from_dict, print_err
 from utils.logger import logit
 from utils.function_wrapper import try_for_times
 from utils.math_functions import get_nearest
@@ -146,8 +146,7 @@ class FightInfo(ABC):
                 return self.state
 
         # 匹配不到时报错
-        print("\n===================================================")
-        print(f"state: {self.state} last_action: {self.last_action}")
+        print_err(f"state: {self.state} last_action: {self.last_action}", "匹配状态失败,时间戳:" + str(time.time()))
         raise ImageNotFoundErr()
 
     @abstractmethod
@@ -226,11 +225,11 @@ class FightPlan(ABC):
         self.timer = timer
         self.fight_recorder = FightRecorder()
 
-    def run(self):
+    def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. """
         self.fight_recorder.reset()
         # 战斗前逻辑
-        ret = self._enter_fight()
+        ret = self._enter_fight(same_work)
         if ret == "success":
             pass
         elif ret == "dock is full":
@@ -241,8 +240,7 @@ class FightPlan(ABC):
         elif ret == "out of times":
             return ret
         else:
-            print("\n==========================================")
-            print('enter fight error,screen logged')
+            print_err("无法进入战斗,原因未知", '屏幕状态已记录,时间戳:' + str(time.time()))
             self.timer.log_screen()
             raise BaseException(str(time.time()) + "enter fight error")
 
@@ -254,7 +252,7 @@ class FightPlan(ABC):
                 continue
             elif ret == "need SL":
                 self.SL()
-                return self.run()
+                return "SL"
             elif ret == "fight end":
                 self.timer.set_page(self.Info.end_page)
                 break
@@ -262,7 +260,7 @@ class FightPlan(ABC):
         return "success"
 
     @abstractmethod
-    def _enter_fight(self) -> str:
+    def _enter_fight(self, same_work=False) -> str:
         pass
 
     @abstractmethod
@@ -350,6 +348,9 @@ class DecisionBlock():
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
             self.timer.Android.click(573, value * 100 - 20, delay=2)
+            if(self.SL_when_enter_fight == True):
+                return None, "need SL"
+            
             return value, "fight continue"
         elif state == "night":
             is_night = self.night
