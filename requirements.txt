@@ -1,3 +1,5 @@
+torch --extra-index-url https://download.pytorch.org/whl/cu113
 airtest
 keyboard
 easyocr
+opencv-python==4.5.5.64

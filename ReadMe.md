@@ -1,116 +1,66 @@
-## 项目简介
+## AutoWSGR
 
-一个战舰少女R的自动化脚本，整合了收集数据的功能。  
+用python与c++实现的战舰少女R的自动化流水线 & 数据统计一体化脚本，提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口。
 
-### Current Work
+## 功能
 
-舰船精确识别功能。  
-活动练级/战术。
-
-### 提示
-
-新的分支已经创建，请勿改动 `main` 中内容，请在对应分支编写测试并最终合并.  
-用的时候在 `usage` 里改代码，不要动其它分支了。
-
-### 环境和语言
-
-- python:`3.7.4-64bit`
-- c++:`c++17`
-- system:`win10-64`
-
-### 功能
-
-提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口。
-
+- 无间断重复远征
+- 自动点击完成任务
+- 全自动出征，可通过简单的描述文本实现高可复用的自定义策略
+  - 支持：战役、演习、常规战、当前活动地图
+  - 即将支持：所有类型活动图、决战
+- 支持多种修理模式：快修大破、快修中破、澡堂修理（可指定船名）
+- 强容错性
+  - 任何游戏界面，返回主页面，处理各种特殊点击需求
+  - 游戏卡死、断网时自动重启游戏、模拟器
 - `ctrl+alt+c` 终止所有操作并退出程序
 
-### 默认设置
+## 配置
 
-- 进入任何战斗前都将会修理队伍中中破或大破的舰船
+请自行安装 [Python](https://www.python.org/) == 3.7，[雷电模拟器](https://www.ldmnq.com/)，[战舰少女R](http://www.jianniang.com/)
 
-### 日志分级
+AutoWSGR 目前已支持通过 [PyPI](https://pypi.org/project/AutoWSGR/) 进行部署，您可以通过以下命令一键安装稳定发布版：
 
-- `DEBUG` 调试级信息，输出所有运行 `api` 级过程
-- `INFO1` 1 级操作信息，输出单个操作（点击，滑动操作）
-- `INFO2` 2 级操作信息，游戏基本操作（切换界面，战斗子阶段）
-- `INFO3` 3 级操作信息，游戏操作（ 暴露的 `api` 的操作）
-- `ERROR` 错误，记录所有异常信息
-- `CRITICAL` 核心信息，记录可能由程序逻辑错误引起的错误
-
-
-### 一些参数的规定:
-
-- 舰船血量状态 `Timer.ship_status` : 0 为绿血，1 为黄血，2 为红血，-1 为不存在
-- 敌方阵容字典 `Timer.enemy_type_count` : keys() 为所有舰船类型，item 结构为 (类型, 数量)，可以参考 `DecisionBlock`  类中的 `old_version` 成员函数
-
-## 使用
-
-当前 `main` 分支可能存在 `bug`，所以请下载 `Release` 中的源代码并按照以下参考进行构建，以第一份 `Release` 为例，简单介绍构建和使用。
-
-### 环境准备
-
-- Windows10
-- Python3.7.x
-
-[安装Python](https://zhuanlan.zhihu.com/p/111168324)
-
-推荐在虚拟环境中运行程序，可以按照下面的教程准备。
-
-#### virtualenv 搭建运行环境
-
-`pip install -r requirements.txt`
-
-#### Anaconda 搭建运行环境（推荐）
-
-咕咕咕
-
-### 接口使用
-
-首先该项目仍处于测试和功能完善状态，且用户 GUI 界面的设计工作优先级较低，所以很长一段时间都只会提供对应的接口，下面简单介绍接口的使用。
-
-#### 设置
-
-路径为 `settings.yaml`，**请自行创建该文件**，可以直接复制 `settings_example.yaml`。
-
-该文件应该是这个样子，你只需要修改 `LDPLAYER_ROOT` 变量的值，修改为你的雷电模拟器所在目录。
-
-请确保雷电模拟器应用程序名为 `dnplayer.exe`，程序将使用 `{LDPLAYER_ROOT}\dnplayer.exe` 命令启动模拟器。
-
-```yaml
-LDPLAYER_ROOT: C:\leidian\LDPlayer9
-TUNNEL_PATH: data\tunnel
-LOG_PATH: data\log
-DELAY: 2
-
-DEBUG: False
-SHOW_MAP_NODE: False
-SHOW_ANDROID_INPUT: False
-SHOW_ENEMY_RUELS: False
-SHOW_FIGHT_STAGE: False
-SHOW_CHAPTER_INFO: False
-SHOW_MATCH_FIGHT_STAGE: False
+```bash
+$ pip install AutoWSGR
 ```
 
-#### 计划
+也可以通过以下命令从 GitHub 安装最新版：
 
-所有战斗的决策和控制工作将按照计划中的参数进行，建议将所有计划放在 `plans` 文件夹下，该文件夹中有一些已经写好的计划示例。
-
-进行一场战斗需要两个计划，一个为默认计划，另一个为当前计划，当前计划指定的参数将覆盖默认计划的参数，当前计划未指定的参数将使用默认计划的参数，**默认计划的任何参数均不能缺省，否则可能导致运行时错误**。
-
-演习和其它战斗计划的格式不同，请自行阅读 `\plans` 中的示例，其中有说明。
-
-### 运行
-
-请导入 `wsgr` 模块以调用提供的接口，可以参考 `example.py` 中的示例。
-
-## 补充
-### OpenCv 相关的一些报错：
-如果出现以下报错，请将 `opencv` 降级为 `4.5.4` 版本。  
+```bash
+$ pip install git+https://github.com/huan-yp/Auto-WSGR.git@main --upgrade
 ```
-AttributeError: module 'cv2' has no attribute 'gapi_wip_gst_GStreamerPipeline'
+
+在安装完成后，打开任意命令行并键入：
+
+```python
+import AutoWSGR
+print(AutoWSGR.__version__)
 ```
-`pip uninstall opencv-python`  
-`pip install opencv-python==4.5.4.60`  
-### 高级功能介绍
-目前基于 `easyocr` 写了舰船精确识别,  **无法支持一些太过生僻的字，比如和谐动物园**，如果你的日系船还是动物园，请自行想办法更改，尽量避免笔画复杂的生僻字。
+
+如果没有报错则说明安装成功。
+
+## 快速使用
+
+样例代码在本项目的`examples/`文件夹下，您可以参考使用。计划在未来功能更新稳定后提供全面的中文文档。
+
+为了确保能正确的重启模拟器，建议进行如下设置，否则请确保每次运行前手动打开雷电模拟器：
+
+- 在您的工作目录下新建一个yaml文件（如`user_settings.yaml`），并在其中键入如下设置（替换为您的雷电模拟器安装根目录）
+
+  ```yaml
+  LDPLAYER_ROOT: C:\leidian\LDPlayer9
+  ```
+
+- 此外请确保雷电模拟器应用程序名为 `dnplayer.exe`，AutoWSGR将使用 `{LDPLAYER_ROOT}\dnplayer.exe` 命令启动模拟器。
+
+
+
+## 未来开发任务
+
+舰船精确识别功能。 
+
+活动练级/战术。
+
+
 

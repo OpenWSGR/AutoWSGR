@@ -1,31 +1,13 @@
-data/log
-data/tunnel/*.PNG
-data/tunnel/*.in
-data/tunnel/*.out
-data/settings/settings.yaml
-source/python_src/test
-
-test/
-test.py
-test.ipynb
-test_main.py
-
-.vscode/
+env/
+log/
 tmp/
-
+tests/
 release/
-
-
-test/
-test.py
-test.ipynb
-test_main.py
-
 .vscode/
-tmp/
 
-release/
-
+AutoWSGR/data/tunnel/*.PNG
+AutoWSGR/data/tunnel/*.in
+AutoWSGR/data/tunnel/*.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
