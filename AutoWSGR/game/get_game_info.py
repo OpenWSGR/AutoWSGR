@@ -6,7 +6,7 @@ import numpy as np
 from AutoWSGR.constants import IMG
 from AutoWSGR.constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
                                        SUPPOER_DISABLE, SUPPORT_ENALBE)
-from AutoWSGR.constants.data_roots import TUNNEL_ROOT
+from AutoWSGR.constants.data_roots import DATA_ROOT, TUNNEL_ROOT
 from AutoWSGR.constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC,
                                                 BG, BM, CA, CAV, CBG, CL, CLT,
                                                 CV, CVL, DD, INFO1, NAP, NO,
@@ -84,9 +84,8 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
                 'exercise': 演习点击挑战后的一横排舰船
                 'fight': 索敌成功后的两列三行
     """
-    timer.enemy_type_count = {CV: 0, BB: 0, SS: 0, BC: 0, NAP: 0, DD: 0, ASDG: 0, AADG: 0,
-                              CL: 0, CA: 0, CLT: 0, CVL: 0, NO: 0, AV: 0, "all": 0, CAV: 0, AV: 0,
-                              BM: 0, SAP: 0, BG: 0, CBG: 0, SC: 0, BBV: 0, 'AP': 0}
+    timer.enemy_type_count = {CV: 0, BB: 0, SS: 0, BC: 0, NAP: 0, DD: 0, ASDG: 0, AADG: 0, CL: 0, CA: 0, CLT: 0, CVL: 0, NO: 0, "all": 0, CAV: 0, AV: 0, BM: 0, SAP: 0, BG: 0, CBG: 0, SC: 0, BBV: 0, 'AP': 0}
+
     if (type == 'exercise'):
         type = 0
     if (type == 'fight'):
@@ -95,11 +94,12 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     if (timer.image_exist(IMG.fight_image[12])):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
-    
+
     # TODO：为什么需要保存这个图片？
-    os.makedirs('.\\Data\\Tmp', exist_ok=True)
-    PIM.fromarray(timer.screen).convert("L").resize((960, 540)).save(".\\Data\\Tmp\\screen.PNG")
-    img = PIM.open(".\\Data\\Tmp\\screen.PNG")
+    os.makedirs(os.path.join(DATA_ROOT,'Tmp'), exist_ok=True)
+    f_name = os.path.join(DATA_ROOT,'Tmp', "screen.PNG")
+    PIM.fromarray(timer.screen).convert("L").resize((960, 540)).save(f_name)
+    img = PIM.open(f_name)
     input_path = os.path.join(TUNNEL_ROOT, "args.in")
     output_path = os.path.join(TUNNEL_ROOT, "res.out")
 
@@ -166,8 +166,8 @@ def DetectShipStatu(timer: Timer, type='prepare'):
 
     timer.update_screen()
     result=[-1, 0, 0, 0, 0, 0, 0]
-    if type == 'prepare':
-        for i in range(1, 7):
+    for i in range(1, 7):
+        if type == 'prepare':
             pixel=timer.get_pixel(*BLOODLIST_POSITION[0][i])
             result[i]=CheckColor(pixel, BLOOD_COLORS[0])
             if result[i] in [3, 2]:
@@ -178,8 +178,7 @@ def DetectShipStatu(timer: Timer, type='prepare'):
                 result[i]=-1
             else:
                 result[i]=1
-    if type == 'sumup':
-        for i in range(1, 7):
+        elif type == 'sumup':
             if timer.ship_status[i] == -1:
                 result[i]=-1
                 continue
@@ -225,18 +224,19 @@ def get_exercise_status(timer: Timer, robot=None):
         timer.update_screen()
         result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50)
         return result
-    if (down):
+    if down:
         for position in range(1, 5):
             result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
         if (robot is not None):
             result.insert(1, robot)
-            return result
         else:
             timer.Android.swipe(800, 200, 800, 400)  # 上滑
             timer.update_screen()
-            result.insert(1, bool(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50))
+            result.insert(1, math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50)
+
             timer.Android.swipe(800, 400, 800, 200)  # 下滑
-            return result
+
+        return result
 
 
 @ logit(level=INFO1)

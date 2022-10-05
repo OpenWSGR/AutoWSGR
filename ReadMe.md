@@ -1,6 +1,12 @@
 ## AutoWSGR
 
+![](https://img.shields.io/github/repo-size/huan-yp/Auto-WSGR) ![](https://img.shields.io/pypi/v/AutoWSGR) ![](https://img.shields.io/pypi/dm/AutoWSGR) ![](https://img.shields.io/github/issues/huan-yp/Auto-WSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
+
 用python与c++实现的战舰少女R的自动化流水线 & 数据统计一体化脚本，提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口。
+
+## 近期更新
+
+- 一体化日常挂机策略，使用方式见`examples/auto_daily.py`   \- *2022/10/5*
 
 ## 功能
 

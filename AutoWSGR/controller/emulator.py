@@ -23,6 +23,7 @@ from .windows_controller import WindowsController
 class Emulator():
     """模拟器管理单位,可以用于其它游戏
     """
+
     def __init__(self):
         self.start_time = time.time()
         self.log_filepre = get_time_as_string()
@@ -31,7 +32,7 @@ class Emulator():
         self.device_name = 'emulator-5554'  # 设备名,雷电模拟器默认值
         self.Windows = WindowsController(self.device_name)
         self.Android = AndroidController(self.resolution)
-    
+
     def connect(self, emulator):
         # if(not self.Windows.is_android_online()):self.Windows.RestartAndroid() # TODO：功能重复
         self.device_name = emulator
@@ -41,7 +42,7 @@ class Emulator():
         self.resolution = self.resolution[::-1]
         from AutoWSGR.utils.logger import time_path
         self.log_filepre = time_path
-    
+
     @logit()
     def update_screen(self, *args, **kwargs):
         """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 RD.screen
@@ -88,13 +89,13 @@ class Emulator():
             否则返回 None
         """
         images = image
-        if(not isinstance(images, Iterable)):
+        if (not isinstance(images, Iterable)):
             images = [images]
         if (need_screen_shot == 1):
             self.update_screen()
         for image in images:
             res = self.locateCenterOnScreen(image, confidence, this_methods)
-            if(res is not None):
+            if (res is not None):
                 return convert_position(res[0], res[1], self.resolution, mode='this_to_960')
         return None
 
@@ -114,14 +115,14 @@ class Emulator():
         if need_screen_shot:
             self.update_screen()
         return any(self.get_image_position(image, 0, confidence, this_methods, no_log=True) is not None for image in images)
-    
+
     def images_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
         """判断图像是否存在于屏幕中
         Returns:
             bool:如果存在为 True 否则为 False 
         """
         return self.image_exist(images, need_screen_shot, confidence, this_methods)
-    
+
     @logit()
     def wait_image(self, image: MyTemplate, confidence=0.85, timeout=10, gap=.15, after_get_delay=0, this_methods=["tpl"]):
         """等待一张图片出现在屏幕中,置信度超过一定阈值
@@ -188,14 +189,14 @@ class Emulator():
 
     def wait_images_position(self, images=[], confidence=0.85, gap=.15, after_get_delay=0, timeout=10, *args, **kwargs):
         """等待一些图片,并返回第一个匹配结果的位置
-        
+
         参考 wait_images     
         """
         rank = self.wait_images(images, confidence, gap, after_get_delay, timeout, *args, **kwargs)
-        if(rank == None):
+        if rank is None:
             return None
         return self.get_image_position(images[rank], 0, confidence)
-    
+
     @logit(level=INFO1)
     def click_image(self, image, must_click=False, timeout=0, delay=0.5):
         """点击一张图片的中心位置
@@ -213,7 +214,7 @@ class Emulator():
             if (must_click == False):
                 return False
             else:
-                raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
+                raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
 
         self.Android.click(pos[0], pos[1], delay=delay)
         return True
@@ -234,20 +235,20 @@ class Emulator():
         if (delay < 0):
             raise ValueError("arg 'delay' should at least be 0 but is ", str(delay))
         pos = self.wait_image(image, timeout=timeout)
-        if (pos == None):
+        if pos is None:
             if (must_click == False):
                 return False
             else:
-                raise ImageNotFoundErr("Target image not found:" + str(image.filepath))
+                raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
 
         self.Android.click(*pos, delay=delay)
         return True
-    
+
     def click_images(self, images, must_click=False, timeout=0, delay=0.5):
         """点击一些图片中第一张出现的,如果有多个,点击第一个
         """
         self.click_image(images, must_click, timeout)
-    
+
     @logit(level=INFO2)
     def ConfirmOperation(self, must_confirm=0, delay=0.5, confidence=.9, timeout=0):
         """等待并点击弹出在屏幕中央的各种确认按钮
@@ -309,5 +310,3 @@ class Emulator():
         """
         if (S.DEBUG):
             self.log_info(info)
-
-    

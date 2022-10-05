@@ -1,1 +1,12 @@
 LDPLAYER_ROOT: C:\LDPlayer\LDPlayer9
+
+Auto_Expedition: True # 自动重复远征
+Auto_Gain_Bonous: True # 当有任务完成时自动点击
+Auto_Bath_Repair: True # 空闲时自动澡堂修理
+
+Auto_Battle: True # 自动打完每日战役次数
+Battle_Name: "hard_Cruiser" # 打哪个。可选名称参考"plans/battle/"
+
+Dock_Full_Destroy: True # 船坞已满时自动清空，若设置为false则船坞已满后终止所有常规出征任务
+Auto_NormalFight: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。plan名参考"plans/normal_fignt/"
+  - [8-5AI, 2, 1]

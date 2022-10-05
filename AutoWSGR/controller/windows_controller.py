@@ -14,6 +14,7 @@ from AutoWSGR.utils.logger import logit
 # Win 和 Android 的通信
 # Win 向系统写入数据
 
+
 class WindowsController:
     def __init__(self, device_name) -> None:
         self.device_name = device_name

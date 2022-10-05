@@ -152,7 +152,7 @@ class NormalFightInfo(FightInfo):
 class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
 
-    def __init__(self, timer: Timer, plan_path):
+    def __init__(self, timer: Timer, plan_path, fleet_id=1):
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
@@ -163,21 +163,21 @@ class NormalFightPlan(FightPlan):
         """
         super().__init__(timer)
 
-        # 加载默认配置
+        # 从配置文件加载计划
         default_args = yaml_to_dict(os.path.join(PLAN_ROOT, "default.yaml"))
         plan_defaults = default_args["normal_fight_defaults"]
         plan_defaults.update({"node_defaults": default_args["node_defaults"]})
-
-        # 加载计划配置
         plan_args = yaml_to_dict(os.path.join(PLAN_ROOT, plan_path))
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
 
+        # 从参数加载计划
+        self.fleet_id = fleet_id # 舰队编号
+
         # 加载节点配置
-        node_defaults = self.node_defaults
         self.nodes = {}
         for node_name in self.selected_nodes:
-            node_args = copy.deepcopy(node_defaults)
+            node_args = copy.deepcopy(self.node_defaults)
             if 'node_args' in plan_args and plan_args['node_args'] is not None and node_name in plan_args['node_args']:
                 node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)

@@ -8,7 +8,6 @@
 # MapLevel
 chapter: 8
 map: 2
-fleet_id: 1
 selected_nodes: [B, J]
 fight_condition: 4 # 瞄准
 

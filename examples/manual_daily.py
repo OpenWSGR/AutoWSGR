@@ -8,8 +8,8 @@ from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
 timer = start_script('user_settings.yaml')
 S.DEBUG = False
 
-battle_plan = BattlePlan(timer, 'battle/hard_destroyer.yaml')
-fight_plan = NormalFightPlan(timer, "normal_fight/9-1BF.yaml")
+battle_plan = BattlePlan(timer, plan_path='battle/hard_destroyer.yaml')
+fight_plan = NormalFightPlan(timer, plan_path="normal_fight/9-1BF.yaml", fleet_id=3)
 expedition_plan = Expedition(timer)
 start_time = last_time = time.time()
 

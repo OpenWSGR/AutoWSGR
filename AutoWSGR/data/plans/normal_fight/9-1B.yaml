@@ -6,7 +6,6 @@
 # MapLevel
 chapter: 9
 map: 1
-fleet_id: 1
 selected_nodes: [B]
 
 # NodeLevel

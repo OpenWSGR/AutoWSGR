@@ -46,7 +46,7 @@ class Timer(Emulator):
         self.defaul_repair_logic = None
         self.fight_result = None
         self.last_mission_compelted = 0
-        self.last_expedition_checktime = time.time()     
+        self.last_expedition_checktime = time.time()
 
     def setup(self, to_main_page):
         self.connect(S.device_name)
@@ -57,7 +57,7 @@ class Timer(Emulator):
         print("resolution:", self.resolution)
         self.ammo = 10
         # self.resources = Resources(self)
-        if(to_main_page):
+        if (to_main_page):
             self.go_main_page()
         try:
             self.set_page()
@@ -130,11 +130,11 @@ class Timer(Emulator):
             self.click_image(IMG.start_image[2])
             time.sleep(1)
         try:
-            if(self.wait_image(IMG.start_image[6], timeout=1) != False): # 新闻与公告,设为今日不再显示
-                if(not self.check_pixel((70, 485), (201, 129, 54))):
+            if (self.wait_image(IMG.start_image[6], timeout=1) != False):  # 新闻与公告,设为今日不再显示
+                if (not self.check_pixel((70, 485), (201, 129, 54))):
                     self.Android.click(70, 485)
                 self.Android.click(30, 30)
-            if(self.wait_image(IMG.start_image[7], timeout=2) != False): # 每日签到
+            if (self.wait_image(IMG.start_image[7], timeout=2) != False):  # 每日签到
                 self.Android.click(474, 357)
                 self.ConfirmOperation(must_confirm=1, timeout=2)
             self.go_main_page()
@@ -298,31 +298,28 @@ class Timer(Emulator):
             if now_page is None:
                 raise ImageNotFoundErr("Can't identify the page")
             else:
-                if(now_page != 'unknown_page'):
+                if (now_page != 'unknown_page'):
                     self.now_page = self.ui.get_node_by_name(now_page)
                 else:
                     self.now_page = now_page
         elif (page is not None):
             if (not isinstance(page, Node)):
-                
+
                 print("============================================")
                 print("arg:page must be an controller.ui.Node object")
                 raise ValueError()
 
-            if (self.ui.page_exist(page)):
-                self.now_page = page
-            else:
-                self.now_page = 'unknown_page'
+            self.now_page = page if (self.ui.page_exist(page)) else 'unknown_page'
         else:
             page = self.ui.get_node_by_name(page_name)
             if (page is None):
                 page = "unknown_page"
-                
+
             self.now_page = page
 
     def walk_to(self, end, try_times=0):
         try:
-            if(isinstance(self.now_page, str) and "unknow" in self.now_page):
+            if (isinstance(self.now_page, str) and "unknow" in self.now_page):
                 self.go_main_page()
             if (isinstance(end, Node)):
                 self.operate(end)
@@ -392,7 +389,7 @@ class Timer(Emulator):
     @logit(level=INFO2)
     def goto_game_page(self, target='main', extra_check=False):
         """到某一个游戏界面
-        
+
         Args:
             target (str, str): 目标章节名(见 ./constants/other_constants). Defaults to 'main'.
         """
@@ -401,17 +398,15 @@ class Timer(Emulator):
             self.wait_pages(names=[self.now_page.name])
 
 
-def process_error(timer:Timer):
+def process_error(timer: Timer):
     print("processing errors")
-    if(timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False):
+    if (timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False):
         timer.Windows.RestartAndroid()
         timer.Windows.ConnectAndroid()
 
         return "Andoird Restarted"
-    
-    if(timer.process_bad_network()):
+
+    if (timer.process_bad_network()):
         return "ok,bad network"
-    
-    return "ok,unknown error"    
-        
-        
+
+    return "ok,unknown error"

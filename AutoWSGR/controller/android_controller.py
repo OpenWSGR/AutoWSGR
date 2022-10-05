@@ -56,11 +56,11 @@ class AndroidController:
             raise ValueError("arg 'delay' should be positive or 0")
         x, y = convert_position(x, y, self.resolution)
         if (enable_subprocess == 1):
-            p = th.Thread(target=lambda: self.ShellCmd("input tap "+str(x) + " " + str(y)))
+            p = th.Thread(target=lambda: self.ShellCmd(f"input tap {str(x)} {str(y)}"))
             p.start()
             return p
         for _ in range(times):
-            self.ShellCmd("input tap " + str(x) + " " + str(y))
+            self.ShellCmd(f"input tap {str(x)} {str(y)}")
             time.sleep(delay * S.DELAY)
 
     @logit(level=INFO1)
@@ -106,5 +106,3 @@ class AndroidController:
         if (duration <= 0.2):
             raise ValueError("duration time too short,arg 'duration' should greater than 0.2")
         self.swipe(x, y, x, y, duration=duration, delay=delay, *args, **kwargs)
-        
-    

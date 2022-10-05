@@ -16,7 +16,7 @@ from AutoWSGR.utils.math_functions import get_nearest
 
 
 @logit(level=INFO2)
-def start_march(timer:Timer):
+def start_march(timer: Timer):
     timer.Android.click(900, 500, 1, delay=0)
     start_time = time.time()
     while timer.identify_page('fight_prepare_page'):
@@ -127,7 +127,8 @@ class FightInfo(ABC):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        if(S.SHOW_MATCH_FIGHT_STAGE):print("waiting:", possible_states, end="  ")
+        if (S.SHOW_MATCH_FIGHT_STAGE):
+            print("waiting:", possible_states, end="  ")
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
         timeout = [timeout[i] if modified_timeout[i] == -1 else modified_timeout[i] for i in range(len(timeout))]
@@ -142,7 +143,8 @@ class FightInfo(ABC):
             ret = [self.timer.image_exist(image, 0, no_log=True) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
-                if(S.SHOW_MATCH_FIGHT_STAGE):print("matched:", self.state)
+                if (S.SHOW_MATCH_FIGHT_STAGE):
+                    print("matched:", self.state)
                 self._after_match()
 
                 return self.state
@@ -212,10 +214,10 @@ class FightRecorder():
 
     @property
     def last_stage(self):
-        if(len(self.sr) == 0):
+        if (len(self.sr) == 0):
             return None
         return self.sr[-1]
-    
+
     def __str__(self):
         res = "".join(str(x) + "\n" for x in self.sr)
         return res
@@ -228,16 +230,16 @@ class FightPlan(ABC):
         self.fight_recorder = FightRecorder()
 
     def run(self, same_work=False):
-        """ 主函数，负责一次完整的战斗. """
+        """ 主函数，负责一次完整的战斗. 
+
+            :return: 进入战斗状态信息，包括['success', 'dock is full', "out of times", "SL"].
+        """
         self.fight_recorder.reset()
         # 战斗前逻辑
         ret = self._enter_fight(same_work)
         if ret == "success":
             pass
         elif ret == "dock is full":
-            return ret  # TODO：加入分解逻辑
-        elif ret == "fight end":
-            self.timer.set_page(self.Info.end_page)
             return ret
         elif ret == "out of times":
             return ret
@@ -340,7 +342,8 @@ class DecisionBlock():
                     return None, "need SL"
 
                 if self.set_formation_by_rule:
-                    if(S.DEBUG):print("set formation by rule:", self.formation_by_rule)
+                    if (S.DEBUG):
+                        print("set formation by rule:", self.formation_by_rule)
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
 
@@ -350,9 +353,9 @@ class DecisionBlock():
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
             self.timer.Android.click(573, value * 100 - 20, delay=2)
-            if(self.SL_when_enter_fight == True):
+            if (self.SL_when_enter_fight == True):
                 return None, "need SL"
-            
+
             return value, "fight continue"
         elif state == "night":
             is_night = self.night
@@ -381,4 +384,3 @@ class NodeLevelDecisionBlock(DecisionBlock):
         """进行决策并执行
         """
         return super().make_decision(state, last_state, last_action)
-

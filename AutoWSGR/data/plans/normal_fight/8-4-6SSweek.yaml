@@ -5,7 +5,6 @@
 # MapLevel
 chapter: 8 # 章节
 map: 4 # 地图
-fleet_id: 4 # 舰队编号
 selected_nodes: [A, B, D, H, I, M] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
 fight_condition: 4 # 战况选择
 repair_mode: 1
