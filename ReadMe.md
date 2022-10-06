@@ -23,18 +23,26 @@
 
 ## 配置
 
+### 前期准备
+
 请自行安装 [Python](https://www.python.org/) == 3.7，[雷电模拟器](https://www.ldmnq.com/)，[战舰少女R](http://www.jianniang.com/)
+
+将雷电模拟器的分辨率按下图设置（目前仅保证该分辨率稳定运行，之后的更新中将兼容所有分辨率）
+
+![image-20221006213603676](.assets/image-20221006213603676.png)
+
+### 安装AutoWSGR
 
 AutoWSGR 目前已支持通过 [PyPI](https://pypi.org/project/AutoWSGR/) 进行部署，您可以通过以下命令一键安装稳定发布版：
 
 ```bash
-$ pip install AutoWSGR
+$ pip install -U AutoWSGR
 ```
 
 也可以通过以下命令从 GitHub 安装最新版：
 
 ```bash
-$ pip install git+https://github.com/huan-yp/Auto-WSGR.git@main --upgrade
+$ pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
 ```
 
 在安装完成后，打开任意命令行并键入：
@@ -50,17 +58,15 @@ print(AutoWSGR.__version__)
 
 样例代码在本项目的`examples/`文件夹下，您可以参考使用。计划在未来功能更新稳定后提供全面的中文文档。
 
-为了确保能正确的重启模拟器，建议进行如下设置，否则请确保每次运行前手动打开雷电模拟器：
+建议先尝试一体化日常挂机策略（`examples/auto_daily.py`），在使用前你需要更改如下设置：
 
-- 在您的工作目录下新建一个yaml文件（如`user_settings.yaml`），并在其中键入如下设置（替换为您的雷电模拟器安装根目录）
+- 将`user_settings.yaml`中的**LDPLAYER_ROOT**属性替换为您的雷电模拟器安装根目录
 
   ```yaml
   LDPLAYER_ROOT: C:\leidian\LDPlayer9
   ```
 
 - 此外请确保雷电模拟器应用程序名为 `dnplayer.exe`，AutoWSGR将使用 `{LDPLAYER_ROOT}\dnplayer.exe` 命令启动模拟器。
-
-
 
 ## 未来开发任务
 
