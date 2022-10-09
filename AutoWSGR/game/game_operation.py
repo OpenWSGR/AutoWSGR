@@ -50,6 +50,16 @@ class Expedition:
                 break
 
 
+@logit(level=INFO2)
+def get_ship(timer:Timer, max_times=1):
+    times = 0 
+    timeout = 5
+    while(timer.wait_image(IMG.symbol_image[8], timeout=timeout) and times <= max_times):
+        timer.Android.click(900, 500, delay=.25)
+        timeout = 1
+        times += 1
+
+
 @logit(level=INFO3)
 def DestoryShip(timer: Timer, reserve=1, amount=1):
     # amount:重要舰船的个数
@@ -127,6 +137,7 @@ def verify_team(timer: Timer):
             # if(S.DEBUG):print(timer.screen[83][64])
             if (timer.check_pixel(position, bgr_color=(228, 132, 16))):
                 return i + 1
+        time.sleep(.2)
         timer.update_screen()
 
     if timer.process_bad_network():
@@ -217,7 +228,7 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         print("ShipStatus:", ShipStatus)
     if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
 
-        timer.Android.click(420, 420, delay=1.5)   # 进入修理页面
+        timer.Android.click(420, 420, times=2, delay=0.8)   # 进入修理页面
         # 快修已经开始泡澡的船
         pos = timer.get_image_position(IMG.repair_image[1])
         while (pos != None):

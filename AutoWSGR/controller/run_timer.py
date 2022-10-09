@@ -10,6 +10,7 @@ from AutoWSGR.constants.other_constants import (ALL_PAGES, INFO1, INFO2, INFO3,
 from AutoWSGR.constants.ui import WSGR_UI, Node
 from AutoWSGR.utils.debug import print_err
 from AutoWSGR.utils.logger import logit
+from AutoWSGR.utils.io import yaml_to_dict
 
 from .emulator import Emulator
 
@@ -34,6 +35,7 @@ class Timer(Emulator):
         self.resources = None
         self.last_error_time = time.time() - 1800
         self.decisive_battle_data = None
+        self.ship_names = []
         """
         以上时能用到的
         以下是暂时用不到的
@@ -49,6 +51,7 @@ class Timer(Emulator):
         self.last_expedition_checktime = time.time()
 
     def setup(self, to_main_page):
+        self.ship_names = [name for name in yaml_to_dict('data/ocr/ship_name.yaml').values()]
         self.connect(S.device_name)
         if S.account != None and S.password != None:
             self.restart(account=S.account, password=S.password)
@@ -61,7 +64,7 @@ class Timer(Emulator):
             self.go_main_page()
         try:
             self.set_page()
-        except BaseException:
+        except (BaseException, Exception):
             if S.DEBUG:
                 self.set_page('main_page')
             else:
@@ -92,7 +95,7 @@ class Timer(Emulator):
             NetworkErr: _description_
         """
         start_app("com.huanmeng.zhanjian2")
-        res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, timeout=60 * delay)
+        res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, timeout=70 * delay)
 
         if res is None:
             raise TimeoutError("start_app timeout")
@@ -126,9 +129,13 @@ class Timer(Emulator):
                 raise TimeoutError("login timeout")
             if res == 0:
                 raise BaseException("password or account is wrong")
+        delay = 2
         while self.image_exist(IMG.start_image[2]):
             self.click_image(IMG.start_image[2])
-            time.sleep(1)
+            time.sleep(delay)
+            delay *= 2
+            if(delay > 16):
+                raise ImageNotFoundErr("can't start game")
         try:
             if (self.wait_image(IMG.start_image[6], timeout=1) != False):  # 新闻与公告,设为今日不再显示
                 if (not self.check_pixel((70, 485), (201, 129, 54))):
@@ -326,7 +333,11 @@ class Timer(Emulator):
                 self.wait_pages(end.name)
                 return
             if (isinstance(end, str)):
-                self.walk_to(self.ui.get_node_by_name(end))
+                end = self.ui.get_node_by_name(end)
+                if(end == None):
+                    print_err("unacceptable value of end:" + end)
+                    raise ValueError("illegal value:end, in Timer.walk_to")
+                self.walk_to(end)
 
         except TimeoutError as exception:
             if try_times > 3:

@@ -1,7 +1,7 @@
 import threading as th
 import time
 
-from airtest.core.api import shell, start_app
+from airtest.core.api import shell, start_app, text
 from AutoWSGR.constants.other_constants import INFO1
 from AutoWSGR.constants.settings import S
 from AutoWSGR.utils.api_image import convert_position
@@ -25,6 +25,9 @@ class AndroidController:
         apps = self.ShellCmd("ps")
         return "zhanjian2" in apps
 
+    def text(self, t):
+        text(t)
+    
     @logit(level=INFO1)
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
         if S.SHOW_ANDROID_INPUT:

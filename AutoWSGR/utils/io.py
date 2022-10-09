@@ -138,3 +138,12 @@ def get_all_files(dir):
         for file in f:
             res.append(os.path.join(r, file))
     return res
+
+
+def count(keys, iter):
+    res = 0 
+    for it in iter:
+        if(it in keys):
+            res += 1
+    return res
+

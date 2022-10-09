@@ -4,6 +4,7 @@ from AutoWSGR.constants import IMG
 from AutoWSGR.constants.data_roots import PLAN_ROOT
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import QuickRepair
+from AutoWSGR.game.get_game_info import DetectShipStatu
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, start_march
@@ -58,12 +59,14 @@ class BattleInfo(FightInfo):
         self.timer.update_screen()
 
     def _after_match(self):
-        pass  # 战役的敌方信息固定，不用获取
+        if self.state == "result":
+            DetectShipStatu(self.timer, 'sumup')
+            self.fight_result.detect_result()
 
 
 class BattlePlan(FightPlan):
 
-    def __init__(self, timer, plan_path) -> None:
+    def __init__(self, timer, plan_path=None, decision_block=None) -> None:
         super().__init__(timer)
 
         # 加载默认配置
@@ -72,16 +75,22 @@ class BattlePlan(FightPlan):
         plan_defaults.update({"node_defaults": default_args["node_defaults"]})
 
         # 加载计划配置
-        plan_args = yaml_to_dict(os.path.join(PLAN_ROOT, plan_path))
-        args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
+        if(plan_path is not None):
+            plan_args = yaml_to_dict(plan_path)
+            args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
+        else:
+            args = plan_defaults
         self.__dict__.update(args)
 
         # 加载节点配置
         node_defaults = self.node_defaults
-        node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
+        if(plan_path is not None):
+            node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
+        else:
+            node_args = node_defaults
         self.node = NodeLevelDecisionBlock(timer, node_args)
-
         self.Info = BattleInfo(timer)
+        self.decision_block = decision_block
 
     def go_fight_prepare_page(self):
         self.timer.goto_game_page("battle_page")
@@ -103,8 +112,9 @@ class BattlePlan(FightPlan):
         self.Info.update_state()
         if self.Info.state == "battle_page":
             return "fight end"
-
+        if(self.decision_block is not None):
+            _action = self.decision_block.make_decision(self.Info.state)
         # 进行通用NodeLevel决策
-        action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action)
+        action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action, _action)
         self.Info.last_action = action
         return fight_stage

@@ -7,11 +7,17 @@ using cv::imread;
 using cv::imwrite;
 using cv::imshow;
 using cv::waitKey;
-
+/*compile:
+	current path: ./c_src
+	general:
+		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I {your_opencv_include} -L {your_opencv_lib} -l libopencv_core454 -l libopencv_imgcodecs454 
+	for me(huan_yp):
+		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I H:/opencv/opencv-4.5.4mingw/include -L H:/opencv/opencv-4.5.4mingw/lib -l libopencv_core454 -l libopencv_imgcodecs454 
+*/
 /*function:
 	locate the blue textbox and write other pixel (255,255,255)
 */
-const int MAX_HEIGHT = 540, MAX_WIDTH = 960;
+const int MAX_HEIGHT = 1000, MAX_WIDTH = 2000;
 const int KEY_COLOR_COUNT = 3;
 const vector<vector<int>> BGR_COLOR({{162, 98, 18}, {173, 103, 17}, {196, 116, 16}});
 
@@ -31,13 +37,26 @@ bool cmp_line(const vector<pair<int,int>> &l1, const vector<pair<int,int>> &l2){
 	return true;
 }
 
+string merge(char* a,const char* b){
+	char ch[1000];
+	strcpy(ch, a);
+	strcat(ch, b);
+	return ch;
+}
 int main(int argc,char **args){
 //	printf("%d\n", is_key_color(vector<uchar>({123, 123, 123}), BGR_COLOR, 20, 3));
-	ifstream in_stream("locator.in");
+	char* ROOT = args[1];
+	ofstream out(merge(ROOT,"/res.out"));
+	ifstream in_stream(merge(ROOT, "/locator.in"));
 	string image_path;
 	in_stream >> image_path;
 //	cout << image_path;
 	Mat image = imread(image_path);
+	if(image.empty()){
+		printf("Image is empty!!!,Please check the path:%s", image_path.data());
+		out << "Image is empty!!!,Please check the path:" << image_path;
+		exit(0);
+	}
 //	imshow("source_image", image);
 //	waitKey(0);
 //	uchar* ptr = image.ptr<uchar>(0);
@@ -82,25 +101,28 @@ int main(int argc,char **args){
 			is_line_legal[i] = true; 
 		
 	}
+	vector<pair<int,int>> lines;
+	int lst = -1;
 	for(int i=0;i<n;i++){
-		if(!is_line_legal[i])
-			memset(image.ptr<uchar>(i), 255, (m) * 3);
-		else{
-			for(int j=0;j<m;j++)if(!is_key[i][j]){
-			//	uchar* ptr = image.ptr<uchar>(i, j);
-			//	if(*min_element(ptr, ptr+3) >= 200)
-			//		memset(ptr, 255, 3);
-			//	else{
-				//	memcpy(ptr, &BGR_COLOR[2][0], 3);
-			//		ptr[0] = min(ptr[0] + 25, 255);
-			//		ptr[1] = min(ptr[1] + 25, 255);
-			//		ptr[2] = min(ptr[2] + 25, 255);
-			//	}
+		if(!is_line_legal[i]){
+			if(lst != -1){
+				lines.emplace_back(lst, i);
+				lst = -1;
 			}
+			memset(image.ptr<uchar>(i), 255, (m) * 3);
+		}
+		else{
+			if(lst == -1)
+				lst = i;
 		}
 	}
+
+	
+	out << lines.size() << endl;
+	for(auto v:lines)
+	out << v.first << ' ' << v.second << endl;
 	imwrite("1.PNG", image);
-	imshow("image", image);
-	waitKey();
+//	imshow("image", image);
+//	waitKey();
 	return 0;
 }

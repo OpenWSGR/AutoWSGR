@@ -106,6 +106,9 @@ def make_tmplate(name=None, path=None, all_image=all_images, *args, **kwargs):
 
 class ImageSet():
     def __init__(self):
+        self.decisive_battle_image = ["", ]
+        self.symbol_image = ["", ]
+        self.fight_image = ["", ]
         self.fight_result_image = {}
         for result in FIGHT_RESULTS:
             self.fight_result_image[result] = make_tmplate(path=f'{IMG_ROOT}/fight_result/{result}.PNG')

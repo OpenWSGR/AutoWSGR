@@ -95,11 +95,9 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         # 特殊补给舰
         timer.enemy_type_count[SAP] = 1
 
-    # TODO：为什么需要保存这个图片？
-    os.makedirs(os.path.join(DATA_ROOT,'Tmp'), exist_ok=True)
-    f_name = os.path.join(DATA_ROOT,'Tmp', "screen.PNG")
-    PIM.fromarray(timer.screen).convert("L").resize((960, 540)).save(f_name)
-    img = PIM.open(f_name)
+    img = PIM.fromarray(timer.screen).convert("L")
+    img.resize((960, 540))
+
     input_path = os.path.join(TUNNEL_ROOT, "args.in")
     output_path = os.path.join(TUNNEL_ROOT, "res.out")
 
@@ -109,17 +107,12 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
 
     for i, area in enumerate(TYPE_SCAN_AREA[type]):
         arr = np.array(img.crop(area))
-        save_image(os.path.join(TUNNEL_ROOT, f"{str(i)}.PNG"), arr, True)
         args += matri_to_str(arr)
 
     write_file(input_path, args)
+    os.system(f"{str(os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe'))} {TUNNEL_ROOT}")
 
-    # TODO: 会改变cwd，需要修复
-    os.chdir(TUNNEL_ROOT)
-    os.system(".\Source.exe")
-    os.chdir("..\\..\\")
-
-    res = read_file(os.path.join("Data", "Tunnel", "res.out")).split()
+    res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()
     timer.enemy_type_count["ALL"]=0
     for i, x in enumerate(res):
         timer.enemy_ship_type[i]=x

@@ -9,19 +9,21 @@ from AutoWSGR.constants.other_constants import (ALL_SHIP_TYPES, INFO1, INFO2,
 from AutoWSGR.constants.positions import BLOODLIST_POSITION
 from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer, process_error
+from AutoWSGR.game.game_operation import get_ship
 from AutoWSGR.utils import print_err, remove_0_value_from_dict
 from AutoWSGR.utils.function_wrapper import try_for_times
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import get_nearest
+from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 
 
 @logit(level=INFO2)
-def start_march(timer: Timer):
-    timer.Android.click(900, 500, 1, delay=0)
+def start_march(timer:Timer, position=(900, 500)):
+    timer.Android.click(*position, 1, delay=0)
     start_time = time.time()
     while timer.identify_page('fight_prepare_page'):
         if time.time() - start_time > 3:
-            timer.Android.click(900, 500, 1, delay=0)
+            timer.Android.click(*position, 1, delay=0)
         if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
             return "dock is full"
         if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0):
@@ -29,7 +31,7 @@ def start_march(timer: Timer):
         if time.time() - start_time > 15:
             if timer.process_bad_network():
                 if timer.identify_page('fight_prepare_page'):
-                    return start_march()
+                    return start_march(timer, position)
                 else:
                     NetworkErr("status unknow")
             else:
@@ -229,26 +231,7 @@ class FightPlan(ABC):
         self.timer = timer
         self.fight_recorder = FightRecorder()
 
-    def run(self, same_work=False):
-        """ 主函数，负责一次完整的战斗. 
-
-            :return: 进入战斗状态信息，包括['success', 'dock is full', "out of times", "SL"].
-        """
-        self.fight_recorder.reset()
-        # 战斗前逻辑
-        ret = self._enter_fight(same_work)
-        if ret == "success":
-            pass
-        elif ret == "dock is full":
-            return ret
-        elif ret == "out of times":
-            return ret
-        else:
-            print_err("无法进入战斗,原因未知", '屏幕状态已记录,时间戳:' + str(time.time()))
-            self.timer.log_screen()
-            raise BaseException(str(time.time()) + "enter fight error")
-
-        # 战斗中逻辑
+    def fight(self):
         self.Info.reset()  # 初始化战斗信息
         while True:
             ret = self._make_decision()
@@ -260,8 +243,28 @@ class FightPlan(ABC):
             elif ret == "fight end":
                 self.timer.set_page(self.Info.end_page)
                 break
+    
+    def run(self, same_work=False):
+        """ 主函数，负责一次完整的战斗. """
+        self.fight_recorder.reset()
+        # 战斗前逻辑
+        ret = self._enter_fight(same_work)
+        if ret == "success":
+            pass
+        elif ret == "dock is full":
+            return ret  # TODO：加入分解逻辑
+        elif ret == "fight end":
+            self.timer.set_page(self.Info.end_page)
+            return ret
+        elif ret == "out of times":
+            return ret
+        else:
+            print_err("无法进入战斗,原因未知", '屏幕状态已记录,时间戳:' + str(time.time()))
+            self.timer.log_screen()
+            raise BaseException(str(time.time()) + "enter fight error")
 
-        return "success"
+        # 战斗中逻辑
+        self.fight()
 
     @abstractmethod
     def _enter_fight(self, same_work=False) -> str:
@@ -308,8 +311,11 @@ class DecisionBlock():
             if eval(rcondition):
                 return act
 
-    def make_decision(self, state, last_state, last_action):
-
+    def make_decision(self, state, last_state, last_action, _action=None):
+        """
+        Args:
+            _action: 用于强行指定夜战和阵型参数. Defaults to None.
+        """
         if state in ["fight_period", "night_fight_period"]:
             return None, "fight continue"
         elif state == "spot_enemy_success":
@@ -337,6 +343,8 @@ class DecisionBlock():
         elif state == "formation":
             spot_enemy = last_state == "spot_enemy_success"
             value = self.formation
+            if(_action is not None):
+                value = _action
             if spot_enemy:
                 if self.SL_when_detour_fails and last_action == "detour":
                     return None, "need SL"
@@ -359,6 +367,8 @@ class DecisionBlock():
             return value, "fight continue"
         elif state == "night":
             is_night = self.night
+            if(_action is not None):
+                is_night = _action
             if is_night:
                 self.timer.Android.click(325, 350, delay=2)
                 return "yes", "fight continue"
@@ -370,7 +380,7 @@ class DecisionBlock():
             self.timer.Android.click(900, 500, 2, 0.16)
             return None, "fight continue"
         elif state == "get_ship":
-            self.timer.Android.click(900, 500, 1, 0.25)
+            get_ship(self.timer)
             return None, "fight continue"
         else:
             print("===========Unknown State==============")
@@ -380,7 +390,90 @@ class DecisionBlock():
 class NodeLevelDecisionBlock(DecisionBlock):
     """ 地图上一个节点的决策模块 """
 
-    def make_decision(self, state, last_state, last_action):
+    """ 地图上一个节点的决策模块 """
+
+    def make_decision(self, state, last_state, last_action, _action=None):
         """进行决策并执行
         """
-        return super().make_decision(state, last_state, last_action)
+        return super().make_decision(state, last_state, last_action, _action=_action)
+
+
+class IndependentFightPlan(FightPlan):
+    def __init__(self, timer:Timer, end_image, plan_path=None, default_path='plans/default.yaml', *args, **kwargs):
+        """创建一个独立战斗模块,处理从形如战役点击出征到收获舰船(或战果结算)的整个过程
+        Args:
+            end_image (MyTemplate): 整个战斗流程结束后的图片
+        """
+        super().__init__(timer)
+        default_args = yaml_to_dict(default_path)
+        node_defaults = default_args["node_defaults"]
+        if(plan_path is not None):
+            node_args = yaml_to_dict(plan_path)
+        else:
+            node_args = kwargs
+        node_args = recursive_dict_update(node_defaults, node_args)
+        self.decision_block = NodeLevelDecisionBlock(timer, node_args)
+        self.Info = IndependentFightInfo(timer, end_image)
+        
+    def run(self):
+        super().fight()
+        
+    def _make_decision(self):
+        self.Info.update_state()
+        if self.Info.state == "battle_page":
+            return "fight end"
+
+        # 进行通用NodeLevel决策
+        action, fight_stage = self.decision_block.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action)
+        self.Info.last_action = action
+        return fight_stage
+
+
+class IndependentFightInfo(FightInfo):
+    def __init__(self, timer: Timer, end_image) -> None:
+        super().__init__(timer)
+
+        self.end_page = "battle_page"
+
+        self.successor_states = {
+            "proceed": ["spot_enemy_success", "formation", "fight_period"],
+            "spot_enemy_success": {
+                "retreat": ["battle_page"],
+                "fight": ["formation", "fight_period"],
+            },
+            "formation": ["fight_period"],
+            "fight_period": ["night", "result"],
+            "night": {
+                "yes": ["night_fight_period"],
+                "no": [["result", 5]],
+            },
+            "night_fight_period": ["result"],
+            "result": ["battle_page"],    # 两页战果
+        }
+
+        self.state2image = {
+            "proceed": [IMG.fight_image[5], 5],
+            "spot_enemy_success": [IMG.fight_image[2], 15],
+            "formation": [IMG.fight_image[1], 15],
+            "fight_period": [IMG.symbol_image[4], 3],
+            "night": [IMG.fight_image[6], 120],
+            "night_fight_period": [IMG.symbol_image[4], 3],
+            "result": [IMG.fight_image[16], 60],
+            "battle_page": [end_image, 5]
+        }
+        self.state2image["battle_page"] = [end_image, 5]
+
+    def reset(self):
+        self.last_state = ""
+        self.last_action = ""
+        self.state = "proceed"
+
+    def _before_match(self):
+        # 点击加速
+        if self.state in ["proceed"]:
+            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
+        self.timer.update_screen()
+
+    def _after_match(self):
+        pass  # 战役的敌方信息固定，不用获取
+    

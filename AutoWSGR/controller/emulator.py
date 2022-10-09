@@ -1,5 +1,6 @@
 import copy
 import os
+import cv2
 import time
 from typing import Iterable, Tuple
 
@@ -49,7 +50,12 @@ class Emulator():
         """
         self.screen = G.DEVICE.snapshot(filename=None, quality=99)
 
-    def get_pixel(self, x, y):
+    def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
+        if(need_screen_shot):
+            self.update_screen()
+        return cv2.resize(self.screen, resolution)
+
+    def get_pixel(self, x, y, screen_shot=False) -> list:
         """获取当前屏幕相对坐标 (x,y) 处的像素值
 
         Args:
@@ -57,16 +63,18 @@ class Emulator():
             y (int): [0, 549)
 
         Returns:
-            Tuple(int,int,int): RGB 格式的像素值
+            list[]: RGB 格式的像素值
         """
+        if(screen_shot):
+            self.update_screen()
+        if(len(self.screen) != 540):
+            self.screen=cv2.resize(self.screen, (960, 540))
+        return [self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0]]
 
-        (x, y) = convert_position(x, y, self.resolution)
-        return (self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0])
-
-    def check_pixel(self, position, bgr_color, distance=30):
-        color = self.screen[position[1]][position[0]]
+    def check_pixel(self, position, bgr_color, distance=30, screen_shot=False) -> bool:
+        color = self.get_pixel(*position, screen_shot)
+        color.reverse()
         return CalcDis(color, bgr_color) < distance ** 2
-
     def locateCenterOnScreen(self, query: MyTemplate, confidence=0.85, this_mehods=["tpl"]):
         """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
             参考 locateCenterOnImage
@@ -192,6 +200,8 @@ class Emulator():
 
         参考 wait_images     
         """
+        if(not isinstance(images, Iterable)):
+            images = [images]
         rank = self.wait_images(images, confidence, gap, after_get_delay, timeout, *args, **kwargs)
         if rank is None:
             return None
@@ -286,13 +296,15 @@ class Emulator():
         save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
 
     def log_screen(self, need_screen_shot=False):
-        """向默认数据记录路径记录当前屏幕数据,带时间戳保存
+        """向默认数据记录路径记录当前屏幕数据,带时间戳保存,960x540大小
         Args:
             need_screen_shot (bool, optional): 是否新截取一张图片. Defaults to False.
         """
         if (need_screen_shot):
             self.update_screen()
-        self.log_image(image=self.screen, name=get_time_as_string(accuracy='second')+'screen')
+        screen = copy.deepcopy(self.screen)
+        cv2.resize(screen, (960, 540))
+        self.log_image(image=screen, name=get_time_as_string(accuracy='second')+'screen')
 
     def log_info(self, info):
         """向默认信息记录文件记录信息自带换行
