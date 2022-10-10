@@ -2,7 +2,7 @@ import copy
 import os
 import time
 
-from AutoWSGR.constants import IMG
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_expections import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT, PLAN_ROOT
 from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3
@@ -11,7 +11,7 @@ from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
 from AutoWSGR.game.get_game_info import DetectShipStatu, GetEnemyCondition
-from AutoWSGR.utils import print_err, print_war
+from AutoWSGR.utils.debug import print_err, print_war
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis
@@ -187,7 +187,7 @@ class NormalFightPlan(FightPlan):
 
     def load_fight_info(self):
         self.Info = NormalFightInfo(self.timer, self.chapter, self.map)
-        self.Info.load_point_positions(os.path.join(MAP_ROOT,'normal'))
+        self.Info.load_point_positions(os.path.join(MAP_ROOT, 'normal'))
 
     def go_map_page(self):
         """进入选择战斗地图的页面

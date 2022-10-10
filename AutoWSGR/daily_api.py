@@ -1,8 +1,9 @@
 import time
 
-from AutoWSGR import start_script
+from AutoWSGR.main import start_script
 from AutoWSGR.constants.settings import S
-from AutoWSGR.fight import BattlePlan, NormalFightPlan
+from AutoWSGR.fight.battle import BattlePlan
+from AutoWSGR.fight.normal_fight import NormalFightPlan
 from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
 
 

@@ -1,6 +1,6 @@
 # MapLevel
 map: 7 # 简单1-5 困难6-10
-
+repair_mode: [1, 1, 1, 2, 2, 2]
 # NodeLevel
 node_args:
   # 阵型选择阶段

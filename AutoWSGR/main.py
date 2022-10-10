@@ -1,6 +1,6 @@
 import keyboard as kd
 
-from AutoWSGR.constants import S
+from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.utils.io import yaml_to_dict
 

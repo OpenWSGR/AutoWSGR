@@ -1,5 +1,6 @@
 class Settings():
     LDPLAYER_ROOT = "C:\leidian\LDPlayer9"
+    SHIPNAME_PATH = None
     LOG_PATH = "log"
     DELAY = 2
 

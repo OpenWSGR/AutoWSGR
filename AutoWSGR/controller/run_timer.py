@@ -2,7 +2,8 @@ import threading as th
 import time
 
 from airtest.core.api import start_app, text
-from AutoWSGR.constants import IMG, S
+from AutoWSGR.constants.settings import S
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_expections import (CriticalErr,
                                                   ImageNotFoundErr, NetworkErr)
 from AutoWSGR.constants.other_constants import (ALL_PAGES, INFO1, INFO2, INFO3,
@@ -51,13 +52,15 @@ class Timer(Emulator):
         self.last_expedition_checktime = time.time()
 
     def setup(self, to_main_page):
-        self.ship_names = [name for name in yaml_to_dict('data/ocr/ship_name.yaml').values()]
+        self.ship_names = [name for name in yaml_to_dict(S.SHIPNAME_PATH).values()]
         self.connect(S.device_name)
         if S.account != None and S.password != None:
             self.restart(account=S.account, password=S.password)
         if self.Android.is_game_running() == False:
             self.start_game()
-        print("resolution:", self.resolution)
+        if (S.DEBUG):
+            print("resolution:", self.resolution)
+            assert(self.resolution == self.Android.resolution)
         self.ammo = 10
         # self.resources = Resources(self)
         if (to_main_page):
@@ -137,11 +140,11 @@ class Timer(Emulator):
             if(delay > 16):
                 raise ImageNotFoundErr("can't start game")
         try:
-            if (self.wait_image(IMG.start_image[6], timeout=1) != False):  # 新闻与公告,设为今日不再显示
+            if (self.wait_image(IMG.start_image[6], timeout=2) != False):  # 新闻与公告,设为今日不再显示
                 if (not self.check_pixel((70, 485), (201, 129, 54))):
                     self.Android.click(70, 485)
                 self.Android.click(30, 30)
-            if (self.wait_image(IMG.start_image[7], timeout=2) != False):  # 每日签到
+            if (self.wait_image(IMG.start_image[7], timeout=3) != False):  # 每日签到
                 self.Android.click(474, 357)
                 self.ConfirmOperation(must_confirm=1, timeout=2)
             self.go_main_page()

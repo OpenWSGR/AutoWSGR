@@ -2,7 +2,7 @@ import copy
 import time
 from abc import ABC, abstractmethod
 
-from AutoWSGR.constants import IMG
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_expections import ImageNotFoundErr, NetworkErr
 from AutoWSGR.constants.other_constants import (ALL_SHIP_TYPES, INFO1, INFO2,
                                                 SAP)
@@ -10,7 +10,8 @@ from AutoWSGR.constants.positions import BLOODLIST_POSITION
 from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer, process_error
 from AutoWSGR.game.game_operation import get_ship
-from AutoWSGR.utils import print_err, remove_0_value_from_dict
+from AutoWSGR.utils.debug import print_err
+from AutoWSGR.utils.operator import remove_0_value_from_dict
 from AutoWSGR.utils.function_wrapper import try_for_times
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import get_nearest
@@ -24,6 +25,7 @@ def start_march(timer:Timer, position=(900, 500)):
     while timer.identify_page('fight_prepare_page'):
         if time.time() - start_time > 3:
             timer.Android.click(*position, 1, delay=0)
+            time.sleep(1)
         if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
             return "dock is full"
         if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0):
@@ -133,16 +135,18 @@ class FightInfo(ABC):
             print("waiting:", possible_states, end="  ")
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
+        confidence = min([0.8] + [self.state2image[state][2] for state in possible_states if len(self.state2image[state]) >= 3])
         timeout = [timeout[i] if modified_timeout[i] == -1 else modified_timeout[i] for i in range(len(timeout))]
         timeout = max(timeout)
-
+        
+        
         # 等待其中一种出现
         fun_start_time = time.time()
         while time.time() - fun_start_time <= timeout:
             self._before_match()
 
             # 尝试匹配
-            ret = [self.timer.image_exist(image, 0, no_log=True) for image in images]
+            ret = [self.timer.images_exist(image, 0, confidence=confidence, no_log=True) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
                 if (S.SHOW_MATCH_FIGHT_STAGE):
@@ -242,8 +246,8 @@ class FightPlan(ABC):
                 return "SL"
             elif ret == "fight end":
                 self.timer.set_page(self.Info.end_page)
-                break
-    
+                return 'success'
+                
     def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. """
         self.fight_recorder.reset()
@@ -264,7 +268,7 @@ class FightPlan(ABC):
             raise BaseException(str(time.time()) + "enter fight error")
 
         # 战斗中逻辑
-        self.fight()
+        return self.fight()
 
     @abstractmethod
     def _enter_fight(self, same_work=False) -> str:

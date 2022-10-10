@@ -32,7 +32,6 @@ class Emulator():
         self.resolution = (960, 540)
         self.device_name = 'emulator-5554'  # 设备名,雷电模拟器默认值
         self.Windows = WindowsController(self.device_name)
-        self.Android = AndroidController(self.resolution)
 
     def connect(self, emulator):
         # if(not self.Windows.is_android_online()):self.Windows.RestartAndroid() # TODO：功能重复
@@ -41,6 +40,7 @@ class Emulator():
         self.update_screen()
         self.resolution = self.screen.shape[:2]
         self.resolution = self.resolution[::-1]
+        self.Android = AndroidController(self.resolution)
         from AutoWSGR.utils.logger import time_path
         self.log_filepre = time_path
 
@@ -124,12 +124,12 @@ class Emulator():
             self.update_screen()
         return any(self.get_image_position(image, 0, confidence, this_methods, no_log=True) is not None for image in images)
 
-    def images_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"]):
+    def images_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=["tpl"], *args, **kwargs):
         """判断图像是否存在于屏幕中
         Returns:
             bool:如果存在为 True 否则为 False 
         """
-        return self.image_exist(images, need_screen_shot, confidence, this_methods)
+        return self.image_exist(images, need_screen_shot, confidence, this_methods, *args, **kwargs)
 
     @logit()
     def wait_image(self, image: MyTemplate, confidence=0.85, timeout=10, gap=.15, after_get_delay=0, this_methods=["tpl"]):
@@ -226,7 +226,7 @@ class Emulator():
             else:
                 raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
 
-        self.Android.click(pos[0], pos[1], delay=delay)
+        self.Android.click(*pos, delay=delay)
         return True
 
     def click_image(self, image: MyTemplate, must_click=False, timeout=0, delay=0.5):
@@ -303,7 +303,7 @@ class Emulator():
         if (need_screen_shot):
             self.update_screen()
         screen = copy.deepcopy(self.screen)
-        cv2.resize(screen, (960, 540))
+        screen = cv2.resize(screen, (960, 540))
         self.log_image(image=screen, name=get_time_as_string(accuracy='second')+'screen')
 
     def log_info(self, info):

@@ -38,5 +38,6 @@ node_defaults: #
 exercise_defaults:
   chapter: 'exercise' # 不要改动
   selected_nodes: [player, robot] # 不要改动
+  discard: False
   exercise_times: 4 # 最大玩家演习次数
   robot: True # 是否打机器人

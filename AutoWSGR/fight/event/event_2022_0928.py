@@ -2,25 +2,26 @@
 import os
 
 from AutoWSGR.controller.run_timer import Timer
+from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.fight.battle import BattleInfo, BattlePlan
 from AutoWSGR.fight.common import start_march
 from AutoWSGR.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
 from AutoWSGR.utils.math_functions import CalcDis
 
-from ..event import PatrollingEvent
+from AutoWSGR.fight.event.event import PatrollingEvent
 
 
 class EventFightPlan20220928(PatrollingEvent, NormalFightPlan):
     
-    def __init__(self, timer: Timer, plan_path, default_path='plans/default.yaml', event="20220928"):
+    def __init__(self, timer: Timer, plan_path, fleet_id=1, event="20220928"):
         self.event_name = event
-        NormalFightPlan.__init__(self, timer, plan_path, default_path)
+        NormalFightPlan.__init__(self, timer, plan_path, fleet_id=fleet_id)
         PatrollingEvent.__init__(self, timer, event)
         
     def load_fight_info(self):
         self.Info = EventFightInfo20220928(self.timer, self.chapter, self.map)
-        self.Info.load_point_positions(os.path.join('data/map/event', self.event_name))
+        self.Info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
      
     def _change_fight_map(self, chapter, map):
         self.enter_map(chapter, map)

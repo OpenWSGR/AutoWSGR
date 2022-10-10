@@ -1,6 +1,6 @@
 import os
 
-from AutoWSGR.constants import IMG
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.data_roots import PLAN_ROOT
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import QuickRepair
@@ -39,12 +39,12 @@ class BattleInfo(FightInfo):
         self.state2image = {
             "proceed": [IMG.fight_image[5], 5],
             "spot_enemy_success": [IMG.fight_image[2], 15],
-            "formation": [IMG.fight_image[1], 15],
+            "formation": [IMG.fight_image[1], 15, .8],
             "fight_period": [IMG.symbol_image[4], 3],
             "night": [IMG.fight_image[6], 120],
             "night_fight_period": [IMG.symbol_image[4], 3],
             "result": [IMG.fight_image[16], 60],
-            "battle_page": [IMG.identify_images["battle_page"][0], 5]
+            "battle_page": [IMG.identify_images["battle_page"][0], 5,]
         }
 
     def reset(self):
@@ -76,7 +76,7 @@ class BattlePlan(FightPlan):
 
         # 加载计划配置
         if(plan_path is not None):
-            plan_args = yaml_to_dict(plan_path)
+            plan_args = yaml_to_dict(os.path.join(PLAN_ROOT, plan_path))
             args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         else:
             args = plan_defaults
@@ -109,6 +109,7 @@ class BattlePlan(FightPlan):
 
     def _make_decision(self) -> str:
 
+        _action = None
         self.Info.update_state()
         if self.Info.state == "battle_page":
             return "fight end"

@@ -1,7 +1,7 @@
 import copy
 import os
 
-from AutoWSGR.constants import IMG
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.data_roots import PLAN_ROOT
 from AutoWSGR.constants.other_constants import INFO2
 from AutoWSGR.controller.run_timer import Timer

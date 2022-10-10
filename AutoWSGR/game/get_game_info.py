@@ -3,7 +3,7 @@ import os
 import time
 
 import numpy as np
-from AutoWSGR.constants import IMG
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
                                        SUPPOER_DISABLE, SUPPORT_ENALBE)
 from AutoWSGR.constants.data_roots import DATA_ROOT, TUNNEL_ROOT
@@ -96,7 +96,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         timer.enemy_type_count[SAP] = 1
 
     img = PIM.fromarray(timer.screen).convert("L")
-    img.resize((960, 540))
+    img = img.resize((960, 540))
 
     input_path = os.path.join(TUNNEL_ROOT, "args.in")
     output_path = os.path.join(TUNNEL_ROOT, "res.out")
@@ -113,7 +113,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     os.system(f"{str(os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe'))} {TUNNEL_ROOT}")
 
     res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()
-    timer.enemy_type_count["ALL"]=0
+    timer.enemy_type_count["ALL"] = 0
     for i, x in enumerate(res):
         timer.enemy_ship_type[i]=x
         timer.enemy_type_count[x] += 1

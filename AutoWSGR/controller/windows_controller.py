@@ -1,3 +1,4 @@
+from macpath import join
 import os
 import shutil
 import time
@@ -7,7 +8,7 @@ from airtest.core.api import auto_setup
 from AutoWSGR.constants.custom_expections import CriticalErr
 from AutoWSGR.constants.other_constants import INFO2
 from AutoWSGR.constants.settings import S
-from AutoWSGR.utils import print_err
+from AutoWSGR.utils.debug import print_err
 from AutoWSGR.utils.function_wrapper import try_for_times
 from AutoWSGR.utils.logger import logit
 
@@ -116,14 +117,11 @@ class WindowsController:
         restart_time = time.time()
         print("Android Restaring")
         try:
-            cwd = os.getcwd()
             try:
                 os.system("taskkill -f -im dnplayer.exe")
             except:
                 pass
-            os.chdir(S.LDPLAYER_ROOT)
-            os.popen(r".\dnplayer.exe")
-            os.chdir(cwd)
+            os.popen(os.path.join(S.LDPLAYER_ROOT, "dnplayer.exe"))
             time.sleep(3)
             while self.is_android_online() == False:
                 time.sleep(1)
