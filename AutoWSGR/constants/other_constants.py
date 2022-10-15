@@ -1,5 +1,9 @@
-ALL_SHIP_TYPES = ["BB", "BC", "CL", "CV", "CA", "CVL", "NAP", "DD", "SS", "CLT",
+ALL_SHIP_TYPES = ["BB", "BC", "CL", "CV", "CA", "CVL", "NAP", "DD", "SS", "CLT", "KP", "CG"
                   "BM", "AV", "AADG", "ASDG", "BG", "CBG", "NO", "BBV", "CAV", "SC", "SAP"]
+ALL_SHIP_TYPES_CN = ["轻巡", "驱逐", "航母", "潜艇", "导驱", "航战", "重巡", "防驱", \
+    "战列", "战巡", "导驱", "导战", "大巡", "补给", "机场", "雷巡", "装母", "轻母", "补给", "重炮", "航巡", \
+    "导巡", "防巡"]
+
 BB = "BB"
 BC = "BC"
 CL = "CL"

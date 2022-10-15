@@ -6,6 +6,7 @@ import easyocr
 import cv2
 
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
+from AutoWSGR.utils.operator import unzip_element
 
 en_reader = None
 ch_reader = None
@@ -85,7 +86,7 @@ def find_lcseque(s1, s2):
 
 def get_allow(names):
     char_set = set()
-    for name in names:
+    for name in unzip_element(names):
         for char in name:
             char_set.add(char)
     res = ""
@@ -160,7 +161,6 @@ def recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7,
         names (_type_): _description_
         char_list (_type_, optional): _description_. Defaults to None.
     """
-    now_dir = os.getcwd()
     if(isinstance(image, str)):
         image_path = os.path.abspath(image)
     else:
@@ -170,9 +170,8 @@ def recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7,
         char_list = get_allow(names)
     with open(os.path.join(TUNNEL_ROOT, "locator.in"), 'w+') as f:
         f.write(image_path)
-    os.system(str(os.path.join(TUNNEL_ROOT, 'locator.exe')))
+    os.system(f"{os.path.join(TUNNEL_ROOT, 'locator.exe')} {TUNNEL_ROOT}")
     result = _recognize_ship('1.PNG', names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
-    os.chdir(now_dir)
     return result
 
 

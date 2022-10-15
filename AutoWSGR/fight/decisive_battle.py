@@ -11,6 +11,7 @@ from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.game.get_game_info import DetectShipStatu
 from AutoWSGR.game.game_operation import QuickRepair, get_ship
 from AutoWSGR.utils.io import yaml_to_dict, count
+from AutoWSGR.utils.debug import print_debug
 from AutoWSGR.ocr.ship_name import recognize_number, _recognize_ship
 from AutoWSGR.port.ship import Fleet, count_ship
 
@@ -31,7 +32,7 @@ def get_formation(fleet:Fleet, enemy:list):
     else:
         if(anti_sub <= 0):
             return 4
-        return 2
+    return 2
 
 
 class DB():
@@ -44,61 +45,106 @@ class DB():
             return rule[state]
 
         
+class DecisiveStatu():
+
+    def __init__(self, timer:Timer, chapter=6, map=1, node='A', version=3) -> None:
+         # 选择战备舰队的点击位置
+        self.timer = timer
+        self.key_points = [["",]] # [chpater][map] (str)
+        self.map_end = ["",] # [chapter] (str)
+        self.enemy = [[["", ]]] # [chapter][map][node(str)] (lst["", enemys])
+        self.__dict__.update(yaml_to_dict(os.path.join(MAP_ROOT, 'decisive_battle', f"{str(version)}.yaml" )))
+        self.score = 10
+        self.level = 1 # 副官等级
+        self.exp = 0
+        self.need = 0 # 副官升级所需经验
+        self.chapter = chapter # 大关
+        self.map = map # 小关
+        self.node = node
+        self.fleet = Fleet(self.timer)
+        self.ships = set()
+        self.ship_status = [-1] * 7
+        self.selections = [] # 获取战备舰队的元素
+
+    def next(self):
+        if(self.node == self.map_end[self.chapter][self.map]):
+            self.map += 1
+            self.node = 'A'
+            if(self.map == 4):
+                return 'quit'
+            return 'next'
+        self.node = chr(ord(self.node) + 1)
+        return 'continue'
+
+    @property
+    def enemy_now(self):
+        return self.enemy[self.chapter][self.map][self.node]
+
+    def reset(self):
+        chapter = self.chapter
+        self.__init__(self.timer)
+        self.chapter = chapter
+
+    def is_begin(self):
+        return self.node == 'A' and self.map == 1
+        
+
+
 class Logic():
     """决战逻辑模块,可以自行编写
     """
-    def __init__(self):
+    def __init__(self, statu:DecisiveStatu):
         self.level1 = ["肥鱼", "U-1206", "狼群47", "射水鱼", "U-96", "U-1405"]
         self.level2 = ["长跑训练", "肌肉记忆"] + self.level1 + ["大青花鱼", "U-81", "黑科技"]
         self.flag_ships = [["U-1405"], ["狼群47", "U-96", "U-1206"]]
+        self.statu = statu
     
-    def _choose_ship(self, elements:dict, *args, **kwargs):
+    def _choose_ship(self, must=False):
         lim = 6
-        score = kwargs['score']
-        if(kwargs['fleet'].count() <= 1):
+        score = self.statu.score
+        if(self.statu.fleet.count() <= 1):
             choose = self.level1
-        elif(kwargs['fleet'].count() < 6):
+        elif(self.statu.fleet.count() < 6):
             choose = [element for element in self.level2 if is_ship(element)]
         else:
             lim = score
             choose = self.level1 + [element for element in self.level2 if not is_ship(element)]
         result = []
         for target in choose:
-            if(target in elements.keys()):
-                cost, position = elements[target]
+            if(target in self.statu.selections.keys()):
+                cost = self.statu.selections[target][0]
                 if(score >= cost and cost <= lim):
                     score -= cost
                     result.append(target)
-        if(len(result) == 0 and 'must' in kwargs):
-            if(kwargs['must']):
-                result.append(list(elements.keys())[0])
+        if(len(result) == 0 and must):
+            result.append(list(self.statu.selections.keys())[0])
         return result
     
-    def _use_skill(self, *args, **kwargs):
-        if(kwargs['node'] == 'A'):
+    def _use_skill(self):
+        if(self.statu.node == 'A'):
             return 3
         return 0
     
-    def need_repair(self, *args, **kwargs):
-        ship_status = kwargs['ship_status']
-        if(1 in ship_status or 2 in ship_status):
+    def need_repair(self):
+        if(1 in self.statu.ship_status or 2 in self.statu.ship_status):
             return True
         return False
     
-    def _up_level(self, *args, **kwargs):
-        if(kwargs["need"] - kwargs["exp"] <= 5 and kwargs['score'] >= 5):
+    def _up_level(self):
+        if(self.statu.need - self.statu.exp <= 5 and self.statu.score >= 5):
             return True
         return False
         
-    def formation(self, *args, **kwargs):
+    def formation(self):
         pass
     
-    def night(self, *args, **kwargs):
+    def night(self):
         pass
     
-    def get_best_fleet(self, ships):
-        print("ALL SHIPS:",ships)
-        best_ships = [None, ]
+    def get_best_fleet(self):
+        ships = self.statu.ships
+        print_debug(S.SHOW_DECISIVE_BATTLE_INFO, "ALL SHIPS:", ships)
+        best_ships = ["", ]
         for ship in self.level1:
             if(ship not in ships or len(best_ships) == 7):
                 continue
@@ -117,48 +163,27 @@ class Logic():
                     break
             if(ok):
                 break
-        for i in range(len(best_ships), 7):
-            best_ships.append(None)
-        print("BEST FLEET:",best_ships)
+        for _ in range(len(best_ships), 7):
+            best_ships.append("")
+        print_debug(S.SHOW_DECISIVE_BATTLE_INFO, "BEST FLEET:",best_ships)
         return best_ships
     
-    def _retreat(self, fleet:list):
-        if(count_ship(fleet) < 2):
+    def _retreat(self):
+        if(count_ship(self.get_best_fleet()) < 2):
             return True
         return False
         
     def _leave(self):
         return False
-    
-
-class DecisiveStatu():
-    """决战状态模块,暂时不启用
-    """
-    def __init__(self) -> None:
-        pass
 
 
 class DecisiveBattle():
     """决战控制模块
     """
-    def __init__(self, timer:Timer, version=3, *args, **kwargs):
-        self.statu = DecisiveStatu()
-        self.key_points = [["",]] # [chpater][map] (str)
-        self.map_end = ["",] # [chapter] (str)
-        self.enemy = [[["", ]]] # [chapter][map][node(str)] (lst["", enemys])
-        self.__dict__.update(yaml_to_dict(os.path.join(MAP_ROOT, 'decisive_battle', f"{str(version)}.yaml" )  + {str(version)} + ".yaml"))
+    def __init__(self, timer:Timer, chatper=6, map=1, node='A', version=3, *args, **kwargs):
+        self.statu = DecisiveStatu(timer, chatper, map, node, version)
+        self.logic = Logic(self.statu)
         self.timer = timer
-        self.fleet = Fleet(self.timer)
-        self.ships = set()
-        self.CHOOSE_POSITION = [(320 * .75, 251), (490 * .75, 251), (645 * .75, 251), (812 * .75, 251), (956 * .75, 251)] # 选择战备舰队的点击位置
-        self.score = 10
-        self.exp = 0
-        self.chapter = 6 # 大关
-        self.map = 1 # 小关
-        self.node = 'A'
-        self.ship_status = [-1] * 7
-        self.timer = timer
-        self.logic = Logic()
         self.__dict__.update(kwargs)
     
     def buy_ticket(self, use='steel', times=3):
@@ -202,65 +227,61 @@ class DecisiveBattle():
         QuickRepair(self.timer, 1)
     
     def next(self):
-        if(self.node == self.map_end[self.chapter][self.map]):
+        res = self.statu.next()
+        if(res == 'next' or res == 'quit'):
             self.timer.ConfirmOperation()
             self.timer.ConfirmOperation()
             get_ship(self.timer, 5)
-            self.map += 1
-            self.node = 'A'
-            return 'next'
-        else:
-            self.node = chr(ord(self.node) + 1)
+        return res
 
     def choose(self, refreshed=False):
         
         # ===================获取备选项信息======================
         DSP = [(250, 390), (410, 550), (570, 710), (730, 870), (890, 1030)] # 扫描战备舰队获取的位置 (1280x720)
+        CHOOSE_POSITION = [(320 * .75, 251), (490 * .75, 251), (645 * .75, 251), (812 * .75, 251), (956 * .75, 251)]
         screen = self.timer.get_screen()
-        self.score = int(recognize_number(screen[25:55, 1162:1245], min_size=5, text_threshold=.05, low_text=.02)[0][1]) # 应该能保证数字读取成功...
+        self.statu.score = int(recognize_number(screen[25:55, 1162:1245], min_size=5, text_threshold=.05, low_text=.02)[0][1]) # 应该能保证数字读取成功...
         costs = recognize_number(screen[550:585, 245:1031], 'x')
         _costs, ships, real_position  = [], [], []
         for i, cost in enumerate(costs):
-            try:
-                if(int(cost[1][1:]) > self.score):
+                if(int(cost[1][1:]) > self.statu.score):
                     continue
                 ships.append(_recognize_ship(screen[488:515,DSP[i][0]:DSP[i][1]], self.timer.ship_names)[0][0])
                 _costs.append(int(cost[1][1:]))
                 real_position.append(i)
-            except:
-                pass
         # print("Scan result:", costs)
         costs = _costs
-        elements = {}  
+        selections = {} 
         for i in range(len(costs)):
-            elements[ships[i]] = (costs[i], self.CHOOSE_POSITION[real_position[i]]) 
-            # elements[舰船名] = (费用, 点击位置)
+            selections[ships[i]] = (costs[i], CHOOSE_POSITION[real_position[i]]) 
+            # selections[舰船名] = (费用, 点击位置)
             
-        # ==================做出决策===================    
-        choose = self.logic._choose_ship(elements, score=self.score, fleet=self.fleet, must=(self.map == 1 and self.node == 'A' and refreshed == True))
+        # ==================做出决策===================
+        self.statu.selections = selections    
+        choose = self.logic._choose_ship(must=(self.statu.map == 1 and self.statu.node == 'A' and refreshed == True))
         if(len(choose) == 0 and refreshed == False):
             self.timer.Android.click(380, 500) # 刷新备选舰船
             return self.choose(True)
         
         for target in choose:
-            cost, p = elements[target]
-            self.score -= cost
+            cost, p = selections[target]
+            self.statu.score -= cost
             self.timer.Android.click(*p)
             if(is_ship(target)):
-                self.ships.add(target)
+                self.statu.ships.add(target)
         self.timer.Android.click(580, 500) # 关闭/确定
         
     def up_level_assistant(self):
         self.timer.Android.click(75, 667 * .75)
-        self.score -= 5
+        self.statu.score -= 5
     
     def use_skill(self, type=3):
         self.timer.Android.click(275 * .75, 644 * .75)
         if(type == 3):
             ships = _recognize_ship(self.timer.get_screen()[488:515], self.timer.ship_names)
             for ship in ships:
-                self.ships.add(ship[0])
-        self.timer.Android.click(275 * .75, 644 * .75)
+                self.statu.ships.add(ship[0])
+        self.timer.Android.click(275 * .75, 644 * .75, times=2, delay=.3)
         
     def leave(self):
         self.timer.Android.click(36, 33)
@@ -270,14 +291,13 @@ class DecisiveBattle():
         return int(recognize_number(self.timer.get_screen()[588:618, 1046:1110], "Ex-X")[0][1][-1])
         
     def move_chapter(self):
-        if(self.get_chapter() < self.chapter):
+        if(self.get_chapter() < self.statu.chapter):
             self.timer.Android.click(900, 507)
-        elif(self.get_chapter() > self.chapter):
+        elif(self.get_chapter() > self.statu.chapter):
             self.timer.Android.click(788, 507)
         else:
             return 
         self.move_chapter()
-            
     
     def enter_decisive_battle(self):
         self.timer.goto_game_page("decisive_battle_entrance")
@@ -316,13 +336,13 @@ class DecisiveBattle():
     
     def get_exp(self):
         src = recognize_number(self.timer.get_screen()[592:615,48:118], "(/)")[0][1]
-        self.exp = 0
-        self.need = 20
+        self.statu.exp = 0
+        self.statu.need = 20
         try:
             i1 = src.index('(')
             i2 = src.index('/')
-            self.exp = int(src[i1 + 1:i2])
-            self.need = int(src[i2 + 1:-1])
+            self.statu.exp = int(src[i1 + 1:i2])
+            self.statu.need = int(src[i2 + 1:-1])
         except:
             pass
         
@@ -333,45 +353,45 @@ class DecisiveBattle():
         if(self.timer.wait_image(IMG.decisive_battle_image[2], timeout=5)):
             self.choose() # 获取战备舰队
         self.get_exp()
-        while(self.logic._up_level(need=self.need, exp=self.exp, score=self.score)):
+        while(self.logic._up_level()):
             self.up_level_assistant()
             self.get_exp()
-        if(self.logic._use_skill(node=self.node)):
-            self.use_skill(self.logic._use_skill(node=self.node)) 
-        if(self.fleet.empty()):
+        if(self.logic._use_skill()):
+            self.use_skill(self.logic._use_skill()) 
+        if(self.statu.fleet.empty() and not self.statu.is_begin()):
             self.check_fleet()
-        _fleet = self.logic.get_best_fleet(self.ships)
-        if(self.logic._retreat(_fleet)):
+        _fleet = self.logic.get_best_fleet()
+        if(self.logic._retreat()):
             self.retreat()
             return 'retreat'
         if(self.logic._leave()):
             self.leave()
             return 'leave'
-        if(self.fleet != _fleet):
+        if(self.statu.fleet != _fleet):
             self.change_fleet(_fleet)
-            self.ship_status = DetectShipStatu(self.timer)
-        if(self.logic.need_repair(ship_status = self.ship_status)):
+            self.statu.ship_status = DetectShipStatu(self.timer)
+        if(self.logic.need_repair()):
             self.repair()
         
     def after_fight(self):
-        self.ship_status = self.timer.ship_status
-        print(self.ship_status)
+        self.statu.ship_status = self.timer.ship_status
+        print(self.statu.ship_status)
         
     def check_fleet(self):
         self.go_fleet_page()
-        self.fleet.detect()
-        for ship in self.fleet.ships:
-            self.ships.add(ship)
-        self.ship_status = DetectShipStatu(self.timer)
+        self.statu.fleet.detect()
+        for ship in self.statu.fleet.ships:
+            self.statu.ships.add(ship)
+        self.statu.ship_status = DetectShipStatu(self.timer)
             
     def during_fight(self):
-        formation = get_formation(self.fleet, self.enemy[self.chapter][self.map][self.node])
-        night = self.node in self.key_points[self.chapter][self.map]
+        formation = get_formation(self.statu.fleet, self.statu.enemy_now)
+        night = self.statu.node in self.statu.key_points[self.statu.chapter][self.statu.map]
         DecisiveBattlePlan(self.timer, decision_block=DB(formation=formation, night=night)).run()
     
     def change_fleet(self, fleet):
         self.go_fleet_page()
-        self.fleet.set_ship(fleet, order=True, search_method=None)
+        self.statu.fleet.set_ship(fleet, order=True, search_method=None)
         
     def fight(self):
         res = self.before_fight()
@@ -381,12 +401,7 @@ class DecisiveBattle():
             return self.fight()
         self.during_fight()
         self.after_fight()
-        res = self.next()
-        if(self.map == 4):
-            return 'quit'
-        if(res == 'next'):
-            return 'next'
-        
+        return self.next()
     
     def start_fight(self):
         self.enter_map()
@@ -404,13 +419,13 @@ class DecisiveBattle():
         self.timer.ConfirmOperation()
     
     def reset(self):
-        self.__init__(self.timer, chapter=self.chapter)
+        self.statu.reset()
 
 
 class DecisiveBattlePlan(BattlePlan):
     
-    def __init__(self, timer:Timer, default_path="plans/default.yaml", decision_block=None):
-        super().__init__(timer, None, default_path, decision_block=decision_block)
+    def __init__(self, timer:Timer, decision_block=None):
+        super().__init__(timer, None, decision_block=decision_block)
         self.Info = DecisiveBattleInfo(timer)
 
     def _enter_fight(self, *args, **kwargs):

@@ -2,10 +2,10 @@ import os, sys, re
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__))) 
 
-from wsgr import start_script
-from source.python_src.controller.run_timer import Timer
-from source.python_src.utils.io import listdir, dict_to_yaml, yaml_to_dict
-from source.python_src.utils.api_image import relative_to_absolute
+from AutoWSGR.main import start_script
+from AutoWSGR.controller.run_timer import Timer
+from AutoWSGR.utils.io import listdir, dict_to_yaml, yaml_to_dict
+from AutoWSGR.utils.api_image import relative_to_absolute
 import easyocr 
 import keyboard
 import cv2

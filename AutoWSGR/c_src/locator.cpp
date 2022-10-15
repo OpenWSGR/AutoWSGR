@@ -16,7 +16,12 @@ using cv::waitKey;
 */
 /*function:
 	locate the blue textbox and write other pixel (255,255,255)
+	output to "1.PNG" and the textbox position
 */
+/*call:
+	{abspath or path}/locator.exe [IO directory]
+	[IO directory]: where the file "locator.in" and output "1.PNG", and output "res.out"
+*/ 
 const int MAX_HEIGHT = 1000, MAX_WIDTH = 2000;
 const int KEY_COLOR_COUNT = 3;
 const vector<vector<int>> BGR_COLOR({{162, 98, 18}, {173, 103, 17}, {196, 116, 16}});
@@ -46,7 +51,7 @@ string merge(char* a,const char* b){
 int main(int argc,char **args){
 //	printf("%d\n", is_key_color(vector<uchar>({123, 123, 123}), BGR_COLOR, 20, 3));
 	char* ROOT = args[1];
-	ofstream out(merge(ROOT,"/res.out"));
+	ofstream out(merge(ROOT, "/res.out"));
 	ifstream in_stream(merge(ROOT, "/locator.in"));
 	string image_path;
 	in_stream >> image_path;
@@ -121,7 +126,7 @@ int main(int argc,char **args){
 	out << lines.size() << endl;
 	for(auto v:lines)
 	out << v.first << ' ' << v.second << endl;
-	imwrite("1.PNG", image);
+	imwrite(merge(ROOT, "1.PNG"), image);
 //	imshow("image", image);
 //	waitKey();
 	return 0;

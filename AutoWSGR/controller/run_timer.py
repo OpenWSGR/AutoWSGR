@@ -12,6 +12,7 @@ from AutoWSGR.constants.ui import WSGR_UI, Node
 from AutoWSGR.utils.debug import print_err
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.io import yaml_to_dict
+from AutoWSGR.utils.operator import unzip_element
 
 from .emulator import Emulator
 
@@ -52,7 +53,7 @@ class Timer(Emulator):
         self.last_expedition_checktime = time.time()
 
     def setup(self, to_main_page):
-        self.ship_names = [name for name in yaml_to_dict(S.SHIPNAME_PATH).values()]
+        self.ship_names = unzip_element([name for name in yaml_to_dict(S.SHIPNAME_PATH).values()])
         self.connect(S.device_name)
         if S.account != None and S.password != None:
             self.restart(account=S.account, password=S.password)
@@ -144,7 +145,7 @@ class Timer(Emulator):
                 if (not self.check_pixel((70, 485), (201, 129, 54))):
                     self.Android.click(70, 485)
                 self.Android.click(30, 30)
-            if (self.wait_image(IMG.start_image[7], timeout=3) != False):  # 每日签到
+            if (self.wait_image(IMG.start_image[7], timeout=7) != False):  # 每日签到
                 self.Android.click(474, 357)
                 self.ConfirmOperation(must_confirm=1, timeout=2)
             self.go_main_page()

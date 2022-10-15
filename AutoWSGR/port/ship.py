@@ -6,7 +6,7 @@ from AutoWSGR.constants.positions import FLEET_POSITION
 from AutoWSGR.game.game_operation import MoveTeam
 from AutoWSGR.ocr.ship_name import recognize_ship 
 from AutoWSGR.utils.api_image import convert_position
-
+from AutoWSGR.utils.operator import unorder_equal
 
 def count_ship(fleet):
     res = 0
@@ -47,7 +47,7 @@ class Fleet():
                 return False
             ships = other.ships
         for i in range(1, 7):
-            if(have_ship(ships[i]) != have_ship(self.ships[i]) or ships[i] != self.ships[i]):
+            if(have_ship(ships[i]) != have_ship(self.ships[i]) or (have_ship(ships[i]) and ships[i] != self.ships[i])):
                 return False
         return True
     
@@ -110,9 +110,10 @@ class Fleet():
                 self.ships[7 - i:] = self.ships[8 - i:]
         
     def reorder(self, ships):
+        assert(unorder_equal(ships, self.ships, skip=[None, ""]))
         for i in range(1, 7):
             ship = ships[i]
-            if(ship == None):
+            if(not have_ship(ship)):
                 return 
             if(self.ships[i] != ship):
                 self.circular_move(self.ships.index(ship), i)
