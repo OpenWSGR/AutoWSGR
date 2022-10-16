@@ -126,7 +126,7 @@ int main(int argc,char **args){
 	out << lines.size() << endl;
 	for(auto v:lines)
 	out << v.first << ' ' << v.second << endl;
-	imwrite(merge(ROOT, "1.PNG"), image);
+	imwrite(merge(ROOT, "/1.PNG"), image);
 //	imshow("image", image);
 //	waitKey();
 	return 0;

@@ -89,14 +89,47 @@ class DecisiveStatu():
         return self.node == 'A' and self.map == 1
         
 
-
-class Logic():
-    """决战逻辑模块,可以自行编写
+class _Logit():
+    """暂时不启用
     """
-    def __init__(self, statu:DecisiveStatu):
-        self.level1 = ["肥鱼", "U-1206", "狼群47", "射水鱼", "U-96", "U-1405"]
-        self.level2 = ["长跑训练", "肌肉记忆"] + self.level1 + ["大青花鱼", "U-81", "黑科技"]
-        self.flag_ships = [["U-1405"], ["狼群47", "U-96", "U-1206"]]
+    def __init__(self, statu:DecisiveStatu, level1:list, level2:list, flagship_priority:list):
+        pass
+    
+    def _choose_ship(self, must=False):
+        pass
+    
+    def _use_skill(self):
+        pass
+    
+    def need_repair(self):
+        pass
+    
+    def _up_level(self):
+        pass
+        
+    def formation(self):
+        pass
+    
+    def night(self):
+        pass
+    
+    def get_best_fleet(self):
+        pass
+    
+    def _retreat(self):
+        pass
+        
+    def _leave(self):
+        pass
+
+
+class Logic(_Logit):
+    """决战逻辑模块
+    """
+    def __init__(self, statu:DecisiveStatu, level1:list, level2:list, flagship_priority:list):
+        self.level1 = level1
+        self.level2 = ["长跑训练", "肌肉记忆"] + self.level1 + level2  + ["黑科技"]
+        self.flag_ships = flagship_priority
         self.statu = statu
     
     def _choose_ship(self, must=False):
@@ -153,16 +186,14 @@ class Logic():
             if(ship not in ships or len(best_ships) == 7 or ship in self.level1):
                 continue
             best_ships.append(ship)
-        for _flag_ships in self.flag_ships:
-            ok = False
-            for flag_ship in _flag_ships:
-                if(flag_ship in best_ships):
-                    p = best_ships.index(flag_ship)
-                    best_ships[p], best_ships[1] = best_ships[1], best_ships[p]
-                    ok = True
-                    break
-            if(ok):
-                break
+
+        for flag_ship in self.flag_ships:
+            if(flag_ship not in best_ships):
+                continue 
+            p = best_ships.index(flag_ship)
+            best_ships[p], best_ships[1] = best_ships[1], best_ships[p]
+            break
+            
         for _ in range(len(best_ships), 7):
             best_ships.append("")
         print_debug(S.SHOW_DECISIVE_BATTLE_INFO, "BEST FLEET:",best_ships)
@@ -179,10 +210,43 @@ class Logic():
 
 class DecisiveBattle():
     """决战控制模块
+    目前仅支持 E5, E6
+    
+    Methods:
+         start_fight(): 开始战斗, 直到打完第三张图的最后一关停止
+         buy_ticket(): 兑换磁盘
+         reset(): 重置除了章节之外的所有信息,重置后再调用 start_fight() 则从 chapter-1-A 开始打
     """
-    def __init__(self, timer:Timer, chatper=6, map=1, node='A', version=3, *args, **kwargs):
+    
+    def __init__(self, timer:Timer, chatper=6, map=1, node='A', version=3, \
+            level1=["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"], \
+            level2=["U-81", "大青花鱼"], \
+            flagship_priority=["U-1405", "U-47", "U-96", "U-1206"], \
+            logic=None, *args, **kwargs):
+        """初始化控制模块
+        Important Information:
+            : 决战逻辑相当优秀, 不建议自行改写, 满配情况约需要 3~6 快速修复打完一轮 E6, 耗时约为 25mins
+            : 请保证可以直接使用上次选船通关, 暂时不支持自动选船
+        Args:
+            timer (Timer): 记录器
+            chatper (int, optional): 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
+            map (int, optional): 当前小关. Defaults to 1.
+            node (str, optional): 当前节点. Defaults to 'A'.
+            version (int, optional): 决战版本. Defaults to 3.
+            level1: 第一优先舰队, Defaults Recommend
+            level2: 第二优先舰船, Defaults Recommend
+            flagship_priority: 旗舰优先级, Defaults Recommend
+            logic: 逻辑模块, unsupported since now
+        Examples:
+            : 若当前决战进度为还没打 6-2-A, 则应填写 chapter=6, map=1, node='A'
+            : 可以支持断点开始
+        """
+        assert(chatper <= 6 and chatper >= 1)
         self.statu = DecisiveStatu(timer, chatper, map, node, version)
-        self.logic = Logic(self.statu)
+        if logic is not None:
+            pass
+        else:
+            self.logic = Logic(self.statu, level1, level2, flagship_priority)
         self.timer = timer
         self.__dict__.update(kwargs)
     

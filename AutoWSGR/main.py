@@ -3,10 +3,11 @@ import keyboard as kd
 from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.utils.io import yaml_to_dict
+from AutoWSGR.utils.debug import print_debug
 
 event_pressed = set()
 script_end = 0
-print("main is imported")
+print_debug(S.DEBUG, "main is imported")
 
 
 def lencmp(s1, s2):

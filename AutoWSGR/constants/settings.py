@@ -16,6 +16,7 @@ class Settings():
     SHOW_CHAPTER_INFO = False
     SHOW_MATCH_FIGHT_STAGE = False
     SHOW_DECISIVE_BATTLE_INFO = False
+    SHOW_OCR_INFO = False
 
     def __init__(self):
         pass
@@ -34,3 +35,4 @@ def show_all_debug_info():
     S.SHOW_CHAPTER_INFO = True
     S.SHOW_DECISIVE_BATTLE_INFO = True
     S.DEBUG = True
+    S.SHOW_OCR_INFO = True

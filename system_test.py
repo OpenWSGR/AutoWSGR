@@ -14,7 +14,8 @@ from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
 timer = start_script('user_settings.yaml', to_main_page=False)
 show_all_debug_info()
 
-decisive_battle = DecisiveBattle(timer, 6, 3, 'A')
+decisive_battle = DecisiveBattle(timer, 6, 1, 'A', level1=["鲃鱼", "U-1206", "狼群47", "射水鱼", "U-96", "U-1405"], \
+    level2=["U-81", "大青花鱼"], flagship_priority=["U-1405", "狼群47"])
 decisive_battle.start_fight()
 for i in range(2):
     decisive_battle.reset()

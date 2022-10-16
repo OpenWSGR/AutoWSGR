@@ -6,6 +6,8 @@ import easyocr
 import cv2
 
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
+from AutoWSGR.constants.settings import S
+from AutoWSGR.utils.debug import print_debug
 from AutoWSGR.utils.operator import unzip_element
 
 en_reader = None
@@ -13,16 +15,16 @@ ch_reader = None
 
 def load_en_reader():
     global en_reader
-    print("start loading en_reader")
+    print_debug(S.SHOW_OCR_INFO, "start loading en_reader")
     en_reader = easyocr.Reader(['en'], gpu=True)
-    print("end loading en_reader")
+    print_debug(S.SHOW_OCR_INFO, "end loading en_reader")
 
 
 def load_ch_reader():
     global ch_reader
-    print("start loading ch_reader")
+    print_debug(S.SHOW_OCR_INFO, "start loading ch_reader")
     ch_reader = easyocr.Reader(['ch_sim'], gpu=True)
-    print("end loading ch_reader")
+    print_debug(S.SHOW_OCR_INFO, "end loading ch_reader")
 
 
 def edit_distance(word1, word2) -> int:
@@ -145,9 +147,8 @@ def _recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7
                 if(dis1 < dis2):
                     res = _name    
         results.append((res, box[0]))
-        print(res, end=' ')
-    print("")
-    print(result)
+    print_debug(S.SHOW_OCR_INFO, result)
+    print_debug(S.SHOW_OCR_INFO, results)
     if(len(results) == 0):
         results.append(("Unknown", (0, 0)))
     return results
@@ -171,7 +172,10 @@ def recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7,
     with open(os.path.join(TUNNEL_ROOT, "locator.in"), 'w+') as f:
         f.write(image_path)
     os.system(f"{os.path.join(TUNNEL_ROOT, 'locator.exe')} {TUNNEL_ROOT}")
-    result = _recognize_ship('1.PNG', names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    if (os.path.exists(os.path.join(TUNNEL_ROOT, '1.PNG'))):
+        result = _recognize_ship(os.path.join(TUNNEL_ROOT, '1.PNG'), names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    else:
+        result = _recognize_ship('1.PNG', names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
     return result
 
 

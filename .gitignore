@@ -9,6 +9,7 @@ AutoWSGR/data/tunnel/*.PNG
 AutoWSGR/data/tunnel/*.in
 AutoWSGR/data/tunnel/*.out
 AutoWSGR/data/ocr/shipname_source.html
+system_test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
