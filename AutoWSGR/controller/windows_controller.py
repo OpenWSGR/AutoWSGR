@@ -8,7 +8,8 @@ from airtest.core.api import auto_setup
 from AutoWSGR.constants.custom_expections import CriticalErr
 from AutoWSGR.constants.other_constants import INFO2
 from AutoWSGR.constants.settings import S
-from AutoWSGR.utils.debug import print_err
+from AutoWSGR.constants.data_roots import ADB_ROOT
+from AutoWSGR.utils.debug import print_err, print_debug
 from AutoWSGR.utils.function_wrapper import try_for_times
 from AutoWSGR.utils.logger import logit
 
@@ -45,9 +46,9 @@ class WindowsController:
         Returns:
             list:一个包含所有设备信息的列表 
         """
-        info = os.popen("adb devices -l")
-        time.sleep(2)
-        info = os.popen("adb devices -l")
+        info = os.popen(f"{ADB_ROOT}/adb.exe devices -l")
+        time.sleep(1)
+        info = os.popen(f"{ADB_ROOT}/adb.exe devices -l")
         res = []
         get = 0
         for x in info:
@@ -58,7 +59,7 @@ class WindowsController:
                 break
             a = x.split()[0]
             res.append(a)
-        print("Devices list:", res)
+        print_debug(S.DEBUG, "Devices list:", res)
         return res
 
     def CopyRequirements(self, path):
@@ -99,12 +100,13 @@ class WindowsController:
         """
         while (times):
             times -= 1
-            res = check_output("adb devices -l").decode('ascii').split('\n')
+            res = check_output(f"{ADB_ROOT}/adb.exe devices -l").decode('ascii').split('\n')
             for x in res:
                 x = x.strip()
                 print(x)
                 if (self.device_name in x and 'device' in x):
                     return True
+            time.sleep(1.5)
         return False
 
     @logit(level=INFO2)
