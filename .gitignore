@@ -5,10 +5,9 @@ tests/
 release/
 .vscode/
 
-AutoWSGR/data/tunnel/*.PNG
-AutoWSGR/data/tunnel/*.in
-AutoWSGR/data/tunnel/*.out
-AutoWSGR/data/ocr/shipname_source.html
+bin/image_recognize/*.PNG
+bin/image_recognize/*.in
+bin/image_recognize/*.out
 system_test.py
 
 # Byte-compiled / optimized / DLL files

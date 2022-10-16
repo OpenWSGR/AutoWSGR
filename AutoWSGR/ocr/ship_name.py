@@ -110,11 +110,11 @@ def compare_box(A, B):
         else: return 1
 
 
-def recognize(image, char_lsit, min_size=10, text_threshold=.7, low_text=.4):
+def recognize(image, char_lsit, min_size=7, text_threshold=.55, low_text=.3):
     return ch_reader.readtext(image, allowlist=char_lsit, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
 
 
-def recognize_number(image, ex_list="", min_size=10, text_threshold=.7, low_text=.4):
+def recognize_number(image, ex_list="", min_size=7, text_threshold=.55, low_text=.3):
     """识别数字和 ex_list 的字符, 返回识别结果列表,
     Returns:
         list(result): 一个 result 为 [position, text, confidence]
@@ -126,7 +126,7 @@ def recognize_number(image, ex_list="", min_size=10, text_threshold=.7, low_text
     return en_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
     
 
-def _recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7, low_text=.4):
+def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55, low_text=.3):
     """识别没有预处理过的图片中的舰船, 返回识别结果列表,
     Returns:
         list(result): 一个 result 为 [ship_name, left_top]
@@ -154,7 +154,7 @@ def _recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7
     return results
 
 
-def recognize_ship(image, names, char_list=None, min_size=10, text_threshold=.7, low_text=.4):
+def recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55, low_text=.3):
     """传入一张图片,返回舰船信息,包括名字和舰船型号
 
     Args:
