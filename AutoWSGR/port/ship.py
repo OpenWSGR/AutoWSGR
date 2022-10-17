@@ -1,12 +1,14 @@
 
 from typing import Iterable
-from AutoWSGR.controller.run_timer import Timer
+
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.positions import FLEET_POSITION
+from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam
-from AutoWSGR.ocr.ship_name import recognize_ship 
+from AutoWSGR.ocr.ship_name import recognize_ship
 from AutoWSGR.utils.api_image import convert_position
 from AutoWSGR.utils.operator import unorder_equal
+
 
 def count_ship(fleet):
     res = 0

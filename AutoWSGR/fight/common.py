@@ -1,9 +1,10 @@
 import copy
 import time
 from abc import ABC, abstractmethod
+from functools import partial
 
-from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_expections import ImageNotFoundErr, NetworkErr
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import (ALL_SHIP_TYPES, INFO1, INFO2,
                                                 SAP)
 from AutoWSGR.constants.positions import BLOODLIST_POSITION
@@ -11,11 +12,11 @@ from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer, process_error
 from AutoWSGR.game.game_operation import get_ship
 from AutoWSGR.utils.debug import print_err
-from AutoWSGR.utils.operator import remove_0_value_from_dict
 from AutoWSGR.utils.function_wrapper import try_for_times
+from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import get_nearest
-from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
+from AutoWSGR.utils.operator import remove_0_value_from_dict
 
 
 @logit(level=INFO2)
@@ -71,7 +72,7 @@ class FightResult():
         self.result = self.timer.wait_images(IMG.fight_result_image, timeout=5)
         if (self.timer.image_exist(IMG.fight_result_image['SS'], need_screen_shot=False)):
             self.result = 'SS'
-        if self.result == None:
+        if self.result is None:
             self.timer.log_screen()
             raise ImageNotFoundErr("can't identify fight result")
         return self
@@ -116,7 +117,7 @@ class FightInfo(ABC):
         self.state = ""
         self.fight_result = FightResult(self.timer)  # 战斗结果记录
 
-    @try_for_times(process_error)
+    # @try_for_times(process_error) # TODO：这里process_error没有timer，会报错
     def update_state(self):
 
         self.last_state = self.state

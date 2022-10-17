@@ -2,16 +2,17 @@ import threading as th
 import time
 
 from airtest.core.api import start_app, text
-from AutoWSGR.constants.settings import S
-from AutoWSGR.constants.image_templates import IMG
+
 from AutoWSGR.constants.custom_expections import (CriticalErr,
                                                   ImageNotFoundErr, NetworkErr)
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import (ALL_PAGES, INFO1, INFO2, INFO3,
                                                 NO)
+from AutoWSGR.constants.settings import S
 from AutoWSGR.constants.ui import WSGR_UI, Node
 from AutoWSGR.utils.debug import print_err
-from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.io import yaml_to_dict
+from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.operator import unzip_element
 
 from .emulator import Emulator

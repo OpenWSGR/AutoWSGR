@@ -1,7 +1,7 @@
 import os
 
-from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.data_roots import PLAN_ROOT
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import QuickRepair
 from AutoWSGR.game.get_game_info import DetectShipStatu
@@ -29,7 +29,7 @@ class BattleInfo(FightInfo):
             "formation": ["fight_period"],
             "fight_period": ["night", "result"],
             "night": {
-                "yes": ["night_fight_period"],
+                "yes": ["night_fight_period", "result"],  # TODO：额外加一个result，已解决已知bug (当夜战无法进行任何操作时night_fight_period来不及匹配)
                 "no": [["result", 5]],
             },
             "night_fight_period": ["result"],
@@ -44,7 +44,7 @@ class BattleInfo(FightInfo):
             "night": [IMG.fight_image[6], 120],
             "night_fight_period": [IMG.symbol_image[4], 3],
             "result": [IMG.fight_image[16], 60],
-            "battle_page": [IMG.identify_images["battle_page"][0], 5,]
+            "battle_page": [IMG.identify_images["battle_page"][0], 5, ]
         }
 
     def reset(self):
@@ -75,7 +75,7 @@ class BattlePlan(FightPlan):
         plan_defaults.update({"node_defaults": default_args["node_defaults"]})
 
         # 加载计划配置
-        if(plan_path is not None):
+        if (plan_path is not None):
             plan_args = yaml_to_dict(os.path.join(PLAN_ROOT, plan_path))
             args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         else:
@@ -84,7 +84,7 @@ class BattlePlan(FightPlan):
 
         # 加载节点配置
         node_defaults = self.node_defaults
-        if(plan_path is not None):
+        if (plan_path is not None):
             node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
         else:
             node_args = node_defaults
@@ -113,7 +113,7 @@ class BattlePlan(FightPlan):
         self.Info.update_state()
         if self.Info.state == "battle_page":
             return "fight end"
-        if(self.decision_block is not None):
+        if (self.decision_block is not None):
             _action = self.decision_block.make_decision(self.Info.state)
         # 进行通用NodeLevel决策
         action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action, _action)

@@ -5,9 +5,9 @@ tests/
 release/
 .vscode/
 
-AutoWSGR/data/tunnel/*.PNG
-AutoWSGR/data/tunnel/*.in
-AutoWSGR/data/tunnel/*.out
+AutoWSGR/bin/image_recognize/*.PNG
+AutoWSGR/bin/image_recognize/*.in
+AutoWSGR/bin/image_recognize/*.out
 AutoWSGR/data/ocr/shipname_source.html
 system_test.py
 

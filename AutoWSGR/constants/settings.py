@@ -1,6 +1,9 @@
+from AutoWSGR.constants.data_roots import DATA_ROOT
+
+
 class Settings():
-    LDPLAYER_ROOT = "C:\leidian\LDPlayer9"
-    SHIPNAME_PATH = None
+    LDPLAYER_ROOT = r"C:\leidian\LDPlayer9"
+    SHIPNAME_PATH = f"{DATA_ROOT}/ocr/ship_name.yaml"
     LOG_PATH = "log"
     DELAY = 2
 
