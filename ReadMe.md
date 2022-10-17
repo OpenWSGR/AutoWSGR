@@ -94,7 +94,7 @@ print(AutoWSGR.__version__)
 
 ### 配置 ship_name.yaml
 
-启用基于舰船识别功能需要配置 `shipname.yaml` 文件，该文件相对路径为 `AutoWSGR/data/ocr/shipname.yaml`
+启用基于舰船识别功能需要配置 `ship_name.yaml` 文件，该文件相对路径为 `AutoWSGR/data/ocr/ship_name.yaml`
 
 请将同意目录下的 `shipname_example.yaml` 文件复制进去，并对照您的船舱修改对应舰船名
 

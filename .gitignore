@@ -4,7 +4,6 @@ tmp/
 tests/
 release/
 .vscode/
-
 bin/image_recognize/*.PNG
 bin/image_recognize/*.in
 bin/image_recognize/*.out

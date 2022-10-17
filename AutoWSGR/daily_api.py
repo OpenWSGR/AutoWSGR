@@ -1,10 +1,10 @@
 import time
 
-from AutoWSGR.main import start_script
 from AutoWSGR.constants.settings import S
 from AutoWSGR.fight.battle import BattlePlan
 from AutoWSGR.fight.normal_fight import NormalFightPlan
 from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
+from AutoWSGR.main import start_script
 
 
 class DailyOperation():
@@ -18,7 +18,7 @@ class DailyOperation():
         if S.Auto_Battle:
             self.battle_plan = BattlePlan(self.timer, plan_path=f'battle/{S.Battle_Name}.yaml')
 
-        if type(S.Auto_NormalFight) == list:
+        if type(S.Auto_NormalFight) == list and S.Auto_NormalFight:
             self.fight_plans = []
             self.fight_complete_times = []
             for plan in S.Auto_NormalFight:
@@ -49,14 +49,15 @@ class DailyOperation():
                 ret = self.battle_plan.run()
 
         # 自动出征
-        while self._has_unfinished():
-            task_id = self._get_unfinished()
-            self._normal_fight_once(task_id)
+        if type(S.Auto_NormalFight) == list and S.Auto_NormalFight:
+            while self._has_unfinished():
+                task_id = self._get_unfinished()
+                self._normal_fight_once(task_id)
 
-            if time.time() - self.last_time >= 5*60:
-                self._expedition()
-                self._gain_bonous()
-                self.last_time = time.time()
+                if time.time() - self.last_time >= 5*60:
+                    self._expedition()
+                    self._gain_bonous()
+                    self.last_time = time.time()
 
         # 自动远征
         while True:
