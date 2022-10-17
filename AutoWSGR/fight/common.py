@@ -157,6 +157,9 @@ class FightInfo(ABC):
 
         # 匹配不到时报错
         print_err(f"state: {self.state} last_action: {self.last_action}", "匹配状态失败,时间戳:" + str(time.time()))
+        self.timer.log_screen(True)
+        for image in images:
+            self.timer.log_image(image, f"match_{str(time.time())}.PNG")
         raise ImageNotFoundErr()
 
     @abstractmethod
@@ -321,6 +324,8 @@ class DecisionBlock():
             _action: 用于强行指定夜战和阵型参数. Defaults to None.
         """
         if state in ["fight_period", "night_fight_period"]:
+            if (self.SL_when_enter_fight == True):
+                return None, "need SL"
             return None, "fight continue"
         elif state == "spot_enemy_success":
             retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
@@ -365,9 +370,6 @@ class DecisionBlock():
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
             self.timer.Android.click(573, value * 100 - 20, delay=2)
-            if (self.SL_when_enter_fight == True):
-                return None, "need SL"
-
             return value, "fight continue"
         elif state == "night":
             is_night = self.night

@@ -97,6 +97,16 @@ def get_allow(names):
     return res
 
 
+def replace(origin_str) -> str:
+    """一些不可避免的识别错误的替换规则
+    Args:
+        origin_str (str): 原始字符串
+    """
+    if(origin_str[0] == '0' and len(origin_str) >= 3): # U 艇识别为 0xxx
+        origin_str[0] = 'U'
+    return origin_str
+
+
 def compare_box(A, B):
     """对 easyocr.readtext 返回的 box 进行排序
     """
@@ -140,6 +150,7 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
     sorted(result, key=functools.cmp_to_key(compare_box))
     for box in result:
         res, lcs, name = "", "", box[1]
+        name = replace(name)
         for _name in names:
             if(any([(_name.find(char) != -1) for char in name])):
                 dis1 = edit_distance(_name, name)

@@ -49,16 +49,15 @@ class EventFightInfo20220928(PatrollingEvent, NormalFightInfo):
         
 
 class EventFightPlan20220928_2(PatrollingEvent, BattlePlan):
-    def __init__(self, timer: Timer, plan_path, default_path='plans/default.yaml', event="20220928"):
+    def __init__(self, timer: Timer, plan_path, fleet_id=1, event="20220928"):
         self.event_name = event
-        BattlePlan.__init__(self, timer, plan_path, default_path)
+        self.fleet_id = fleet_id
+        BattlePlan.__init__(self, timer, plan_path)
         PatrollingEvent.__init__(self, timer, event)
 
     def _enter_fight(self, same_work=False):
-        if(same_work == False):
-            self.go_map_page()
-            self.enter_map(self.chapter, self.map)
-            
+        self.go_map_page()
+        self.enter_map(self.chapter, self.map)
         assert(self.timer.wait_image(self.event_image[2]) is not False)
         self.find(self.enemy_image[self.target])
         ret = self.get_close(self.enemy_image[self.target])

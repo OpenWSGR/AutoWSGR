@@ -7,16 +7,13 @@ from AutoWSGR.fight.battle import BattlePlan
 from AutoWSGR.fight.normal_fight import NormalFightPlan
 from AutoWSGR.fight.exercise import NormalExercisePlan
 from AutoWSGR.fight.decisive_battle import DecisiveBattle
-from AutoWSGR.fight.event.event_2022_0928 import EventFightPlan20220928
+from AutoWSGR.fight.event.event_2022_0928 import EventFightPlan20220928, EventFightPlan20220928_2
 from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
 from AutoWSGR.port.ship import Fleet
 
 
 timer = start_script('user_settings.yaml', to_main_page=False)
 show_all_debug_info()
-fleet = Fleet(timer)
-fleet.set_ship(["", "U-1405", "狼群47", "U-81", "大青花鱼"], search_method=None)
-quit()
 decisive_battle = DecisiveBattle(timer, 6, 1, 'D', level1=["肥鱼", "U-1206", "狼群47", "射水鱼", "U-96", "U-1405"], \
     level2=["U-81", "大青花鱼"], flagship_priority=["U-1405", "狼群47"])
 # decisive_battle.start_fight()
@@ -27,9 +24,12 @@ exercise_plan = NormalExercisePlan(timer, plan_path='exercise/plan_1.yaml')
 expedition_plan = Expedition(timer)
 start_time = last_time = time.time()
 # exercise_plan.run()
+event_plan2 = EventFightPlan20220928_2(timer, 'event/20220929/E10BB.yaml', 4)
+for i in range(300):
+    event_plan2.run(i != 0)
 event_plan = EventFightPlan20220928(timer, 'event/20220929/E10AE.yaml', 2)
 for i in range(60):
-    event_plan.run()
+    event_plan.run(i != 0)
 # 自动出征
 """ret = fight_plan.run()
 while ret == "success":
