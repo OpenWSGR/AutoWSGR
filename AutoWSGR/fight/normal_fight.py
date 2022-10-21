@@ -2,9 +2,9 @@ import copy
 import os
 import time
 
-from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_expections import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT, PLAN_ROOT
+from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3
 from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITON
 from AutoWSGR.constants.settings import S
@@ -16,8 +16,7 @@ from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis
 
-from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, Ship,
-                     StageRecorder, start_march)
+from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, StageRecorder, start_march)
 
 """
 常规战决策模块/地图战斗用模板
@@ -29,13 +28,14 @@ MAP_LIST = [None, range(1, 6), range(1, 7), range(1, 5), range(1, 5),
 
 class NormalFightInfo(FightInfo):
     # ==================== Unified Interface ====================
-    def __init__(self, timer: Timer, chapter, map) -> None:
+    def __init__(self, timer: Timer, chapter_id, map_id) -> None:
         super().__init__(timer)
 
+        self.point_positions = None
         self.end_page = "map_page"
         self.map_image = IMG.identify_images["map_page"][0]
-        self.chapter = chapter  # 章节名,战役为 'battle', 演习为 'exercise'
-        self.map = map  # 节点名
+        self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
+        self.map = map_id  # 节点名
         self.ship_position = (0, 0)
         self.node = "A"  # 常规地图战斗中,当前战斗点位的编号
         self.successor_states = {
@@ -56,7 +56,7 @@ class NormalFightInfo(FightInfo):
                 "no": [["result", 5]],
             },
             "night_fight_period": ["result"],
-            "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],    # 两页战果
+            "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],  # 两页战果
             "get_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
             "flagship_severe_damage": ["map_page"],
         }
@@ -80,14 +80,10 @@ class NormalFightInfo(FightInfo):
         self.last_action = "yes"
         self.state = "proceed"  # 初始状态等同于 proceed选择yes
 
-        # TODO: 舰船信息，暂时不用
-        self.ally_ships = [Ship() for _ in range(6)]  # 我方舰船状态
-        self.enemy_ships = [Ship() for _ in range(6)]  # 敌方舰船状态
-
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed", "fight_condition"]:
-            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
+            self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
 
         self.timer.update_screen()
 
@@ -113,9 +109,6 @@ class NormalFightInfo(FightInfo):
     @logit(level=INFO1)
     def _update_ship_position(self):
         """在战斗移动界面(有一个黄色小船在地图上跑)更新黄色小船的位置
-
-        Args:
-            timer (Timer): 记录器
         """
         pos = self.timer.get_image_position(IMG.fight_image[7], 0, 0.8)
         if pos is None:
@@ -123,15 +116,11 @@ class NormalFightInfo(FightInfo):
         if pos is None:
             return
         self.ship_position = pos
-        if (S.SHOW_MAP_NODE):
+        if S.SHOW_MAP_NODE:
             print(self.ship_position)
 
     def _update_ship_point(self):
-        """更新黄色小船(战斗地图上那个)所在的点位 (1-1A 这种,'A' 就是点位) 
-
-        Args:
-            timer (Timer): 记录器
-
+        """更新黄色小船(战斗地图上那个)所在的点位 (1-1A 这种,'A' 就是点位)
         """
 
         self.node = "A"
@@ -139,14 +128,33 @@ class NormalFightInfo(FightInfo):
             ch = chr(ord('A') + i)
             if ch not in self.point_positions.keys():
                 break
-            if (CalcDis(self.point_positions[ch], self.ship_position) < CalcDis(self.point_positions[self.node], self.ship_position)):
+            if CalcDis(self.point_positions[ch], self.ship_position) < CalcDis(self.point_positions[self.node],
+                                                                               self.ship_position):
                 self.node = ch
 
-        if (S.SHOW_MAP_NODE):
+        if S.SHOW_MAP_NODE:
             print(self.node)
 
     def load_point_positions(self, map_path):
         self.point_positions = yaml_to_dict(os.path.join(map_path, str(self.chapter) + "-" + str(self.map) + ".yaml"))
+
+
+def _check_blood(blood, rule):
+    """检查血量状态是否满足前进条件
+        >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])
+
+        >>>True
+    Args:
+        blood (list): 1-based
+        rule (list): 0-based
+    """
+    l = max(len(blood) - 1, len(rule))
+    for i in range(l):
+        if (blood[i + 1] == -1 or rule[i] == -1):
+            continue
+        if (blood[i + 1] >= rule[i]):
+            return False
+    return True
 
 
 class NormalFightPlan(FightPlan):
@@ -156,7 +164,6 @@ class NormalFightPlan(FightPlan):
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
-            default_path (str): 默认配置路径. 
 
         Raises:
             BaseException: _description_
@@ -172,7 +179,7 @@ class NormalFightPlan(FightPlan):
         self.__dict__.update(args)
 
         # 从参数加载计划
-        self.fleet_id = fleet_id # 舰队编号
+        self.fleet_id = fleet_id  # 舰队编号
 
         # 加载节点配置
         self.nodes = {}
@@ -183,9 +190,6 @@ class NormalFightPlan(FightPlan):
             self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
 
         # 信息记录器
-        self.load_fight_info()
-
-    def load_fight_info(self):
         self.Info = NormalFightInfo(self.timer, self.chapter, self.map)
         self.Info.load_point_positions(os.path.join(MAP_ROOT, 'normal'))
 
@@ -204,7 +208,7 @@ class NormalFightPlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full].
         """
-        if (same_work == False):
+        if not same_work:
             self.go_map_page()
             self._change_fight_map(self.chapter, self.map)
         try:
@@ -212,8 +216,8 @@ class NormalFightPlan(FightPlan):
             self.go_fight_prepare_page()
             MoveTeam(self.timer, self.fleet_id)
             QuickRepair(self.timer, self.repair_mode)
-        except AssertionError as e:
-            if ("process_err" in kwargs and kwargs["process_err"] == False):
+        except AssertionError:
+            if "process_err" in kwargs and kwargs["process_err"] == False:
                 raise ImageNotFoundErr("进入战斗前置界面错误")
             print_war("进入战斗前置界面不正确")
             self.timer.process_bad_network()
@@ -223,7 +227,7 @@ class NormalFightPlan(FightPlan):
 
     def _make_decision(self):
 
-        if (S.SHOW_FIGHT_STAGE):
+        if S.SHOW_FIGHT_STAGE:
             print(self.fight_recorder.last_stage)
         self.Info.update_state()
         state = self.Info.state
@@ -247,7 +251,7 @@ class NormalFightPlan(FightPlan):
 
         elif state == "proceed":
             is_proceed = self.nodes[self.Info.node].proceed and \
-                self._check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
+                         _check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
 
             if is_proceed:
                 self.timer.Android.click(325, 350)
@@ -267,7 +271,8 @@ class NormalFightPlan(FightPlan):
 
         # 进行通用NodeLevel决策
 
-        action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state, self.Info.last_action)
+        action, fight_stage = self.nodes[self.Info.node].make_decision(state, self.Info.last_state,
+                                                                       self.Info.last_action)
         self.Info.last_action = action
         self.fight_recorder.append(StageRecorder(self.Info, self.timer))
         return fight_stage
@@ -287,9 +292,9 @@ class NormalFightPlan(FightPlan):
             time.sleep(0.15 * 2 ** try_times)
             self.timer.update_screen()
             for i in range(1, len(IMG.chapter_image)):
-                if (self.timer.image_exist(IMG.chapter_image[i], 0)):
+                if self.timer.image_exist(IMG.chapter_image[i], 0):
                     return i
-        raise TimeoutError("can't vertify chapter")
+        raise TimeoutError("can't verify chapter")
 
     @logit(level=INFO1)
     def _get_node(self, need_screen_shot=True):
@@ -301,15 +306,12 @@ class NormalFightPlan(FightPlan):
             int: 节点编号
         """
 
-        # TODO（已修复）: 你改了循环变量的名字，但没改下面
-        for try_times in range(5):
-            time.sleep(.15 * 2 ** try_times)
-            if (need_screen_shot):
-                self.timer.update_screen()
-            for try_times in range(1, 7):
-                if (self.timer.image_exist(IMG.number_image[try_times], 0, confidence=0.95)):
-                    return try_times
-        raise TimeoutError("can't vertify map")
+        if need_screen_shot:
+            self.timer.update_screen()
+        for try_times in range(1, 7):
+            if self.timer.image_exist(IMG.number_image[try_times], 0, confidence=0.95):
+                return try_times
+        raise TimeoutError("can't verify map")
 
     @logit(level=INFO2)
     def _move_chapter(self, target, chapter_now=None):
@@ -317,32 +319,31 @@ class NormalFightPlan(FightPlan):
         含错误检查
 
         Args:
-            timer (Timer): _description_
             target (int): 目标
             chapter_now (_type_, optional): 现在的章节. Defaults to None.
         Raise:
             ImageNotFoundErr:如果没有找到章节标志或地图界面标志
         """
-        if (self.timer.identify_page('map_page') == False):
+        if not self.timer.identify_page('map_page'):
             raise ImageNotFoundErr("not on page 'map_page' now")
 
-        if (chapter_now == target):
+        if chapter_now == target:
             return
         try:
             if chapter_now is None:
                 chapter_now = self._get_chapter()
-            if (S.SHOW_CHAPTER_INFO):
+            if S.SHOW_CHAPTER_INFO:
                 print("NowChapter:", chapter_now)
-            if (chapter_now > target):
-                if (chapter_now - target >= 3):
+            if chapter_now > target:
+                if chapter_now - target >= 3:
                     chapter_now -= 3
                     self.timer.Android.click(95, 97, delay=0)
 
-                elif (chapter_now - target == 2):
+                elif chapter_now - target == 2:
                     chapter_now -= 2
                     self.timer.Android.click(95, 170, delay=0)
 
-                elif (chapter_now - target == 1):
+                elif chapter_now - target == 1:
                     chapter_now -= 1
                     self.timer.Android.click(95, 229, delay=0)
 
@@ -351,15 +352,15 @@ class NormalFightPlan(FightPlan):
                     chapter_now += 3
                     self.timer.Android.click(95, 485, delay=0)
 
-                elif (chapter_now - target == -2):
+                elif chapter_now - target == -2:
                     chapter_now += 2
                     self.timer.Android.click(95, 416, delay=0)
 
-                elif (chapter_now - target == -1):
+                elif chapter_now - target == -1:
                     chapter_now += 1
                     self.timer.Android.click(95, 366, delay=0)
 
-            if (self.timer.wait_image(IMG.chapter_image[chapter_now]) == False):
+            if not self.timer.wait_image(IMG.chapter_image[chapter_now]):
                 raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
 
             time.sleep(0.15)
@@ -369,34 +370,33 @@ class NormalFightPlan(FightPlan):
             if self.timer.process_bad_network('move_chapter'):
                 self._move_chapter(target)
             else:
-                raise ImageNotFoundErr("unknow reason can't find chapter image")
+                raise ImageNotFoundErr("unknown reason can't find chapter image")
 
     @logit(level=INFO2)
     def _move_node(self, target):
         """改变地图节点,不检查是否有该节点
         含网络错误检查
         Args:
-            timer (Timer): _description_
             target (_type_): 目标节点
 
         """
-        if (self.timer.identify_page('map_page') == False):
+        if not self.timer.identify_page('map_page'):
             raise ImageNotFoundErr("not on page 'map_page' now")
 
         NowNode = self._get_node()
         try:
-            if (S.SHOW_CHAPTER_INFO):
+            if S.SHOW_CHAPTER_INFO:
                 print("NowNode:", NowNode)
-            if (target > NowNode):
+            if target > NowNode:
                 for i in range(1, target - NowNode + 1):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)
-                    if (self.timer.wait_image(IMG.number_image[NowNode + i]) == False):
+                    if not self.timer.wait_image(IMG.number_image[NowNode + i]):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
             else:
                 for i in range(1, NowNode - target + 1):
                     self.timer.Android.swipe(552, 147, 715, 147, duration=0.25)
-                    if (self.timer.wait_image(IMG.number_image[NowNode - i]) == False):
+                    if not self.timer.wait_image(IMG.number_image[NowNode - i]):
                         raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
                     time.sleep(0.15)
         except:
@@ -404,44 +404,26 @@ class NormalFightPlan(FightPlan):
             if self.timer.process_bad_network():
                 self._move_node(target)
             else:
-                raise ImageNotFoundErr("unknow reason can't find number image" + str(target))
+                raise ImageNotFoundErr("unknown reason can't find number image" + str(target))
 
     @logit(level=INFO3)
-    def _change_fight_map(self, chapter, map):
+    def _change_fight_map(self, chapter_id, map_id):
         """在地图界面改变战斗地图(通常是为了出征)
         可以处理网络错误
         Args:
-            timer (Timer): _description_
-            chapter (int): 目标章节
-            map (int): 目标节点
+            chapter_id (int): 目标章节
+            map_id (int): 目标节点
 
         Raises:
             ValueError: 不在地图界面
             ValueError: 不存在的节点
         """
-        if (self.timer.now_page.name != 'map_page'):
+        if self.timer.now_page.name != 'map_page':
             raise ValueError("can't _change_fight_map at page:", self.timer.now_page.name)
-        if map not in MAP_LIST[chapter]:
-            raise ValueError('map' + str(map) + 'not in the list of chapter' + str(chapter))
+        if map_id not in MAP_LIST[chapter_id]:
+            raise ValueError('map' + str(map_id) + 'not in the list of chapter' + str(chapter_id))
 
-        self._move_chapter(chapter)
-        self._move_node(map)
+        self._move_chapter(chapter_id)
+        self._move_node(map_id)
         self.Info.chapter = self.chapter
         self.Info.map = self.map
-
-    def _check_blood(self, blood, rule):
-        """检查血量状态是否满足前进条件
-            >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])  
-
-            >>>True
-        Args:
-            blood (list): 1-based
-            rule (list): 0-based
-        """
-        l = max(len(blood) - 1, len(rule))
-        for i in range(l):
-            if (blood[i + 1] == -1 or rule[i] == -1):
-                continue
-            if (blood[i + 1] >= rule[i]):
-                return False
-        return True

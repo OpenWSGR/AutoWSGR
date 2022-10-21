@@ -27,7 +27,7 @@ class AndroidController:
 
     def text(self, t):
         text(t)
-    
+
     @logit(level=INFO1)
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
         if S.SHOW_ANDROID_INPUT:
@@ -54,7 +54,8 @@ class AndroidController:
             raise ValueError("subprocess enabled but arg 'times' is not 1 but " + str(times))
         if (x >= 960 or x < 0 or y >= 540 or y <= 0):
             raise ValueError(
-                "invaild args 'x' or 'y',x should be in [0,960),y should be in [0,540)\n,but x is " + str(x) + ",y is " + str(y))
+                "invaild args 'x' or 'y',x should be in [0,960),y should be in [0,540)\n,but x is " + str(
+                    x) + ",y is " + str(y))
         if (delay < 0):
             raise ValueError("arg 'delay' should be positive or 0")
         x, y = convert_position(x, y, self.resolution)
@@ -78,10 +79,12 @@ class AndroidController:
             raise ValueError("arg 'delay' should be positive or 0")
         if (x1 >= 960 or x1 < 0 or y1 >= 540 or y1 <= 0):
             raise ValueError(
-                "invaild args 'x1' or 'y1',x1 should be in [0,960),y1 should be in [0,540)\n,but x1 is " + str(x1), +",y1 is " + str(y1))
+                "invaild args 'x1' or 'y1',x1 should be in [0,960),y1 should be in [0,540)\n,but x1 is " + str(x1),
+                +",y1 is " + str(y1))
         if (x2 >= 960 or x2 < 0 or y2 >= 540 or y2 <= 0):
             raise ValueError(
-                "invaild args 'x2' or 'y2',x2 should be in [0,960),y2 should be in [0,540)\n,but x2 is " + str(x2), +",y2 is " + str(y2))
+                "invaild args 'x2' or 'y2',x2 should be in [0,960),y2 should be in [0,540)\n,but x2 is " + str(x2),
+                +",y2 is " + str(y2))
         x1, y1 = convert_position(x1, y1, self.resolution)
         x2, y2 = convert_position(x2, y2, self.resolution)
         duration = int(duration * 1000)
@@ -103,7 +106,8 @@ class AndroidController:
         """
         if (x >= 960 or x < 0 or y >= 540 or y <= 0):
             raise ValueError(
-                "invaild args 'x' or 'y',x should be in [0,960),y should be in [0,540)\n,but x is " + str(x), +",y is " + str(y))
+                "invaild args 'x' or 'y',x should be in [0,960),y should be in [0,540)\n,but x is " + str(x),
+                +",y is " + str(y))
         if (delay < 0):
             raise ValueError("arg 'delay' should be positive or 0")
         if (duration <= 0.2):
