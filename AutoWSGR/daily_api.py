@@ -7,7 +7,7 @@ from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
 from AutoWSGR.main import start_script
 
 
-class DailyOperation():
+class DailyOperation:
     def __init__(self, setting_path) -> None:
         self.timer = start_script(setting_path)
         S.DEBUG = False
@@ -56,21 +56,21 @@ class DailyOperation():
 
                 if time.time() - self.last_time >= 5*60:
                     self._expedition()
-                    self._gain_bonous()
+                    self._gain_bonus()
                     self.last_time = time.time()
 
         # 自动远征
         while True:
             self._bath_repair()
             self._expedition()
-            self._gain_bonous()
+            self._gain_bonus()
             time.sleep(360)
 
     def _expedition(self):
         if S.Auto_Expedition:
             self.expedition_plan.run(True)
 
-    def _gain_bonous(self):
+    def _gain_bonus(self):
         if S.Auto_Gain_Bonous:
             GainBounds(self.timer)
 

@@ -23,8 +23,8 @@ class EventFightPlan20220928(PatrollingEvent, NormalFightPlan):
         self.Info = EventFightInfo20220928(self.timer, self.chapter, self.map)
         self.Info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
      
-    def _change_fight_map(self, chapter, map):
-        self.enter_map(chapter, map)
+    def _change_fight_map(self, chapter_id, map_id):
+        self.enter_map(chapter_id, map_id)
         while(self.timer.image_exist(self.common_image['little_monster']) == False): # 找到小怪物图标,点击下方进入主力决战
             while(self.timer.wait_images_position(self.common_image['monster'], timeout=1) is None):
                 self.random_walk()
@@ -40,8 +40,8 @@ class EventFightPlan20220928(PatrollingEvent, NormalFightPlan):
     
 class EventFightInfo20220928(PatrollingEvent, NormalFightInfo):
     
-    def __init__(self, timer: Timer, chapter, map, event="20220928") -> None:
-        NormalFightInfo.__init__(self, timer, chapter, map)
+    def __init__(self, timer: Timer, chapter_id, map_id, event="20220928") -> None:
+        NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         PatrollingEvent.__init__(self, timer, event)
         self.map_image = self.event_image[1]
         self.end_page = 'unknown_page'
