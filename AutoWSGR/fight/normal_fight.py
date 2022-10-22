@@ -425,10 +425,10 @@ class NormalFightPlan(FightPlan):
         """
         if self.timer.now_page.name != 'map_page':
             raise ValueError("can't _change_fight_map at page:", self.timer.now_page.name)
-        if map not in MAP_LIST[chapter_id]:
+        if map_id not in MAP_LIST[chapter_id]:
             raise ValueError(f"map {str(map)} not in the list of chapter {str(chapter_id)}")
 
         self._move_chapter(chapter_id)
-        self._move_node(map, chapter_id)
+        self._move_node(map_id, chapter_id)
         self.Info.chapter = self.chapter
         self.Info.map = self.map
