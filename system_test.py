@@ -20,6 +20,8 @@ fight_plan = NormalFightPlan(timer, plan_path="normal_fight/9-1BF.yaml", fleet_i
 # print(fight_plan._get_node(1))
 
 for chapter, nodes in enumerate(NORMAL_MAP_EVERY_CHAPTER):
+    if chapter < 1:
+        continue
     for node, _ in enumerate(nodes):
         fight_plan._change_fight_map(chapter, node + 1)
 

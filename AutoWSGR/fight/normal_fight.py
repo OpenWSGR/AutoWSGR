@@ -293,8 +293,8 @@ class NormalFightPlan(FightPlan):
 
     def vertify_node(self, target, chapter, need_screen_shot=True, timeout=0):
         if timeout == 0:
-            return self.timer.image_exist(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], need_screen_shot, confidence=0.9)
-        return self.timer.wait_image(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], confidence=0.9, timeout=timeout, gap=0.03)
+            return self.timer.image_exist(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], need_screen_shot, confidence=0.85)
+        return self.timer.wait_image(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], confidence=0.85, timeout=timeout, gap=0.03)
         
     @logit(level=INFO1)
     def _get_node(self, chapter, need_screen_shot=True):
