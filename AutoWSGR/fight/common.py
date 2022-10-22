@@ -377,10 +377,10 @@ class DecisionBlock():
             if(_action is not None):
                 is_night = _action
             if is_night:
-                self.timer.Android.click(325, 350, delay=2)
+                self.timer.Android.click(325, 350, delay=.5)
                 return "yes", "fight continue"
             else:
-                self.timer.Android.click(615, 350, delay=2)
+                self.timer.Android.click(615, 350, delay=.5)
                 return "no", "fight continue"
         elif state == "result":
             time.sleep(1.5)

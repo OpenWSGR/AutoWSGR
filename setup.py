@@ -21,10 +21,10 @@ setup(
     include_package_data=True,
     packages=['AutoWSGR'],
     install_requires=[
+        "opencv-python==4.5.1.48",
         "torch",
         "airtest",
         "keyboard",
         "easyocr",
-        "opencv-python==4.5.5.64",
     ],
 )

@@ -103,7 +103,7 @@ def replace(origin_str) -> str:
         origin_str (str): 原始字符串
     """
     if(origin_str[0] == '0' and len(origin_str) >= 3): # U 艇识别为 0xxx
-        origin_str[0] = 'U'
+        origin_str = 'U' + origin_str[1:]
     return origin_str
 
 
@@ -121,6 +121,8 @@ def compare_box(A, B):
 
 
 def recognize(image, char_lsit, min_size=7, text_threshold=.55, low_text=.3):
+    if (ch_reader == None):
+        load_ch_reader()
     return ch_reader.readtext(image, allowlist=char_lsit, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
 
 
@@ -129,6 +131,8 @@ def recognize_number(image, ex_list="", min_size=7, text_threshold=.55, low_text
     Returns:
         list(result): 一个 result 为 [position, text, confidence]
     """
+    if (en_reader == None):
+        load_en_reader()
     char_list = "0123456789"
     for ch in ex_list:
         if(char_list.find(ch) == -1):
@@ -141,8 +145,10 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
     Returns:
         list(result): 一个 result 为 [ship_name, left_top]
     """
-    if(char_list is None):
+    if (char_list is None):
         char_list = get_allow(names)
+    if (ch_reader == None):
+        load_ch_reader()
     result = ch_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
     results = []
     # cv2.imshow("PIC", cv2.imread(image))
@@ -194,12 +200,7 @@ def recover(image):
     for p in image:
         pass
 
-p1 = threading.Thread(target=load_ch_reader)
-p2 = threading.Thread(target=load_en_reader)
-p1.start()
-p2.start()
-p1.join()
-p2.join()
+
 
 
 if __name__ == '__main__':

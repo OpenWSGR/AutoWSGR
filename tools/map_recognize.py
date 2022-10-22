@@ -1,4 +1,5 @@
 import os, sys, re
+import pathlib
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__))) 
 
@@ -12,6 +13,7 @@ import cv2
 # en_reader = easyocr.Reader(['en'], gpu=False)
 timer = None
 point = 'A'
+screen_shot_count = 0
 
 def ocr(image):
     img = cv2.imread(image)
@@ -25,10 +27,11 @@ def ocr(image):
 
 
 def log_image(event:keyboard.KeyboardEvent):
+    global screen_shot_count
     if(event.event_type != 'down' or event.name != 'P'):
         return 
-    print("Screen Processing")
-    
+    print("Screen Processing:", screen_shot_count)
+    screen_shot_count += 1
     timer.update_screen()
     timer.log_screen()
     
@@ -81,9 +84,15 @@ def get_image():
     time.sleep(1000)
 
 
-def make_map(image_path):
+def make_map(image_path, dict_dir):
+    """根据图像目录下的所有图片文件,打开后顺次点击ABCD,生成对应文件名的地图文件
+
+    Args:
+        image_path (_type_): _description_
+        dict_dir (_type_): _description_
+    """
     files = listdir(image_path)
-    dict_dir = r'data\map\event\20220928'
+    dict_dir = dict_dir
     for file in files:
         name = os.path.basename(file)
         dict_value = SetPoints(name, cv2.imread(file))
@@ -126,7 +135,7 @@ def coverter_9_1():
     print(relative_to_absolute((0.406, 0.06)))
     print(relative_to_absolute((0.264, 0.157)))
 
-coverter_9_1()
+    
+# coverter_9_1()
 # coverter()
 # make_map(r'data\map\image\event\20220928')
-# get_image()

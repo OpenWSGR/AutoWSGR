@@ -6,6 +6,13 @@ from cv2 import imwrite
 from PIL import Image as PIM
 
 def listdir(path):
+    """返回指定目录下所有文件路径的列表(含 path 前缀)
+    Args:
+        path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return [os.path.join(path, file) for file in os.listdir(path)]
 
 

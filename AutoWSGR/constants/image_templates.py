@@ -109,6 +109,7 @@ class ImageSet():
         self.decisive_battle_image = ["", ]
         self.symbol_image = ["", ]
         self.fight_image = ["", ]
+        self.normal_map_image = make_dir_templates(path=f"{IMG_ROOT}/normal_map_image")
         self.fight_result_image = {}
         for result in FIGHT_RESULTS:
             self.fight_result_image[result] = make_tmplate(path=f'{IMG_ROOT}/fight_result/{result}.PNG')
@@ -125,7 +126,7 @@ class ImageSet():
             self.identify_images[page] = make_tmplate(name=page)
 
         for sub_folder in os.listdir(IMG_ROOT):
-            if sub_folder not in ["identify_images", "errors", "fight_result", "exercise"]:
+            if sub_folder not in ["identify_images", "errors", "fight_result", "exercise", "normal_map_image"]:
                 if not hasattr(self, sub_folder):
                     exec(f"self.{sub_folder} = ['', ]")
                 for i in range(1, 1 + len(os.listdir(os.path.join(IMG_ROOT, sub_folder)))):

@@ -5,7 +5,7 @@ import time
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_expections import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT, PLAN_ROOT
-from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3
+from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3, NORMAL_MAP_EVERY_CHAPTER
 from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITON
 from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
@@ -291,9 +291,13 @@ class NormalFightPlan(FightPlan):
                     return i
         raise TimeoutError("can't vertify chapter")
 
+    def vertify_node(self, target, chapter, need_screen_shot=True, timeout=0):
+        if timeout == 0:
+            return self.timer.image_exist(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], need_screen_shot, confidence=0.9)
+        return self.timer.wait_image(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], confidence=0.9, timeout=timeout, gap=0.03)
+        
     @logit(level=INFO1)
-    def _get_node(self, need_screen_shot=True):
-        """不够完善"""
+    def _get_node(self, chapter, need_screen_shot=True):
         """出征界面获取当前显示地图节点编号
         例如在出征界面显示的地图 2-5,则返回 5
         
@@ -301,14 +305,13 @@ class NormalFightPlan(FightPlan):
             int: 节点编号
         """
 
-        # TODO（已修复）: 你改了循环变量的名字，但没改下面
         for try_times in range(5):
             time.sleep(.15 * 2 ** try_times)
             if (need_screen_shot):
                 self.timer.update_screen()
-            for try_times in range(1, 7):
-                if (self.timer.image_exist(IMG.number_image[try_times], 0, confidence=0.95)):
-                    return try_times
+            for i in range(1, len(NORMAL_MAP_EVERY_CHAPTER[chapter]) + 1):
+                if (self.vertify_node(i, chapter, False)):
+                    return i
         raise TimeoutError("can't vertify map")
 
     @logit(level=INFO2)
@@ -370,9 +373,9 @@ class NormalFightPlan(FightPlan):
                 self._move_chapter(target)
             else:
                 raise ImageNotFoundErr("unknow reason can't find chapter image")
-
+    
     @logit(level=INFO2)
-    def _move_node(self, target):
+    def _move_node(self, target, chapter):
         """改变地图节点,不检查是否有该节点
         含网络错误检查
         Args:
@@ -383,26 +386,26 @@ class NormalFightPlan(FightPlan):
         if (self.timer.identify_page('map_page') == False):
             raise ImageNotFoundErr("not on page 'map_page' now")
 
-        NowNode = self._get_node()
+        NowNode = self._get_node(chapter)
         try:
             if (S.SHOW_CHAPTER_INFO):
                 print("NowNode:", NowNode)
             if (target > NowNode):
                 for i in range(1, target - NowNode + 1):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)
-                    if (self.timer.wait_image(IMG.number_image[NowNode + i]) == False):
-                        raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+                    if (not self.vertify_node(NowNode + i, chapter, timeout=4)):
+                        raise ImageNotFoundErr("after movenode operation but the chapter do not move")
                     time.sleep(0.15)
             else:
                 for i in range(1, NowNode - target + 1):
                     self.timer.Android.swipe(552, 147, 715, 147, duration=0.25)
-                    if (self.timer.wait_image(IMG.number_image[NowNode - i]) == False):
-                        raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+                    if (not self.vertify_node(NowNode - i, chapter, timeout=4)):
+                        raise ImageNotFoundErr("after movecnode operation but the chapter do not move")
                     time.sleep(0.15)
         except:
             print_err("切换地图失败", "时间戳:" + str(time.time()))
             if self.timer.process_bad_network():
-                self._move_node(target)
+                self._move_node(target, chapter)
             else:
                 raise ImageNotFoundErr("unknow reason can't find number image" + str(target))
 
@@ -422,10 +425,10 @@ class NormalFightPlan(FightPlan):
         if (self.timer.now_page.name != 'map_page'):
             raise ValueError("can't _change_fight_map at page:", self.timer.now_page.name)
         if map not in MAP_LIST[chapter]:
-            raise ValueError('map' + str(map) + 'not in the list of chapter' + str(chapter))
+            raise ValueError(f"map {str(map)} not in the list of chapter {str(chapter)}")
 
         self._move_chapter(chapter)
-        self._move_node(map)
+        self._move_node(map, chapter)
         self.Info.chapter = self.chapter
         self.Info.map = self.map
 
