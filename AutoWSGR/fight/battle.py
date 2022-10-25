@@ -29,7 +29,7 @@ class BattleInfo(FightInfo):
             "formation": ["fight_period"],
             "fight_period": ["night", "result"],
             "night": {
-                "yes": ["night_fight_period", "result"],  # TODO：额外加一个result，已解决已知bug (当夜战无法进行任何操作时night_fight_period来不及匹配)
+                "yes": ["result"],
                 "no": [["result", 5]],
             },
             "night_fight_period": ["result"],
@@ -40,9 +40,8 @@ class BattleInfo(FightInfo):
             "proceed": [IMG.fight_image[5], 5],
             "spot_enemy_success": [IMG.fight_image[2], 15],
             "formation": [IMG.fight_image[1], 15, .8],
-            "fight_period": [IMG.symbol_image[4], 3],
+            "fight_period": [IMG.symbol_image[4], 5],
             "night": [IMG.fight_image[6], 120],
-            "night_fight_period": [IMG.symbol_image[4], 3],
             "result": [IMG.fight_image[16], 60],
             "battle_page": [IMG.identify_images["battle_page"][0], 5, ]
         }
@@ -64,6 +63,7 @@ class BattleInfo(FightInfo):
             self.fight_result.detect_result()
         if self.state == 'get_ship':
             get_ship(self.timer)
+
 
 class BattlePlan(FightPlan):
 

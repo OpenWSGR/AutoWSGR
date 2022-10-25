@@ -157,7 +157,7 @@ class FightInfo(ABC):
                 return self.state
 
         # 匹配不到时报错
-        print_err(f"state: {self.state} last_action: {self.last_action}", "匹配状态失败,时间戳:" + str(time.time()))
+        print_err(f"state: {self.state} last_action: {self.last_action}", "匹配状态失败,时间戳:" + time.ctime())
         self.timer.log_screen(True)
         for image in images:
             self.timer.log_image(image, f"match_{str(time.time())}.PNG")

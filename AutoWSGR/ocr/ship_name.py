@@ -2,6 +2,7 @@
 import os
 import functools
 import threading
+import time
 import easyocr
 import cv2
 
@@ -150,9 +151,8 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
     if (ch_reader == None):
         load_ch_reader()
     result = ch_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    result = [x for x in result if x[1] != '']  # 去除空匹配
     results = []
-    # cv2.imshow("PIC", cv2.imread(image))
-    # cv2.waitKey(2)
     sorted(result, key=functools.cmp_to_key(compare_box))
     for box in result:
         res, lcs, name = "", "", box[1]

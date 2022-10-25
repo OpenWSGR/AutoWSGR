@@ -71,7 +71,7 @@ class DailyOperation:
             self.expedition_plan.run(True)
 
     def _gain_bonus(self):
-        if S.Auto_Gain_Bonous:
+        if S.Auto_Gain_Bonus:
             GainBounds(self.timer)
 
     def _bath_repair(self):

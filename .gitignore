@@ -1,12 +1,12 @@
-env/
+.env
 log/
 tmp/
 tests/
 release/
 .vscode/
-bin/image_recognize/*.PNG
-bin/image_recognize/*.in
-bin/image_recognize/*.out
+AutoWSGR/bin/image_recognize/*.PNG
+AutoWSGR/bin/image_recognize/*.in
+AutoWSGR/bin/image_recognize/*.out
 system_test.py
 
 # Byte-compiled / optimized / DLL files

@@ -490,3 +490,4 @@ class DecisiveBattleInfo(BattleInfo):
         super().__init__(timer)
         self.end_page = 'unknown_page'
         self.state2image["battle_page"] = [IMG.decisive_battle_image[1], 5]
+        self.state2image["result"] = [IMG.fight_image[3], 60, 0.7]

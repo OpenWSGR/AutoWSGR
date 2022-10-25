@@ -4,8 +4,9 @@ import time
 
 from AutoWSGR.constants.custom_expections import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT, PLAN_ROOT
-from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3, NORMAL_MAP_EVERY_CHAPTER
 from AutoWSGR.constants.image_templates import IMG
+from AutoWSGR.constants.other_constants import (INFO1, INFO2, INFO3,
+                                                NORMAL_MAP_EVERY_CHAPTER)
 from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITON
 from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
@@ -16,7 +17,8 @@ from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis
 
-from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock, StageRecorder, start_march)
+from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock,
+                     StageRecorder, start_march)
 
 """
 常规战决策模块/地图战斗用模板
@@ -52,10 +54,9 @@ class NormalFightInfo(FightInfo):
             "formation": ["fight_period"],
             "fight_period": ["night", "result"],
             "night": {
-                "yes": ["night_fight_period"],
+                "yes": ["result"],
                 "no": [["result", 5]],
             },
-            "night_fight_period": ["result"],
             "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],  # 两页战果
             "get_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
             "flagship_severe_damage": ["map_page"],
@@ -66,9 +67,8 @@ class NormalFightInfo(FightInfo):
             "fight_condition": [IMG.fight_image[10], 15],
             "spot_enemy_success": [IMG.fight_image[2], 15],
             "formation": [IMG.fight_image[1], 15],
-            "fight_period": [IMG.symbol_image[4], 3],
+            "fight_period": [IMG.symbol_image[4], 5],
             "night": [IMG.fight_image[6], 120],
-            "night_fight_period": [IMG.symbol_image[4], 3],
             "result": [IMG.fight_image[3], 60],
             "get_ship": [IMG.symbol_image[8], 5],
             "flagship_severe_damage": [IMG.fight_image[4], 5],
@@ -93,7 +93,9 @@ class NormalFightInfo(FightInfo):
             self._update_ship_point()
 
         # 1. proceed: 资源点  2. get_ship: 锁定新船
-        if self.state in ["proceed", "get_ship"]:
+        # if self.state in ["proceed", "get_ship"]: # TODO: 提高proceed时confirm的速度，否则导致上面舰船位置匹配失败
+        if self.state in ["get_ship"]:
+            print(time.time())
             self.timer.ConfirmOperation(delay=0)
 
     def _after_match(self):
@@ -139,7 +141,7 @@ class NormalFightInfo(FightInfo):
         self.point_positions = yaml_to_dict(os.path.join(map_path, str(self.chapter) + "-" + str(self.map) + ".yaml"))
 
 
-def _check_blood(blood, rule):
+def _check_blood(blood, rule) -> bool:
     """检查血量状态是否满足前进条件
         >>>check_blood([None, 1, 1, 1, 2, -1, -1], [2, 2, 2, -1, -1, -1])
 
@@ -160,7 +162,7 @@ def _check_blood(blood, rule):
 class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
 
-    def __init__(self, timer: Timer, plan_path, fleet_id=1):
+    def __init__(self, timer: Timer, plan_path, fleet_id=1) -> None:
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
@@ -198,7 +200,7 @@ class NormalFightPlan(FightPlan):
         """
         self.timer.goto_game_page('map_page')
 
-    def go_fight_prepare_page(self):
+    def go_fight_prepare_page(self) -> None:
         """(从当前战斗结束后跳转到的页面)进入准备战斗的页面"""
         self.timer.goto_game_page('fight_prepare_page')
 
@@ -279,7 +281,7 @@ class NormalFightPlan(FightPlan):
 
     # ======================== Functions ========================
     @logit(level=INFO1)
-    def _get_chapter(self):
+    def _get_chapter(self) -> int:
         """在出征界面获取当前章节(远征界面也可获取)
 
         Raises:
@@ -302,7 +304,7 @@ class NormalFightPlan(FightPlan):
         return self.timer.wait_image(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], confidence=0.85, timeout=timeout, gap=0.03)
         
     @logit(level=INFO1)
-    def _get_node(self, chapter, need_screen_shot=True):
+    def _get_node(self, chapter, need_screen_shot=True) -> int:
         """出征界面获取当前显示地图节点编号
         例如在出征界面显示的地图 2-5,则返回 5
         
