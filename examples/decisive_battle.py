@@ -1,8 +1,10 @@
+import os
+
 from AutoWSGR.constants.settings import show_all_debug_info
 from AutoWSGR.fight.decisive_battle import DecisiveBattle
 from AutoWSGR.main import start_script
 
-timer = start_script(f"{__file__}/user_settings.yaml", to_main_page=False)
+timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml", to_main_page=False)
 # show_all_debug_info()
 
 decisive_battle = DecisiveBattle(timer, 6, 1, 'A', level1=["肥鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
