@@ -55,7 +55,7 @@ class Expedition:
 def get_ship(timer:Timer, max_times=1):
     times = 0 
     timeout = 5
-    while(timer.wait_image(IMG.symbol_image[8], timeout=timeout) and times <= max_times):
+    while(timer.wait_image(IMG.symbol_image[8], timeout=timeout) and times < max_times):
         timer.Android.click(900, 500, delay=.25)
         timeout = 2
         times += 1

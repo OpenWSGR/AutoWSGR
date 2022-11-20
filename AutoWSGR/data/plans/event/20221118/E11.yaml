@@ -1,0 +1,10 @@
+# E11 A 六雷巡战术, 一般用于潜艇的大角度
+# 带路要求 1SS
+# 默认进入战斗后 SL
+chapter: H
+map: 5
+selected_nodes: [A]
+node_defaults:
+  proceed: True
+  formation: 4
+  SL_when_enter_fight: True

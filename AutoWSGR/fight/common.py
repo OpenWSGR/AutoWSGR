@@ -298,7 +298,7 @@ class FightPlan(ABC):
                     self.timer.Android.click(615, 350, times=1)
             self.Info.update_state()
             state = self.Info.state
-            return state
+        return state
     
     @abstractmethod
     def _enter_fight(self, same_work=False) -> str:

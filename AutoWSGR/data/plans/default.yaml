@@ -4,7 +4,8 @@ normal_fight_defaults: # 常规战斗的默认参数(包括活动)
   repair_mode: 2 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案
   selected_nodes: [] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
   fight_condition: 1 # 战况选择
-  
+  fleet_id: 1 # 默认舰队
+
 battle_defaults: # 战役的默认参数
   map: 1 # 简单1-5 困难6-10
   repair_mode: 1 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案 [1, 1, 1, 1, 1, 1]

@@ -94,7 +94,11 @@ def make_map(image_path, dict_dir):
     files = listdir(image_path)
     dict_dir = dict_dir
     for file in files:
-        name = os.path.basename(file)
+        import pathlib
+        f = pathlib.Path(file)
+        if f.suffix != '.PNG':
+            continue
+        name = f.stem
         dict_value = SetPoints(name, cv2.imread(file))
         dict_to_yaml(dict_value, os.path.join(dict_dir, name + '.yaml'))
 
@@ -135,7 +139,7 @@ def coverter_9_1():
     print(relative_to_absolute((0.406, 0.06)))
     print(relative_to_absolute((0.264, 0.157)))
 
-    
+get_image()
 # coverter_9_1()
 # coverter()
-# make_map(r'data\map\image\event\20220928')
+# make_map(r'tests', r'tests')
