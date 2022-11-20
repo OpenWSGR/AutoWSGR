@@ -34,7 +34,7 @@ class AndroidController:
             if 'print' in kwargs:
                 is_print = kwargs.get('print')
             else:
-                print("click:", time.time(), x, y)
+                print("click:", time.time(), x, y, times)
         """点击模拟器相对坐标 (x,y).
         Args:
             x:相对横坐标  (相对 960x540 屏幕)

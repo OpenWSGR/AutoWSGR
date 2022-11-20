@@ -26,6 +26,7 @@ class Timer(Emulator):
         参考银河远征的战斗模拟写一个 Ship 类,更好的保存信息
         """
         super().__init__()
+        self.everyday_check = True # 是否需要进行每日登录奖励处理
         self.now_page = None
         self.ui = WSGR_UI
         self.ship_status = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
@@ -142,13 +143,15 @@ class Timer(Emulator):
             if(delay > 16):
                 raise ImageNotFoundErr("can't start game")
         try:
-            if (self.wait_image(IMG.start_image[6], timeout=2) != False):  # 新闻与公告,设为今日不再显示
-                if (not self.check_pixel((70, 485), (201, 129, 54))):
-                    self.Android.click(70, 485)
-                self.Android.click(30, 30)
-            if (self.wait_image(IMG.start_image[7], timeout=7) != False):  # 每日签到
-                self.Android.click(474, 357)
-                self.ConfirmOperation(must_confirm=1, timeout=2)
+            if self.everyday_check:
+                if (self.wait_image(IMG.start_image[6], timeout=2) != False):  # 新闻与公告,设为今日不再显示
+                    if (not self.check_pixel((70, 485), (201, 129, 54))):
+                        self.Android.click(70, 485)
+                    self.Android.click(30, 30)
+                if (self.wait_image(IMG.start_image[7], timeout=7) != False):  # 每日签到
+                    self.Android.click(474, 357)
+                    self.ConfirmOperation(must_confirm=1, timeout=2)
+                self.everyday_check = False
             self.go_main_page()
         except:
             raise BaseException("fail to start game")
@@ -185,7 +188,7 @@ class Timer(Emulator):
         return self.wait_images([IMG.error_image['bad_network'][0], IMG.symbol_image[10]], timeout=timeout) != None
 
     @logit(level=INFO2)
-    def process_bad_network(self, extra_info=""):
+    def process_bad_network(self, extra_info="", timeout=10):
         """判断并处理网络状况问题
         Returns:
             bool: 如果为 True 则表示为网络状况问题,并已经成功处理,否则表示并非网络问题或者处理超时.
@@ -193,7 +196,7 @@ class Timer(Emulator):
             TimeoutError:处理超时
         """
         start_time = time.time()
-        while self.is_bad_network():
+        while self.is_bad_network(timeout):
             print_err(f"bad network at{str(time.time())}", extra_info)
             while True:
                 if (time.time() - start_time >= 180):

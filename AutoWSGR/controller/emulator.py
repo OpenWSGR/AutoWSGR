@@ -36,6 +36,7 @@ class Emulator():
     def connect(self, emulator):
         # if(not self.Windows.is_android_online()):self.Windows.RestartAndroid() # TODO：功能重复
         self.device_name = emulator
+        self.Windows.device_name = emulator
         self.Windows.ConnectAndroid()
         self.update_screen()
         self.resolution = self.screen.shape[:2]

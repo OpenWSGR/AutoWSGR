@@ -1,4 +1,6 @@
 LDPLAYER_ROOT: C:\LDPlayer\LDPlayer9
+device_name: emulator-5554 # 雷电模拟器默认主设备名, 如果使用多开器, 请自行确定
+
 
 Auto_Expedition: True # 自动重复远征
 Auto_Gain_Bonus: True # 当有任务完成时自动点击

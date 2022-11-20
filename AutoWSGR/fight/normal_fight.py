@@ -55,7 +55,7 @@ class NormalFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 5]],
+                "no": [["result", 10]],
             },
             "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],  # 两页战果
             "get_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
@@ -73,6 +73,11 @@ class NormalFightInfo(FightInfo):
             "get_ship": [IMG.symbol_image[8], 5],
             "flagship_severe_damage": [IMG.fight_image[4], 5],
             "map_page": [self.map_image, 5]
+        }
+        
+        self.after_match_delay = {
+            "night":1,
+            "proceed":.5
         }
 
     def reset(self):
@@ -231,8 +236,7 @@ class NormalFightPlan(FightPlan):
 
         if S.SHOW_FIGHT_STAGE:
             print(self.fight_recorder.last_stage)
-        self.Info.update_state()
-        state = self.Info.state
+        state = self.update_state()
         # 进行MapLevel的决策
         if state == "map_page":
             return "fight end"

@@ -112,6 +112,7 @@ class FightInfo(ABC):
         self.timer = timer
         self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
         self.state2image = {}  # 所需用到的图片模板。格式为 [模板，等待时间]
+        self.after_match_delay = {} # 匹配成功后的延时。格式为 {状态名 : 延时时间(s),}
         self.last_state = ""
         self.last_action = ""
         self.state = ""
@@ -141,6 +142,7 @@ class FightInfo(ABC):
         timeout = max(timeout)
         
         
+        
         # 等待其中一种出现
         fun_start_time = time.time()
         while time.time() - fun_start_time <= timeout:
@@ -149,7 +151,13 @@ class FightInfo(ABC):
             # 尝试匹配
             ret = [self.timer.images_exist(image, 0, confidence=confidence, no_log=True) for image in images]
             if any(ret):
+                
                 self.state = possible_states[ret.index(True)]
+                # 查询是否有匹配后延时
+                if self.state in self.after_match_delay:
+                    delay = self.after_match_delay[self.state]
+                    time.sleep(delay)
+                    
                 if (S.SHOW_MATCH_FIGHT_STAGE):
                     print("matched:", self.state)
                 self._after_match()
@@ -274,6 +282,24 @@ class FightPlan(ABC):
         # 战斗中逻辑
         return self.fight()
 
+    def update_state(self):
+        try:
+            self.Info.update_state()
+            state = self.Info.state
+        except ImageNotFoundErr as _:
+            # 处理点击延迟或者网络波动导致的匹配失败
+            print_err("ImageNotFoundErr", "Image Match Failed, Processing")
+            if self.timer.process_bad_network(timeout=2.5):
+                pass
+            if self.Info.last_state in ['proceed', 'night']:
+                if self.Info.last_action == "yes":
+                    self.timer.Android.click(325, 350, times=2)
+                else:                
+                    self.timer.Android.click(615, 350, times=2)
+            self.Info.update_state()
+            state = self.Info.state
+            return state
+    
     @abstractmethod
     def _enter_fight(self, same_work=False) -> str:
         pass
@@ -377,10 +403,10 @@ class DecisionBlock():
             if(_action is not None):
                 is_night = _action
             if is_night:
-                self.timer.Android.click(325, 350, delay=.5)
+                self.timer.Android.click(325, 350)
                 return "yes", "fight continue"
             else:
-                self.timer.Android.click(615, 350, delay=.5)
+                self.timer.Android.click(615, 350)
                 return "no", "fight continue"
         elif state == "result":
             time.sleep(1.5)

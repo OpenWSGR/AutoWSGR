@@ -279,8 +279,8 @@ class DecisiveBattle():
 
     def repair(self):
         self.go_fleet_page()
-        # QuickRepair(self.timer, 1) # TODO：我的中破比很高，先改成只修大破控制一下用桶
-        QuickRepair(self.timer, 2)
+        QuickRepair(self.timer, 1) # TODO：我的中破比很高，先改成只修大破控制一下用桶
+        # QuickRepair(self.timer, 2)
 
     def next(self):
         res = self.statu.next()
@@ -446,7 +446,17 @@ class DecisiveBattle():
         self.statu.fleet.set_ship(fleet, order=True, search_method=None)
 
     def fight(self):
-        res = self.before_fight()
+        try:
+            res = self.before_fight()
+        except (Exception, BaseException) as e:
+            if self.statu.map == 1 and self.statu.node == 'A':
+                # 处理临时 BUG (https://nga.178.com/read.php?tid=34341326)
+                print(e, "Temporary Game BUG, Processing...")
+                self.timer.restart()
+                self.enter_map()
+                self.reset()
+                return 'continue'
+                
         if (res == 'retreat'):
             self.enter_map(check_map=False)
             self.reset()

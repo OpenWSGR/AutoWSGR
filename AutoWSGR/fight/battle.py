@@ -30,7 +30,7 @@ class BattleInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 5]],
+                "no": [["result", 10]],
             },
             "night_fight_period": ["result"],
             "result": ["battle_page"],    # 两页战果
@@ -44,6 +44,10 @@ class BattleInfo(FightInfo):
             "night": [IMG.fight_image[6], 120],
             "result": [IMG.fight_image[16], 60],
             "battle_page": [IMG.identify_images["battle_page"][0], 5, ]
+        }
+        
+        self.after_match_delay = {
+            "night":1.5,
         }
 
     def reset(self):
@@ -111,7 +115,7 @@ class BattlePlan(FightPlan):
     def _make_decision(self) -> str:
 
         _action = None
-        self.Info.update_state()
+        self.update_state()
         if self.Info.state == "battle_page":
             return "fight end"
         if (self.decision_block is not None):
