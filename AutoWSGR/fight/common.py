@@ -293,9 +293,9 @@ class FightPlan(ABC):
                 pass
             if self.Info.last_state in ['proceed', 'night']:
                 if self.Info.last_action == "yes":
-                    self.timer.Android.click(325, 350, times=2)
+                    self.timer.Android.click(325, 350, times=1)
                 else:                
-                    self.timer.Android.click(615, 350, times=2)
+                    self.timer.Android.click(615, 350, times=1)
             self.Info.update_state()
             state = self.Info.state
             return state
