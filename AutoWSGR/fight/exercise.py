@@ -77,7 +77,7 @@ class NormalExerciseInfo(FightInfo):
                 "discard": ["exercise_page"],
             },
             "fight_prepare_page": ["spot_enemy_success", "formation", "fight_period"],
-            "spot_enemy_success": ["formation"],
+            "spot_enemy_success": ["formation", "fight_period"],
 
             "formation": ["fight_period"],
             "fight_period": ["night", "result"],

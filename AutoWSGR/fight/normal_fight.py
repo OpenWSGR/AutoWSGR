@@ -49,7 +49,7 @@ class NormalFightInfo(FightInfo):
             "spot_enemy_success": {
                 "detour": ["fight_condition", "spot_enemy_success", "formation"],
                 "retreat": ["map_page"],
-                "fight": ["formation"],
+                "fight": ["formation", "fight_period"],
             },
             "formation": ["fight_period"],
             "fight_period": ["night", "result"],
