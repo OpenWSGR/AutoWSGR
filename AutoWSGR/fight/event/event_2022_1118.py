@@ -33,7 +33,8 @@ class EventFightPlan20221118(Event, NormalFightPlan):
         self.change_difficulty(chapter_id)
     
     def go_fight_prepare_page(self) -> None:
-        self.timer.Android.click(*NODE_POSITION[self.map])
+        if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
+            self.timer.Android.click(*NODE_POSITION[self.map])
         self.timer.wait_image(self.event_image[1])
         self.timer.Android.click(850, 490)
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
@@ -44,7 +45,7 @@ class EventFightInfo20221118(Event, NormalFightInfo):
     def __init__(self, timer: Timer, chapter_id, map_id, event="20221118") -> None:
         NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         Event.__init__(self, timer, event)
-        self.map_image = self.common_image['easy'] + self.common_image['hard']
+        self.map_image = self.common_image['easy'] + self.common_image['hard'] + [self.event_image[1]]
         self.end_page = 'unknown_page'
         self.state2image["map_page"] = [self.map_image, 5]
         

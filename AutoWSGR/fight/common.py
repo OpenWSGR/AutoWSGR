@@ -8,7 +8,7 @@ from AutoWSGR.constants.other_constants import (ALL_SHIP_TYPES, INFO1, INFO2,
                                                 SAP)
 from AutoWSGR.constants.positions import BLOODLIST_POSITION
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import get_ship
+from AutoWSGR.game.game_operation import get_ship, Expedition
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 # from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import get_nearest
@@ -260,6 +260,23 @@ class FightPlan(ABC):
                 self.timer.set_page(self.Info.end_page)
                 return 'success'
 
+    def run_for_times(self, times, expedion_gap=1900):
+        """多次执行同一任务
+        Args:
+            times (int): 任务执行总次数
+            expedion_gap (int, optional): 远征检查时间间隔. Defaults to 1900.
+        """
+        assert(times >= 1)
+        res = self.run()
+        for _ in range(1, times):
+            if time.time() - self.timer.last_expedition_checktime >= expedion_gap:
+                expedition = Expedition(self.timer)
+                expedition.run(True)
+                self.timer.last_expedition_checktime = time.time()
+                res = self.run()
+            else:
+                res = self.run(res != 'SL')
+    
     def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. """
         self.fight_recorder.reset()

@@ -133,12 +133,13 @@ class Timer(Emulator):
                 raise TimeoutError("login timeout")
             if res == 0:
                 raise BaseException("password or account is wrong")
-        delay = 2
+        delay = 15
         while self.image_exist(IMG.start_image[2]):
             self.click_image(IMG.start_image[2])
-            time.sleep(delay)
+            if self.wait_image(IMG.game_ui[3], timeout=delay, after_get_delay=.25):
+                break
             delay *= 2
-            if (delay > 16):
+            if (delay > 30):
                 raise ImageNotFoundErr("can't start game")
         try:
             if self.everyday_check:
