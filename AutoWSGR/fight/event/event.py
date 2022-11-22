@@ -1,12 +1,11 @@
 import os
 
 from AutoWSGR.constants.data_roots import IMG_ROOT
-from AutoWSGR.constants.custom_expections import ImageNotFoundErr
+from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.image_templates import (
     IMG, make_dir_templates, make_dir_templates_without_number)
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.utils.math_functions import CalcDis
-from AutoWSGR.utils.debug import print_err
 
 
 class Event():
@@ -17,6 +16,7 @@ class Event():
         enemy_dir = os.path.join(IMG_ROOT, "event", "enemy")
         event_dir = os.path.join(image_dir, event_name)
         self.timer = timer
+        self.logger = timer.logger
 
         self.event_image = make_dir_templates(event_dir)
         self.common_image = make_dir_templates_without_number(common_dir)
@@ -36,10 +36,10 @@ class Event():
         """
         res = self.timer.wait_images(self.common_image['hard'] + self.common_image['easy'])
         if res is None:
-            print_err("ImageNotFoundErr", "difficulty image not found")
+            self.logger.error("ImageNotFoundErr", "difficulty image not found")
             self.timer.log_screen()
             raise ImageNotFoundErr()
-        
+
         if (self.timer.image_exist(self.common_image['hard'], need_screen_shot=False)):
             return 0
         else:
@@ -107,8 +107,3 @@ class PatrollingEvent(Event):
             else:
                 self.random_walk()
         return None
-
-
-    
-        
-    

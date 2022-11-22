@@ -1,12 +1,8 @@
 import os
-import time
 
-import cv2
-
-from AutoWSGR.constants.custom_expections import ImageNotFoundErr
+from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.constants.image_templates import IMG
-from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.fight.battle import BattleInfo, BattlePlan
 from AutoWSGR.fight.common import start_march
@@ -14,7 +10,6 @@ from AutoWSGR.game.game_operation import QuickRepair, get_ship
 from AutoWSGR.game.get_game_info import DetectShipStatu
 from AutoWSGR.ocr.ship_name import _recognize_ship, recognize_number
 from AutoWSGR.port.ship import Fleet, count_ship
-from AutoWSGR.utils.debug import print_debug
 from AutoWSGR.utils.io import count, yaml_to_dict
 
 """决战结构:
@@ -126,7 +121,11 @@ class Logic(_Logit):
     """决战逻辑模块
     """
 
-    def __init__(self, statu: DecisiveStatu, level1: list, level2: list, flagship_priority: list):
+    def __init__(self, timer, statu: DecisiveStatu, level1: list, level2: list, flagship_priority: list):
+        self.timer = timer
+        self.config = timer.config
+        self.logger = timer.logger
+        
         self.level1 = level1
         self.level2 = ["长跑训练", "肌肉记忆"] + self.level1 + level2 + ["黑科技"]
         self.flag_ships = flagship_priority
@@ -170,7 +169,7 @@ class Logic(_Logit):
 
     def get_best_fleet(self):
         ships = self.statu.ships
-        print_debug(S.SHOW_DECISIVE_BATTLE_INFO, "ALL SHIPS:", ships)
+        self.logger.debug(f"ALL SHIPS: {ships}")
         best_ships = ["", ]
         for ship in self.level1:
             if (ship not in ships or len(best_ships) == 7):
@@ -190,7 +189,7 @@ class Logic(_Logit):
 
         for _ in range(len(best_ships), 7):
             best_ships.append("")
-        print_debug(S.SHOW_DECISIVE_BATTLE_INFO, "BEST FLEET:", best_ships)
+        self.logger.debug(f"BEST FLEET: {best_ships}")
         return best_ships
 
     def _retreat(self):
@@ -233,11 +232,12 @@ class DecisiveBattle():
             : 若当前决战进度为还没打 6-2-A, 则应填写 chapter=6, map=1, node='A'
             : 可以支持断点开始
         """
+        self.timer = timer
+        self.config = timer.config
         assert (chatper <= 6 and chatper >= 1)
         self.statu = DecisiveStatu(timer, chatper, map, node, version)
         if logic is None:
-            self.logic = Logic(self.statu, level1, level2, flagship_priority)
-        self.timer = timer
+            self.logic = Logic(self.timer, self.statu, level1, level2, flagship_priority)
         self.__dict__.update(kwargs)
 
     def buy_ticket(self, use='steel', times=3):

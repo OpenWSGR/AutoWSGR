@@ -33,7 +33,7 @@ def log_image(event:keyboard.KeyboardEvent):
     print("Screen Processing:", screen_shot_count)
     screen_shot_count += 1
     timer.update_screen()
-    timer.log_screen()
+    timer.timer.log_screen()
     
 
 def SetPoints(windowname, img):

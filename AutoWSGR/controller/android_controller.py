@@ -3,16 +3,18 @@ import time
 
 from airtest.core.api import shell, start_app, text
 from AutoWSGR.constants.other_constants import INFO1
-from AutoWSGR.constants.settings import S
 from AutoWSGR.utils.api_image import convert_position
-from AutoWSGR.utils.logger import logit
+# from AutoWSGR.utils.logger import logit
 
 
 class AndroidController:
-    def __init__(self, resolution) -> None:
-        self.resolution = resolution
+    def __init__(self, config, logger) -> None:
+        self.config = config
+        self.logger = logger
+        
+        self.resolution = config.resolution
 
-    @logit()
+    # @logit()
     def ShellCmd(self, cmd, *args, **kwargs):
         """向链接的模拟器发送 shell 命令
         Args:
@@ -20,7 +22,10 @@ class AndroidController:
         """
         return shell(cmd)
 
-    @logit()
+    def start_app(self, package_name):
+        start_app(package_name)
+    
+    #@logit()
     def is_game_running(self):
         apps = self.ShellCmd("ps")
         return "zhanjian2" in apps
@@ -28,13 +33,8 @@ class AndroidController:
     def text(self, t):
         text(t)
 
-    @logit(level=INFO1)
-    def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
-        if S.SHOW_ANDROID_INPUT:
-            if 'print' in kwargs:
-                is_print = kwargs.get('print')
-            else:
-                print("click:", time.time(), x, y, times)
+    #@logit(level=INFO1)
+    def click(self, x, y, times=1, delay=0.5, enable_subprocess=False):
         """点击模拟器相对坐标 (x,y).
         Args:
             x:相对横坐标  (相对 960x540 屏幕)
@@ -48,6 +48,9 @@ class AndroidController:
             enable_subprocess == True:
                 A class threading.Thread refers to this click subprocess
         """
+        if self.config.SHOW_ANDROID_INPUT:
+            self.logger.debug("click:", time.time(), x, y)
+            
         if (times < 1):
             raise ValueError("invaild arg 'times' " + str(times))
         if (enable_subprocess and times != 1):
@@ -65,9 +68,9 @@ class AndroidController:
             return p
         for _ in range(times):
             self.ShellCmd(f"input tap {str(x)} {str(y)}")
-            time.sleep(delay * S.DELAY)
+            time.sleep(delay * self.config.DELAY)
 
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
         """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
         Args:
@@ -89,13 +92,13 @@ class AndroidController:
         x2, y2 = convert_position(x2, y2, self.resolution)
         duration = int(duration * 1000)
         input_str = f"input swipe {str(x1)} {str(y1)} {str(x2)} {str(y2)} {duration}"
-        if S.SHOW_ANDROID_INPUT:
-            print("Time:", time.time(), input_str)
+        if self.config.SHOW_ANDROID_INPUT:
+            self.logger.debug(input_str)
         self.ShellCmd(input_str)
 
         time.sleep(delay)
 
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
         """长按相对坐标 (x,y)
         Args:

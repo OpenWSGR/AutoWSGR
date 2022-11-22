@@ -1,14 +1,9 @@
-# import easyocr
 import os
 import functools
-import threading
-import time
 import easyocr
 import cv2
 
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
-from AutoWSGR.constants.settings import S
-from AutoWSGR.utils.debug import print_debug
 from AutoWSGR.utils.operator import unzip_element
 
 en_reader = None
@@ -16,16 +11,12 @@ ch_reader = None
 
 def load_en_reader():
     global en_reader
-    print_debug(S.SHOW_OCR_INFO, "start loading en_reader")
     en_reader = easyocr.Reader(['en'], gpu=True)
-    print_debug(S.SHOW_OCR_INFO, "end loading en_reader")
 
 
 def load_ch_reader():
     global ch_reader
-    print_debug(S.SHOW_OCR_INFO, "start loading ch_reader")
     ch_reader = easyocr.Reader(['ch_sim'], gpu=True)
-    print_debug(S.SHOW_OCR_INFO, "end loading ch_reader")
 
 
 def edit_distance(word1, word2) -> int:
@@ -164,8 +155,8 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
                 if(dis1 < dis2):
                     res = _name    
         results.append((res, box[0]))
-    print_debug(S.SHOW_OCR_INFO, result)
-    print_debug(S.SHOW_OCR_INFO, results)
+    # print_debug(True, result)
+    # print_debug(True, results)
     if(len(results) == 0):
         results.append(("Unknown", (0, 0)))
     return results

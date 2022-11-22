@@ -2,12 +2,11 @@ import time
 
 from airtest.core.api import text
 from AutoWSGR.constants.image_templates import IMG
-from AutoWSGR.constants.custom_expections import ImageNotFoundErr, NetworkErr
+from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3
 from AutoWSGR.constants.positions import BLOODLIST_POSITION
-from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.utils.logger import logit
+# from AutoWSGR.utils.logger import logit
 
 from .get_game_info import CheckSupportStatu, DetectShipStatu
 
@@ -18,7 +17,7 @@ class Expedition:
         self.is_ready = False
         self.last_check = time.time()
 
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def update(self, force=False):
         self.timer.update_screen()
         if  (isinstance(self.timer.now_page, str) and 'unknow' in self.timer.now_page)\
@@ -30,7 +29,7 @@ class Expedition:
         else:
             self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
             
-    @logit(level=INFO3)
+    #@logit(level=INFO3)
     def run(self, force=False):
         """检查远征,如果有未收获远征,则全部收获并用原队伍继续
 
@@ -51,7 +50,7 @@ class Expedition:
                 break
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def get_ship(timer:Timer, max_times=1):
     times = 0 
     timeout = 5
@@ -61,7 +60,7 @@ def get_ship(timer:Timer, max_times=1):
         times += 1
 
 
-@logit(level=INFO3)
+#@logit(level=INFO3)
 def DestoryShip(timer: Timer, reserve=1, amount=1):
     # amount:重要舰船的个数
     # 解装舰船
@@ -116,7 +115,7 @@ def DestoryShip(timer: Timer, reserve=1, amount=1):
     #     click(807, 346)"""
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def verify_team(timer: Timer):
     """检验目前是哪一个队伍(1~4)
     含网络状况处理
@@ -135,7 +134,6 @@ def verify_team(timer: Timer):
 
     for _ in range(5):
         for i, position in enumerate([(64, 83), (186, 83), (310, 83), (430, 83)]):
-            # if(S.DEBUG):print(timer.screen[83][64])
             if (timer.check_pixel(position, bgr_color=(228, 132, 16))):
                 return i + 1
         time.sleep(.2)
@@ -144,11 +142,11 @@ def verify_team(timer: Timer):
     if timer.process_bad_network():
         return verify_team(timer)
 
-    timer.log_screen()
+    timer.timer.log_screen()
     raise ImageNotFoundErr()
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def MoveTeam(timer: Timer, target, try_times=0):
     """切换队伍
     Args:
@@ -163,7 +161,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
         raise ValueError("can't change team sucessfully")
 
     if (timer.identify_page('fight_prepare_page') == False):
-        timer.log_screen()
+        timer.timer.log_screen()
         raise ImageNotFoundErr("not on 'fight_prepare_page' ")
 
     if (verify_team(timer) == target):
@@ -174,7 +172,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
         MoveTeam(timer, target, try_times + 1)
 
 
-@logit(level=INFO3)
+#@logit(level=INFO3)
 def SetSupport(timer: Timer, target, try_times=0):
     """启用战役支援
 
@@ -201,7 +199,7 @@ def SetSupport(timer: Timer, target, try_times=0):
             raise ValueError("can't set right support")
 
 
-@logit(level=INFO3)
+#@logit(level=INFO3)
 def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
     """战斗界面的快速修理
 
@@ -225,7 +223,7 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         elif x == 2:
             need_repair[i] = ShipStatus[i+1] not in [-1, 0, 1]
 
-    if (S.DEBUG):
+    if (timer.config.DEBUG):
         print("ShipStatus:", ShipStatus)
     if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
 
@@ -238,12 +236,12 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         # 按逻辑修理
         for i in range(1, 7):
             if need_repair[i-1]:
-                timer.log_info("WorkInfo:" + str(kwargs))
-                timer.log_info(str(i)+" Repaired")
+                timer.logger.info("WorkInfo:" + str(kwargs))
+                timer.logger.info(str(i)+" Repaired")
                 timer.Android.click(BLOODLIST_POSITION[0][i][0], BLOODLIST_POSITION[0][i][1], delay=1.5)
 
 
-@logit(level=INFO3)
+#@logit(level=INFO3)
 def GainBounds(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取
 
@@ -265,7 +263,7 @@ def GainBounds(timer: Timer):
     #timer.Android.click(774, 502)
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def RepairByBath(timer: Timer):
     """使用浴室修理修理时间最长的单位
 
@@ -281,7 +279,7 @@ def RepairByBath(timer: Timer):
             timer.set_page()
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def SetAutoSupply(timer: Timer, type=1):
     timer.update_screen()
     NowType = int(timer.check_pixel((48, 508), (224, 135, 35)))
@@ -289,7 +287,7 @@ def SetAutoSupply(timer: Timer, type=1):
         timer.Android.click(44, 503, delay=0.33)
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def Supply(timer: Timer, List=[1, 2, 3, 4, 5, 6], try_times=0):
     """补给指定舰船
 
@@ -319,7 +317,7 @@ def Supply(timer: Timer, List=[1, 2, 3, 4, 5, 6], try_times=0):
         Supply(timer, List, try_times + 1)
 
 
-@logit(level=INFO2)
+#@logit(level=INFO2)
 def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_statu=True):
     """切换舰船(不支持第一舰队)
 
@@ -361,7 +359,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
     timer.wait_pages('fight_prepare_page', gap=0)
 
 
-@logit(level=INFO3)
+#@logit(level=INFO3)
 def ChangeShips(timer: Timer, team, list):
     """更换编队舰船
 

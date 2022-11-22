@@ -1,18 +1,18 @@
+import os
 import threading as th
 import time
 
-from airtest.core.api import start_app, text
+from airtest.core.api import text
 
-from AutoWSGR.constants.custom_expections import (CriticalErr,
+from AutoWSGR.constants.custom_exceptions import (CriticalErr,
                                                   ImageNotFoundErr, NetworkErr)
+from AutoWSGR.constants.data_roots import DATA_ROOT
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import (ALL_PAGES, INFO1, INFO2, INFO3,
                                                 NO)
-from AutoWSGR.constants.settings import S
 from AutoWSGR.constants.ui import WSGR_UI, Node
-from AutoWSGR.utils.debug import print_err
 from AutoWSGR.utils.io import yaml_to_dict
-from AutoWSGR.utils.logger import logit
+# from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.operator import unzip_element
 
 from .emulator import Emulator
@@ -21,12 +21,14 @@ from .emulator import Emulator
 class Timer(Emulator):
     """ 程序运行记录器,用于记录和传递部分数据,同时用于区分多开 """
 
-    def __init__(self):
+    def __init__(self, config, logger):
         """Todo
         参考银河远征的战斗模拟写一个 Ship 类,更好的保存信息
         """
-        super().__init__()
-        self.everyday_check = True # 是否需要进行每日登录奖励处理
+        # 模拟器通用设置
+        super().__init__(config, logger)
+
+        # 战舰少女R专用
         self.now_page = None
         self.ui = WSGR_UI
         self.ship_status = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
@@ -39,7 +41,6 @@ class Timer(Emulator):
         self.resources = None
         self.last_error_time = time.time() - 1800
         self.decisive_battle_data = None
-        self.ship_names = []
         """
         以上时能用到的
         以下是暂时用不到的
@@ -54,42 +55,39 @@ class Timer(Emulator):
         self.last_mission_compelted = 0
         self.last_expedition_checktime = time.time()
 
-    def setup(self, to_main_page):
-        self.ship_names = unzip_element([name for name in yaml_to_dict(S.SHIPNAME_PATH).values()])
-        self.connect(S.device_name)
-        if S.account != None and S.password != None:
-            self.restart(account=S.account, password=S.password)
+        ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
+        self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
+
+        if self.config.account is not None and self.config.password != None:
+            self.restart(account=self.config.account, password=self.config.password)
         if self.Android.is_game_running() == False:
             self.start_game()
-        if (S.DEBUG):
-            print("resolution:", self.resolution)
-            assert(self.resolution == self.Android.resolution)
+
         self.ammo = 10
         # self.resources = Resources(self)
-        if (to_main_page):
-            self.go_main_page()
+        self.go_main_page()
         try:
             self.set_page()
-        except (BaseException, Exception):
-            if S.DEBUG:
+        except:
+            if self.config.DEBUG:
                 self.set_page('main_page')
             else:
                 self.restart()
                 self.set_page()
-        print(self.now_page)
+        self.logger.info(f"Now at: {self.now_page}")
 
     # ========================= 初级游戏控制 =========================
-    @logit(level=INFO3)
+    #@logit(level=INFO3)
     def log_in(self, account, password):
         pass
 
-    @logit(level=INFO3)
+    #@logit(level=INFO3)
     def log_out(self, account, password):
         """在登录界面登出账号
         """
         pass
 
-    @logit(level=INFO3)
+    #@logit(level=INFO3)
     def start_game(self, account=None, password=None, delay=1.0):
         """启动游戏(实现不优秀,需重写)
 
@@ -100,7 +98,7 @@ class Timer(Emulator):
         Raises:
             NetworkErr: _description_
         """
-        start_app("com.huanmeng.zhanjian2")
+        self.Android.start_app("com.huanmeng.zhanjian2")
         res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, timeout=70 * delay)
 
         if res is None:
@@ -140,7 +138,7 @@ class Timer(Emulator):
             self.click_image(IMG.start_image[2])
             time.sleep(delay)
             delay *= 2
-            if(delay > 16):
+            if (delay > 16):
                 raise ImageNotFoundErr("can't start game")
         try:
             if self.everyday_check:
@@ -156,7 +154,7 @@ class Timer(Emulator):
         except:
             raise BaseException("fail to start game")
 
-    @logit(level=INFO3)
+    #@logit(level=INFO3)
     def restart(self, times=0, *args, **kwargs):
         try:
             self.Android.ShellCmd("am force-stop com.huanmeng.zhanjian2")
@@ -183,11 +181,11 @@ class Timer(Emulator):
             self.Windows.ConnectAndroid()
             self.restart(times + 1, *args, **kwargs)
 
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def is_bad_network(self, timeout=10):
         return self.wait_images([IMG.error_image['bad_network'][0], IMG.symbol_image[10]], timeout=timeout) != None
 
-    @logit(level=INFO2)
+    # @logit(level=INFO2)
     def process_bad_network(self, extra_info="", timeout=10):
         """判断并处理网络状况问题
         Returns:
@@ -197,7 +195,7 @@ class Timer(Emulator):
         """
         start_time = time.time()
         while self.is_bad_network(timeout):
-            print_err(f"bad network at{str(time.time())}", extra_info)
+            self.logger.error(f"bad network: {extra_info}")
             while True:
                 if (time.time() - start_time >= 180):
                     raise TimeoutError("Process bad network timeout")
@@ -213,21 +211,20 @@ class Timer(Emulator):
                     self.Android.click(476, 298, delay=2)
 
             if (time.time() - start_time2 < 60):
-                if (S.DEBUG):
-                    print("ok network problem solved, at", time.time())
+                self.logger.debug("ok network problem solved, at", time.time())
                 return True
 
         return False
 
     # ========================= 维护当前所在游戏界面 =========================
-    @logit()
+    #@logit()
     def _intergrative_page_identify(self):
         positions = [(171, 47), (300, 47), (393, 47), (504, 47), (659, 47)]
         for i, position in enumerate(positions):
             if self.check_pixel(position, (225, 130, 16)):
                 return i + 1
 
-    @logit()
+    #@logit()
     def identify_page(self, name, need_screen_shot=True):
         if need_screen_shot:
             self.update_screen()
@@ -243,7 +240,7 @@ class Timer(Emulator):
 
         return any(self.image_exist(template, 0) for template in IMG.identify_images[name])
 
-    @logit()
+    #@logit()
     def wait_pages(self, names, timeout=5, gap=.1, after_wait=0.1):
         start_time = time.time()
         if (isinstance(names, str)):
@@ -261,19 +258,19 @@ class Timer(Emulator):
 
         raise TimeoutError(f"identify timeout of{str(names)}")
 
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def get_now_page(self):
         """获取并返回当前页面名称
         """
         self.update_screen()
         for page in ALL_PAGES:
-            if (self.identify_page(page, need_screen_shot=False, no_log=True)):
+            if (self.identify_page(page, need_screen_shot=False)):
                 return page
         return 'unknown_page'
 
-    @logit()
+    #@logit()
     def check_now_page(self):
-        return self.identify_page(name=self.now_page.name, no_log=True)
+        return self.identify_page(name=self.now_page.name)
 
     def operate(self, end: Node):
         ui_list = self.ui.find_path(self.now_page, end)
@@ -286,18 +283,16 @@ class Timer(Emulator):
                 if (fun == "click"):
                     self.Android.click(*args)
                 else:
-                    print_err(f"unknown function name:{str(fun)}")
+                    self.logger.error(f"unknown function name: {fun}")
                     raise BaseException()
 
             if (edge.other_dst is not None):
                 dst = self.wait_pages(names=[self.now_page.name, edge.other_dst.name])
                 if (dst == 1):
                     continue
-                if S.DEBUG:
-                    print(f"Go page {self.now_page.name} but arrive ", edge.other_dst.name)
+                self.logger.debug(f"Go page: {self.now_page.name}, but arrive: {edge.other_dst.name}")
                 self.now_page = self.ui.get_node_by_name([self.now_page.name, edge.other_dst.name][dst - 1])
-                if S.DEBUG:
-                    print(self.now_page.name)
+                self.logger.debug(f"Now page: {self.now_page.name}")
 
                 self.operate(end)
                 return
@@ -319,9 +314,7 @@ class Timer(Emulator):
                     self.now_page = now_page
         elif (page is not None):
             if (not isinstance(page, Node)):
-
-                print("============================================")
-                print("arg:page must be an controller.ui.Node object")
+                self.logger.error("arg:page must be an controller.ui.Node object")
                 raise ValueError()
 
             self.now_page = page if (self.ui.page_exist(page)) else 'unknown_page'
@@ -342,8 +335,8 @@ class Timer(Emulator):
                 return
             if (isinstance(end, str)):
                 end = self.ui.get_node_by_name(end)
-                if(end == None):
-                    print_err("unacceptable value of end:" + end)
+                if end is None:
+                    self.logger.error("unacceptable value of end: {end}")
                     raise ValueError("illegal value:end, in Timer.walk_to")
                 self.walk_to(end)
 
@@ -351,8 +344,8 @@ class Timer(Emulator):
             if try_times > 3:
                 raise TimeoutError("can't access the page")
             if self.is_bad_network(timeout=0) == False:
-                print("wrong path is operated,anyway we find a way to solve,processing")
-                print('wrong info is:', exception)
+                self.logger.debug("wrong path is operated,anyway we find a way to solve,processing")
+                self.logger.debug('wrong info is:', exception)
                 self.go_main_page()
                 self.walk_to(end, try_times + 1)
             else:
@@ -369,7 +362,7 @@ class Timer(Emulator):
                         raise ValueError('unknown error')
                 self.walk_to(end)
 
-    @logit(level=INFO2)
+    #@logit(level=INFO2)
     def go_main_page(self, QuitOperationTime=0, List=[], ExList=[]):
         """回退到游戏主页
 
@@ -391,7 +384,7 @@ class Timer(Emulator):
         type = self.wait_images(List + [IMG.game_ui[3]], 0.8, timeout=0)
 
         if type is None:
-            self.go_main_page(QuitOperationTime + 1, List, no_log=True)
+            self.go_main_page(QuitOperationTime + 1, List)
             return
 
         if (type >= len(List)):
@@ -403,9 +396,9 @@ class Timer(Emulator):
         self.Android.click(pos[0], pos[1])
 
         NewList = List[1:] + [List[0]]
-        self.go_main_page(QuitOperationTime + 1, NewList, no_log=True)
+        self.go_main_page(QuitOperationTime + 1, NewList)
 
-    @logit(level=INFO2)
+    #@logit(level=INFO2)
     def goto_game_page(self, target='main', extra_check=False):
         """到某一个游戏界面
 
@@ -416,16 +409,37 @@ class Timer(Emulator):
         if extra_check:
             self.wait_pages(names=[self.now_page.name])
 
+    #@logit(level=INFO2)
+    def ConfirmOperation(self, must_confirm=0, delay=0.5, confidence=.9, timeout=0):
+        """等待并点击弹出在屏幕中央的各种确认按钮
+
+        Args:
+            must_confirm (int, optional): 是否必须按. Defaults to 0.
+            delay (float, optional): 点击后延时(秒). Defaults to 0.5.
+            timeout (int, optional): 等待延时(秒),负数或 0 不等待. Defaults to 0.
+
+        Raises:
+            ImageNotFoundErr: 如果 must_confirm = True 但是 timeout 之内没找到确认按钮排除该异常
+        Returns:
+            bool:True 为成功,False 为失败
+        """
+        pos = self.wait_images(IMG.confirm_image[1:], confidence, timeout=timeout)
+        if pos is None:
+            if (must_confirm == 1):
+                raise ImageNotFoundErr("no confirm image found")
+            else:
+                return False
+        res = self.get_image_position(IMG.confirm_image[pos + 1], 0)
+        self.Android.click(res[0], res[1], delay=delay)
+        return True
+
 
 def process_error(timer: Timer):
     print("processing errors")
-    if (timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False):
+    if timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False:
         timer.Windows.RestartAndroid()
         timer.Windows.ConnectAndroid()
 
         return "Andoird Restarted"
 
-    if (timer.process_bad_network()):
-        return "ok,bad network"
-
-    return "ok,unknown error"
+    return "ok,bad network" if timer.process_bad_network() else "ok,unknown error"

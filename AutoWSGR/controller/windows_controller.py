@@ -1,25 +1,22 @@
-from macpath import join
 import os
 import shutil
 import time
 from subprocess import check_output
 
 from airtest.core.api import auto_setup
-from AutoWSGR.constants.custom_expections import CriticalErr
-from AutoWSGR.constants.other_constants import INFO2
-from AutoWSGR.constants.settings import S
+from AutoWSGR.constants.custom_exceptions import CriticalErr
 from AutoWSGR.constants.data_roots import ADB_ROOT
-from AutoWSGR.utils.debug import print_err, print_debug
 from AutoWSGR.utils.function_wrapper import try_for_times
-from AutoWSGR.utils.logger import logit
+# from AutoWSGR.utils.logger import logit
 
 # Win 和 Android 的通信
 # Win 向系统写入数据
 
 
 class WindowsController:
-    def __init__(self, device_name) -> None:
-        self.device_name = device_name
+    def __init__(self, config, logger) -> None:
+        self.config = config
+        self.logger = logger
 
     def wait_network(self, timeout=1000):
         """等待到网络恢复
@@ -59,17 +56,17 @@ class WindowsController:
                 break
             a = x.split()[0]
             res.append(a)
-        print_debug(S.DEBUG, "Devices list:", res)
+        self.logger.debug(f"Devices list: {res}")
         return res
 
     def CopyRequirements(self, path):
         """还没写好"""
-        print(path)
+        self.logger.info(path)
         try:
             shutil.rmtree(path + "\\airtest")
         except:
             pass
-        print(f"xcopy req {path} /E/H/C/I")
+        self.logger.info(f"xcopy req {path} /E/H/C/I")
         os.system(f"xcopy req {path} /E/H/C/I")
         time.sleep(5)
 
@@ -85,9 +82,9 @@ class WindowsController:
         from logging import ERROR, getLogger
         getLogger("airtest").setLevel(ERROR)
         auto_setup(__file__, devices=[
-            f"android://127.0.0.1:5037//{self.device_name}?cap_method=MINICAP&&ori_method=MINICAPORI&&touch_method=MINITOUCH"])
+            f"android://127.0.0.1:5037//{self.config.device_name}?cap_method=MINICAP&&ori_method=MINICAPORI&&touch_method=MINITOUCH"])
 
-        print("Hello,I am WSGR auto commanding system")
+        self.logger.info("Hello,I am WSGR auto commanding system")
 
     def is_android_online(self, times=4):
         """判断 timer 给定的设备是否在线
@@ -103,13 +100,13 @@ class WindowsController:
             res = check_output(f"{ADB_ROOT}/adb.exe devices -l").decode('ascii').split('\n')
             for x in res:
                 x = x.strip()
-                print(x)
-                if (self.device_name in x and 'device' in x):
+                self.logger.info(x)
+                if (self.config.device_name in x and 'device' in x):
                     return True
             time.sleep(1.5)
         return False
 
-    @logit(level=INFO2)
+    #@logit(level=INFO2)
     def RestartAndroid(self):
         """重启安卓设备
 
@@ -117,20 +114,20 @@ class WindowsController:
             times (int):重启次数
         """
         restart_time = time.time()
-        print("Android Restaring")
+        self.logger.info("Android Restaring")
         try:
             try:
                 os.system("taskkill -f -im dnplayer.exe")
             except:
                 pass
-            os.popen(os.path.join(S.LDPLAYER_ROOT, "dnplayer.exe"))
+            os.popen(os.path.join(self.config.LDPLAYER_ROOT, "dnplayer.exe"))
             time.sleep(3)
             while self.is_android_online() == False:
                 time.sleep(1)
                 if (time.time() - restart_time > 120):
                     raise TimeoutError("can't start the emulator")
         except BaseException as E:
-            print_err(E, "请检查模拟器路径!")
+            self.logger.error(f"{E} 请检查模拟器路径!")
             raise CriticalErr("on Restart Android")
 
     def CheckNetWork(self):

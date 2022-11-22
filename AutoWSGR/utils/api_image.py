@@ -56,34 +56,36 @@ def convert_area(area, resolution, mode='960_to_this'):
     """转化矩阵格式(放缩)
 
     Args:
-        area list(left, top, right, buttom): 矩阵,列表或者元组
+        area list(left, top, right, button): 矩阵,列表或者元组
         mode (str): 工作模式
             values:
                 '960_to_this':将 960x540 格式转化为当前模拟器屏幕坐标
                 'this_to_960':将当前模拟器屏幕坐标转化为 960x540 格式
 
     Returns:
-        (left, top, right, buttom): 转化后的矩阵(元组)
+        (left, top, right, button): 转化后的矩阵(元组)
     """
     left, top = convert_position(area[0], area[1], resolution, mode)
-    right, buttom = convert_position(area[2], area[3], resolution, mode)
-    return (left, top, right, buttom)
+    right, button = convert_position(area[2], area[3], resolution, mode)
+    return (left, top, right, button)
 
 
-def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, this_mehods=['tpl']):
+def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, this_methods=None):
     """从原图像中尝试找出一个置信度相对于模板图像最高的矩阵区域的中心坐标
 
     Args:
         image (np.ndarray): 原图像
         query (MyTemplate): 模板图像
         confidence (float, optional): 置信度阈值. Defaults to 0.85.
-        this_mehods (list, optional): 匹配方式. Defaults to ['tpl'].
+        this_methods (list, optional): 匹配方式. Defaults to ['tpl'].
 
     Returns:
         如果匹配结果中有超过阈值的,返回置信度最高的结果的中心绝对坐标:Tuple(int,int)
 
         否则返回 None 
     """
+    if this_methods is None:
+        this_methods = ['tpl']
     query.threshold = confidence
-    match_pos = query.match_in(image, this_methods=this_mehods)
+    match_pos = query.match_in(image, this_methods=this_methods)
     return match_pos or None

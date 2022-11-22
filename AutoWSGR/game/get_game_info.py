@@ -6,17 +6,16 @@ import numpy as np
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
                                        SUPPOER_DISABLE, SUPPORT_ENALBE)
-from AutoWSGR.constants.data_roots import DATA_ROOT, TUNNEL_ROOT
+from AutoWSGR.constants.data_roots import TUNNEL_ROOT
 from AutoWSGR.constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC,
                                                 BG, BM, CA, CAV, CBG, CL, CLT,
                                                 CV, CVL, DD, INFO1, NAP, NO,
                                                 RESOURCE_NAME, SAP, SC, SS)
 from AutoWSGR.constants.positions import BLOODLIST_POSITION, TYPE_SCAN_AREA
-from AutoWSGR.constants.settings import S
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.ocr.digit import get_resources
 from AutoWSGR.utils.io import delete_file, read_file, save_image, write_file
-from AutoWSGR.utils.logger import logit
+# from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis, CheckColor, matri_to_str
 from PIL import Image as PIM
 
@@ -71,7 +70,7 @@ class Resources():
         return self.resources.get(name)
 
 
-@logit(level=INFO1)
+#@logit(level=INFO1)
 def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     """获取敌方舰船类型数据并更新到 timer.enemy_type_count
     timer.enemy_type_count 为一个记录了敌方情况的字典
@@ -123,14 +122,14 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
 
     timer.enemy_type_count[NAP] -= timer.enemy_type_count['AP'] - timer.enemy_type_count[SAP]
 
-    if (S.DEBUG):
+    if (timer.config.DEBUG):
         for key, value in timer.enemy_type_count.items():
             if (value != 0 and key != 'AP'):
                 print(key, ':', value, end=',')
         print("")
 
 
-@ logit(level=INFO1)
+# @logit(level=INFO1)
 def DetectShipStatu(timer: Timer, type='prepare'):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_status
 
@@ -178,19 +177,19 @@ def DetectShipStatu(timer: Timer, type='prepare'):
             pixel=timer.get_pixel(*BLOODLIST_POSITION[1][i])
             result[i]=CheckColor(pixel, BLOOD_COLORS[1])
     timer.ship_status=result
-    if S.DEBUG:
+    if timer.config.DEBUG:
         print(type, ":ship_status =", result)
     return result
 
 
-@ logit(level=INFO1)
+#@logit(level=INFO1)
 def DetectShipType(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
 
 
-@ logit(level=INFO1)
+#@logit(level=INFO1)
 def get_exercise_status(timer: Timer, robot=None):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
@@ -232,7 +231,7 @@ def get_exercise_status(timer: Timer, robot=None):
         return result
 
 
-@ logit(level=INFO1)
+#@logit(level=INFO1)
 def CheckSupportStatu(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 

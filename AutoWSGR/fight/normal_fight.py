@@ -2,19 +2,17 @@ import copy
 import os
 import time
 
-from AutoWSGR.constants.custom_expections import ImageNotFoundErr
+from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT, PLAN_ROOT
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import (INFO1, INFO2, INFO3,
                                                 NORMAL_MAP_EVERY_CHAPTER)
-from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITON
-from AutoWSGR.constants.settings import S
+from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITION
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
 from AutoWSGR.game.get_game_info import DetectShipStatu, GetEnemyCondition
-from AutoWSGR.utils.debug import print_err, print_war
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
-from AutoWSGR.utils.logger import logit
+# from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis
 
 from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock,
@@ -88,7 +86,7 @@ class NormalFightInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed", "fight_condition"]:
-            self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, print=0, no_log=True)
+            self.timer.Android.click(380, 520, delay=0, enable_subprocess=True)
 
         self.timer.update_screen()
 
@@ -113,7 +111,7 @@ class NormalFightInfo(FightInfo):
             self.fight_result.detect_result()
 
     # ======================== Functions ========================
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def _update_ship_position(self):
         """在战斗移动界面(有一个黄色小船在地图上跑)更新黄色小船的位置
         """
@@ -123,7 +121,7 @@ class NormalFightInfo(FightInfo):
         if pos is None:
             return
         self.ship_position = pos
-        if S.SHOW_MAP_NODE:
+        if self.config.SHOW_MAP_NODE:
             print(self.ship_position)
 
     def _update_ship_point(self):
@@ -139,7 +137,7 @@ class NormalFightInfo(FightInfo):
                                                                                self.ship_position):
                 self.node = ch
 
-        if S.SHOW_MAP_NODE:
+        if self.config.SHOW_MAP_NODE:
             print(self.node)
 
     def load_point_positions(self, map_path):
@@ -189,7 +187,7 @@ class NormalFightPlan(FightPlan):
         
         # 检查参数完整情况
         if "fleet_id" not in plan_args:
-            print_war("fleet_id not set", "Default arg 1 will be used")
+            self.logger.warning("fleet_id not set", "Default arg 1 will be used")
         
         # 从默认参数加载
         plan_defaults = default_args["normal_fight_defaults"]
@@ -239,7 +237,7 @@ class NormalFightPlan(FightPlan):
         except AssertionError:
             if "process_err" in kwargs and kwargs["process_err"] == False:
                 raise ImageNotFoundErr("进入战斗前置界面错误")
-            print_war("进入战斗前置界面不正确")
+            self.logger.warning("进入战斗前置界面不正确")
             self.timer.process_bad_network()
             return self._enter_fight(process_err=False)
 
@@ -247,7 +245,7 @@ class NormalFightPlan(FightPlan):
 
     def _make_decision(self):
 
-        if S.SHOW_FIGHT_STAGE:
+        if self.config.SHOW_FIGHT_STAGE:
             print(self.fight_recorder.last_stage)
         state = self.update_state()
         # 进行MapLevel的决策
@@ -256,7 +254,7 @@ class NormalFightPlan(FightPlan):
 
         elif state == "fight_condition":
             value = self.fight_condition
-            self.timer.Android.click(*FIGHT_CONDITIONS_POSITON[value])
+            self.timer.Android.click(*FIGHT_CONDITIONS_POSITION[value])
             self.Info.last_action = value
             self.fight_recorder.append(StageRecorder(self.Info, self.timer))
             return "fight continue"
@@ -297,7 +295,7 @@ class NormalFightPlan(FightPlan):
         return fight_stage
 
     # ======================== Functions ========================
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def _get_chapter(self) -> int:
         """在出征界面获取当前章节(远征界面也可获取)
 
@@ -320,7 +318,7 @@ class NormalFightPlan(FightPlan):
             return self.timer.image_exist(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], need_screen_shot, confidence=0.85)
         return self.timer.wait_image(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], confidence=0.85, timeout=timeout, gap=0.03)
         
-    @logit(level=INFO1)
+    #@logit(level=INFO1)
     def _get_node(self, chapter, need_screen_shot=True) -> int:
         """出征界面获取当前显示地图节点编号
         例如在出征界面显示的地图 2-5,则返回 5
@@ -337,7 +335,7 @@ class NormalFightPlan(FightPlan):
                     return i
         raise TimeoutError("can't vertify map")
 
-    @logit(level=INFO2)
+    #@logit(level=INFO2)
     def _move_chapter(self, target, chapter_now=None):
         """移动地图章节到 target
         含错误检查
@@ -356,7 +354,7 @@ class NormalFightPlan(FightPlan):
         try:
             if chapter_now is None:
                 chapter_now = self._get_chapter()
-            if S.SHOW_CHAPTER_INFO:
+            if self.config.SHOW_CHAPTER_INFO:
                 print("NowChapter:", chapter_now)
             if chapter_now > target:
                 if chapter_now - target >= 3:
@@ -390,13 +388,13 @@ class NormalFightPlan(FightPlan):
             time.sleep(0.15)
             self._move_chapter(target, chapter_now)
         except:
-            print_err("切换章节失败", ex_info="时间戳:" + str(time.time()))
+            self.logger.error(f"切换章节失败 target: {target}   now: {chapter_now}")
             if self.timer.process_bad_network('move_chapter'):
                 self._move_chapter(target)
             else:
                 raise ImageNotFoundErr("unknow reason can't find chapter image")
 
-    @logit(level=INFO2)
+    #@logit(level=INFO2)
     def _move_node(self, target, chapter):
         """改变地图节点,不检查是否有该节点
         含网络错误检查
@@ -409,7 +407,7 @@ class NormalFightPlan(FightPlan):
 
         NowNode = self._get_node(chapter)
         try:
-            if S.SHOW_CHAPTER_INFO:
+            if self.config.SHOW_CHAPTER_INFO:
                 print("NowNode:", NowNode)
             if target > NowNode:
                 for i in range(1, target - NowNode + 1):
@@ -424,13 +422,13 @@ class NormalFightPlan(FightPlan):
                         raise ImageNotFoundErr("after movecnode operation but the chapter do not move")
                     time.sleep(0.15)
         except:
-            print_err("切换地图失败", "时间戳:" + str(time.time()))
+            self.logger.error(f"切换地图失败 target: {target}   now: {NowNode}")
             if self.timer.process_bad_network():
                 self._move_node(target, chapter)
             else:
                 raise ImageNotFoundErr("unknown reason can't find number image" + str(target))
 
-    @logit(level=INFO3)
+    #@logit(level=INFO3)
     def _change_fight_map(self, chapter_id, map_id):
         """ 活动多点战斗必须重写该模块 """
         """ 这个模块负责的工作在战斗结束后如果需要进行重复战斗, 则不会进行 """
