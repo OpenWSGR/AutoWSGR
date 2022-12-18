@@ -1,4 +1,5 @@
 import os
+import time
 
 from AutoWSGR.constants.data_roots import IMG_ROOT
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
@@ -45,13 +46,18 @@ class Event():
         else:
             return 1
 
-    def change_difficulty(self, chapter):
+    def change_difficulty(self, chapter, retry=True):
         r_difficulty = int(chapter in 'Hh')
         difficulty = self.get_difficulty()
 
         if (r_difficulty != difficulty):
+            time.sleep(.2)
             self.timer.Android.click(66, 483)
-            assert (self.get_difficulty() == r_difficulty)
+            if (self.get_difficulty() != r_difficulty):
+                if retry:
+                    return self.change_difficulty(chapter, False)
+                self.timer.log_screen()
+                raise ImageNotFoundErr("Can't change difficulty")
 
 
 class PatrollingEvent(Event):

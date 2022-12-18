@@ -134,7 +134,7 @@ class FightInfo(ABC):
                 possible_states[i] = state
                 modified_timeout[i] = timeout
         if (self.config.SHOW_MATCH_FIGHT_STAGE):
-            self.logger.debug("waiting:", possible_states, end="  ")
+            self.logger.debug("waiting:", possible_states, "  ")
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
         confidence = min([0.8] + [self.state2image[state][2] for state in possible_states if len(self.state2image[state]) >= 3])

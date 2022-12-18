@@ -208,7 +208,13 @@ class DecisiveBattle():
          buy_ticket(): 兑换磁盘
          reset(): 重置除了章节之外的所有信息,重置后再调用 start_fight() 则从 chapter-1-A 开始打
     """
-
+    def run_for_times(self, times=1):
+        assert(times >= 1)
+        self.start_fight()
+        for _ in range(times - 1):
+            self.reset_chapter()
+            self.start_fight()
+    
     def __init__(self, timer: Timer, chatper=6, map=1, node='A', version=3,
                  level1=["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
                  level2=["U-81", "大青花鱼"],
@@ -290,7 +296,7 @@ class DecisiveBattle():
             get_ship(self.timer, 5)
         return res
 
-    def choose(self, refreshed=False):
+    def choose(self, refreshed=False, rec_only=False):
 
         # ===================获取备选项信息======================
         DSP = [(250, 390), (410, 550), (570, 710), (730, 870), (890, 1030)]  # 扫描战备舰队获取的位置 (1280x720)
@@ -309,9 +315,11 @@ class DecisiveBattle():
         # print("Scan result:", costs)
         costs = _costs
         selections = {ships[i]: (costs[i], CHOOSE_POSITION[real_position[i]]) for i in range(len(costs))}
-
+        if rec_only:
+            return 
         # ==================做出决策===================
         self.statu.selections = selections
+        self.timer.logger.debug(selections)
         choose = self.logic._choose_ship(must=(self.statu.map == 1 and self.statu.node == 'A' and refreshed == True))
         if (len(choose) == 0 and refreshed == False):
             self.timer.Android.click(380, 500)  # 刷新备选舰船
@@ -402,7 +410,7 @@ class DecisiveBattle():
         if (self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False):
             self.timer.Android.click(300, 225)  # 选上中下路
             self.timer.ConfirmOperation(must_confirm=1)
-        if (self.timer.wait_image(IMG.decisive_battle_image[2], timeout=5)):
+        if (self.timer.wait_image([IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=5)):
             self.choose()  # 获取战备舰队
         self.get_exp()
         while (self.logic._up_level()):
@@ -449,6 +457,7 @@ class DecisiveBattle():
         try:
             res = self.before_fight()
         except (Exception, BaseException) as e:
+            print(e)
             if self.statu.map == 1 and self.statu.node == 'A':
                 # 处理临时 BUG (https://nga.178.com/read.php?tid=34341326)
                 print(e, "Temporary Game BUG, Processing...")
@@ -475,7 +484,10 @@ class DecisiveBattle():
                 self.enter_map(False)
 
     def reset_chapter(self):
+        """使用磁盘重置关卡, 并重置状态
+        """
         # Todo: 缺少磁盘报错
+        self.statu.reset()
         self.move_chapter()
         self.timer.Android.click(500, 500)
         self.timer.ConfirmOperation()

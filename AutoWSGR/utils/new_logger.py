@@ -5,7 +5,7 @@ import sys
 
 import wandb
 
-from .io import save_image
+from AutoWSGR.utils.io import save_image
 
 
 class Logger:
@@ -40,8 +40,7 @@ class Logger:
     #                reinit=True,
     #                config=self.config)
 
-    def debug(self, condition, *args):
-        if(condition):
+    def debug(self, *args):
             print(*args)
     
     def info(self, string):

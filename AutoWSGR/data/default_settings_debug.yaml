@@ -8,14 +8,14 @@ account:
 password:
 
 # ========== Logger设置 ==========
-DEBUG: False
+DEBUG: True
 SHOW_MAP_NODE: False
-SHOW_ANDROID_INPUT: False
-SHOW_ENEMY_RUELS: False
+SHOW_ANDROID_INPUT: True
+SHOW_ENEMY_RUELS: True
 SHOW_FIGHT_STAGE: False
 SHOW_CHAPTER_INFO: False
-SHOW_MATCH_FIGHT_STAGE: False
-SHOW_DECISIVE_BATTLE_INFO: False
+SHOW_MATCH_FIGHT_STAGE: True
+SHOW_DECISIVE_BATTLE_INFO: True
 SHOW_OCR_INFO: False
 
 # ========== 日常挂机策略设置 ==========
@@ -31,4 +31,4 @@ Auto_NormalFight: # 自动出征任务用列表 [plan名，舰队号，目标成
   - [8-5AI, 2, 0]
 
 # 数据信息设置
-SHIP_NAME_PATH: ""
+SHIP_NAME_PATH: "AutoWSGR/data/ocr/ship_name.yaml"

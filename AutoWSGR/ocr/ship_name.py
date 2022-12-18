@@ -115,7 +115,9 @@ def compare_box(A, B):
 def recognize(image, char_lsit, min_size=7, text_threshold=.55, low_text=.3):
     if (ch_reader == None):
         load_ch_reader()
-    return ch_reader.readtext(image, allowlist=char_lsit, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    result = ch_reader.readtext(image, allowlist=char_lsit, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    print(result)
+    return result
 
 
 def recognize_number(image, ex_list="", min_size=7, text_threshold=.55, low_text=.3):
@@ -129,8 +131,10 @@ def recognize_number(image, ex_list="", min_size=7, text_threshold=.55, low_text
     for ch in ex_list:
         if(char_list.find(ch) == -1):
             char_list += ch
-    return en_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
-    
+    result = en_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    print(result)
+    return result
+
 
 def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55, low_text=.3):
     """识别没有预处理过的图片中的舰船, 返回识别结果列表,
@@ -141,7 +145,7 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
         char_list = get_allow(names)
     if (ch_reader == None):
         load_ch_reader()
-    result = ch_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    result = recognize(image, char_lsit=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
     result = [x for x in result if x[1] != '']  # 去除空匹配
     results = []
     sorted(result, key=functools.cmp_to_key(compare_box))
@@ -159,6 +163,7 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
     # print_debug(True, results)
     if(len(results) == 0):
         results.append(("Unknown", (0, 0)))
+    print(results)
     return results
 
 
@@ -184,6 +189,7 @@ def recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55,
         result = _recognize_ship(os.path.join(TUNNEL_ROOT, '1.PNG'), names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
     else:
         result = _recognize_ship('1.PNG', names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
+    print(result)
     return result
 
 

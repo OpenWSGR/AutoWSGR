@@ -28,12 +28,13 @@ def ocr(image):
 
 def log_image(event:keyboard.KeyboardEvent):
     global screen_shot_count
+    assert type(timer) == Timer
     if(event.event_type != 'down' or event.name != 'P'):
         return 
     print("Screen Processing:", screen_shot_count)
     screen_shot_count += 1
     timer.update_screen()
-    timer.timer.log_screen()
+    timer.log_screen()
     
 
 def SetPoints(windowname, img):
@@ -77,7 +78,7 @@ def SetPoints(windowname, img):
 
 def get_image():
     global timer
-    timer = start_script(to_main_page=False)
+    timer = start_script(settings_path=r"C:\Users\Administrator\Desktop\Pro\Auto-WSGR\AutoWSGR\data\default_settings_debug.yaml")
     print("HOOKED")
     keyboard.hook(callback=log_image)
     import time
@@ -140,6 +141,13 @@ def coverter_9_1():
     print(relative_to_absolute((0.264, 0.157)))
 
 get_image()
+"""if __name__ == "__main__":
+    
+    oper = input()
+    if oper == "1":
+        get_image()
+    elif oper == "2":
+        make_map()"""
 # coverter_9_1()
 # coverter()
 # make_map(r'tests', r'tests')

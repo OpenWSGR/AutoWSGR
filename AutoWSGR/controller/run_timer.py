@@ -29,6 +29,7 @@ class Timer(Emulator):
         super().__init__(config, logger)
 
         # 战舰少女R专用
+        self.everyday_check = True
         self.now_page = None
         self.ui = WSGR_UI
         self.ship_status = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
@@ -55,9 +56,12 @@ class Timer(Emulator):
         self.last_mission_compelted = 0
         self.last_expedition_checktime = time.time()
 
-        ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
-        self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
-
+        try:
+            self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
+        except:
+            self.logger.info(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}")
+            ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
+            self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
         if self.config.account is not None and self.config.password != None:
             self.restart(account=self.config.account, password=self.config.password)
         if self.Android.is_game_running() == False:
@@ -65,7 +69,8 @@ class Timer(Emulator):
 
         self.ammo = 10
         # self.resources = Resources(self)
-        self.go_main_page()
+        if not config.DEBUG:
+            self.go_main_page()
         try:
             self.set_page()
         except:
