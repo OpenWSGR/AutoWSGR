@@ -349,7 +349,7 @@ def ChangeShip(timer: Timer, team, pos=None, name=None, pre=None, detect_ship_st
     timer.Android.click(700, 30, delay=0)
     timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=.1)
 
-    text(name)
+    timer.Android.text(name)
     timer.Android.click(50, 50, delay=.5)
     if (timer.ship_status[pos] == -1):
         timer.Android.click(83, 167, delay=0)
@@ -371,15 +371,20 @@ def ChangeShips(timer: Timer, team, list):
         ChangeShips(timer, 2, [None, "萤火虫", "伏尔塔", "吹雪", "明斯克", None, None])
 
     """
+    timer.logger.info(f"Change Fleet {str(team)} to {str(list)}")
     if (team is not None):
         timer.goto_game_page('fight_prepare_page')
         MoveTeam(timer, team)
-
+    if team == 1:
+        raise ValueError("change member of fleet 1 is unsupported")
     DetectShipStatu(timer)
     for i in range(1, 7):
         if (timer.ship_status[i] != -1):
             ChangeShip(timer, team, 1, None, detect_ship_statu=False)
     list = list + [None] * 6
+    for i in range(len(list)):
+        if list[i] == "":
+            list[i] = None
     time.sleep(.3)
     DetectShipStatu(timer)
     for i in range(1, 7):

@@ -1,5 +1,7 @@
 # ========== 游戏设置 ==========
-LDPLAYER_ROOT: C:/leidian/LDPlayer9
+EMULATOR: "leidian" # 模拟器类型
+START_CMD: "C:/leidian/LDPlayer9/dnplayer.exe"
+LDPLAYER_ROOT: 
 LOG_PATH: "log"
 DELAY: 2
 

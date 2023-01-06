@@ -33,6 +33,7 @@ class Emulator():
         self.update_screen()
         self.config.resolution = self.screen.shape[:2]
         self.config.resolution = self.config.resolution[::-1]  # 转换为 （宽x高）
+        self.logger.info(f"resolution:{str(self.config.resolution)}")
         self.Android = AndroidController(config, logger)
 
     # @logit()

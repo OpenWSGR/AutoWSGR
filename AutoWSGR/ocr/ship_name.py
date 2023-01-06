@@ -150,7 +150,7 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
     results = []
     sorted(result, key=functools.cmp_to_key(compare_box))
     for box in result:
-        res, lcs, name = "", "", box[1]
+        res, lcs, name = "dsjfagiahsdifhaoisd", "", box[1]
         name = replace(name)
         for _name in names:
             if(any([(_name.find(char) != -1) for char in name])):

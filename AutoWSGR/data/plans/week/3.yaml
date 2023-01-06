@@ -1,0 +1,21 @@
+
+# MapLevel
+chapter: 3 # 章节
+map: 2 # 地图
+selected_nodes: [C, E, G] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
+repair_mode: 1
+fleet_id: 2
+fleet: ["", "明斯克", "萤火虫", "伏尔塔", "吹雪", "弗莱彻", "黑潮"]
+
+node_defaults:
+  formation: 2 # 正常情况阵型选择，1-5
+  # 夜战选择阶段
+  night: False # 是否夜战
+  # 前进选择阶段
+  proceed: True # 结束后是否继续
+  proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
+
+node_args:
+  G:
+    night: True
+

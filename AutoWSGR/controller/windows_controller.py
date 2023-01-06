@@ -75,15 +75,14 @@ class WindowsController:
         """连接指定安卓设备
         Args:
         """
-
-        if self.is_android_online(5) == False:
-            self.RestartAndroid()
+        cap_method = "MINICAP"
+        if self.config.EMULATOR == "bluestacks":
+            cap_method = "JAVACAP"
 
         from logging import ERROR, getLogger
-        getLogger("airtest").setLevel(ERROR)
+        getLogger("airtest").setLevel(ERROR)        
         auto_setup(__file__, devices=[
-            f"android://127.0.0.1:5037//{self.config.device_name}?cap_method=MINICAP&&ori_method=MINICAPORI&&touch_method=MINITOUCH"])
-
+            f"android://127.0.0.1:5037//{self.config.device_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
         self.logger.info("Hello,I am WSGR auto commanding system")
 
     def is_android_online(self, times=4):

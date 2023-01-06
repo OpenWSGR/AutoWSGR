@@ -299,6 +299,36 @@ class FightPlan(ABC):
         # 战斗中逻辑
         return self.fight()
 
+    def run_for_times_condition(self, times, last_point, result='S', insist_time=900):
+        """有要求的多次运行
+        警告, 使用前务必检查参数是否有误, 防止死循环
+        Args:
+            times : 次数
+            last_point: 最后一个点
+            result: 战果要求
+            insist_time: 如果大于这个时间工作量未减少则退出工作
+        """
+        if not isinstance(result, str) or not isinstance(last_point, str):
+            raise TypeError(f"last_point, result must be str,but is {type(last_point)}, {type(result)}")
+        if result not in ["S", "A", "B", "C", "D", "SS"]:
+            raise ValueError(f"result value {result} is illegal, it should be 'A','B','C','D','S' or 'SS'")
+        if len(last_point) != 1 or ord(last_point) > ord('Z') or ord(last_point) < ord('A'):
+            raise ValueError(f"last_point should be a uppercase within 'A' to 'Z'")
+        import time
+        start_time, run = time.time(), False
+        while times:
+            self.run(run)
+            run = True
+            if last_point != self.Info.node or self.fight_recorder.fight_results[-1] < result:
+                if time.time() - start_time > insist_time:
+                    return False
+                continue
+            self.timer.logger.info(f"over, last_point:{self.Info.node}, result:{self.fight_recorder.fight_results[-1].result}")
+            start_time = time.time()
+            times -= 1
+            self.timer.logger.info(f"one fight finished, rest:{str(times)}")
+        return True
+        
     def update_state(self):
         try:
             self.Info.update_state()

@@ -142,11 +142,11 @@ class Fleet():
         return True
                     
     def set_ship(self, ships, flag_ship=None, order=False, search_method='word'):
-        """设置指定位置的舰队,1-index
+        """设置指定位置的舰队, 1-index        
         Args:
-            ships (list(str)): 代表舰船
-            flag_ship: 如果不为 None,则代表旗舰名称
-            order (bool): 是否按照 ships 给定的顺序
+            ships (list(str)): 代表舰船 [0号位留空, 1号位, 2号位, ...]
+            flag_ship: 如果不为 None, 则代表旗舰名称
+            order (bool): 是否按照 ships 给定的顺序 (优先级高于旗舰指定)
         """
         assert(self.legal(ships))
         assert(flag_ship == None or flag_ship in ships)

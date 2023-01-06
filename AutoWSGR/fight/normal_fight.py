@@ -9,11 +9,12 @@ from AutoWSGR.constants.other_constants import (INFO1, INFO2, INFO3,
                                                 NORMAL_MAP_EVERY_CHAPTER)
 from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITION
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
+from AutoWSGR.game.game_operation import MoveTeam, QuickRepair, ChangeShips
 from AutoWSGR.game.get_game_info import DetectShipStatu, GetEnemyCondition
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 # from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis
+from AutoWSGR.port.ship import Fleet
 
 from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock,
                      StageRecorder, start_march)
@@ -94,12 +95,15 @@ class NormalFightInfo(FightInfo):
         if self.state in ["proceed"]:
             self._update_ship_position()
             self._update_ship_point()
+            pos = self.timer.get_image_position(IMG.confirm_image[3], False, .8)
+            if pos:
+                self.timer.ConfirmOperation(delay=.25, must_confirm=1, confidence=.8)
 
         # 1. proceed: 资源点  2. get_ship: 锁定新船
         # if self.state in ["proceed", "get_ship"]: # TODO: 提高proceed时confirm的速度，否则导致上面舰船位置匹配失败
-        if self.state in ["get_ship"]:
-            print(time.time())
-            self.timer.ConfirmOperation(delay=0)
+        # if self.state in ["get_ship"]:
+        #     print(time.time())
+        #     self.timer.ConfirmOperation(delay=0)
 
     def _after_match(self):
         # 在某些State下可以记录额外信息
@@ -167,14 +171,16 @@ class NormalFightPlan(FightPlan):
     """" 常规战斗的决策模块 """
     """ 多点战斗基本模板 """
 
-    def __init__(self, timer: Timer, plan_path, fleet_id=None) -> None:
+    def __init__(self, timer: Timer, plan_path, fleet_id=None, fleet=-1) -> None:
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
             fleet_id: 指定舰队编号, 如果为 None 则使用计划中的参数
+            fleet: 舰队成员, ["", "1号位", "2号位", ...], 如果为 None 则全部不变, 为 "" 则该位置无舰船, 为 -1 则不覆盖 yaml 文件中的参数
         Raises:
             BaseException: _description_
         """
+            
         super().__init__(timer)
 
         # 从配置文件加载计划
@@ -184,6 +190,8 @@ class NormalFightPlan(FightPlan):
         # 从参数加载计划
         if fleet_id is not None:
             plan_args['fleet_id'] = fleet_id # 舰队编号
+        if fleet != -1:
+            plan_args['fleet'] = fleet
         
         # 检查参数完整情况
         if "fleet_id" not in plan_args:
@@ -233,6 +241,8 @@ class NormalFightPlan(FightPlan):
             assert (self.timer.wait_images(self.Info.map_image) != None)
             self.go_fight_prepare_page()
             MoveTeam(self.timer, self.fleet_id)
+            if self.fleet is not None and same_work == False:
+                ChangeShips(self.timer, self.fleet_id, self.fleet)
             QuickRepair(self.timer, self.repair_mode)
         except AssertionError:
             if "process_err" in kwargs and kwargs["process_err"] == False:

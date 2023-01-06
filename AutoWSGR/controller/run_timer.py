@@ -60,6 +60,7 @@ class Timer(Emulator):
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
         except:
             self.logger.info(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}")
+            self.logger.info(f"Default shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
             ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
             self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
         if self.config.account is not None and self.config.password != None:
