@@ -75,12 +75,9 @@ class WindowsController:
         """连接指定安卓设备
         Args:
         """
-        cap_method = "MINICAP"
-        if self.config.EMULATOR == "bluestacks":
-            cap_method = "JAVACAP"
-
+        cap_method = "JAVACAP" if self.config.EMULATOR == "bluestacks" else "MINICAP"
         from logging import ERROR, getLogger
-        getLogger("airtest").setLevel(ERROR)        
+        getLogger("airtest").setLevel(ERROR)
         auto_setup(__file__, devices=[
             f"android://127.0.0.1:5037//{self.config.device_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
         self.logger.info("Hello,I am WSGR auto commanding system")
@@ -113,7 +110,7 @@ class WindowsController:
             times (int):重启次数
         """
         restart_time = time.time()
-        self.logger.info("Android Restaring")
+        self.logger.info("Android Restarting")
         try:
             try:
                 os.system("taskkill -f -im dnplayer.exe")

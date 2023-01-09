@@ -10,7 +10,7 @@ from AutoWSGR.constants.other_constants import (INFO1, INFO2, INFO3,
 from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITION
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam, QuickRepair, ChangeShips
-from AutoWSGR.game.get_game_info import DetectShipStatu, GetEnemyCondition
+from AutoWSGR.game.get_game_info import DetectShipStats, GetEnemyCondition
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 # from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis
@@ -111,7 +111,7 @@ class NormalFightInfo(FightInfo):
             GetEnemyCondition(self.timer, 'fight')
 
         elif self.state == "result":
-            DetectShipStatu(self.timer, 'sumup')
+            DetectShipStats(self.timer, 'sumup')
             self.fight_result.detect_result()
 
     # ======================== Functions ========================
@@ -253,7 +253,7 @@ class NormalFightPlan(FightPlan):
 
         return start_march(self.timer)
 
-    def _make_decision(self):
+    def _make_decision(self):  # sourcery skip: extract-duplicate-method
 
         if self.config.SHOW_FIGHT_STAGE:
             print(self.fight_recorder.last_stage)
@@ -278,7 +278,7 @@ class NormalFightPlan(FightPlan):
 
         elif state == "proceed":
             is_proceed = self.nodes[self.Info.node].proceed and \
-                         _check_blood(self.timer.ship_status, self.nodes[self.Info.node].proceed_stop)
+                         _check_blood(self.timer.ship_stats, self.nodes[self.Info.node].proceed_stop)
 
             if is_proceed:
                 self.timer.Android.click(325, 350)
@@ -323,7 +323,7 @@ class NormalFightPlan(FightPlan):
                     return i
         raise TimeoutError("can't verify chapter")
 
-    def vertify_node(self, target, chapter, need_screen_shot=True, timeout=0):
+    def verify_node(self, target, chapter, need_screen_shot=True, timeout=0):
         if timeout == 0:
             return self.timer.image_exist(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], need_screen_shot, confidence=0.85)
         return self.timer.wait_image(IMG.normal_map_image[f"{str(chapter)}-{str(target)}"], confidence=0.85, timeout=timeout, gap=0.03)
@@ -341,9 +341,9 @@ class NormalFightPlan(FightPlan):
             if (need_screen_shot):
                 self.timer.update_screen()
             for i in range(1, len(NORMAL_MAP_EVERY_CHAPTER[chapter]) + 1):
-                if (self.vertify_node(i, chapter, False)):
+                if (self.verify_node(i, chapter, False)):
                     return i
-        raise TimeoutError("can't vertify map")
+        raise TimeoutError("can't verify map")
 
     #@logit(level=INFO2)
     def _move_chapter(self, target, chapter_now=None):
@@ -393,7 +393,7 @@ class NormalFightPlan(FightPlan):
                     self.timer.Android.click(95, 366, delay=0)
 
             if not self.timer.wait_image(IMG.chapter_image[chapter_now]):
-                raise ImageNotFoundErr("after movechapter operation but the chapter do not move")
+                raise ImageNotFoundErr("after 'move chapter' operation but the chapter do not move")
 
             time.sleep(0.15)
             self._move_chapter(target, chapter_now)
@@ -422,14 +422,14 @@ class NormalFightPlan(FightPlan):
             if target > NowNode:
                 for i in range(1, target - NowNode + 1):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)
-                    if (not self.vertify_node(NowNode + i, chapter, timeout=4)):
-                        raise ImageNotFoundErr("after movenode operation but the chapter do not move")
+                    if (not self.verify_node(NowNode + i, chapter, timeout=4)):
+                        raise ImageNotFoundErr("after 'move node' operation but the chapter do not move")
                     time.sleep(0.15)
             else:
                 for i in range(1, NowNode - target + 1):
                     self.timer.Android.swipe(552, 147, 715, 147, duration=0.25)
-                    if (not self.vertify_node(NowNode - i, chapter, timeout=4)):
-                        raise ImageNotFoundErr("after movecnode operation but the chapter do not move")
+                    if (not self.verify_node(NowNode - i, chapter, timeout=4)):
+                        raise ImageNotFoundErr("after 'move node' operation but the chapter do not move")
                     time.sleep(0.15)
         except:
             self.logger.error(f"切换地图失败 target: {target}   now: {NowNode}")

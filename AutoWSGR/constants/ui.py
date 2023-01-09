@@ -123,17 +123,17 @@ class UI():
 
         main_page = self._construct_node('main_page', None)
         map_page, exercise_page, expedition_page, battle_page, decisive_battle_entrance = \
-            self._construct_intergrative_pages(main_page, names=['map_page', 'exercise_page', 'expedition_page', 'battle_page', 'decisive_battle_entrance'],
+            self._construct_integrative_pages(main_page, names=['map_page', 'exercise_page', 'expedition_page', 'battle_page', 'decisive_battle_entrance'],
                                                click_positions=[(163, 25), (287, 25), (417, 25), (544, 25), (661, 25)],
                                                common_edges=[{'pos': (30, 30), 'dst': main_page}])
 
         options_page = self._construct_node('options_page', main_page)
         build_page, destroy_page, develop_page, discard_page = \
-            self._construct_intergrative_pages(options_page, names=['build_page', 'destroy_page', 'develop_page', 'discard_page', ],
+            self._construct_integrative_pages(options_page, names=['build_page', 'destroy_page', 'develop_page', 'discard_page', ],
                                                click_positions=[(163, 25), (287, 25), (417, 25), (544, 25)],
                                                common_edges=[{'pos': (30, 30), 'dst': options_page}])
         intensify_page, remake_page, skill_page = \
-            self._construct_intergrative_pages(options_page, names=['intensify_page', 'remake_page', 'skill_page', ],
+            self._construct_integrative_pages(options_page, names=['intensify_page', 'remake_page', 'skill_page', ],
                                                click_positions=[(163, 25), (287, 25), (417, 25)],
                                                common_edges=[{'pos': (30, 30), 'dst': options_page}])
 
@@ -225,7 +225,7 @@ class UI():
         edge = Edge(method, u, v, other_dst=other_dst)
         u.add_edge(edge)
 
-    def _construct_intergrative_pages(self, father, click_positions=[], names=[], common_edges=[]):
+    def _construct_integrative_pages(self, father, click_positions=[], names=[], common_edges=[]):
         assert len(click_positions) == len(names)
         first_node = self._construct_node(names[0], father)
         nodes = [first_node]

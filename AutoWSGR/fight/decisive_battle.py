@@ -7,7 +7,7 @@ from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.fight.battle import BattleInfo, BattlePlan
 from AutoWSGR.fight.common import start_march
 from AutoWSGR.game.game_operation import QuickRepair, get_ship
-from AutoWSGR.game.get_game_info import DetectShipStatu
+from AutoWSGR.game.get_game_info import DetectShipStats
 from AutoWSGR.ocr.ship_name import _recognize_ship, recognize_number
 from AutoWSGR.port.ship import Fleet, count_ship
 from AutoWSGR.utils.io import count, yaml_to_dict
@@ -40,14 +40,14 @@ class DB():
             return rule[state]
 
 
-class DecisiveStatu():
+class DecisiveStats():
 
     def __init__(self, timer: Timer, chapter=6, map=1, node='A', version=3) -> None:
         # 选择战备舰队的点击位置
         self.timer = timer
-        self.key_points = [["", ]]  # [chpater][map] (str)
+        self.key_points = [["", ]]  # [chapter][map] (str)
         self.map_end = ["", ]  # [chapter] (str)
-        self.enemy = [[["", ]]]  # [chapter][map][node(str)] (lst["", enemys])
+        self.enemy = [[["", ]]]  # [chapter][map][node(str)] (lst["", enemies])
         self.__dict__.update(yaml_to_dict(os.path.join(MAP_ROOT, 'decisive_battle', f"{str(version)}.yaml")))
         self.score = 10
         self.level = 1  # 副官等级
@@ -58,7 +58,7 @@ class DecisiveStatu():
         self.node = node
         self.fleet = Fleet(self.timer)
         self.ships = set()
-        self.ship_status = [-1] * 7
+        self.ship_stats = [-1] * 7
         self.selections = []  # 获取战备舰队的元素
 
     def next(self):
@@ -86,7 +86,7 @@ class _Logit():
     """暂时不启用
     """
 
-    def __init__(self, statu: DecisiveStatu, level1: list, level2: list, flagship_priority: list):
+    def __init__(self, stats: DecisiveStats, level1: list, level2: list, flagship_priority: list):
         pass
 
     def _choose_ship(self, must=False):
@@ -121,7 +121,7 @@ class Logic(_Logit):
     """决战逻辑模块
     """
 
-    def __init__(self, timer, statu: DecisiveStatu, level1: list, level2: list, flagship_priority: list):
+    def __init__(self, timer, stats: DecisiveStats, level1: list, level2: list, flagship_priority: list):
         self.timer = timer
         self.config = timer.config
         self.logger = timer.logger
@@ -129,37 +129,37 @@ class Logic(_Logit):
         self.level1 = level1
         self.level2 = ["长跑训练", "肌肉记忆"] + self.level1 + level2 + ["黑科技"]
         self.flag_ships = flagship_priority
-        self.statu = statu
+        self.stats = stats
 
     def _choose_ship(self, must=False):
         lim = 6
-        score = self.statu.score
-        if (self.statu.fleet.count() <= 1):
+        score = self.stats.score
+        if (self.stats.fleet.count() <= 1):
             choose = self.level1
-        elif (self.statu.fleet.count() < 6):
+        elif (self.stats.fleet.count() < 6):
             choose = [element for element in self.level2 if is_ship(element)]
         else:
             lim = score
             choose = self.level1 + [element for element in self.level2 if not is_ship(element)]
         result = []
         for target in choose:
-            if (target in self.statu.selections.keys()):
-                cost = self.statu.selections[target][0]
+            if (target in self.stats.selections.keys()):
+                cost = self.stats.selections[target][0]
                 if (score >= cost and cost <= lim):
                     score -= cost
                     result.append(target)
         if not result and must:
-            result.append(list(self.statu.selections.keys())[0])
+            result.append(list(self.stats.selections.keys())[0])
         return result
 
     def _use_skill(self):
-        return 3 if (self.statu.node == 'A') else 0
+        return 3 if (self.stats.node == 'A') else 0
 
     def need_repair(self):
-        return bool((1 in self.statu.ship_status or 2 in self.statu.ship_status))
+        return bool((1 in self.stats.ship_stats or 2 in self.stats.ship_stats))
 
     def _up_level(self):
-        return bool((self.statu.need - self.statu.exp <= 5 and self.statu.score >= 5))
+        return bool((self.stats.need - self.stats.exp <= 5 and self.stats.score >= 5))
 
     def formation(self):
         pass
@@ -168,7 +168,7 @@ class Logic(_Logit):
         pass
 
     def get_best_fleet(self):
-        ships = self.statu.ships
+        ships = self.stats.ships
         self.logger.debug(f"ALL SHIPS: {ships}")
         best_ships = ["", ]
         for ship in self.level1:
@@ -215,7 +215,7 @@ class DecisiveBattle():
             self.reset_chapter()
             self.start_fight()
     
-    def __init__(self, timer: Timer, chatper=6, map=1, node='A', version=3,
+    def __init__(self, timer: Timer, chapter=6, map=1, node='A', version=3,
                  level1=["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
                  level2=["U-81", "大青花鱼"],
                  flagship_priority=["U-1405", "U-47", "U-96", "U-1206"],
@@ -226,7 +226,7 @@ class DecisiveBattle():
             : 请保证可以直接使用上次选船通关, 暂时不支持自动选船
         Args:
             timer (Timer): 记录器
-            chatper (int, optional): 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
+            chapter (int, optional): 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
             map (int, optional): 当前小关. Defaults to 1.
             node (str, optional): 当前节点. Defaults to 'A'.
             version (int, optional): 决战版本. Defaults to 3.
@@ -240,15 +240,15 @@ class DecisiveBattle():
         """
         self.timer = timer
         self.config = timer.config
-        assert (chatper <= 6 and chatper >= 1)
-        self.statu = DecisiveStatu(timer, chatper, map, node, version)
+        assert (chapter <= 6 and chapter >= 1)
+        self.stats = DecisiveStats(timer, chapter, map, node, version)
         if logic is None:
-            self.logic = Logic(self.timer, self.statu, level1, level2, flagship_priority)
+            self.logic = Logic(self.timer, self.stats, level1, level2, flagship_priority)
         self.__dict__.update(kwargs)
 
     def buy_ticket(self, use='steel', times=3):
         self.enter_decisive_battle()
-        position = {"oil": 184, "ammo": 235, "steel": 279, "aluminium": 321}
+        position = {"oil": 184, "ammo": 235, "steel": 279, "aluminum": 321}
         self.timer.Android.click(458 * .75, 665 * .75, delay=1.5)
         self.timer.Android.click(638, position[use], delay=1, times=times)
         self.timer.Android.click(488, 405)
@@ -289,7 +289,7 @@ class DecisiveBattle():
         # QuickRepair(self.timer, 2)
 
     def next(self):
-        res = self.statu.next()
+        res = self.stats.next()
         if res in ['next', 'quit']:
             self.timer.ConfirmOperation()
             self.timer.ConfirmOperation()
@@ -303,11 +303,11 @@ class DecisiveBattle():
         CHOOSE_POSITION = [(320 * .75, 251), (490 * .75, 251), (645 * .75, 251), (812 * .75, 251), (956 * .75, 251)]
         screen = self.timer.get_screen()
         # 应该能保证数字读取成功...
-        self.statu.score = int(recognize_number(screen[25:55, 1162:1245], min_size=5, text_threshold=.05, low_text=.02)[0][1])
+        self.stats.score = int(recognize_number(screen[25:55, 1162:1245], min_size=5, text_threshold=.05, low_text=.02)[0][1])
         costs = recognize_number(screen[550:585, 245:1031], 'x')
         _costs, ships, real_position = [], [], []
         for i, cost in enumerate(costs):
-            if (int(cost[1][1:]) > self.statu.score):
+            if (int(cost[1][1:]) > self.stats.score):
                 continue
             ships.append(_recognize_ship(screen[488:515, DSP[i][0]:DSP[i][1]], self.timer.ship_names)[0][0])
             _costs.append(int(cost[1][1:]))
@@ -318,31 +318,31 @@ class DecisiveBattle():
         if rec_only:
             return 
         # ==================做出决策===================
-        self.statu.selections = selections
+        self.stats.selections = selections
         self.timer.logger.debug(selections)
-        choose = self.logic._choose_ship(must=(self.statu.map == 1 and self.statu.node == 'A' and refreshed == True))
+        choose = self.logic._choose_ship(must=(self.stats.map == 1 and self.stats.node == 'A' and refreshed == True))
         if (len(choose) == 0 and refreshed == False):
             self.timer.Android.click(380, 500)  # 刷新备选舰船
             return self.choose(True)
 
         for target in choose:
             cost, p = selections[target]
-            self.statu.score -= cost
+            self.stats.score -= cost
             self.timer.Android.click(*p)
             if (is_ship(target)):
-                self.statu.ships.add(target)
+                self.stats.ships.add(target)
         self.timer.Android.click(580, 500)  # 关闭/确定
 
     def up_level_assistant(self):
         self.timer.Android.click(75, 667 * .75)
-        self.statu.score -= 5
+        self.stats.score -= 5
 
     def use_skill(self, type=3):
         self.timer.Android.click(275 * .75, 644 * .75)
         if (type == 3):
             ships = _recognize_ship(self.timer.get_screen()[488:515], self.timer.ship_names)
             for ship in ships:
-                self.statu.ships.add(ship[0])
+                self.stats.ships.add(ship[0])
         self.timer.Android.click(275 * .75, 644 * .75, times=2, delay=.3)
 
     def leave(self):
@@ -353,9 +353,9 @@ class DecisiveBattle():
         return int(recognize_number(self.timer.get_screen()[588:618, 1046:1110], "Ex-X")[0][1][-1])
 
     def move_chapter(self):
-        if (self.get_chapter() < self.statu.chapter):
+        if (self.get_chapter() < self.stats.chapter):
             self.timer.Android.click(900, 507)
-        elif (self.get_chapter() > self.statu.chapter):
+        elif (self.get_chapter() > self.stats.chapter):
             self.timer.Android.click(788, 507)
         else:
             return
@@ -369,12 +369,12 @@ class DecisiveBattle():
     def enter_map(self, check_map=True):
         if (check_map):
             self.enter_decisive_battle()
-            statu = self.detect()
+            stats = self.detect()
             self.move_chapter()
-            if (statu == 'refresh'):
+            if (stats == 'refresh'):
                 self.reset_chapter()
-                statu = 'refreshed'
-            if (statu == 'refreshed'):
+                stats = 'refreshed'
+            if (stats == 'refreshed'):
                 # 选用上一次的舰船并进入
                 self.timer.Android.click(500, 500, delay=0)
                 self.timer.click_image(IMG.decisive_battle_image[7], timeout=3)
@@ -396,13 +396,13 @@ class DecisiveBattle():
 
     def get_exp(self):
         src = recognize_number(self.timer.get_screen()[592:615, 48:118], "(/)")[0][1]
-        self.statu.exp = 0
-        self.statu.need = 20
+        self.stats.exp = 0
+        self.stats.need = 20
         try:
             i1 = src.index('(')
             i2 = src.index('/')
-            self.statu.exp = int(src[i1 + 1:i2])
-            self.statu.need = int(src[i2 + 1:-1])
+            self.stats.exp = int(src[i1 + 1:i2])
+            self.stats.need = int(src[i2 + 1:-1])
         except:
             pass
 
@@ -418,7 +418,7 @@ class DecisiveBattle():
             self.get_exp()
         if (self.logic._use_skill()):
             self.use_skill(self.logic._use_skill())
-        if (self.statu.fleet.empty() and not self.statu.is_begin()):
+        if (self.stats.fleet.empty() and not self.stats.is_begin()):
             self.check_fleet()
         _fleet = self.logic.get_best_fleet()
         if (self.logic._retreat()):
@@ -427,45 +427,45 @@ class DecisiveBattle():
         if (self.logic._leave()):
             self.leave()
             return 'leave'
-        if (self.statu.fleet != _fleet):
+        if (self.stats.fleet != _fleet):
             self.change_fleet(_fleet)
-            self.statu.ship_status = DetectShipStatu(self.timer)
+            self.stats.ship_stats = DetectShipStats(self.timer)
         if (self.logic.need_repair()):
             self.repair()
 
     def after_fight(self):
-        self.statu.ship_status = self.timer.ship_status
-        print(self.statu.ship_status)
+        self.stats.ship_stats = self.timer.ship_stats
+        print(self.stats.ship_stats)
 
     def check_fleet(self):
         self.go_fleet_page()
-        self.statu.fleet.detect()
-        for ship in self.statu.fleet.ships:
-            self.statu.ships.add(ship)
-        self.statu.ship_status = DetectShipStatu(self.timer)
+        self.stats.fleet.detect()
+        for ship in self.stats.fleet.ships:
+            self.stats.ships.add(ship)
+        self.stats.ship_stats = DetectShipStats(self.timer)
 
     def during_fight(self):
-        formation = get_formation(self.statu.fleet, self.statu.enemy_now)
-        night = self.statu.node in self.statu.key_points[self.statu.chapter][self.statu.map]
+        formation = get_formation(self.stats.fleet, self.stats.enemy_now)
+        night = self.stats.node in self.stats.key_points[self.stats.chapter][self.stats.map]
         DecisiveBattlePlan(self.timer, decision_block=DB(formation=formation, night=night)).run()
 
     def change_fleet(self, fleet):
         self.go_fleet_page()
-        self.statu.fleet.set_ship(fleet, order=True, search_method=None)
+        self.stats.fleet.set_ship(fleet, order=True, search_method=None)
 
     def fight(self):
         try:
             res = self.before_fight()
-        except (Exception, BaseException) as e:
+        except BaseException as e:
             print(e)
-            if self.statu.map == 1 and self.statu.node == 'A':
+            if self.stats.map == 1 and self.stats.node == 'A':
                 # 处理临时 BUG (https://nga.178.com/read.php?tid=34341326)
                 print(e, "Temporary Game BUG, Processing...")
                 self.timer.restart()
                 self.enter_map()
                 self.reset()
                 return 'continue'
-                
+
         if (res == 'retreat'):
             self.enter_map(check_map=False)
             self.reset()
@@ -487,13 +487,13 @@ class DecisiveBattle():
         """使用磁盘重置关卡, 并重置状态
         """
         # Todo: 缺少磁盘报错
-        self.statu.reset()
+        self.stats.reset()
         self.move_chapter()
         self.timer.Android.click(500, 500)
         self.timer.ConfirmOperation()
 
     def reset(self):
-        self.statu.reset()
+        self.stats.reset()
 
 
 class DecisiveBattlePlan(BattlePlan):

@@ -18,12 +18,12 @@ def CalcDis(p1, p2):
     return square
 
 
-def get_nearest(positon, points):
+def get_nearest(position, points):
     if not True:
         raise ValueError("no color template")
     result = 0 if points[0] is not None else 1
     for i in range(1, len(points)):
-        if CalcDis(positon, points[i]) < CalcDis(positon, points[result]):
+        if CalcDis(position, points[i]) < CalcDis(position, points[result]):
             result = i
     return result
 
@@ -43,30 +43,30 @@ def CheckColor(col, ColorList):
     return get_nearest(col, ColorList)
 
 
-def matri_to_str(matri: np.ndarray):
+def matrix_to_str(matrix: np.ndarray):
     """将一个矩阵转化为字符串,格式为:第一行两个正整数 n,m 表示行数和列数,接下来 n 行每行 m 列
 
     For Example:
-        >>> print(matri_to_str([[1, 2, 3], [2, 3, 4]]))
+        >>> print(matrix_to_str([[1, 2, 3], [2, 3, 4]]))
         2 3
         1 2 3
         2 3 4
 
     Args:
-        matri (numpy.ndarray): 矩阵
+        matrix (numpy.ndarray): 矩阵
 
     Raises:
-        ValueError: 如果 matri 参数不是二维的
+        ValueError: 如果 matrix 参数不是二维的
 
     Returns:
         str: 结果字符串
     """
-    shape = matri.shape
+    shape = matrix.shape
     if (len(shape) != 2):
-        raise ValueError("matri must be a 2D ndarray")
-    res = str(len(matri))+" "+str(len(matri[0]))+"\n"
-    for i in range(len(matri)):
-        x = matri[i]
+        raise ValueError("matrix must be a 2D ndarray")
+    res = str(len(matrix))+" "+str(len(matrix[0]))+"\n"
+    for i in range(len(matrix)):
+        x = matrix[i]
         for j in range(len(x)):
             y = x[j]
             res += str(y)+" "

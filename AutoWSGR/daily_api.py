@@ -2,7 +2,7 @@ import time
 
 from AutoWSGR.fight.battle import BattlePlan
 from AutoWSGR.fight.normal_fight import NormalFightPlan
-from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
+from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath, DestroyShip
 from AutoWSGR.main import start_script
 
 
@@ -35,12 +35,6 @@ class DailyOperation:
             if times[0] < times[1]:
                 return i
 
-    def _normal_fight_once(self, task_id):
-        plan = self.fight_plans[task_id]
-        ret = plan.run()
-        if ret == "success":
-            self.fight_complete_times[task_id][0] += 1
-
     def run(self):
         # 自动战役，直到超过次数
         if self.config.Auto_Battle:
@@ -52,7 +46,18 @@ class DailyOperation:
         if type(self.config.Auto_NormalFight) == list and self.config.Auto_NormalFight:
             while self._has_unfinished():
                 task_id = self._get_unfinished()
-                self._normal_fight_once(task_id)
+
+                plan = self.fight_plans[task_id]
+                ret = plan.run()
+
+                if ret == "success":
+                    self.fight_complete_times[task_id][0] += 1
+                elif ret == "dock is full":
+                    if self.config.Dock_Full_Destroy:
+                        self.timer.Android.relative_click(0.38-0.5, 0.565-0.5)
+                        DestroyShip(self.timer)
+                    else:
+                        break  # 不解装则结束出征
 
                 if time.time() - self.last_time >= 5*60:
                     self._expedition()

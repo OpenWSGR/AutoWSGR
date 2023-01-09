@@ -24,7 +24,7 @@ def split_str(str, keywords):
 def recognize_decisive_enemy(image):
     allow = get_allow(ALL_SHIP_TYPES_CN)
     char = 'A'
-    for box in recognize(image, char_lsit=allow + '/'):
+    for box in recognize(image, char_list=allow + '/'):
         try:
             text = box[1]
             if(DEBUG):

@@ -32,10 +32,10 @@ class Timer(Emulator):
         self.everyday_check = True
         self.now_page = None
         self.ui = WSGR_UI
-        self.ship_status = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
+        self.ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
         self.enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
         self.now_page = None  # 当前所在节点名
-        self.expedition_status = None  # 远征状态记录器
+        self.expedition_stats = None  # 远征状态记录器
         self.team = 1  # 当前队伍名
         self.ammo = 10
         self.oil = 10
@@ -51,10 +51,10 @@ class Timer(Emulator):
         self.enemies = []
         self.enemy_ship_type = [None, NO, NO, NO, NO, NO, NO]
         self.friend_ship_type = [None, NO, NO, NO, NO, NO, NO]
-        self.defaul_repair_logic = None
+        self.default_repair_logic = None
         self.fight_result = None
-        self.last_mission_compelted = 0
-        self.last_expedition_checktime = time.time()
+        self.last_mission_completed = 0
+        self.last_expedition_check_time = time.time()
 
         try:
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
@@ -225,7 +225,7 @@ class Timer(Emulator):
 
     # ========================= 维护当前所在游戏界面 =========================
     #@logit()
-    def _intergrative_page_identify(self):
+    def _integrative_page_identify(self):
         positions = [(171, 47), (300, 47), (393, 47), (504, 47), (659, 47)]
         for i, position in enumerate(positions):
             if self.check_pixel(position, (225, 130, 16)):
@@ -238,11 +238,11 @@ class Timer(Emulator):
 
         if (name == 'main_page') and (self.identify_page('options_page', 0)):
             return False
-        if (name == 'map_page') and (self._intergrative_page_identify() != 1 or self.check_pixel((35, 297), (47, 253, 226))):
+        if (name == 'map_page') and (self._integrative_page_identify() != 1 or self.check_pixel((35, 297), (47, 253, 226))):
             return False
-        if (name == 'build_page') and (self._intergrative_page_identify() != 1):
+        if (name == 'build_page') and (self._integrative_page_identify() != 1):
             return False
-        if (name == 'develop_page') and (self._intergrative_page_identify() != 3):
+        if (name == 'develop_page') and (self._integrative_page_identify() != 3):
             return False
 
         return any(self.image_exist(template, 0) for template in IMG.identify_images[name])
@@ -447,6 +447,6 @@ def process_error(timer: Timer):
         timer.Windows.RestartAndroid()
         timer.Windows.ConnectAndroid()
 
-        return "Andoird Restarted"
+        return "Android Restarted"
 
     return "ok,bad network" if timer.process_bad_network() else "ok,unknown error"

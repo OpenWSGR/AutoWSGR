@@ -6,7 +6,7 @@ from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import (ALL_SHIP_TYPES, INFO1, INFO2,
                                                 SAP)
-from AutoWSGR.constants.positions import BLOODLIST_POSITION
+from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import get_ship, Expedition
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
@@ -32,7 +32,7 @@ def start_march(timer: Timer, position=(900, 500)):
                 if timer.identify_page('fight_prepare_page'):
                     return start_march(timer, position)
                 else:
-                    NetworkErr("status unknow")
+                    NetworkErr("stats unknow")
             else:
                 raise TimeoutError("map_fight prepare timeout")
     return "success"
@@ -46,7 +46,7 @@ class Ship():
         self.name = ''  # 舰船名称
         self.ship_type = 0  # TODO: 舰船类型，用字面常量实现
         self.health = 0  # 舰船生命值
-        self.ship_status = 0  # TODO：舰船状态，主要用于记录击沉、空位
+        self.ship_stats = 0  # TODO：舰船状态，主要用于记录击沉、空位
 
         # 友方
         self.level = 0  # 舰船等级
@@ -65,7 +65,7 @@ class FightResult():
     #@logit(level=INFO1)
     def detect_result(self):
         mvp_pos = self.timer.get_image_position(IMG.fight_image[14])
-        self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOODLIST_POSITION[1])
+        self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
         self.result = self.timer.wait_images(IMG.fight_result_image, timeout=5)
         if (self.timer.image_exist(IMG.fight_result_image['SS'], need_screen_shot=False)):
             self.result = 'SS'
@@ -200,7 +200,7 @@ class StageRecorder():
         if self.stage_name == "result":
             self.info = copy.deepcopy(Info.fight_result)
         if self.stage_name == 'proceed':
-            self.info = timer.ship_status
+            self.info = timer.ship_stats
 
 
 class FightRecorder():
@@ -224,14 +224,12 @@ class FightRecorder():
         return self.get_fight_infos("result")
 
     @property
-    def enemys(self):
+    def enemies(self):
         return self.get_fight_infos("fight_period")
 
     @property
     def last_stage(self):
-        if (len(self.sr) == 0):
-            return None
-        return self.sr[-1]
+        return None if len(self.sr) == 0 else self.sr[-1]
 
     def __str__(self):
         res = "".join(str(x) + "\n" for x in self.sr)
@@ -260,19 +258,19 @@ class FightPlan(ABC):
                 self.timer.set_page(self.Info.end_page)
                 return 'success'
 
-    def run_for_times(self, times, expedion_gap=1900):
+    def run_for_times(self, times, expedition_gap=1900):
         """多次执行同一任务
         Args:
             times (int): 任务执行总次数
-            expedion_gap (int, optional): 远征检查时间间隔. Defaults to 1900.
+            expedition_gap (int, optional): 远征检查时间间隔. Defaults to 1900.
         """
         assert(times >= 1)
         res = self.run()
         for _ in range(1, times):
-            if time.time() - self.timer.last_expedition_checktime >= expedion_gap:
+            if time.time() - self.timer.last_expedition_check_time >= expedition_gap:
                 expedition = Expedition(self.timer)
                 expedition.run(True)
-                self.timer.last_expedition_checktime = time.time()
+                self.timer.last_expedition_check_time = time.time()
                 res = self.run()
             else:
                 res = self.run(res != 'SL')
@@ -285,7 +283,7 @@ class FightPlan(ABC):
         if ret == "success":
             pass
         elif ret == "dock is full":
-            return ret  # TODO：加入分解逻辑
+            return ret
         elif ret == "fight end":
             self.timer.set_page(self.Info.end_page)
             return ret
@@ -313,7 +311,7 @@ class FightPlan(ABC):
         if result not in ["S", "A", "B", "C", "D", "SS"]:
             raise ValueError(f"result value {result} is illegal, it should be 'A','B','C','D','S' or 'SS'")
         if len(last_point) != 1 or ord(last_point) > ord('Z') or ord(last_point) < ord('A'):
-            raise ValueError(f"last_point should be a uppercase within 'A' to 'Z'")
+            raise ValueError("last_point should be a uppercase within 'A' to 'Z'")
         import time
         start_time, run = time.time(), False
         while times:
@@ -326,7 +324,7 @@ class FightPlan(ABC):
             self.timer.logger.info(f"over, last_point:{self.Info.node}, result:{self.fight_recorder.fight_results[-1].result}")
             start_time = time.time()
             times -= 1
-            self.timer.logger.info(f"one fight finished, rest:{str(times)}")
+            self.timer.logger.info(f"one fight finished, rest:{times}")
         return True
         
     def update_state(self):
@@ -390,12 +388,13 @@ class DecisionBlock():
                     rcondition += ch
                     last = i + 1
 
-            if (self.config.SHOW_ENEMY_RUELS):
+            if (self.config.SHOW_ENEMY_RULES):
                 self.logger.info(rcondition)
             if eval(rcondition):
                 return act
 
     def make_decision(self, state, last_state, last_action, _action=None):
+        # sourcery skip: extract-method
         """
         Args:
             _action: 用于强行指定夜战和阵型参数. Defaults to None.
@@ -489,10 +488,7 @@ class IndependentFightPlan(FightPlan):
         super().__init__(timer)
         default_args = yaml_to_dict(default_path)
         node_defaults = default_args["node_defaults"]
-        if (plan_path is not None):
-            node_args = yaml_to_dict(plan_path)
-        else:
-            node_args = kwargs
+        node_args = yaml_to_dict(plan_path) if (plan_path is not None) else kwargs
         node_args = recursive_dict_update(node_defaults, node_args)
         self.decision_block = NodeLevelDecisionBlock(timer, node_args)
         self.Info = IndependentFightInfo(timer, end_image)
@@ -543,7 +539,6 @@ class IndependentFightInfo(FightInfo):
             "result": [IMG.fight_image[16], 60],
             "battle_page": [end_image, 5]
         }
-        self.state2image["battle_page"] = [end_image, 5]
 
     def reset(self):
         self.last_state = ""

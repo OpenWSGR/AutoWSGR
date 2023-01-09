@@ -6,8 +6,8 @@ from AutoWSGR.constants.data_roots import PLAN_ROOT
 from AutoWSGR.constants.other_constants import INFO2
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam
-from AutoWSGR.game.get_game_info import (DetectShipStatu, GetEnemyCondition,
-                                         get_exercise_status)
+from AutoWSGR.game.get_game_info import (DetectShipStats, GetEnemyCondition,
+                                         get_exercise_stats)
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 # from AutoWSGR.utils.logger import logit
 
@@ -121,7 +121,7 @@ class NormalExerciseInfo(FightInfo):
 
     def _after_match(self):
         if self.state == "result":
-            DetectShipStatu(self.timer, 'sumup')
+            DetectShipStats(self.timer, 'sumup')
             self.fight_result.detect_result()
 
     @property
@@ -168,7 +168,7 @@ class NormalExercisePlan(FightPlan):
             self.timer.goto_game_page('exercise_page')
 
         self._exercise_times = self.exercise_times
-        self.exercise_status = [None, None]
+        self.exercise_stats = [None, None]
         return "success"
 
     #@logit(level=INFO2)
@@ -178,17 +178,17 @@ class NormalExercisePlan(FightPlan):
         state = self.Info.state
         # 进行MapLevel的决策
         if state == "exercise_page":
-            self.exercise_status = get_exercise_status(self.timer, self.exercise_status[1])
-            if (self._exercise_times > 0 and any(self.exercise_status[2:])):
-                pos = self.exercise_status[2:].index(True)
+            self.exercise_stats = get_exercise_stats(self.timer, self.exercise_stats[1])
+            if (self._exercise_times > 0 and any(self.exercise_stats[2:])):
+                pos = self.exercise_stats[2:].index(True)
                 self.rival = 'player'
                 self.timer.Android.click(770, (pos + 1) * 110 - 10)
                 return 'fight continue'
-            elif (self.robot and self.exercise_status[1]):
+            elif (self.robot and self.exercise_stats[1]):
                 self.timer.Android.swipe(800, 200, 800, 400)  # 上滑
                 self.timer.Android.click(770, 100)
                 self.rival = 'robot'
-                self.exercise_status[1] = False
+                self.exercise_stats[1] = False
                 return "fight continue"
 
             else:

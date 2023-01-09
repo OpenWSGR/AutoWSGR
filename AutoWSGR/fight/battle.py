@@ -4,7 +4,7 @@ from AutoWSGR.constants.data_roots import PLAN_ROOT
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import QuickRepair, get_ship
-from AutoWSGR.game.get_game_info import DetectShipStatu
+from AutoWSGR.game.get_game_info import DetectShipStats
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 
 from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, start_march
@@ -63,7 +63,7 @@ class BattleInfo(FightInfo):
 
     def _after_match(self):
         if self.state == "result":
-            DetectShipStatu(self.timer, 'sumup')
+            DetectShipStats(self.timer, 'sumup')
             self.fight_result.detect_result()
         if self.state == 'get_ship':
             get_ship(self.timer)

@@ -52,10 +52,10 @@ FIGHT_RESULTS = {"SS", "S", "A", "B", "C", "D"}
 
 
 RESOURCE_NAME = {'oil', 'ammo', 'steel', 'aluminum', 'diamond', 'quick_repair', 'quick_build',
-                 'ship_blueprint', 'equipment_builprint', }
+                 'ship_blueprint', 'equipment_blueprint', }
 
 # 船舱容量,装备容量
-PORT_FACILITIES = {'ship_limit', 'ship_ammount', 'equipment_limit', 'equipment_ammount'}
+PORT_FACILITIES = {'ship_limit', 'ship_amount', 'equipment_limit', 'equipment_amount'}
 
 # 维修船坞,建造位,开发位
 

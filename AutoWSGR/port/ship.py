@@ -11,9 +11,7 @@ from AutoWSGR.utils.operator import unorder_equal
 
 
 def count_ship(fleet):
-    res = 0
-    for i in range(1, min(len(fleet), 7)):
-        res += have_ship(fleet[i])
+    res = sum(have_ship(fleet[i]) for i in range(1, min(len(fleet), 7)))
     return res
 
 def have_ship(ship):
@@ -36,9 +34,7 @@ class Fleet():
         return self.count() == 0
     
     def count(self):
-        if(self.ships == None):
-            return 0
-        return count_ship(self.ships)
+        return 0 if self.ships is None else count_ship(self.ships)
     
     def __eq__(self, other:object):
         if(not isinstance(other, (Iterable, Fleet))):
@@ -68,7 +64,7 @@ class Fleet():
         self.ships[position] = ship_name
         self.timer.Android.click(*FLEET_POSITION[position], delay=0)
         res = self.timer.wait_images(IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]], after_get_delay=.4, gap=0)
-        if(ship_name == None):
+        if ship_name is None:
             self.timer.Android.click(83, 167, delay=0)
         else:
             if (res == 1):
@@ -78,7 +74,7 @@ class Fleet():
                 self.timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=.1)
                 self.timer.Android.text(ship_name)
                 self.timer.Android.click(1219 * .75, 667 * .75, delay=1)
-            
+
             ships = recognize_ship(self.timer.get_screen()[:, :1048], self.timer.ship_names)
             for ship in ships:
                 if(ship[0] == ship_name):
@@ -86,12 +82,12 @@ class Fleet():
                     center = convert_position(*center, (1280, 720), 'this_to_960')
                     self.timer.Android.click(*center)
                     break            
-                    
+
         self.timer.wait_pages('fight_prepare_page', gap=0)
     
     def _set_ships(self, ships, search_method='word'):
         ok = [None] + [False] * 6
-        if(self.ships == None):
+        if self.ships is None:
             self.detect()
         for i in range(1, 7):
             ship = self.ships[i]
@@ -105,7 +101,7 @@ class Fleet():
             position = ok.index(False)
             self.change_ship(position, ship, search_method=search_method)
             ok[position] = True
-        
+
         for i in range(1, 7):
             if(ok[7 - i] == False and self.ships[7 - i] != None):
                 self.change_ship(7 - i, None)
@@ -135,7 +131,7 @@ class Fleet():
         if(len(ships) <= 7):
             ships += [None] * 7
         for i in range(1, 7):
-            if(ships[i] == None):
+            if ships[i] is None:
                 ok = True
             if(ok and ships[i] is not None):
                 return False
@@ -149,7 +145,7 @@ class Fleet():
             order (bool): 是否按照 ships 给定的顺序 (优先级高于旗舰指定)
         """
         assert(self.legal(ships))
-        assert(flag_ship == None or flag_ship in ships)
+        assert flag_ship is None or flag_ship in ships
         self.detect()
         self._set_ships(ships, search_method=search_method)
         if(order):

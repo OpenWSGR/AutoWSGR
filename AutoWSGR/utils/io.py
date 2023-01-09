@@ -17,10 +17,7 @@ def listdir(path):
 
 
 def all_in(elements, set):
-    for element in elements:
-        if element not in set:
-            return False
-    return True
+    return all(element in set for element in elements)
 
 
 def yaml_to_dict(yaml_file):
@@ -47,11 +44,11 @@ def recursive_dict_update(d, u, skip=[]):
     return d
 
 
-def get_file_suffixname(path):
+def get_file_suffix_name(path):
     """返回文件后缀名,不包含 '.'
 
     For Example:
-        >>> get_file_suffixname("testdir\\testfile.py")
+        >>> get_file_suffix_name("testdir\\testfile.py")
         'py'
     Args:
         path (str): 文件路径
@@ -148,9 +145,6 @@ def get_all_files(dir):
 
 
 def count(keys, iter):
-    res = 0 
-    for it in iter:
-        if(it in keys):
-            res += 1
+    res = sum(1 for it in iter if (it in keys))
     return res
 

@@ -5,18 +5,18 @@ import time
 import numpy as np
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
-                                       SUPPOER_DISABLE, SUPPORT_ENALBE)
+                                       SUPPORT_DISABLE, SUPPORT_ENABLE)
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
 from AutoWSGR.constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC,
                                                 BG, BM, CA, CAV, CBG, CL, CLT,
                                                 CV, CVL, DD, INFO1, NAP, NO,
                                                 RESOURCE_NAME, SAP, SC, SS)
-from AutoWSGR.constants.positions import BLOODLIST_POSITION, TYPE_SCAN_AREA
+from AutoWSGR.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.ocr.digit import get_resources
 from AutoWSGR.utils.io import delete_file, read_file, save_image, write_file
 # from AutoWSGR.utils.logger import logit
-from AutoWSGR.utils.math_functions import CalcDis, CheckColor, matri_to_str
+from AutoWSGR.utils.math_functions import CalcDis, CheckColor, matrix_to_str
 from PIL import Image as PIM
 
 
@@ -106,7 +106,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
 
     for i, area in enumerate(TYPE_SCAN_AREA[type]):
         arr = np.array(img.crop(area))
-        args += matri_to_str(arr)
+        args += matrix_to_str(arr)
 
     write_file(input_path, args)
     os.system(f"{str(os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe'))} {TUNNEL_ROOT}")
@@ -130,10 +130,10 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
 
 
 # @logit(level=INFO1)
-def DetectShipStatu(timer: Timer, type='prepare'):
-    """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_status
+def DetectShipStats(timer: Timer, type='prepare'):
+    """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_stats
 
-    timer.ship_status:一个表示舰船血量状态的列表,从 1 开始编号.
+    timer.ship_stats:一个表示舰船血量状态的列表,从 1 开始编号.
 
         For Example:
         [-1, 0, 0, 1, 1, 2, 2] 表示 1,2 号位绿血,3,4 号位中破,5,6 号位大破
@@ -160,7 +160,7 @@ def DetectShipStatu(timer: Timer, type='prepare'):
     result=[-1, 0, 0, 0, 0, 0, 0]
     for i in range(1, 7):
         if type == 'prepare':
-            pixel=timer.get_pixel(*BLOODLIST_POSITION[0][i])
+            pixel=timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
             result[i]=CheckColor(pixel, BLOOD_COLORS[0])
             if result[i] in [3, 2]:
                 result[i]=2
@@ -171,14 +171,14 @@ def DetectShipStatu(timer: Timer, type='prepare'):
             else:
                 result[i]=1
         elif type == 'sumup':
-            if timer.ship_status[i] == -1:
+            if timer.ship_stats[i] == -1:
                 result[i]=-1
                 continue
-            pixel=timer.get_pixel(*BLOODLIST_POSITION[1][i])
+            pixel=timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
             result[i]=CheckColor(pixel, BLOOD_COLORS[1])
-    timer.ship_status=result
+    timer.ship_stats=result
     if timer.config.DEBUG:
-        print(type, ":ship_status =", result)
+        print(type, ":ship_stats =", result)
     return result
 
 
@@ -190,7 +190,7 @@ def DetectShipType(timer: Timer):
 
 
 #@logit(level=INFO1)
-def get_exercise_status(timer: Timer, robot=None):
+def get_exercise_stats(timer: Timer, robot=None):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
     Args:
@@ -232,7 +232,7 @@ def get_exercise_status(timer: Timer, robot=None):
 
 
 #@logit(level=INFO1)
-def CheckSupportStatu(timer: Timer):
+def CheckSupportStats(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 
     Returns:
@@ -240,6 +240,6 @@ def CheckSupportStatu(timer: Timer):
     """
     timer.update_screen()
     pixel=timer.get_pixel(623, 75)
-    d1=CalcDis(pixel, SUPPORT_ENALBE)
-    d2=CalcDis(pixel, SUPPOER_DISABLE)
+    d1=CalcDis(pixel, SUPPORT_ENABLE)
+    d2=CalcDis(pixel, SUPPORT_DISABLE)
     return d1 < d2
