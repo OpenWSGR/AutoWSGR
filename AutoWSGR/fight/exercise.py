@@ -3,13 +3,11 @@ import os
 
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.data_roots import PLAN_ROOT
-from AutoWSGR.constants.other_constants import INFO2
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam
 from AutoWSGR.game.get_game_info import (DetectShipStats, GetEnemyCondition,
                                          get_exercise_stats)
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
-# from AutoWSGR.utils.logger import logit
 
 from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
 
@@ -20,7 +18,6 @@ from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
 
 class ExerciseDecisionBlock(DecisionBlock):
 
-    #@logit(level=INFO2)
     def make_decision(self, state, last_state, last_action):
         if state == "rival_info":
             max_times = self.max_refresh_times
@@ -157,7 +154,6 @@ class NormalExercisePlan(FightPlan):
         # 构建信息存储结构
         self.Info = NormalExerciseInfo(self.timer)
 
-    #@logit(level=INFO2)
     def _enter_fight(self, same_work=False) -> str:
         """
         从任意界面进入战斗.
@@ -171,7 +167,6 @@ class NormalExercisePlan(FightPlan):
         self.exercise_stats = [None, None]
         return "success"
 
-    #@logit(level=INFO2)
     def _make_decision(self):
 
         self.Info.update_state()

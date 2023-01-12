@@ -4,18 +4,16 @@ import time
 
 import numpy as np
 from AutoWSGR.constants.image_templates import IMG
-from AutoWSGR.constants.colors import (BLOOD_COLORS, CHALLENGE_BLUE,
-                                       SUPPORT_DISABLE, SUPPORT_ENABLE)
+from AutoWSGR.constants.colors import COLORS
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
 from AutoWSGR.constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC,
                                                 BG, BM, CA, CAV, CBG, CL, CLT,
-                                                CV, CVL, DD, INFO1, NAP, NO,
+                                                CV, CVL, DD, NAP, NO,
                                                 RESOURCE_NAME, SAP, SC, SS)
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.ocr.digit import get_resources
 from AutoWSGR.utils.io import delete_file, read_file, save_image, write_file
-# from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import CalcDis, CheckColor, matrix_to_str
 from PIL import Image as PIM
 
@@ -70,7 +68,6 @@ class Resources():
         return self.resources.get(name)
 
 
-#@logit(level=INFO1)
 def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     """获取敌方舰船类型数据并更新到 timer.enemy_type_count
     timer.enemy_type_count 为一个记录了敌方情况的字典
@@ -116,7 +113,6 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     for i, x in enumerate(res):
         timer.enemy_ship_type[i]=x
         timer.enemy_type_count[x] += 1
-        timer.enemy_ship_type[i]=x
         if (x != NO):
             timer.enemy_type_count["ALL"] += 1
 
@@ -129,7 +125,6 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         print("")
 
 
-# @logit(level=INFO1)
 def DetectShipStats(timer: Timer, type='prepare'):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_stats
 
@@ -161,7 +156,7 @@ def DetectShipStats(timer: Timer, type='prepare'):
     for i in range(1, 7):
         if type == 'prepare':
             pixel=timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
-            result[i]=CheckColor(pixel, BLOOD_COLORS[0])
+            result[i]=CheckColor(pixel, COLORS.BLOOD_COLORS[0])
             if result[i] in [3, 2]:
                 result[i]=2
             elif result[i] == 0:
@@ -175,21 +170,19 @@ def DetectShipStats(timer: Timer, type='prepare'):
                 result[i]=-1
                 continue
             pixel=timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
-            result[i]=CheckColor(pixel, BLOOD_COLORS[1])
+            result[i]=CheckColor(pixel, COLORS.BLOOD_COLORS[1])
     timer.ship_stats=result
     if timer.config.DEBUG:
         print(type, ":ship_stats =", result)
     return result
 
 
-#@logit(level=INFO1)
 def DetectShipType(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
 
 
-#@logit(level=INFO1)
 def get_exercise_stats(timer: Timer, robot=None):
     """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
 
@@ -211,27 +204,26 @@ def get_exercise_stats(timer: Timer, robot=None):
         up=True
     if (up):
         for position in range(1, 5):
-            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
+            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
         timer.Android.swipe(800, 400, 800, 200)  # 下滑
         timer.update_screen()
-        result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50)
+        result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
         return result
     if down:
         for position in range(1, 5):
-            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), CHALLENGE_BLUE)) <= 50)
+            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
         if (robot is not None):
             result.insert(1, robot)
         else:
             timer.Android.swipe(800, 200, 800, 400)  # 上滑
             timer.update_screen()
-            result.insert(1, math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), CHALLENGE_BLUE)) <= 50)
+            result.insert(1, math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
 
             timer.Android.swipe(800, 400, 800, 200)  # 下滑
 
         return result
 
 
-#@logit(level=INFO1)
 def CheckSupportStats(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 
@@ -240,6 +232,6 @@ def CheckSupportStats(timer: Timer):
     """
     timer.update_screen()
     pixel=timer.get_pixel(623, 75)
-    d1=CalcDis(pixel, SUPPORT_ENABLE)
-    d2=CalcDis(pixel, SUPPORT_DISABLE)
+    d1=CalcDis(pixel, COLORS.SUPPORT_ENABLE)
+    d2=CalcDis(pixel, COLORS.SUPPORT_DISABLE)
     return d1 < d2

@@ -5,13 +5,8 @@ from airtest.core.cv import (MATCHING_METHODS, ST, InvalidMatchingMethodError,
                              TargetPos, Template)
 from airtest.core.helper import G
 from airtest.core.settings import Settings as ST
-from AutoWSGR.utils.io import (all_in, get_all_files, get_file_suffix_name,
-                               listdir)
 
 from .data_roots import IMG_ROOT
-from .other_constants import ALL_ERRORS, ALL_PAGES, FIGHT_RESULTS
-
-all_images = get_all_files(IMG_ROOT)
 
 
 class MyTemplate(Template):
@@ -47,23 +42,25 @@ class MyTemplate(Template):
 
 
 def make_dir_templates(path):
-    """给定路径,返回一个字典    
+    """ 建立path目录下所有图片的模板字典 """
+    # 不处理二级目录和非png文件
+    all_files = [file for file in os.listdir(path) if not (os.path.isdir(file or file.split('.')[-1].lower() != "png"))]
 
-    字典的键为路径下所有图片的文件名(不含后缀)
+    if all(file.split('.')[0].isdecimal() for file in all_files):
+        res = [None, ]
+        for file in all_files:
+            key = int(file.split('.')[0])
+            if key >= len(res):
+                res.extend([None, ] * (key - len(res) + 1))
+            file_path = os.path.join(path, file)
+            res[key] = MyTemplate(file_path, 0.9, resolution=(960, 540))
+    else:
+        res = {}
+        for file in all_files:
+            file_path = os.path.join(path, file)
+            key_name = file.split('.')[0]
+            res[key_name] = MyTemplate(file_path, 0.9, resolution=(960, 540))
 
-    字典的值为对应图片的 MyTemplate 类
-
-    如果文件名是纯数字,再创建一个数字下标映射
-    """
-    res = {}
-    files = listdir(path)
-    for file in files:
-        if (os.path.isdir(file) or get_file_suffix_name(file) != "PNG"):
-            continue
-        filename = os.path.basename(file).split('.')[0]
-        res[filename] = make_template(path=file)[0]
-        if (filename.isdecimal()):
-            res[int(filename)] = make_template(path=file)[0]
     return res
 
 
@@ -74,65 +71,26 @@ def make_dir_templates_without_number(path):
 
     字典的值为对应图片的 MyTemplate 类列表,所有英文名相同的图片会被放入同一个列表(仅忽略数字)
     """
-    files = listdir(path)
     res = {}
-    for file in files:
-        filename = os.path.basename(file).split('.')[0]
-        alpha = re.findall(r'[^0-9]*', filename)[0]
-        if (alpha not in res.keys()):
-            res[alpha] = []
-        res[alpha] += make_template(path=file)
+    for file in os.listdir(path):
+        filename = file.split('.')[0]
+        key_name = re.findall(r'[^0-9]*', filename)[0]
+        if (key_name not in res.keys()):
+            res[key_name] = []
+        file_path = os.path.join(path, file)
+        res[key_name].append(MyTemplate(file_path, 0.9, resolution=(960, 540)))
     return res
-
-
-def make_template(name=None, path=None, all_image=all_images, *args, **kwargs):
-    """给定路径，或者给定关键字和图片库返回一个图像模板列表。
-
-    Args:
-        name (list): 关键字组
-
-    Returns:
-        如果给定了关键字和图像列表，则返回图像列表中，路径字符串含关键字的图片列表
-
-        否则返回给定路径的图片模板,(单个元素以列表形式)
-    """
-    if (name is not None):
-        if (not isinstance(name, list)):
-            name = [name]
-        rec_pos = kwargs['rec_pos'] if "rec_pos" in kwargs else None
-        return [MyTemplate(image, 0.9, resolution=(960, 540), record_pos=rec_pos) for image in all_image if (all_in(name, image))]
-
-    return [MyTemplate(path, 0.9, resolution=(960, 540))]
 
 
 class ImageSet():
     def __init__(self):
-        self.decisive_battle_image = ["", ]
-        self.symbol_image = ["", ]
-        self.fight_image = ["", ]
-        self.normal_map_image = make_dir_templates(path=f"{IMG_ROOT}/normal_map_image")
-        self.fight_result_image = {}
-        for result in FIGHT_RESULTS:
-            self.fight_result_image[result] = make_template(path=f'{IMG_ROOT}/fight_result/{result}.PNG')
-
-
-        self.exercise_image = {'rival_info': make_template(path=f'{IMG_ROOT}/exercise/rival_info.PNG')}
-
-        self.error_image = {}
-        for error in ALL_ERRORS:
-            self.error_image[error] = make_template(name=error)
-
-        self.identify_images = {}
-        for page in ALL_PAGES:
-            self.identify_images[page] = make_template(name=page)
+        # identify_images 多图识别，单独处理
+        self.identify_images = make_dir_templates_without_number(f"{IMG_ROOT}/identify_images")
 
         for sub_folder in os.listdir(IMG_ROOT):
-            if sub_folder not in ["identify_images", "errors", "fight_result", "exercise", "normal_map_image"]:
-                if not hasattr(self, sub_folder):
-                    exec(f"self.{sub_folder} = ['', ]")
-                for i in range(1, 1 + len(os.listdir(os.path.join(IMG_ROOT, sub_folder)))):
-                    eval(f"self.{sub_folder}").append(
-                        MyTemplate(os.path.join(IMG_ROOT, sub_folder, f"{i}.PNG"), resolution=(960, 540)))
+            if sub_folder not in self.__dict__:
+                sub_folder_path = os.path.join(IMG_ROOT, sub_folder)
+                self.__dict__.update({sub_folder: make_dir_templates(sub_folder_path)})
 
 
 IMG = ImageSet()

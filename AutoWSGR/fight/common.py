@@ -4,18 +4,15 @@ from abc import ABC, abstractmethod
 
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
 from AutoWSGR.constants.image_templates import IMG
-from AutoWSGR.constants.other_constants import (ALL_SHIP_TYPES, INFO1, INFO2,
-                                                SAP)
+from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES, SAP
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import get_ship, Expedition
+from AutoWSGR.game.game_operation import Expedition, get_ship
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
-# from AutoWSGR.utils.logger import logit
 from AutoWSGR.utils.math_functions import get_nearest
 from AutoWSGR.utils.operator import remove_0_value_from_dict
 
 
-#@logit(level=INFO2)
 def start_march(timer: Timer, position=(900, 500)):
     timer.Android.click(*position, 1, delay=0)
     start_time = time.time()
@@ -62,12 +59,11 @@ class FightResult():
         self.mvp = 0
         self.experiences = [None, 0, 0, 0, 0, 0, 0]
 
-    #@logit(level=INFO1)
     def detect_result(self):
         mvp_pos = self.timer.get_image_position(IMG.fight_image[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
-        self.result = self.timer.wait_images(IMG.fight_result_image, timeout=5)
-        if (self.timer.image_exist(IMG.fight_result_image['SS'], need_screen_shot=False)):
+        self.result = self.timer.wait_images(IMG.fight_result, timeout=5)
+        if (self.timer.image_exist(IMG.fight_result['SS'], need_screen_shot=False)):
             self.result = 'SS'
         if self.result is None:
             self.timer.log_screen()
@@ -109,10 +105,10 @@ class FightInfo(ABC):
         self.timer = timer
         self.config = timer.config
         self.logger = timer.logger
-        
+
         self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
         self.state2image = {}  # 所需用到的图片模板。格式为 [模板，等待时间]
-        self.after_match_delay = {} # 匹配成功后的延时。格式为 {状态名 : 延时时间(s),}
+        self.after_match_delay = {}  # 匹配成功后的延时。格式为 {状态名 : 延时时间(s),}
         self.last_state = ""
         self.last_action = ""
         self.state = ""
@@ -148,13 +144,13 @@ class FightInfo(ABC):
             # 尝试匹配
             ret = [self.timer.images_exist(image, 0, confidence=confidence) for image in images]
             if any(ret):
-                
+
                 self.state = possible_states[ret.index(True)]
                 # 查询是否有匹配后延时
                 if self.state in self.after_match_delay:
                     delay = self.after_match_delay[self.state]
                     time.sleep(delay)
-                    
+
                 if (self.config.SHOW_MATCH_FIGHT_STAGE):
                     self.logger.info(f"matched: {self.state}")
                 self._after_match()
@@ -242,7 +238,7 @@ class FightPlan(ABC):
         self.timer = timer
         self.config = timer.config
         self.logger = timer.logger
-        
+
         self.fight_recorder = FightRecorder()
 
     def fight(self):
@@ -264,7 +260,7 @@ class FightPlan(ABC):
             times (int): 任务执行总次数
             expedition_gap (int, optional): 远征检查时间间隔. Defaults to 1900.
         """
-        assert(times >= 1)
+        assert (times >= 1)
         res = self.run()
         for _ in range(1, times):
             if time.time() - self.timer.last_expedition_check_time >= expedition_gap:
@@ -274,7 +270,7 @@ class FightPlan(ABC):
                 res = self.run()
             else:
                 res = self.run(res != 'SL')
-    
+
     def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. """
         self.fight_recorder.reset()
@@ -326,7 +322,7 @@ class FightPlan(ABC):
             times -= 1
             self.timer.logger.info(f"one fight finished, rest:{times}")
         return True
-        
+
     def update_state(self):
         try:
             self.Info.update_state()
@@ -339,12 +335,12 @@ class FightPlan(ABC):
             if self.Info.last_state in ['proceed', 'night']:
                 if self.Info.last_action == "yes":
                     self.timer.Android.click(325, 350, times=1)
-                else:                
+                else:
                     self.timer.Android.click(615, 350, times=1)
             self.Info.update_state()
             state = self.Info.state
         return state
-    
+
     @abstractmethod
     def _enter_fight(self, same_work=False) -> str:
         pass
@@ -354,7 +350,6 @@ class FightPlan(ABC):
         pass
 
     # =============== 战斗中通用的操作 ===============
-    #@logit(level=INFO2)
     def SL(self):
         self.timer.restart()
         self.timer.go_main_page()
@@ -366,7 +361,7 @@ class DecisionBlock():
         self.timer = timer
         self.config = timer.config
         self.logger = timer.logger
-        
+
         self.__dict__.update(args)
 
         # 用于根据规则设置阵型
@@ -382,7 +377,7 @@ class DecisionBlock():
                 if ord(ch) > ord("Z") or ord(ch) < ord("A"):
                     if last != i:
                         if condition[last:i] in ALL_SHIP_TYPES:
-                            rcondition += f"self.timer.enemy_type_count['{condition[last:i]}']"
+                            rcondition += f"self.timer.enemy_type_count.get('{condition[last:i]}', 0)"
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch

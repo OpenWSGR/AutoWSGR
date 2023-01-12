@@ -12,30 +12,6 @@ event_pressed = set()
 script_end = 0
 
 
-def lencmp(s1, s2):
-    if (len(s1) < len(s2)):
-        return 1
-    if (len(s1) > len(s2)):
-        return -1
-    return 0
-
-
-def listener(event: kd.KeyboardEvent):
-    on_press = event_pressed
-    if (event.event_type == 'down'):
-        if (event.name in on_press):
-            return
-        on_press.add(event.name)
-    if (event.event_type == 'up'):
-        on_press.discard(event.name)
-
-    if ('ctrl' in on_press and 'alt' in on_press and 'c' in on_press):
-        global script_end
-        script_end = 1
-        print("Script end by user request")
-        quit()
-
-
 def start_script(settings_path=None):
     """启动脚本,返回一个 Timer 记录器
 

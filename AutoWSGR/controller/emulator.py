@@ -7,10 +7,8 @@ import cv2
 from airtest.core.helper import G
 
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
-from AutoWSGR.constants.other_constants import INFO1
 from AutoWSGR.utils.api_image import (MyTemplate, convert_position,
                                       locateCenterOnImage)
-# from AutoWSGR.utils.logger import get_time_as_string, logit
 from AutoWSGR.utils.math_functions import CalcDis
 from AutoWSGR.utils.new_logger import Logger
 
@@ -22,7 +20,7 @@ class Emulator():
     """模拟器管理单位,可以用于其它游戏
     """
 
-    def __init__(self, config, logger:Logger):
+    def __init__(self, config, logger: Logger):
         # 获取设置，初始化windows控制器
         self.config = config
         self.logger = logger
@@ -36,7 +34,6 @@ class Emulator():
         self.logger.info(f"resolution:{str(self.config.resolution)}")
         self.Android = AndroidController(config, logger)
 
-    # @logit()
     def update_screen(self):
         """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 RD.screen
         """
@@ -80,7 +77,6 @@ class Emulator():
             this_methods = ["tpl"]
         return locateCenterOnImage(self.screen, query, confidence, this_methods)
 
-    # @logit()
     def get_image_position(self, image, need_screen_shot=1, confidence=0.85, this_methods=None):
         """从屏幕中找出和多张模板图像匹配度超过阈值的矩阵区域的中心坐标,如果有多个,返回第一个
             参考 locateCenterOnScreen
@@ -111,7 +107,6 @@ class Emulator():
             this_methods = ["tpl"]
         return self.get_image_position(images, need_screen_shot, confidence, this_methods)
 
-    # @logit()
     def image_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=None):
         """判断图像是否存在于屏幕中
         Returns:
@@ -134,7 +129,6 @@ class Emulator():
             this_methods = ["tpl"]
         return self.image_exist(images, need_screen_shot, confidence, this_methods)
 
-    # @logit()
     def wait_image(self, image: MyTemplate, confidence=0.85, timeout=10, gap=.15, after_get_delay=0, this_methods=None):
         """等待一张图片出现在屏幕中,置信度超过一定阈值(支持多图片)
 
@@ -160,7 +154,6 @@ class Emulator():
                 return False
             time.sleep(gap)
 
-    # @logit()
     def wait_images(self, images=None, confidence=0.85, gap=.15, after_get_delay=0, timeout=10):
         """等待一系列图片中的一个在屏幕中出现
 
@@ -177,19 +170,17 @@ class Emulator():
             a number of int: 第一个出现的图片的下标(0-based) if images is a list
             the key of the value: if images is a dict
         """
-        if images is None:
-            images = []
-        images = copy.copy(images)
-        if (isinstance(images, MyTemplate)):
-            images = [images]
-        if isinstance(images, (list, Tuple)):
-            for i in range(len(images)):
-                images[i] = (i, images[i])
-        if (isinstance(images, dict)):
-            images = images.items()
-
         if (timeout < 0):
             raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
+        if images is None:
+            return None
+
+        if isinstance(images, MyTemplate):
+            images = [(0, images)]
+        elif isinstance(images, (list, Tuple)) and isinstance(images[0], MyTemplate):
+            images = enumerate(images)
+        elif isinstance(images, dict):
+            images = images.items()
 
         StartTime = time.time()
         while (True):
@@ -216,7 +207,6 @@ class Emulator():
             return None
         return self.get_image_position(images[rank], 0, confidence)
 
-    # @logit(level=INFO1)
     def click_image(self, image, must_click=False, timeout=0, delay=0.5):
         """点击一张图片的中心位置
         Args:

@@ -7,7 +7,6 @@ from airtest.core.api import auto_setup
 from AutoWSGR.constants.custom_exceptions import CriticalErr
 from AutoWSGR.constants.data_roots import ADB_ROOT
 from AutoWSGR.utils.function_wrapper import try_for_times
-# from AutoWSGR.utils.logger import logit
 
 # Win 和 Android 的通信
 # Win 向系统写入数据
@@ -102,7 +101,6 @@ class WindowsController:
             time.sleep(1.5)
         return False
 
-    #@logit(level=INFO2)
     def RestartAndroid(self):
         """重启安卓设备
 

@@ -3,10 +3,8 @@ import time
 from airtest.core.api import text
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
-from AutoWSGR.constants.other_constants import INFO1, INFO2, INFO3
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
 from AutoWSGR.controller.run_timer import Timer
-# from AutoWSGR.utils.logger import logit
 
 from .get_game_info import CheckSupportStats, DetectShipStats
 
@@ -17,7 +15,6 @@ class Expedition:
         self.is_ready = False
         self.last_check = time.time()
 
-    # @logit(level=INFO1)
     def update(self, force=False):
         self.timer.update_screen()
         if (isinstance(self.timer.now_page, str) and 'unknow' in self.timer.now_page)\
@@ -29,7 +26,6 @@ class Expedition:
         else:
             self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
 
-    # @logit(level=INFO3)
     def run(self, force=False):
         """检查远征,如果有未收获远征,则全部收获并用原队伍继续
 
@@ -50,7 +46,6 @@ class Expedition:
                 break
 
 
-# @logit(level=INFO2)
 def get_ship(timer: Timer, max_times=1):
     times = 0
     timeout = 5
@@ -58,9 +53,9 @@ def get_ship(timer: Timer, max_times=1):
         timer.Android.click(900, 500, delay=.25)
         timeout = 2
         times += 1
+    timer.ConfirmOperation() # TODO: 检查是否高效
 
 
-# @logit(level=INFO3)
 def DestroyShip(timer: Timer):
     """解装舰船，目前仅支持：全部解装+保留装备"""
 
@@ -76,7 +71,6 @@ def DestroyShip(timer: Timer):
     timer.Android.relative_click(0.38-0.5, 0.567-0.5, delay=1.5)  # 四星确认
 
 
-# @logit(level=INFO2)
 def verify_team(timer: Timer):
     """检验目前是哪一个队伍(1~4)
     含网络状况处理
@@ -107,7 +101,6 @@ def verify_team(timer: Timer):
     raise ImageNotFoundErr()
 
 
-# @logit(level=INFO2)
 def MoveTeam(timer: Timer, target, try_times=0):
     """切换队伍
     Args:
@@ -133,7 +126,6 @@ def MoveTeam(timer: Timer, target, try_times=0):
         MoveTeam(timer, target, try_times + 1)
 
 
-# @logit(level=INFO3)
 def SetSupport(timer: Timer, target, try_times=0):
     """启用战役支援
 
@@ -160,7 +152,6 @@ def SetSupport(timer: Timer, target, try_times=0):
             raise ValueError("can't set right support")
 
 
-# @logit(level=INFO3)
 def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
     """战斗界面的快速修理
 
@@ -202,7 +193,6 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
                 timer.Android.click(BLOOD_BAR_POSITION[0][i][0], BLOOD_BAR_POSITION[0][i][1], delay=1.5)
 
 
-# @logit(level=INFO3)
 def GainBounds(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取
 
@@ -224,7 +214,6 @@ def GainBounds(timer: Timer):
     #timer.Android.click(774, 502)
 
 
-# @logit(level=INFO2)
 def RepairByBath(timer: Timer):
     """使用浴室修理修理时间最长的单位
 
@@ -240,7 +229,6 @@ def RepairByBath(timer: Timer):
             timer.set_page()
 
 
-# @logit(level=INFO2)
 def SetAutoSupply(timer: Timer, type=1):
     timer.update_screen()
     NowType = int(timer.check_pixel((48, 508), (224, 135, 35)))
@@ -248,7 +236,6 @@ def SetAutoSupply(timer: Timer, type=1):
         timer.Android.click(44, 503, delay=0.33)
 
 
-# @logit(level=INFO2)
 def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
     """补给指定舰船
 
@@ -278,7 +265,6 @@ def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
         Supply(timer, ship_ids, try_times + 1)
 
 
-# @logit(level=INFO2)
 def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, detect_ship_stats=True):
     """切换舰船(不支持第一舰队)
 
@@ -320,7 +306,6 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, detect
     timer.wait_pages('fight_prepare_page', gap=0)
 
 
-# @logit(level=INFO3)
 def ChangeShips(timer: Timer, fleet_id, ship_names):
     """更换编队舰船
 

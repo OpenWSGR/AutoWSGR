@@ -2,9 +2,7 @@ import threading as th
 import time
 
 from airtest.core.api import shell, start_app, text
-from AutoWSGR.constants.other_constants import INFO1
 from AutoWSGR.utils.api_image import convert_position, relative_to_absolute
-# from AutoWSGR.utils.logger import logit
 
 
 class AndroidController:
@@ -14,7 +12,6 @@ class AndroidController:
 
         self.resolution = config.resolution
 
-    # @logit()
     def ShellCmd(self, cmd, *args, **kwargs):
         """向链接的模拟器发送 shell 命令
         Args:
@@ -25,7 +22,6 @@ class AndroidController:
     def start_app(self, package_name):
         start_app(package_name)
 
-    # @logit()
     def is_game_running(self):
         apps = self.ShellCmd("ps")
         return "zhanjian2" in apps
@@ -33,7 +29,6 @@ class AndroidController:
     def text(self, t):
         text(t)
 
-    # @logit(level=INFO1)
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False):
         """点击模拟器相对坐标 (x,y).
         Args:
@@ -91,7 +86,6 @@ class AndroidController:
             self.ShellCmd(f"input tap {str(x)} {str(y)}")
             time.sleep(delay * self.config.DELAY)
 
-    # @logit(level=INFO1)
     def swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
         """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
         Args:
@@ -119,7 +113,6 @@ class AndroidController:
 
         time.sleep(delay)
 
-    # @logit(level=INFO1)
     def long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
         """长按相对坐标 (x,y)
         Args:

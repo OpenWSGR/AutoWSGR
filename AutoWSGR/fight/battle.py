@@ -65,7 +65,7 @@ class BattleInfo(FightInfo):
         if self.state == "result":
             DetectShipStats(self.timer, 'sumup')
             self.fight_result.detect_result()
-        if self.state == 'get_ship':
+        elif self.state == 'get_ship':
             get_ship(self.timer)
 
 
