@@ -114,7 +114,6 @@ class FightInfo(ABC):
         self.state = ""
         self.fight_result = FightResult(self.timer)  # 战斗结果记录
 
-    # @try_for_times(process_error) # TODO：这里process_error没有timer，会报错
     def update_state(self):
 
         self.last_state = self.state

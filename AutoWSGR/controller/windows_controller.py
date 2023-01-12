@@ -74,6 +74,9 @@ class WindowsController:
         """连接指定安卓设备
         Args:
         """
+        if not self.is_android_online():
+            self.RestartAndroid()
+        
         cap_method = "JAVACAP" if self.config.EMULATOR == "bluestacks" else "MINICAP"
         from logging import ERROR, getLogger
         getLogger("airtest").setLevel(ERROR)
@@ -102,11 +105,7 @@ class WindowsController:
         return False
 
     def RestartAndroid(self):
-        """重启安卓设备
-
-        Args:
-            times (int):重启次数
-        """
+        """ 重启安卓设备 """
         restart_time = time.time()
         self.logger.info("Android Restarting")
         try:
@@ -115,9 +114,9 @@ class WindowsController:
             except:
                 pass
             os.popen(os.path.join(self.config.LDPLAYER_ROOT, "dnplayer.exe"))
-            time.sleep(3)
+            time.sleep(5)
             while self.is_android_online() == False:
-                time.sleep(1)
+                time.sleep(3)
                 if (time.time() - restart_time > 120):
                     raise TimeoutError("can't start the emulator")
         except BaseException as E:

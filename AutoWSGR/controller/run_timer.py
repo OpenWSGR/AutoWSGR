@@ -61,6 +61,7 @@ class Timer(Emulator):
             self.logger.info(f"Default shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
             ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
             self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
+            
         if self.config.account is not None and self.config.password != None:
             self.restart(account=self.config.account, password=self.config.password)
         if self.Android.is_game_running() == False:
@@ -100,7 +101,7 @@ class Timer(Emulator):
             NetworkErr: _description_
         """
         self.Android.start_app("com.huanmeng.zhanjian2")
-        res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, timeout=70 * delay)
+        res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, gap=1, timeout=70 * delay)
 
         if res is None:
             raise TimeoutError("start_app timeout")

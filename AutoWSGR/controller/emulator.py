@@ -178,7 +178,7 @@ class Emulator():
         if isinstance(images, MyTemplate):
             images = [(0, images)]
         elif isinstance(images, (list, Tuple)) and isinstance(images[0], MyTemplate):
-            images = enumerate(images)
+            images = list(enumerate(images))
         elif isinstance(images, dict):
             images = images.items()
 
@@ -186,7 +186,7 @@ class Emulator():
         while (True):
             self.update_screen()
             for res, image in images:
-                if self.image_exist(image, 0, confidence):
+                if self.image_exist(image, False, confidence):
                     time.sleep(after_get_delay)
                     return res
             time.sleep(gap)
