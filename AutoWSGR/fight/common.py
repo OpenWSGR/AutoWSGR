@@ -67,7 +67,8 @@ class FightResult():
             self.result = 'SS'
         if self.result is None:
             self.timer.log_screen()
-            raise ImageNotFoundErr("can't identify fight result")
+            self.timer.logger.warning("can't identify fight result, screen logged")
+            # raise ImageNotFoundErr("can't identify fight result")
         return self
 
     # TODO：获得经验
