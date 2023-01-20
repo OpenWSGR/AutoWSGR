@@ -13,7 +13,10 @@ class Logger:
     def __init__(self, config):
         self.config = config
         self.log_dir = config['log_dir']
-        self.console_logger = self._get_logger()
+        log_level = "INFO"
+        if config["DEBUG"]:
+            log_level = "DEBUG"
+        self.console_logger = self._get_logger(log_level)
 
         # self.use_wandb = config["use_wandb"]
 
@@ -42,7 +45,7 @@ class Logger:
     #                config=self.config)
 
     def debug(self, *args):
-        print(*args)
+        self.console_logger.debug(str(args))
 
     def info(self, string):
         self.console_logger.info(string)
@@ -78,10 +81,10 @@ class Logger:
 
         save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
 
-    def _get_logger(self) -> logging.Logger:
+    def _get_logger(self, log_level="INFO") -> logging.Logger:
         logger = logging.getLogger()
         logger.handlers = []
-        logger.setLevel('INFO')
+        logger.setLevel(log_level)
 
         # Stream
         ch_formatter = logging.Formatter('[%(levelname)s %(asctime)s %(name)s] %(message)s', '%H:%M:%S')

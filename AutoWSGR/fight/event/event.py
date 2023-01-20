@@ -61,8 +61,24 @@ class Event():
 
 
 class PatrollingEvent(Event):
-
+    """巡戈作战活动 类
+    """
+    def __init__(self, timer: Timer, event_name, map_positions):
+        """
+        Args:
+            map_positions : 从主页面点进活动后, 去到对应地图需要点的位置
+                : 对于 E1~E3/H1~H3, 值为地图页面滑到最左边时的点击位置
+                : 对于 E4~E6/H4~H6, 值为地图页面滑到最右边时点击的位置
+                : map_positions[0] 为 None
+                : map_positions[1] 为 E1 的点击位置
+                : map_positions[2] 为 E2 的点击位置...
+        """
+        self.MAP_POSITIONS = map_positions
+        super().__init__(timer, event_name)
+    
     def enter_map(self, chapter, map):
+        """从活动地图选择界面进入到巡游地图
+        """
         assert (chapter in 'HEhe')
         assert (map in range(1, 7))
         self.change_difficulty(chapter)
@@ -72,7 +88,6 @@ class PatrollingEvent(Event):
         else:
             self.timer.Android.swipe(600, 300, 100, 300, duration=.4, delay=.15)
             self.timer.Android.swipe(600, 300, 100, 300, duration=.4, delay=.15)
-        self.MAP_POSITIONS = [None, (275, 118), (364, 383), (578, 147), (522, 337), (445, 158), (791, 157)]
         self.timer.Android.click(*self.MAP_POSITIONS[map], delay=.25)
         assert (self.timer.wait_image(self.event_image[2]) is not False)  # 是否成功进入地图
 
