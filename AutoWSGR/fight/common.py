@@ -120,7 +120,7 @@ class FightInfo(ABC):
         self.last_state = self.state
 
         # 计算当前可能的状态
-        possible_states = copy.deepcopy(self.successor_states[self.state])
+        possible_states = copy.deepcopy(self.successor_states[self.last_state])
         if isinstance(possible_states, dict):
             possible_states = possible_states[self.last_action]
         modified_timeout = [-1 for _ in possible_states]    # 某些状态需要修改等待时间
@@ -142,7 +142,7 @@ class FightInfo(ABC):
             self._before_match()
 
             # 尝试匹配
-            ret = [self.timer.images_exist(image, 0, confidence=confidence) for image in images]
+            ret = [self.timer.images_exist(image, False, confidence=confidence) for image in images]
             if any(ret):
 
                 self.state = possible_states[ret.index(True)]
@@ -357,6 +357,8 @@ class FightPlan(ABC):
 
 
 class DecisionBlock():
+    """ 地图上一个节点的决策模块 """
+
     def __init__(self, timer: Timer, args):
         self.timer = timer
         self.config = timer.config
@@ -400,7 +402,8 @@ class DecisionBlock():
             return None, "fight continue"
         elif state == "spot_enemy_success":
             retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
-            detour = self.detour  # 由Node指定是否要迂回
+            can_detour = self.timer.image_exist(IMG.fight_image[13])  # 判断该点是否可以迂回
+            detour = can_detour and self.detour  # 由Node指定是否要迂回
 
             # 功能，根据敌方阵容进行选择
             act = self.check_rules()
@@ -408,17 +411,21 @@ class DecisionBlock():
             if act == "retreat":
                 retreat = True
             elif act == "detour":
+                assert can_detour, "该点无法迂回，但是规则中指定了迂回"
                 detour = True
             elif isinstance(act, int):
                 self.set_formation_by_rule = True
                 self.formation_by_rule = act
+
             if retreat:
-                self.timer.Android.click(677, 492, delay=0)
+                self.timer.Android.click(677, 492, delay=0.2)
                 return "retreat", "fight end"
             elif detour:
-                self.timer.Android.click(540, 500, delay=0)
+                self.timer.Android.click(540, 500, delay=0.2)
                 return "detour", "fight continue"
-            self.timer.Android.click(855, 501, delay=0)
+
+            self.timer.Android.click(855, 501, delay=0.2)
+            # self.timer.Android.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
             return "fight", "fight continue"
         elif state == "formation":
             spot_enemy = last_state == "spot_enemy_success"
@@ -463,17 +470,6 @@ class DecisionBlock():
             raise BaseException()
 
 
-class NodeLevelDecisionBlock(DecisionBlock):
-    """ 地图上一个节点的决策模块 """
-
-    """ 地图上一个节点的决策模块 """
-
-    def make_decision(self, state, last_state, last_action, _action=None):
-        """进行决策并执行
-        """
-        return super().make_decision(state, last_state, last_action, _action=_action)
-
-
 class IndependentFightPlan(FightPlan):
     def __init__(self, timer: Timer, end_image, plan_path=None, default_path='plans/default.yaml', *args, **kwargs):
         """创建一个独立战斗模块,处理从形如战役点击出征到收获舰船(或战果结算)的整个过程
@@ -485,7 +481,7 @@ class IndependentFightPlan(FightPlan):
         node_defaults = default_args["node_defaults"]
         node_args = yaml_to_dict(plan_path) if (plan_path is not None) else kwargs
         node_args = recursive_dict_update(node_defaults, node_args)
-        self.decision_block = NodeLevelDecisionBlock(timer, node_args)
+        self.decision_block = DecisionBlock(timer, node_args)
         self.Info = IndependentFightInfo(timer, end_image)
 
     def run(self):

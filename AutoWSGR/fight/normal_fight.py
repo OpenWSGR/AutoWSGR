@@ -13,7 +13,7 @@ from AutoWSGR.port.ship import Fleet
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.math_functions import CalcDis
 
-from .common import (FightInfo, FightPlan, NodeLevelDecisionBlock,
+from .common import (FightInfo, FightPlan, DecisionBlock,
                      StageRecorder, start_march)
 
 
@@ -43,7 +43,7 @@ class NormalFightInfo(FightInfo):
             },
             "fight_condition": ["spot_enemy_success", "formation", "fight_period"],
             "spot_enemy_success": {
-                "detour": ["fight_condition", "spot_enemy_success", "formation"],
+                "detour": ["fight_condition", "spot_enemy_success", "formation", "fight_period"],
                 "retreat": ["map_page"],
                 "fight": ["formation", "fight_period"],
             },
@@ -83,13 +83,13 @@ class NormalFightInfo(FightInfo):
 
     def _before_match(self):
         # 点击加速
-        if self.state in ["proceed", "fight_condition"]:
+        if self.last_state in ["proceed", "fight_condition"] or self.last_action == "detour":
             self.timer.Android.click(380, 520, delay=0, enable_subprocess=True)
 
         self.timer.update_screen()
 
         # 在地图上走的过程中获取舰船位置
-        if self.state in ["proceed"]:
+        if self.last_state == "proceed" or self.last_action == "detour":
             self._update_ship_position()
             self._update_ship_point()
             pos = self.timer.get_image_position(IMG.confirm_image[3], False, .8)
@@ -198,7 +198,7 @@ class NormalFightPlan(FightPlan):
             node_args = copy.deepcopy(self.node_defaults)
             if 'node_args' in plan_args and plan_args['node_args'] is not None and node_name in plan_args['node_args']:
                 node_args = recursive_dict_update(node_args, plan_args['node_args'][node_name])
-            self.nodes[node_name] = NodeLevelDecisionBlock(timer, node_args)
+            self.nodes[node_name] = DecisionBlock(timer, node_args)
         self.load_fight_info()
 
     def load_fight_info(self):
@@ -258,12 +258,17 @@ class NormalFightPlan(FightPlan):
             self.fight_recorder.append(StageRecorder(self.Info, self.timer))
             return "fight continue"
 
-        elif state == "spot_enemy_success":
-            if self.Info.node not in self.selected_nodes:  # 不在白名单之内直接SL
+        # 不在白名单之内 SL
+        if self.Info.node not in self.selected_nodes:
+            # 可以撤退点撤退
+            if state == "spot_enemy_success":
                 self.timer.Android.click(677, 492, delay=0)
                 self.Info.last_action = "retreat"
                 self.fight_recorder.append(StageRecorder(self.Info, self.timer))
                 return "fight end"
+            # 不能撤退退游戏
+            elif state in ["formation", "fight_period"]:
+                return "need SL"
 
         elif state == "proceed":
             is_proceed = self.nodes[self.Info.node].proceed and \
@@ -290,7 +295,7 @@ class NormalFightPlan(FightPlan):
                                                                        self.Info.last_action)
         self.Info.last_action = action
         self.fight_recorder.append(StageRecorder(self.Info, self.timer))
-        
+
         return fight_stage
 
     # ======================== Functions ========================

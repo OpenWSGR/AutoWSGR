@@ -7,7 +7,7 @@ from AutoWSGR.game.game_operation import QuickRepair, get_ship
 from AutoWSGR.game.get_game_info import DetectShipStats
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 
-from .common import FightInfo, FightPlan, NodeLevelDecisionBlock, start_march
+from .common import FightInfo, FightPlan, DecisionBlock, start_march
 
 """
 战役模块/单点战斗模板
@@ -93,7 +93,7 @@ class BattlePlan(FightPlan):
             node_args = recursive_dict_update(node_defaults, plan_args["node_args"])
         else:
             node_args = node_defaults
-        self.node = NodeLevelDecisionBlock(timer, node_args)
+        self.node = DecisionBlock(timer, node_args)
         self.Info = BattleInfo(timer)
         self.decision_block = decision_block
 

@@ -12,7 +12,7 @@ from AutoWSGR.utils.math_functions import CalcDis
 from AutoWSGR.fight.event.event import PatrollingEvent
 
 
-MAP_POSITIONS = [None, (100, 200), (500, 450), (500, 200), (350, 330), (600, 100), (700, 400)]
+MAP_POSITIONS = [None, (100, 200), (500, 450), (520, 220), (350, 330), (600, 100), (700, 400)]
 
 
 class EventFightPlan20230117(PatrollingEvent, NormalFightPlan):
