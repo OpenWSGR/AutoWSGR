@@ -7,7 +7,7 @@ from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES, SAP
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import Expedition, get_ship
+from AutoWSGR.game.game_operation import Expedition, get_ship, DestroyShip
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.math_functions import get_nearest
 from AutoWSGR.utils.operator import remove_0_value_from_dict
@@ -273,13 +273,20 @@ class FightPlan(ABC):
 
     def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. """
-        self.fight_recorder.reset()
         # 战斗前逻辑
+        self.fight_recorder.reset()
         ret = self._enter_fight(same_work)
+        
         if ret == "success":
             pass
         elif ret == "dock is full":
-            return ret
+            # 自动解装功能
+            if self.config.Dock_Full_Destroy:
+                self.timer.Android.relative_click(0.38-0.5, 0.565-0.5)
+                DestroyShip(self.timer)
+                return self.run(same_work)
+            else:
+                return ret
         elif ret == "fight end":
             self.timer.set_page(self.Info.end_page)
             return ret
