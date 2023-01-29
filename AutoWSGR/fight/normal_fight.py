@@ -184,7 +184,7 @@ class NormalFightPlan(FightPlan):
 
         # 检查参数完整情况
         if "fleet_id" not in plan_args:
-            self.logger.warning("fleet_id not set", "Default arg 1 will be used")
+            self.logger.warning("fleet_id not set" + "Default arg 1 will be used")
 
         # 从默认参数加载
         plan_defaults = default_args["normal_fight_defaults"]
