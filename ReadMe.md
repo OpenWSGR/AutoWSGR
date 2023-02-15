@@ -54,7 +54,7 @@ $ pip install -U AutoWSGR
 $ pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
 ```
 
-在安装完成后，打开任意命令行并键入：
+在安装完成后，打开任意python终端并键入：
 
 ```python
 import AutoWSGR
