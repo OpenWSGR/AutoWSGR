@@ -169,10 +169,10 @@ class Timer(Emulator):
             elif (times == 1):
                 raise CriticalErr("on restart,")
 
-            elif (self.Windows.CheckNetWork() == False):
+            elif (self.Windows.check_network() == False):
                 for i in range(11):
                     time.sleep(10)
-                    if (self.Windows.CheckNetWork() == True):
+                    if (self.Windows.check_network() == True):
                         break
                     if (i == 10):
                         raise NetworkErr()
@@ -180,7 +180,7 @@ class Timer(Emulator):
             elif (self.Android.is_game_running()):
                 raise CriticalErr("CriticalErr on restart function")
 
-            self.Windows.ConnectAndroid()
+            self.Windows.connect_android()
             self.restart(times + 1, *args, **kwargs)
 
     def is_bad_network(self, timeout=10):
@@ -199,7 +199,7 @@ class Timer(Emulator):
             while True:
                 if (time.time() - start_time >= 180):
                     raise TimeoutError("Process bad network timeout")
-                if self.Windows.CheckNetWork() != False:
+                if self.Windows.check_network() != False:
                     break
 
             start_time2 = time.time()
@@ -429,8 +429,8 @@ class Timer(Emulator):
 def process_error(timer: Timer):
     print("processing errors")
     if timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False:
-        timer.Windows.RestartAndroid()
-        timer.Windows.ConnectAndroid()
+        timer.Windows.restart_android()
+        timer.Windows.connect_android()
 
         return "Android Restarted"
 

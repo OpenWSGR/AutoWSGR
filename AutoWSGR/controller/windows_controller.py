@@ -14,33 +14,43 @@ from AutoWSGR.utils.function_wrapper import try_for_times
 
 class WindowsController:
     def __init__(self, config, logger) -> None:
-        self.config = config
         self.logger = logger
+
+        self.emulator = config["type"]  # 模拟器类型
+        self.start_cmd = config["start_cmd"]  # 模拟器启动命令
+        if self.emulator == "蓝叠 Hyper-V":
+            assert config["config_file"], "Bluestacks 需要提供配置文件"
+            self.emulator_config_file = config["config_file"]
+
+        self.exe_name = self.start_cmd.split('/')[-1]  # 自动获得模拟器的进程名
+
+    # ======================== 网络 ========================
+    def check_network(self):
+        """检查网络状况
+
+        Returns:
+            bool:网络正常返回 True,否则返回 False
+        """
+        return os.system("ping www.moefantasy.com") == 0
 
     def wait_network(self, timeout=1000):
         """等待到网络恢复
-
-        Args:
-            timer (_type_): _description_
-            timeout (int, optional): _description_. Defaults to 1000.
-
-        Returns:
-            _type_: _description_
         """
         start_time = time.time()
         while (time.time() - start_time <= timeout):
-            if self.CheckNetWork():
+            if self.check_network():
                 return True
             time.sleep(10)
 
         return False
 
+    # ======================== 模拟器 ========================
     def GetAndroidInfo(self):
         """还没写好"""
         """返回所有在线设备的编号
 
         Returns:
-            list:一个包含所有设备信息的列表 
+            list:一个包含所有设备信息的列表
         """
         info = os.popen(f"{ADB_ROOT}/adb.exe devices -l")
         time.sleep(1)
@@ -70,64 +80,60 @@ class WindowsController:
         time.sleep(5)
 
     @try_for_times()
-    def ConnectAndroid(self):
+    def connect_android(self):
         """连接指定安卓设备
         Args:
         """
         if not self.is_android_online():
-            self.RestartAndroid()
-        
-        cap_method = "JAVACAP" if self.config.EMULATOR == "bluestacks" else "MINICAP"
+            self.restart_android()
+
+        if self.emulator == "雷电":
+            dev_name = "emulator-5554"
+            cap_method = "MINICAP"
+        elif self.emulator == "蓝叠 Hyper-V":
+            with open(self.emulator_config_file, 'r') as f:
+                lines = f.readlines()
+            for line in lines:
+                if line.startswith("bst.instance.Pie64.status.adb_port="):
+                    port = line.split("=")[-1].strip()[1:-1]
+                    dev_name = f"127.0.0.1:{port}"
+            cap_method = "JAVACAP"
+
         from logging import ERROR, getLogger
         getLogger("airtest").setLevel(ERROR)
         auto_setup(__file__, devices=[
-            f"android://127.0.0.1:5037//{self.config.device_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
+            f"android://127.0.0.1:5037/{dev_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
+
         self.logger.info("Hello,I am WSGR auto commanding system")
 
-    def is_android_online(self, times=4):
+    def is_android_online(self):
         """判断 timer 给定的设备是否在线
-
-        Args:
-            timer (Timer): _description_
-
         Returns:
             bool: 在线返回 True,否则返回 False
         """
-        while (times):
-            times -= 1
-            res = check_output(f"{ADB_ROOT}/adb.exe devices -l").decode('ascii').split('\n')
-            for x in res:
-                x = x.strip()
-                self.logger.info(x)
-                if (self.config.device_name in x and 'device' in x):
-                    return True
-            time.sleep(1.5)
-        return False
+        raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode('gbk')  # TODO: 检查是否所有windows版本返回都是中文
+        return "PID" in raw_res
 
-    def RestartAndroid(self):
-        """ 重启安卓设备 """
-        restart_time = time.time()
-        self.logger.info("Android Restarting")
+    def kill_android(self):
         try:
-            try:
-                os.system("taskkill -f -im dnplayer.exe")
-            except:
-                pass
-            os.popen(os.path.join(self.config.LDPLAYER_ROOT, "dnplayer.exe"))
-            time.sleep(5)
-            while self.is_android_online() == False:
-                time.sleep(3)
-                if (time.time() - restart_time > 120):
-                    raise TimeoutError("can't start the emulator")
-        except BaseException as E:
-            self.logger.error(f"{E} 请检查模拟器路径!")
+            os.system(f"taskkill -f -im {self.exe_name}")
+        except:
+            pass
+
+    def start_android(self):
+        try:
+            os.popen(self.start_cmd)
+            start_time = time.time()
+            while not self.is_android_online():
+                time.sleep(1)
+                if time.time() - start_time > 120:
+                    raise TimeoutError("模拟器启动超时！")
+        except Exception as e:
+            self.logger.error(f"{e} 请检查模拟器路径!")
             raise CriticalErr("on Restart Android")
 
-    def CheckNetWork(self):
-        """检查网络状况
+    def restart_android(self):
+        self.kill_android()
+        self.start_android()
 
-        Returns:
-            bool:网络正常返回 True,否则返回 False
-        """
-        time.sleep(.5)
-        return os.system("ping baidu.com") == False
+    

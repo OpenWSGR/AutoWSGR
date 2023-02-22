@@ -1,11 +1,12 @@
 # ========== 游戏设置 ==========
-EMULATOR: "leidian" # 模拟器类型
-START_CMD: "C:/leidian/LDPlayer9/dnplayer.exe"
-LDPLAYER_ROOT: 
+emulator:
+  type: "雷电" # 模拟器类型
+  start_cmd: "C:/leidian/LDPlayer9/dnplayer.exe"
+  config_file: ""
+
 LOG_PATH: "log"
 DELAY: 2
 
-device_name: "emulator-5554"
 account:
 password:
 

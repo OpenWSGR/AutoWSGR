@@ -34,36 +34,45 @@
 ### 前期准备
 
 
-请自行安装 [Python](https://www.python.org/) == 3.7，[雷电模拟器](https://www.ldmnq.com/)，[战舰少女R](http://www.jianniang.com/)
+安装 [Python](https://www.python.org/) >= 3.7, <=3.9，[雷电模拟器](https://www.ldmnq.com/)，[战舰少女R](http://www.jianniang.com/)
 
-推荐分辨率为 1280x720，兼容其它分辨率，高级功能的使用对分辨率有特殊要求，详见下方。
+将模拟器设置为 `>=1280x720` 的 `16:9` 分辨率。
 
 ![image-20221006213603676](.assets/LeidianResolution.png)
 
+### 安装pytorch
+pytorch的gpu版本在windows上需要特殊命令安装，因此不放在AutoWSGR的依赖里，先提前装好：
+```bash
+$ pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
+```
+
+如果你没有GPU或者以上安装存在问题，则可改用CPU版本（图像识别速度会略有下降）：
+```bash
+$ pip install torch torchvision torchaudio
+```
+
 ### 安装AutoWSGR
 
-AutoWSGR 目前已支持通过 [PyPI](https://pypi.org/project/AutoWSGR/) 进行部署，您可以通过以下命令一键安装稳定发布版（推荐）：
+AutoWSGR 目前已支持通过 [PyPI](https://pypi.org/project/AutoWSGR/) 进行部署，您可以通过以下命令一键安装正式发布版：
 
 ```bash
 $ pip install -U AutoWSGR
 ```
 
-也可以通过以下命令从 GitHub 安装最新版：
+你也可以通过以下命令从 GitHub 安装最新版（推荐，本项目尚处于开发早期，这里bug修复更及时）：
 
 ```bash
 $ pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
 ```
 
-在安装完成后，打开任意python终端并键入：
+在安装完成后，打开任意python终端并键入以下内容，如果没有报错则说明安装成功：
 
 ```python
 import AutoWSGR
 print(AutoWSGR.__version__)
 ```
 
-如果没有报错则说明安装成功。
 
-（github 上的代码并不是稳定版本，如果出现无法解决的问题请使用 pip 安装稳定发布版本）
 
 ## 快速使用
 
@@ -111,12 +120,6 @@ No.1: # 胡德
 本项目通过**舰船名字**唯一区分舰船，**如果两艘舰船为同一名字（例如战列狮和战巡狮），那么她们被认为是同一艘舰船，为了避免出现不必要的麻烦，请保证需要使用到的舰船没有同名。**
 
 **另外，由于 `easyocr` 工具本身可能没有收录一些中文字体, 所以无法识别部分生僻字, 经典例子是日系动物园和 "鲃鱼", 这里推荐把 "鲃鱼" 改名为 "肥鱼", 以解决相关问题, 以后会解决这个问题**
-
-### 配置 GPU
-
-这一步不是必要的，如果进行配置，会有一定的执行效率提升，但不会很大，不建议配置。
-
-使用了 `easyocr` 识别舰船，请参考 `easyocr` 的 GPU 配置方式。
 
 ## 未来开发任务
 

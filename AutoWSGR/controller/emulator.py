@@ -24,10 +24,10 @@ class Emulator():
         # 获取设置，初始化windows控制器
         self.config = config
         self.logger = logger
-        self.Windows = WindowsController(config, logger)
+        self.Windows = WindowsController(config.emulator, logger)
 
         # 初始化android控制器
-        self.Windows.ConnectAndroid()
+        self.Windows.connect_android()
         self.update_screen()
         self.config.resolution = self.screen.shape[:2]
         self.config.resolution = self.config.resolution[::-1]  # 转换为 （宽x高）
