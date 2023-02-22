@@ -19,7 +19,7 @@ setup(
     setup_requires=['setuptools_scm'],
     use_scm_version=False,
     include_package_data=True,
-    packages=['AutoWSGR'],
+    # packages=['AutoWSGR'],
     install_requires=[
         "opencv-python==4.5.5.64",
         "airtest",

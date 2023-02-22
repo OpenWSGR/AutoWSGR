@@ -1,7 +1,7 @@
 import os
 
 from AutoWSGR.fight import DecisiveBattle
-from AutoWSGR.main import start_script
+from AutoWSGR.scripts.main import start_script
 
 timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml", to_main_page=False)
 

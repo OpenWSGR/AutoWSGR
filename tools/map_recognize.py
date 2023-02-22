@@ -3,7 +3,7 @@ import pathlib
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__))) 
 
-from AutoWSGR.main import start_script
+from AutoWSGR.scripts.main import start_script
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.utils.io import listdir, dict_to_yaml, yaml_to_dict
 from AutoWSGR.utils.api_image import relative_to_absolute
