@@ -2,18 +2,18 @@
 
 ![](https://img.shields.io/github/repo-size/huan-yp/Auto-WSGR) ![](https://img.shields.io/pypi/v/AutoWSGR) ![](https://img.shields.io/pypi/dm/AutoWSGR) ![](https://img.shields.io/github/issues/huan-yp/Auto-WSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
 
-用python与c++实现的战舰少女R的自动化流水线 & 数据统计一体化脚本，提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口。
+用python与c++实现的战舰少女R的自动化流水线 & 数据统计一体化脚本，提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口
 
-用户交流, 意见反馈 qq 群:  568500514。
-
-独乐乐不如众乐乐，更多的测试反馈和社区帮助是该项目持续发展的基础，请推荐给身边有需要的朋友吧！
+用户交流, 意见反馈 qq 群:  568500514
 
 ## 近期更新
 
+![image-20230226001532677](assets/image-20230226001532677.png)
+
+- GUI上线测试，详情请见：[AutoWSGR-GUI](https://github.com/Nickydusk/AutoWSGR-GUI) - *2023/2/26*
 - 支持了当前活动 "炽热星辰行动" - *2023/1/20*
 - 解装升级为更快的 "一键解装" - *2023/1/12*
 - 支持了在配置方案中指定舰船 - *2023/1/6*
-- 支持了"美食联合作战" 活动 - *2022/11/20*
 
 
 ## 功能
@@ -41,15 +41,18 @@
 ![image-20221006213603676](.assets/LeidianResolution.png)
 
 ### 安装pytorch
-pytorch的gpu版本在windows上需要特殊命令安装，因此不放在AutoWSGR的依赖里，先提前装好：
+
+AutoWSGR采用基于神经网络的视觉模型进行图像识别和文字解读，安装GPU版本的pytorch可以加快所有图像操作速度：
+
 ```bash
 $ pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
 ```
 
-如果你没有GPU或者以上安装存在问题，则可改用CPU版本（图像识别速度会略有下降）：
+如果你没有英伟达显卡，则用以下命令安装CPU版本（稍微慢点，不影响使用）：
 ```bash
 $ pip install torch torchvision torchaudio
 ```
+
 
 ### 安装AutoWSGR
 
@@ -65,28 +68,23 @@ $ pip install -U AutoWSGR
 $ pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
 ```
 
-在安装完成后，打开任意python终端并键入以下内容，如果没有报错则说明安装成功：
-
-```python
-import AutoWSGR
-print(AutoWSGR.__version__)
-```
-
 
 
 ## 快速使用
 
-样例代码在本项目的`examples/`文件夹下，您可以参考使用。计划在未来功能更新稳定后提供全面的中文文档。
+- 配合前端使用：详见 [AutoWSGR-GUI](https://github.com/Nickydusk/AutoWSGR-GUI)
 
-建议先尝试一体化日常挂机策略（`examples/auto_daily.py`），在使用前你需要更改如下设置：
+- 纯后端使用：样例代码在本项目的`examples/`文件夹下，建议先尝试一体化日常挂机策略（`examples/auto_daily.py`），在使用前你需要更改如下设置：
 
-- 将`user_settings.yaml`中的**LDPLAYER_ROOT**属性替换为您的雷电模拟器安装根目录
+  - 将`user_settings.yaml`中的**LDPLAYER_ROOT**属性替换为您的雷电模拟器安装根目录
 
-  ```yaml
-  LDPLAYER_ROOT: C:\leidian\LDPlayer9
-  ```
+    ```yaml
+    LDPLAYER_ROOT: C:\leidian\LDPlayer9
+    ```
 
-- 此外请确保雷电模拟器应用程序名为 `dnplayer.exe`，AutoWSGR将使用 `{LDPLAYER_ROOT}\dnplayer.exe` 命令启动模拟器。
+
+  - 此外请确保雷电模拟器应用程序名为 `dnplayer.exe`，AutoWSGR将使用 `{LDPLAYER_ROOT}\dnplayer.exe` 命令启动模拟器。
+
 
 ## 启用高级功能
 

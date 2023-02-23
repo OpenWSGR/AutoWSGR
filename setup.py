@@ -5,7 +5,7 @@ from setuptools import setup
 
 def get_version() -> str:
     # https://packaging.python.org/guides/single-sourcing-package-version/
-    init = open(os.path.join("AutoWSGR", "__init__.py"), "r").read().split()
+    init = open(os.path.join("src", "AutoWSGR", "__init__.py"), "r").read().split()
     return init[init.index("__version__") + 2][1:-1]
 
 
@@ -19,7 +19,6 @@ setup(
     setup_requires=['setuptools_scm'],
     use_scm_version=False,
     include_package_data=True,
-    # packages=['AutoWSGR'],
     install_requires=[
         "opencv-python==4.5.5.64",
         "airtest",

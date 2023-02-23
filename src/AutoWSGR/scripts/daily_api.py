@@ -10,7 +10,8 @@ from types import SimpleNamespace as SN
 class DailyOperation:
     def __init__(self, setting_path) -> None:
         self.timer = start_script(setting_path)
-        self.config = SN(**self.timer.config["daily_automation"])
+        
+        self.config = SN(**self.timer.config.daily_automation)
         self.config.DEBUG = False
 
         if self.config.auto_expedition:
@@ -19,10 +20,10 @@ class DailyOperation:
         if self.config.auto_battle:
             self.battle_plan = BattlePlan(self.timer, plan_path=f'battle/{self.config.battle_type}.yaml')
 
-        if type(self.config.auto_normal_fight) == list and self.config.auto_normal_fight:
+        if self.config.auto_normal_fight:
             self.fight_plans = []
             self.fight_complete_times = []
-            for plan in self.config.auto_normal_fight:
+            for plan in self.config.normal_fight_tasks:
                 self.fight_plans.append(NormalFightPlan(self.timer, plan_path=f"normal_fight/{plan[0]}.yaml", fleet_id=plan[1]))
                 self.fight_complete_times.append([0, plan[2]])  # 二元组， [已完成次数, 目标次数]
 
@@ -36,7 +37,7 @@ class DailyOperation:
                 ret = self.battle_plan.run()
 
         # 自动出征
-        if type(self.config.auto_normal_fight) == list and self.config.auto_normal_fight:
+        if self.config.auto_normal_fight:
             while self._has_unfinished():
                 task_id = self._get_unfinished()
 

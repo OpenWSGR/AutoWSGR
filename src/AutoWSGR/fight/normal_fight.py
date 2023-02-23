@@ -3,7 +3,7 @@ import os
 import time
 
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
-from AutoWSGR.constants.data_roots import MAP_ROOT, PLAN_ROOT
+from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.positions import FIGHT_CONDITIONS_POSITION
 from AutoWSGR.controller.run_timer import Timer
@@ -173,8 +173,8 @@ class NormalFightPlan(FightPlan):
         super().__init__(timer)
 
         # 从配置文件加载计划
-        default_args = yaml_to_dict(os.path.join(PLAN_ROOT, "default.yaml"))
-        plan_args = yaml_to_dict(os.path.join(PLAN_ROOT, plan_path))
+        default_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, "default.yaml"))
+        plan_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, plan_path))
 
         # 从参数加载计划
         if fleet_id is not None:

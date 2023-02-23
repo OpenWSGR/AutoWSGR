@@ -54,6 +54,9 @@ class Timer(Emulator):
         self.last_mission_completed = 0
         self.last_expedition_check_time = time.time()
 
+        if not self.config.PLAN_ROOT:
+            self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
+        
         try:
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
         except:

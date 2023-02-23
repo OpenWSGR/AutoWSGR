@@ -4,6 +4,7 @@ from types import SimpleNamespace as SN
 
 import keyboard as kd
 
+import AutoWSGR
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.new_logger import Logger
@@ -18,7 +19,7 @@ def start_script(settings_path=None):
     Returns:
         Timer: 该模拟器的记录器
     """
-    config = yaml_to_dict(os.path.join(os.path.dirname(__file__), "data", "default_settings.yaml"))
+    config = yaml_to_dict(os.path.join(os.path.dirname(AutoWSGR.__file__), "data", "default_settings.yaml"))
     if settings_path is not None:
         user_settings = yaml_to_dict(settings_path)
         config = recursive_dict_update(config, user_settings)

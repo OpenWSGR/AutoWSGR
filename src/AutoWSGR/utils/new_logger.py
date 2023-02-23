@@ -2,10 +2,9 @@ import json
 import logging
 import os
 import sys
+import streamlit as st
 
 from AutoWSGR.utils.io import save_image
-
-# import wandb
 
 
 
@@ -18,12 +17,6 @@ class Logger:
             log_level = "DEBUG"
         self.console_logger = self._get_logger(log_level)
 
-        # self.use_wandb = config["use_wandb"]
-
-        # if config["use_wandb"] and not config["evaluate"]:
-        #     self.wandb_last_log_t = -1
-        #     self._setup_wandb(self.log_dir)  # will automatically create "wandb" subfolder
-
     def save_config(self, config):
         # write config file
         config_str = json.dumps(vars(config), ensure_ascii=False, indent=4, sort_keys=True)
@@ -31,43 +24,27 @@ class Logger:
             f.write(config_str)
         return config_str
 
-    # def _setup_wandb(self, directory_name):
-    #     group_name = self.config['env']
-    #     if 'map_name' in self.config['env_args']:
-    #         group_name += '.' + self.config['env_args']['map_name']
-    #     job_name = self.config['name'] + self.config.get('remark', '')
-
-    #     wandb.init(project="pymarl-ext",
-    #                group=group_name,
-    #                job_type=job_name,
-    #                dir=directory_name,
-    #                reinit=True,
-    #                config=self.config)
-
     def debug(self, *args):
         self.console_logger.debug(str(args))
 
     def info(self, string):
         self.console_logger.info(string)
+        st.write(string)
 
     def warning(self, string):
         self.console_logger.warning("===================WARNING===================")
         self.console_logger.warning(string)
         self.console_logger.warning("====================END====================")
+        st.write(string)
 
     def error(self, string):
         self.console_logger.error("===================ERROR===================")
         self.console_logger.error(string)
         self.console_logger.error("====================END====================")
+        st.write(string)
 
     def log_stat(self, key, value, t, tag='train'):
         self.info(f"{tag} {key}: {value:.4f}")
-
-        # if self.use_wandb:
-        #     if self.wandb_last_log_t != t:
-        #         wandb.log({"timesteps": self.wandb_last_log_t})
-        #     wandb.log(f"{tag}/{key}", commit=False)
-        #     self.wandb_last_log_t = t
 
     def log_image(self, image, name, ndarray_mode="BGR", ignore_existed_image=False, *args, **kwargs):
         """向默认数据记录路径记录图片

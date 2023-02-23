@@ -22,7 +22,7 @@ class WindowsController:
             assert config["config_file"], "Bluestacks 需要提供配置文件"
             self.emulator_config_file = config["config_file"]
 
-        self.exe_name = self.start_cmd.split('/')[-1]  # 自动获得模拟器的进程名
+        self.exe_name = os.path.basename(self.start_cmd)  # 自动获得模拟器的进程名
 
     # ======================== 网络 ========================
     def check_network(self):
@@ -79,7 +79,7 @@ class WindowsController:
         os.system(f"xcopy req {path} /E/H/C/I")
         time.sleep(5)
 
-    @try_for_times()
+    # @try_for_times()
     def connect_android(self):
         """连接指定安卓设备
         Args:
@@ -101,10 +101,19 @@ class WindowsController:
 
         from logging import ERROR, getLogger
         getLogger("airtest").setLevel(ERROR)
-        auto_setup(__file__, devices=[
-            f"android://127.0.0.1:5037/{dev_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
-
-        self.logger.info("Hello,I am WSGR auto commanding system")
+        time.sleep(15)
+        start_time = time.time()
+        while time.time() - start_time <= 30:
+            try:
+                auto_setup(__file__, devices=[
+                    f"android://127.0.0.1:5037/{dev_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
+                self.logger.info("Hello,I am WSGR auto commanding system")
+                return
+            except:
+                pass
+        
+        self.logger.error("连接模拟器失败！")
+        raise CriticalErr("连接模拟器失败！")
 
     def is_android_online(self):
         """判断 timer 给定的设备是否在线
@@ -135,5 +144,3 @@ class WindowsController:
     def restart_android(self):
         self.kill_android()
         self.start_android()
-
-    

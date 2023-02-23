@@ -2,7 +2,6 @@ import copy
 import os
 
 from AutoWSGR.constants.image_templates import IMG
-from AutoWSGR.constants.data_roots import PLAN_ROOT
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import MoveTeam
 from AutoWSGR.game.get_game_info import (DetectShipStats, GetEnemyCondition,
@@ -133,12 +132,12 @@ class NormalExercisePlan(FightPlan):
         super().__init__(timer)
 
         # 加载默认配置
-        default_args = yaml_to_dict(os.path.join(PLAN_ROOT, "default.yaml"))
+        default_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, "default.yaml"))
         plan_defaults = default_args["exercise_defaults"]
         plan_defaults.update({"node_defaults": default_args["node_defaults"]})
 
         # 加载计划配置
-        plan_args = yaml_to_dict(os.path.join(PLAN_ROOT, plan_path))
+        plan_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, plan_path))
         args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         self.__dict__.update(args)
 
