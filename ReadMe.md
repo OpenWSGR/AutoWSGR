@@ -45,12 +45,12 @@
 AutoWSGR采用基于神经网络的视觉模型进行图像识别和文字解读，安装GPU版本的pytorch可以加快所有图像操作速度：
 
 ```bash
-$ pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
+pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
 ```
 
 如果你没有英伟达显卡，则用以下命令安装CPU版本（稍微慢点，不影响使用）：
 ```bash
-$ pip install torch torchvision torchaudio
+pip install torch torchvision torchaudio
 ```
 
 
@@ -59,13 +59,13 @@ $ pip install torch torchvision torchaudio
 AutoWSGR 目前已支持通过 [PyPI](https://pypi.org/project/AutoWSGR/) 进行部署，您可以通过以下命令一键安装正式发布版：
 
 ```bash
-$ pip install -U AutoWSGR
+pip install -U AutoWSGR
 ```
 
 你也可以通过以下命令从 GitHub 安装最新版（推荐，本项目尚处于开发早期，这里bug修复更及时）：
 
 ```bash
-$ pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
+pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
 ```
 
 

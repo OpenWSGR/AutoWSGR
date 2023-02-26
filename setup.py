@@ -20,7 +20,8 @@ setup(
     use_scm_version=False,
     include_package_data=True,
     install_requires=[
-        "opencv-python==4.5.5.64",
+        "opencv-contrib-python==4.5.4.60",
+        "opencv-python-headless==4.5.4.60",
         "airtest",
         "keyboard",
         "easyocr",
