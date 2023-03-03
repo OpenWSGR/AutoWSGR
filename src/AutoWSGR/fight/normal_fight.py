@@ -226,19 +226,20 @@ class NormalFightPlan(FightPlan):
         if not same_work:
             self.go_map_page()
             self.change_fight_map(self.chapter, self.map)
-        try:
-            assert (self.timer.wait_images(self.Info.map_image) != None)
-            self.go_fight_prepare_page()
-            MoveTeam(self.timer, self.fleet_id)
-            if self.fleet is not None and same_work == False:
-                ChangeShips(self.timer, self.fleet_id, self.fleet)
-            QuickRepair(self.timer, self.repair_mode)
-        except AssertionError:
-            if "process_err" in kwargs and kwargs["process_err"] == False:
-                raise ImageNotFoundErr("进入战斗前置界面错误")
-            self.logger.warning("进入战斗前置界面不正确")
-            self.timer.process_bad_network()
-            return self._enter_fight(process_err=False)
+        # try:
+        assert (self.timer.wait_images(self.Info.map_image) != None)
+        self.go_fight_prepare_page()
+        MoveTeam(self.timer, self.fleet_id)
+        if self.fleet is not None and same_work == False:
+            ChangeShips(self.timer, self.fleet_id, self.fleet)
+        QuickRepair(self.timer, self.repair_mode)
+        # TODO: 这里应该只catch network error，太宽的catch会导致其他错误被隐藏
+        # except AssertionError:
+        #     if "process_err" in kwargs and kwargs["process_err"] == False:
+        #         raise ImageNotFoundErr("进入战斗前置界面错误")
+        #     self.logger.warning("进入战斗前置界面不正确")
+        #     self.timer.process_bad_network()
+        #     return self._enter_fight(process_err=False)
 
         return start_march(self.timer)
 

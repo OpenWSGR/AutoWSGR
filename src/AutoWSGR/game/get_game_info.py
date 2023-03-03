@@ -13,7 +13,7 @@ from AutoWSGR.constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC,
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.ocr.digit import get_resources
-from AutoWSGR.utils.io import delete_file, read_file, save_image, write_file
+from AutoWSGR.utils.io import delete_file, read_file
 from AutoWSGR.utils.math_functions import CalcDis, CheckColor, matrix_to_str
 from PIL import Image as PIM
 
@@ -97,15 +97,15 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     input_path = os.path.join(TUNNEL_ROOT, "args.in")
     output_path = os.path.join(TUNNEL_ROOT, "res.out")
 
-    delete_file(input_path)
     delete_file(output_path)
     args = "recognize\n6\n"
 
     for i, area in enumerate(TYPE_SCAN_AREA[type]):
         arr = np.array(img.crop(area))
         args += matrix_to_str(arr)
-
-    write_file(input_path, args)
+    
+    with open(input_path, 'w') as f:
+        f.write(args)
     os.system(f"{str(os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe'))} {TUNNEL_ROOT}")
 
     res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()

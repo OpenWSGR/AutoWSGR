@@ -53,7 +53,7 @@ def get_ship(timer: Timer, max_times=1):
         timer.Android.click(900, 500, delay=.25)
         timeout = 2
         times += 1
-    timer.ConfirmOperation() # TODO: 检查是否高效
+    timer.ConfirmOperation()  # TODO: 检查是否高效
 
 
 def DestroyShip(timer: Timer):
@@ -162,7 +162,7 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
             2: 快修，修大破
     """
     ShipStats = DetectShipStats(timer)
-    assert type(repair_mode) in [int, list]
+    assert type(repair_mode) in [int, list, tuple]
     if type(repair_mode) == int:  # 指定所有统一修理方案
         repair_mode = [repair_mode for _ in range(6)]
 
@@ -211,7 +211,7 @@ def GainBounds(timer: Timer):
         timer.ConfirmOperation(must_confirm=1)
         return 'ok'
     return 'no'
-    #timer.Android.click(774, 502)
+    # timer.Android.click(774, 502)
 
 
 def RepairByBath(timer: Timer):
