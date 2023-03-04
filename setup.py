@@ -26,5 +26,6 @@ setup(
         "airtest",
         "keyboard",
         "easyocr",
+        "streamlit",
     ],
 )
