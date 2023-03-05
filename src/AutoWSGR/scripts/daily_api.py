@@ -4,6 +4,7 @@ from AutoWSGR.fight.battle import BattlePlan
 from AutoWSGR.fight.normal_fight import NormalFightPlan
 from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
 from AutoWSGR.scripts.main import start_script
+from AutoWSGR.constants import literals
 from types import SimpleNamespace as SN
 
 
@@ -32,8 +33,8 @@ class DailyOperation:
     def run(self):
         # 自动战役，直到超过次数
         if self.config.auto_battle:
-            ret = "success"
-            while ret == "success":
+            ret = literals.OPERATION_SUCCESS_FLAG
+            while ret == literals.OPERATION_SUCCESS_FLAG:
                 ret = self.battle_plan.run()
 
         # 自动出征
@@ -44,12 +45,12 @@ class DailyOperation:
                 plan = self.fight_plans[task_id]
                 ret = plan.run()
 
-                if ret == "success":
+                if ret == literals.OPERATION_SUCCESS_FLAG:
                     self.fight_complete_times[task_id][0] += 1
-                elif ret == "dock is full":
+                elif ret == literals.DOCK_FULL_FLAG:
                     break  # 不解装则结束出征
 
-                if time.time() - self.last_time >= 5*60:
+                if time.time() - self.last_time >= 5 * 60:
                     self._expedition()
                     self._gain_bonus()
                     self.last_time = time.time()

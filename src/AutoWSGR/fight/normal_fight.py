@@ -12,6 +12,7 @@ from AutoWSGR.game.get_game_info import DetectShipStats, GetEnemyCondition
 from AutoWSGR.port.ship import Fleet
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.math_functions import CalcDis
+from AutoWSGR.constants import literals
 
 from .common import (FightInfo, FightPlan, DecisionBlock,
                      StageRecorder, start_march)
@@ -221,7 +222,7 @@ class NormalFightPlan(FightPlan):
         """
         从任意界面进入战斗.
 
-        :return: 进入战斗状态信息，包括['success', 'dock is full].
+        :return: 进入战斗状态信息，包括['success', 'dock is full'].
         """
         if not same_work:
             self.go_map_page()
@@ -250,14 +251,14 @@ class NormalFightPlan(FightPlan):
         state = self.update_state()
         # 进行MapLevel的决策
         if state == "map_page":
-            return "fight end"
+            return literals.FIGHT_END_FLAG
 
         elif state == "fight_condition":
             value = self.fight_condition
             self.timer.Android.click(*FIGHT_CONDITIONS_POSITION[value])
             self.Info.last_action = value
             self.fight_recorder.append(StageRecorder(self.Info, self.timer))
-            return "fight continue"
+            return literals.FIGHT_CONTINUE_FLAG
 
         # 不在白名单之内 SL
         if self.Info.node not in self.selected_nodes:
@@ -266,7 +267,7 @@ class NormalFightPlan(FightPlan):
                 self.timer.Android.click(677, 492, delay=0)
                 self.Info.last_action = "retreat"
                 self.fight_recorder.append(StageRecorder(self.Info, self.timer))
-                return "fight end"
+                return literals.FIGHT_END_FLAG
             # 不能撤退退游戏
             elif state in ["formation", "fight_period"]:
                 return "need SL"
@@ -279,12 +280,12 @@ class NormalFightPlan(FightPlan):
                 self.timer.Android.click(325, 350)
                 self.Info.last_action = "yes"
                 self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
-                return "fight continue"
+                return literals.FIGHT_CONTINUE_FLAG
             else:
                 self.timer.Android.click(615, 350)
                 self.Info.last_action = "no"
                 self.fight_recorder.append(StageRecorder(self.Info, self.timer, no_action=True))
-                return "fight end"
+                return literals.FIGHT_END_FLAG
 
         elif state == "flagship_severe_damage":
             self.timer.click_image(IMG.fight_image[4], must_click=True, delay=0.25)

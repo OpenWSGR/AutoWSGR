@@ -2,6 +2,7 @@
 log/
 tmp/
 tests/
+user_settings/
 release/
 .vscode/
 src/AutoWSGR/bin/image_recognize/*.PNG

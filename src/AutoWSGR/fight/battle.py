@@ -5,6 +5,7 @@ from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import QuickRepair, get_ship
 from AutoWSGR.game.get_game_info import DetectShipStats
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
+from AutoWSGR.constants import literals
 
 from .common import FightInfo, FightPlan, DecisionBlock, start_march
 
@@ -116,7 +117,7 @@ class BattlePlan(FightPlan):
         _action = None
         self.update_state()
         if self.Info.state == "battle_page":
-            return "fight end"
+            return literals.FIGHT_END_FLAG
         if (self.decision_block is not None):
             _action = self.decision_block.make_decision(self.Info.state)
         # 进行通用NodeLevel决策

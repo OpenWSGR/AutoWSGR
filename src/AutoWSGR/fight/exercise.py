@@ -9,6 +9,7 @@ from AutoWSGR.game.get_game_info import (DetectShipStats, GetEnemyCondition,
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 
 from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
+from AutoWSGR.constants import literals
 
 """
 演习决策模块
@@ -31,7 +32,7 @@ class ExerciseDecisionBlock(DecisionBlock):
                     else:
                         if self.discard:
                             self.timer.Android.click(878, 136, delay=1)
-                            return "discard", "fight continue"
+                            return "discard", literals.FIGHT_CONTINUE_FLAG
                         else:
                             break
                 elif isinstance(act, int):
@@ -40,21 +41,21 @@ class ExerciseDecisionBlock(DecisionBlock):
                     break
 
             self.timer.Android.click(804, 390, delay=0)
-            return "fight", "fight continue"
+            return "fight", literals.FIGHT_CONTINUE_FLAG
 
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
-            if start_march(self.timer) != 'success':
+            if start_march(self.timer) != literals.OPERATION_SUCCESS_FLAG:
                 return self.make_decision(state, last_state, last_action)
-            return None, "fight continue"
+            return None, literals.FIGHT_CONTINUE_FLAG
 
         elif state == "spot_enemy_success":
             self.timer.Android.click(900, 500, delay=0)
-            return None, "fight continue"
+            return None, literals.FIGHT_CONTINUE_FLAG
 
         elif state == "formation":
             self.timer.Android.click(573, self.formation_chosen * 100 - 20, delay=2)
-            return None, "fight continue"
+            return None, literals.FIGHT_CONTINUE_FLAG
 
         return super().make_decision(state, last_state, last_action)
 
@@ -157,14 +158,14 @@ class NormalExercisePlan(FightPlan):
         """
         从任意界面进入战斗.
 
-        :return: 进入战斗状态信息，包括['success', 'dock is full].
+        :return: 进入战斗状态信息，包括['success', 'dock is full'].
         """
         if (same_work == False):
             self.timer.goto_game_page('exercise_page')
 
         self._exercise_times = self.exercise_times
         self.exercise_stats = [None, None]
-        return "success"
+        return literals.OPERATION_SUCCESS_FLAG
 
     def _make_decision(self):
 
@@ -177,16 +178,16 @@ class NormalExercisePlan(FightPlan):
                 pos = self.exercise_stats[2:].index(True)
                 self.rival = 'player'
                 self.timer.Android.click(770, (pos + 1) * 110 - 10)
-                return 'fight continue'
+                return literals.FIGHT_CONTINUE_FLAG
             elif (self.robot and self.exercise_stats[1]):
                 self.timer.Android.swipe(800, 200, 800, 400)  # 上滑
                 self.timer.Android.click(770, 100)
                 self.rival = 'robot'
                 self.exercise_stats[1] = False
-                return "fight continue"
+                return literals.FIGHT_CONTINUE_FLAG
 
             else:
-                return "fight end"
+                return literals.FIGHT_END_FLAG
 
         # 进行通用NodeLevel决策
         action, fight_stage = self.nodes[self.rival].make_decision(state, self.Info.last_state, self.Info.last_action)
