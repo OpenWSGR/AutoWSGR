@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from AutoWSGR.ocr.ship_name import recognize, get_allow
-from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES_CN
+from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES_CN, CN_TYPE_TO_EN_TYPE
 
 DEBUG = False
 
@@ -31,11 +31,15 @@ def recognize_decisive_enemy(image):
                 print(text)
             assert(isinstance(text, str))
             enemy = split_str(text, keywords=ALL_SHIP_TYPES_CN)
-            print(char,":", [""] + enemy)
+            for i in range(len(enemy)):
+                enemy[i] = CN_TYPE_TO_EN_TYPE[enemy[i]]
+            print(char, ":", [""] + enemy)
         except Exception as e:
             print(e)
             print(char)
         char = chr(ord(char) + 1)    
             
 if __name__ == '__main__':
-    recognize_decisive_enemy(r'AutoWSGR\data\map\decisive_battle\3-6-1.PNG')
+    print("Please Input The Image File:")
+    path = input()
+    recognize_decisive_enemy(path)

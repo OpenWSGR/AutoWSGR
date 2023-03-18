@@ -87,7 +87,7 @@ string merge(char* a,const char* b){
 void recognize(ifstream &ain)
 {
 	int TemplateCount,TargetCount;
-	ifstream fin(merge(ROOT, "/TemplateData.in"));
+	ifstream fin(merge(ROOT, "/TemplateData"));
 	ofstream fout(merge(ROOT, "/res.out"));
 	fin>>TemplateCount;
 	for(int i=0;i<TemplateCount;i++)

@@ -7,6 +7,9 @@ key_points:
     - ""
   4:
     - ""
+    - "CFH"
+    - "BFH"
+    - "DHJ"
   5:
     - ""
     - "DFH"
@@ -30,8 +33,39 @@ enemy:
   - ""
   - ""
   - ""
-  - ""
-  -
+  - 
+    - ""
+    -
+      A: ['', 'CL', 'CL', 'DD']
+      B: ['', 'CA', 'CA', 'DD', 'DD']
+      C: ['', "CLT", "CLT", "CL", "CL", "SS"]
+      D: ['', 'BC', 'CVL', 'CVL', 'CL', 'DD']
+      E: ['', 'BB', 'CA', 'CL', 'CVL', 'CL', 'DD']
+      F: ['', 'CV', 'BC', 'CL', 'DD', 'DD', 'AADG']
+      G: ['', 'BC', 'CBG', 'CA', 'CA', 'CL', 'DD']
+      H: ['', 'CV', 'CV', 'CVL', 'CL', 'BBV', 'BBV']
+    - 
+      A: ['', 'BC', 'CV', 'CV', 'CL', 'DD', 'DD']
+      B: ['', 'BB', 'BC', 'BC', 'CA', 'DD', 'SS']
+      C: ['', 'CV', 'CV', 'BB', 'CLT', 'CL', 'CL']
+      D: ['', 'BB', 'CV', 'CBG', 'CA', 'DD', 'AADG']
+      E: ['', 'BC', 'BC', 'CV', 'CL', 'CL', 'ASDG']
+      F: ['', 'BB', 'BB', 'BB', 'CA', 'DD', 'SS']
+      G: ['', 'BB', 'BB', 'CV', 'CVL', 'CL', 'CL']
+      H: ['', 'AF', 'BC', 'BB', 'BB', 'BB', 'CA']
+    -
+      A: ['', 'BB', 'BC', 'BB', 'CA', 'SS', 'SS']
+      B: ['', 'CV', 'BC', 'BC', 'CVL', 'DD', 'ASDG']
+      C: ['', 'CV', 'CV', 'BB', 'BC', 'DD', 'DD']
+      D: ['', 'BB', 'CV', 'BC', 'CA', 'CL', 'CBG']
+      E: ['', 'CV', 'BC', 'BC', 'CA', 'SS', 'CL']
+      F: ['', 'BB', 'BB', 'BC', 'BC', 'CL', 'CL']
+      G: ['', 'BB', 'BB', 'CA', 'CA', 'CA']
+      H: ['', 'BB', 'CV', 'BB', 'BC', 'CL', 'SS']
+      I: ['', 'BB', 'BG', 'CV', 'CA', 'CA', 'CL']
+      J: ['', 'BB', 'CA', 'BBV', 'BBV', 'SS', 'BC']
+
+  - 
     - ""
     - 
       A: ['', 'DD', 'SS', '', '', '', '']
