@@ -438,7 +438,7 @@ class DecisiveBattle():
 
     def after_fight(self):
         self.stats.ship_stats = self.timer.ship_stats
-        print(self.stats.ship_stats)
+        self.timer.logger.info(self.stats.ship_stats)
 
     def check_fleet(self):
         self.go_fleet_page()

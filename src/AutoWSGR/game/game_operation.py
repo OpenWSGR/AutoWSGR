@@ -120,7 +120,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
 
     if (verify_team(timer) == target):
         return
-    print("正在切换队伍到:", target)
+    timer.logger.info("正在切换队伍到:" + str(target))
     timer.Android.click(110 * target, 81)
     if (verify_team(timer) != target):
         MoveTeam(timer, target, try_times + 1)
@@ -176,7 +176,7 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
             need_repair[i] = ShipStats[i+1] not in [-1, 0, 1]
 
     if (timer.config.DEBUG):
-        print("ShipStats:", ShipStats)
+        timer.logger.debug("ShipStats:", ShipStats)
     if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
 
         timer.Android.click(420, 420, times=2, delay=0.8)   # 进入修理页面

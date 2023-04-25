@@ -58,7 +58,7 @@ class BattleInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed"]:
-            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True)
+            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
         self.timer.update_screen()
 
     def _after_match(self):

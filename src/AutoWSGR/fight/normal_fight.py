@@ -116,7 +116,7 @@ class NormalFightInfo(FightInfo):
             return
         self.ship_position = pos
         if self.config.SHOW_MAP_NODE:
-            print(self.ship_position)
+            self.timer.logger.debug(self.ship_position)
 
     def _update_ship_point(self):
         """更新黄色小船(战斗地图上那个)所在的点位 (1-1A 这种,'A' 就是点位)
@@ -132,7 +132,7 @@ class NormalFightInfo(FightInfo):
                 self.node = ch
 
         if self.config.SHOW_MAP_NODE:
-            print(self.node)
+            self.timer.logger.debug(self.node)
 
     def load_point_positions(self, map_path):
         """ 地图文件命名格式: [chapter]-[map].yaml """
@@ -247,7 +247,7 @@ class NormalFightPlan(FightPlan):
     def _make_decision(self):  # sourcery skip: extract-duplicate-method
 
         if self.config.SHOW_FIGHT_STAGE:
-            print(self.fight_recorder.last_stage)
+            self.timer.logger.debug(self.fight_recorder.last_stage)
         state = self.update_state()
         # 进行MapLevel的决策
         if state == "map_page":
@@ -338,7 +338,7 @@ class NormalFightPlan(FightPlan):
             if now_chapter is None:
                 now_chapter = self.get_chapter()
             if self.config.SHOW_CHAPTER_INFO:
-                print("NowChapter:", now_chapter)
+                self.timer.logger.debug("NowChapter:", now_chapter)
             if now_chapter > target_chapter:
                 if now_chapter - target_chapter >= 3:
                     now_chapter -= 3
@@ -414,7 +414,7 @@ class NormalFightPlan(FightPlan):
         now_map = self.get_map(chapter)
         try:
             if self.config.SHOW_CHAPTER_INFO:
-                print("now_map:", now_map)
+                self.timer.logger.debug("now_map:", now_map)
             if target_map > now_map:
                 for i in range(target_map - now_map):
                     self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)

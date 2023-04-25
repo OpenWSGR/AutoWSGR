@@ -29,7 +29,7 @@ class AndroidController:
     def text(self, t):
         text(t)
 
-    def click(self, x, y, times=1, delay=0.5, enable_subprocess=False):
+    def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
         """点击模拟器相对坐标 (x,y).
         Args:
             x:相对横坐标  (相对 960x540 屏幕)
@@ -43,7 +43,7 @@ class AndroidController:
             enable_subprocess == True:
                 A class threading.Thread refers to this click subprocess
         """
-        if self.config.SHOW_ANDROID_INPUT:
+        if self.config.SHOW_ANDROID_INPUT and "not_show" not in kwargs:
             self.logger.debug("click:", time.time(), x, y)
 
         if (times < 1):

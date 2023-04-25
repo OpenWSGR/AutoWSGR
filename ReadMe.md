@@ -102,7 +102,7 @@ pip install -U git+https://github.com/huan-yp/Auto-WSGR.git@main
 
 请将同一目录下的 `shipname_example.yaml` 文件复制进去，并对照您的船舱修改对应舰船名
 
-`shipname_example.yaml` 文件中所有舰船名和游戏图鉴保持一致，当前更新到济南版本，欢迎 PR。
+`shipname_example.yaml` 文件中所有舰船名和游戏图鉴保持一致，当前更新到絮弗伦版本，欢迎 PR。
 
 如果某一舰船有多艘，请使用以下格式填写：
 
