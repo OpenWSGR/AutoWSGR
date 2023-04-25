@@ -43,7 +43,7 @@ class Emulator():
         if (need_screen_shot):
             self.update_screen()
         return cv2.resize(self.screen, resolution)
-
+    
     def get_pixel(self, x, y, screen_shot=False) -> list:
         """获取当前屏幕相对坐标 (x,y) 处的像素值
 

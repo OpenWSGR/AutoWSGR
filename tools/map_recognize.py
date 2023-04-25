@@ -78,8 +78,7 @@ def SetPoints(windowname, img):
 
 def get_image():
     global timer
-    # timer = start_script(settings_path=r"C:\Users\Administrator\Desktop\Pro\Auto-WSGR\AutoWSGR\data\default_settings_debug.yaml")
-    timer = start_script()
+    timer = start_script(settings_path="user_settings/user_settings.yaml")
     print("HOOKED")
     keyboard.hook(callback=log_image)
     import time

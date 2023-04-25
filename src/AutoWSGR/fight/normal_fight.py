@@ -22,7 +22,7 @@ from .common import (FightInfo, FightPlan, DecisionBlock,
 常规战决策模块/地图战斗用模板
 """
 
-MAP_NUM = [5, 6, 4, 4, 5, 4, 5, 5, 1]  # 每一章的地图数量
+MAP_NUM = [5, 6, 4, 4, 5, 4, 5, 5, 2]  # 每一章的地图数量
 
 
 class NormalFightInfo(FightInfo):

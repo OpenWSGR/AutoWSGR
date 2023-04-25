@@ -13,7 +13,9 @@ using cv::waitKey;
 		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I {your_opencv_include} -L {your_opencv_lib} -l libopencv_core454 -l libopencv_imgcodecs454 
 	for me(huan_yp):
 		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I H:/opencv/opencv-4.5.4mingw/include -L H:/opencv/opencv-4.5.4mingw/lib -l libopencv_core454 -l libopencv_imgcodecs454 
-*/
+	for me(huan_yp2023):
+		 g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I C:\Develop\opencv\opencv-4.5.4-mingw64\include -L C:\Develop\opencv\opencv-4.5.4-mingw64\lib -l libopencv_core454 -l libopencv_imgcodecs454
+*/	
 /*function:
 	locate the blue textbox and write other pixel (255,255,255)
 	output to "1.PNG" and the textbox position
@@ -48,14 +50,16 @@ string merge(char* a,const char* b){
 	strcat(ch, b);
 	return ch;
 }
-int main(int argc,char **args){
+int main(int argc, char **args){
 //	printf("%d\n", is_key_color(vector<uchar>({123, 123, 123}), BGR_COLOR, 20, 3));
+	// printf("%d\n", argc);
+	// cout << args[1] <<'\n';
 	char* ROOT = args[1];
 	ofstream out(merge(ROOT, "/res.out"));
 	ifstream in_stream(merge(ROOT, "/locator.in"));
 	string image_path;
-	in_stream >> image_path;
-//	cout << image_path;
+	getline(in_stream, image_path);
+	// cout << image_path << '\n';
 	Mat image = imread(image_path);
 	if(image.empty()){
 		printf("Image is empty!!!,Please check the path:%s", image_path.data());

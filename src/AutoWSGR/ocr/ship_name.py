@@ -2,6 +2,7 @@ import os
 import functools
 import easyocr
 import cv2
+import subprocess
 
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
 from AutoWSGR.utils.operator import unzip_element
@@ -116,7 +117,7 @@ def recognize(image, char_list, min_size=7, text_threshold=.55, low_text=.3):
     if (ch_reader == None):
         load_ch_reader()
     result = ch_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
-    print(result)
+    # print(result)
     return result
 
 
@@ -132,7 +133,7 @@ def recognize_number(image, ex_list="", min_size=7, text_threshold=.55, low_text
         if(char_list.find(ch) == -1):
             char_list += ch
     result = en_reader.readtext(image, allowlist=char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
-    print(result)
+    # print(result)
     return result
 
 
@@ -159,11 +160,9 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55
                 if(dis1 < dis2):
                     res = _name    
         results.append((res, box[0]))
-    # print_debug(True, result)
-    # print_debug(True, results)
     if(len(results) == 0):
         results.append(("Unknown", (0, 0)))
-    print(results)
+    # print(results)
     return results
 
 
@@ -184,12 +183,13 @@ def recognize_ship(image, names, char_list=None, min_size=7, text_threshold=.55,
         char_list = get_allow(names)
     with open(os.path.join(TUNNEL_ROOT, "locator.in"), 'w+') as f:
         f.write(image_path)
-    os.system(f"{os.path.join(TUNNEL_ROOT, 'locator.exe')} {TUNNEL_ROOT}")
+    locator_exe = os.path.join(TUNNEL_ROOT, "locator.exe")
+    subprocess.run([locator_exe, TUNNEL_ROOT])
     if (os.path.exists(os.path.join(TUNNEL_ROOT, '1.PNG'))):
         result = _recognize_ship(os.path.join(TUNNEL_ROOT, '1.PNG'), names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
     else:
         result = _recognize_ship('1.PNG', names, char_list, min_size=min_size, text_threshold=text_threshold, low_text=low_text)
-    print(result)
+    # print(result)
     return result
 
 
@@ -201,10 +201,4 @@ def recover(image):
 
 
 if __name__ == '__main__':
-    # print(os.path.abspath(r'data\images\ocr_test\2.PNG'))
-    # print(recognize_ship(r'data\images\ocr_test\4.PNG', ship_names))
-    # print(_recognize_ship(r'data\images\ocr_test\5.PNG', ship_names))
-    print(recognize_number(r'data\images\ocr_test\7.PNG', "x"))
-    print(recognize_number(r'data\images\ocr_test\8.PNG', "x"))
-    print(recognize_number(r'data\images\ocr_test\9.PNG', "x"))
-    print(recognize_number(r'data\images\ocr_test\10.PNG', "Lv.(/)"))
+    pass

@@ -1,6 +1,7 @@
 import math
 import os
 import time
+import subprocess
 
 import numpy as np
 from AutoWSGR.constants.image_templates import IMG
@@ -106,8 +107,9 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
     
     with open(input_path, 'w') as f:
         f.write(args)
-    os.system(f"{str(os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe'))} {TUNNEL_ROOT}")
-
+        
+    recognize_enemy_exe = os.path.join(TUNNEL_ROOT, "recognize_enemy.exe")
+    subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
     res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()
     timer.enemy_type_count["ALL"] = 0
     for i, x in enumerate(res):

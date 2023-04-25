@@ -1,6 +1,8 @@
 import os
 import shutil
 import time
+import subprocess
+
 from subprocess import check_output
 
 from airtest.core.api import auto_setup
@@ -68,17 +70,6 @@ class WindowsController:
         self.logger.debug(f"Devices list: {res}")
         return res
 
-    def CopyRequirements(self, path):
-        """还没写好"""
-        self.logger.info(path)
-        try:
-            shutil.rmtree(path + "\\airtest")
-        except:
-            pass
-        self.logger.info(f"xcopy req {path} /E/H/C/I")
-        os.system(f"xcopy req {path} /E/H/C/I")
-        time.sleep(5)
-
     # @try_for_times()
     def connect_android(self):
         """连接指定安卓设备
@@ -86,6 +77,7 @@ class WindowsController:
         """
         if not self.is_android_online():
             self.restart_android()
+            time.sleep(15)
 
         if self.emulator == "雷电":
             dev_name = "emulator-5554"
@@ -101,7 +93,7 @@ class WindowsController:
 
         from logging import ERROR, getLogger
         getLogger("airtest").setLevel(ERROR)
-        time.sleep(15)
+        
         start_time = time.time()
         while time.time() - start_time <= 30:
             try:
@@ -125,7 +117,7 @@ class WindowsController:
 
     def kill_android(self):
         try:
-            os.system(f"taskkill -f -im {self.exe_name}")
+            subprocess.run(["taskkill", "-f", "-im", self.exe_name])
         except:
             pass
 

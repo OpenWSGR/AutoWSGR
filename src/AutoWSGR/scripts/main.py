@@ -32,5 +32,6 @@ def start_script(settings_path=None):
     config = SN(**config)
     timer = Timer(config, logger)
     config_str = logger.save_config(config)
+    timer.logger.reset_level() # sb airtest reset all the fucking log level
 
     return timer

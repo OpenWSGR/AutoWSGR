@@ -215,6 +215,9 @@ class DecisiveBattle():
             self.reset_chapter()
             self.start_fight()
     
+    def run(self):
+        self.run_for_times()
+    
     def __init__(self, timer: Timer, chapter=6, map=1, node='A', version=3,
                  level1=["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
                  level2=["U-81", "大青花鱼"],
@@ -454,17 +457,17 @@ class DecisiveBattle():
         self.stats.fleet.set_ship(fleet, order=True, search_method=None)
 
     def fight(self):
-        try:
-            res = self.before_fight()
-        except BaseException as e:
-            print(e)
-            if self.stats.map == 1 and self.stats.node == 'A':
-                # 处理临时 BUG (https://nga.178.com/read.php?tid=34341326)
-                print(e, "Temporary Game BUG, Processing...")
-                self.timer.restart()
-                self.enter_map()
-                self.reset()
-                return 'continue'
+        # try:
+        res = self.before_fight()
+        # except BaseException as e:
+        #     print(e)
+        #     if self.stats.map == 1 and self.stats.node == 'A':
+        #         # 处理临时 BUG (https://nga.178.com/read.php?tid=34341326)
+        #         print(e, "Temporary Game BUG, Processing...")
+        #         self.timer.restart()
+        #         self.enter_map()
+        #         self.reset()
+        #         return 'continue'
 
         if (res == 'retreat'):
             self.enter_map(check_map=False)

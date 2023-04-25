@@ -12,9 +12,11 @@ class Logger:
     def __init__(self, config):
         self.config = config
         self.log_dir = config['log_dir']
-        log_level = "INFO"
-        if config["DEBUG"]:
-            log_level = "DEBUG"
+        if "log_level" in config.keys():
+            log_level = config["log_level"]
+        else:
+            log_level = "INFO"
+        self.log_level = log_level
         self.console_logger = self._get_logger(log_level)
 
     def save_config(self, config):
@@ -24,6 +26,9 @@ class Logger:
             f.write(config_str)
         return config_str
 
+    def reset_level(self):
+        self.console_logger.setLevel(self.log_level)
+    
     def debug(self, *args):
         self.console_logger.debug(str(args))
 

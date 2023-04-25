@@ -5,7 +5,7 @@ emulator:
   config_file: ""
 
 LOG_PATH: "log"
-DELAY: 2
+DELAY: 1.5
 
 account:
 password:
@@ -20,6 +20,7 @@ SHOW_CHAPTER_INFO: False
 SHOW_MATCH_FIGHT_STAGE: False
 SHOW_DECISIVE_BATTLE_INFO: False
 SHOW_OCR_INFO: False
+log_level: INFO # 调试模式 log_level 应该设置为 DEBUG
 
 # ========== 日常挂机策略设置 ==========
 daily_automation:

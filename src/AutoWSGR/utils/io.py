@@ -82,7 +82,7 @@ def read_file(path):
         _type_: _description_
     """
     if (os.path.exists(path) == False):
-        raise FileNotFoundError("file " + os.path.abspath(path) + "not found")
+        raise FileNotFoundError("file " + os.path.abspath(path) + " not found")
     with open(path, mode='r') as f:
         return f.read()
 

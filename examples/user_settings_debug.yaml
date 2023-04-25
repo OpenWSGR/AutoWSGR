@@ -20,6 +20,7 @@ SHOW_CHAPTER_INFO: True
 SHOW_MATCH_FIGHT_STAGE: True
 SHOW_DECISIVE_BATTLE_INFO: True
 SHOW_OCR_INFO: True
+log_level: DEBUG
 
 # ========== 日常挂机策略设置 ==========
 daily_automation:
