@@ -380,7 +380,7 @@ class DecisiveBattle():
             if (stats == 'refreshed'):
                 # 选用上一次的舰船并进入
                 self.timer.Android.click(500, 500, delay=.25)
-                self.timer.click_image(IMG.decisive_battle_image[7], timeout=8, must_click=True)
+                self.timer.click_image(IMG.decisive_battle_image[7], timeout=12, must_click=True)
                 self.timer.Android.click(873, 500)
             else:
                 self.timer.Android.click(500, 500, delay=0)
