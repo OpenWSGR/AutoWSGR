@@ -366,7 +366,7 @@ class DecisiveBattle():
 
     def enter_decisive_battle(self):
         self.timer.goto_game_page("decisive_battle_entrance")
-        self.timer.Android.click(115, 113)
+        self.timer.Android.click(115, 113, delay=1.5)
         self.detect()
 
     def enter_map(self, check_map=True):
@@ -379,8 +379,8 @@ class DecisiveBattle():
                 stats = 'refreshed'
             if (stats == 'refreshed'):
                 # 选用上一次的舰船并进入
-                self.timer.Android.click(500, 500, delay=0)
-                self.timer.click_image(IMG.decisive_battle_image[7], timeout=3)
+                self.timer.Android.click(500, 500, delay=.25)
+                self.timer.click_image(IMG.decisive_battle_image[7], timeout=8, must_click=True)
                 self.timer.Android.click(873, 500)
             else:
                 self.timer.Android.click(500, 500, delay=0)

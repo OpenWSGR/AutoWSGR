@@ -37,17 +37,17 @@ class BattleInfo(FightInfo):
         }
 
         self.state2image = {
-            "proceed": [IMG.fight_image[5], 5],
+            "proceed": [IMG.fight_image[5], 7.5],
             "spot_enemy_success": [IMG.fight_image[2], 15],
             "formation": [IMG.fight_image[1], 15, .8],
-            "fight_period": [IMG.symbol_image[4], 5],
-            "night": [IMG.fight_image[6], 120],
-            "result": [IMG.fight_image[16], 60],
-            "battle_page": [IMG.identify_images["battle_page"][0], 5, ]
+            "fight_period": [IMG.symbol_image[4], 7.5],
+            "night": [IMG.fight_image[6], 150],
+            "result": [IMG.fight_image[16], 75],
+            "battle_page": [IMG.identify_images["battle_page"][0], 7.5, ]
         }
         
         self.after_match_delay = {
-            "night":1.5,
+            "night":1,
         }
 
     def reset(self):

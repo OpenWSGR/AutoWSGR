@@ -87,14 +87,14 @@ class NormalExerciseInfo(FightInfo):
         }
 
         self.state2image = {
-            "exercise_page": [IMG.identify_images['exercise_page'], 5],
-            "rival_info": [IMG.exercise_image["rival_info"], 5],
-            "fight_prepare_page": [IMG.identify_images["fight_prepare_page"], 5],
+            "exercise_page": [IMG.identify_images['exercise_page'], 7.5],
+            "rival_info": [IMG.exercise_image["rival_info"], 7.5],
+            "fight_prepare_page": [IMG.identify_images["fight_prepare_page"], 7.5],
             "spot_enemy_success": [IMG.fight_image[2], 15],
             "formation": [IMG.fight_image[1], 15],
-            "fight_period": [IMG.symbol_image[4], 3],
+            "fight_period": [IMG.symbol_image[4], 10],
             "night": [IMG.fight_image[6], .85, 180],
-            "night_fight_period": [IMG.symbol_image[4], 3],
+            "night_fight_period": [IMG.symbol_image[4], 10],
             "result": [IMG.fight_image[3], 90],
         }
         

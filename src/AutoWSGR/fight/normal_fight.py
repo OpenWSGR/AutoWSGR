@@ -60,16 +60,16 @@ class NormalFightInfo(FightInfo):
         }
 
         self.state2image = {
-            "proceed": [IMG.fight_image[5], 5],
-            "fight_condition": [IMG.fight_image[10], 15],
-            "spot_enemy_success": [IMG.fight_image[2], 15],
-            "formation": [IMG.fight_image[1], 15],
-            "fight_period": [IMG.symbol_image[4], 5],
-            "night": [IMG.fight_image[6], 120],
-            "result": [IMG.fight_image[3], 60],
+            "proceed": [IMG.fight_image[5], 7.5],
+            "fight_condition": [IMG.fight_image[10], 22.5],
+            "spot_enemy_success": [IMG.fight_image[2], 22.5],
+            "formation": [IMG.fight_image[1], 22.5],
+            "fight_period": [IMG.symbol_image[4], 7.5],
+            "night": [IMG.fight_image[6], 150],
+            "result": [IMG.fight_image[3], 90],
             "get_ship": [IMG.symbol_image[8], 5],
-            "flagship_severe_damage": [IMG.fight_image[4], 5],
-            "map_page": [self.map_image, 5]
+            "flagship_severe_damage": [IMG.fight_image[4], 7.5],
+            "map_page": [self.map_image, 7.5]
         }
 
         self.after_match_delay = {

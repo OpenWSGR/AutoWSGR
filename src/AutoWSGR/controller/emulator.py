@@ -244,7 +244,7 @@ class Emulator():
         if (delay < 0):
             raise ValueError("arg 'delay' should at least be 0 but is ", str(delay))
         pos = self.wait_image(image, timeout=timeout)
-        if pos is None:
+        if pos == False:
             if (must_click == False):
                 return False
             else:

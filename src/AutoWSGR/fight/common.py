@@ -24,6 +24,7 @@ def start_march(timer: Timer, position=(900, 500)):
         if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
             return literals.DOCK_FULL_FLAG
         if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0):
+            time.sleep(1)
             return literals.BATTLE_TIMES_EXCEED
         if time.time() - start_time > 15:
             if timer.process_bad_network():
@@ -76,6 +77,13 @@ class FightResult():
     def detect_experiences(self):
         pass
 
+
+class FightResultInfo():
+    def __init__(self, fight_result:FightResult) -> None:
+        self.mvp = fight_result.mvp
+        self.experiences = fight_result.experiences
+        self.result = fight_result.result
+    
     def __str__(self):
         return "mvp:{mvp},result:{result}".format(mvp=str(self.mvp), result=str(self.result))
 
@@ -195,7 +203,7 @@ class StageRecorder():
         if self.stage_name == 'fight_period':
             self.info = remove_0_value_from_dict(timer.enemy_type_count)
         if self.stage_name == "result":
-            self.info = copy.deepcopy(Info.fight_result)
+            self.info = FightResultInfo(Info.fight_result)
         if self.stage_name == 'proceed':
             self.info = timer.ship_stats
 

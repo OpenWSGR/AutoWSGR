@@ -97,12 +97,12 @@ class AndroidController:
             raise ValueError("arg 'delay' should be positive or 0")
         if (x1 >= 960 or x1 < 0 or y1 >= 540 or y1 <= 0):
             raise ValueError(
-                "invalid args 'x1' or 'y1',x1 should be in [0,960),y1 should be in [0,540)\n,but x1 is " + str(x1),
-                +",y1 is " + str(y1))
+                "invalid args 'x1' or 'y1',x1 should be in [0,960),y1 should be in [0,540)\n,but x1 is " + str(x1) \
+                + ",y1 is " + str(y1))
         if (x2 >= 960 or x2 < 0 or y2 >= 540 or y2 <= 0):
             raise ValueError(
-                "invalid args 'x2' or 'y2',x2 should be in [0,960),y2 should be in [0,540)\n,but x2 is " + str(x2),
-                +",y2 is " + str(y2))
+                "invalid args 'x2' or 'y2',x2 should be in [0,960),y2 should be in [0,540)\n,but x2 is " + str(x2) \
+                + ",y2 is " + str(y2))
         x1, y1 = convert_position(x1, y1, self.resolution)
         x2, y2 = convert_position(x2, y2, self.resolution)
         duration = int(duration * 1000)

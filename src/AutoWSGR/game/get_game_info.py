@@ -172,10 +172,10 @@ def DetectShipStats(timer: Timer, type='prepare'):
                 result[i]=-1
                 continue
             pixel=timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
-            result[i]=CheckColor(pixel, COLORS.BLOOD_COLORS[1])
+            result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[1])
     timer.ship_stats=result
     if timer.config.DEBUG:
-        print(type, ":ship_stats =", result)
+        timer.logger.debug(type + ":ship_stats =" + str(result))
     return result
 
 

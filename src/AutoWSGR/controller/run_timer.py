@@ -60,8 +60,8 @@ class Timer(Emulator):
         try:
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
         except:
-            self.logger.info(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}")
-            self.logger.info(f"Default shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
+            self.logger.warning(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}")
+            self.logger.warning(f"Default shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
             ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
             self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
             
@@ -241,7 +241,7 @@ class Timer(Emulator):
 
         return any(self.image_exist(template, 0) for template in IMG.identify_images[name])
 
-    def wait_pages(self, names, timeout=5, gap=.1, after_wait=0.1):
+    def wait_pages(self, names, timeout=10, gap=.1, after_wait=0.1):
         start_time = time.time()
         if (isinstance(names, str)):
             names = [names]

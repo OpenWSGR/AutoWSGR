@@ -121,6 +121,18 @@ def recognize(image, char_list, min_size=7, text_threshold=.55, low_text=.3):
     return result
 
 
+def recognize_single_number(image, ex_list="", min_size=7, text_threshold=.55, low_text=.3):
+    """识别单个数字
+    Returns:
+        int: 结果
+        False: 识别失败
+    """
+    result = recognize_number(image, ex_list, min_size, text_threshold, low_text)
+    if len(result) != 1:
+        return False
+    return int(result[0][1])
+
+
 def recognize_number(image, ex_list="", min_size=7, text_threshold=.55, low_text=.3):
     """识别数字和 ex_list 的字符, 返回识别结果列表,
     Returns:

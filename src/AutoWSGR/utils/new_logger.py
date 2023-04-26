@@ -64,7 +64,7 @@ class Logger:
         save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
 
     def _get_logger(self, log_level="INFO") -> logging.Logger:
-        logger = logging.getLogger()
+        logger = logging.Logger("AutoWSGR")
         logger.handlers = []
         logger.setLevel(log_level)
 
