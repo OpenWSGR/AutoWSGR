@@ -263,22 +263,24 @@ class FightPlan(ABC):
                 self.timer.set_page(self.Info.end_page)
                 return 'success'
 
-    def run_for_times(self, times, expedition_gap=1900):
-        """多次执行同一任务
+
+    def run_for_times(self, times, gap=1800):
+        """多次执行同一任务, 自动进行远征操作
         Args:
             times (int): 任务执行总次数
-            expedition_gap (int, optional): 远征检查时间间隔. Defaults to 1900.
+            gap (int): 强制远征检查的间隔时间
         """
         assert (times >= 1)
-        res = self.run()
+        expedition = Expedition(self.timer)
+        last_flag = (self.run() != 'SL')
         for _ in range(1, times):
-            if time.time() - self.timer.last_expedition_check_time >= expedition_gap:
-                expedition = Expedition(self.timer)
+            if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
-                self.timer.last_expedition_check_time = time.time()
-                res = self.run()
-            else:
-                res = self.run(res != 'SL')
+                last_flag = False
+                
+            last_flag = self.run(last_flag) != 'SL'
+            if expedition.run(False):
+                last_flag = True
 
     def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. """
@@ -348,7 +350,10 @@ class FightPlan(ABC):
             self.logger.error("Image Match Failed, Processing")
             if self.timer.process_bad_network(timeout=2.5):
                 pass
-            if self.Info.last_state in ['proceed', 'night']:
+            if self.Info.last_state == "spot_enemy_success":
+                if self.timer.image_exist(IMG.fight_image[2]):
+                    self.timer.Android.click(900, 500)
+            if self.Info.last_state in ['proceed', 'night'] and self.timer.images_exist(IMG.fight_image[5:7]):
                 if self.Info.last_action == "yes":
                     self.timer.Android.click(325, 350, times=1)
                 else:

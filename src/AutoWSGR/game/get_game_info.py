@@ -150,15 +150,15 @@ def DetectShipStats(timer: Timer, type='prepare'):
     """
     """ToDo:
     血量检测精确到是否满血和是否触发中破保护
-    血量检测精确到数值,相对误差少于 3%
+    血量检测精确到数值, 相对误差少于 3%
     """
 
     timer.update_screen()
-    result=[-1, 0, 0, 0, 0, 0, 0]
+    result = [-1, 0, 0, 0, 0, 0, 0]
     for i in range(1, 7):
         if type == 'prepare':
-            pixel=timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
-            result[i]=CheckColor(pixel, COLORS.BLOOD_COLORS[0])
+            pixel = timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
+            result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[0])
             if result[i] in [3, 2]:
                 result[i]=2
             elif result[i] == 0:
@@ -173,7 +173,7 @@ def DetectShipStats(timer: Timer, type='prepare'):
                 continue
             pixel=timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
             result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[1])
-    timer.ship_stats=result
+    timer.ship_stats = result
     if timer.config.DEBUG:
         timer.logger.debug(type + ":ship_stats =" + str(result))
     return result
@@ -234,6 +234,6 @@ def CheckSupportStats(timer: Timer):
     """
     timer.update_screen()
     pixel=timer.get_pixel(623, 75)
-    d1=CalcDis(pixel, COLORS.SUPPORT_ENABLE)
-    d2=CalcDis(pixel, COLORS.SUPPORT_DISABLE)
+    d1 = CalcDis(pixel, COLORS.SUPPORT_ENABLE)
+    d2 = CalcDis(pixel, COLORS.SUPPORT_DISABLE)
     return d1 < d2

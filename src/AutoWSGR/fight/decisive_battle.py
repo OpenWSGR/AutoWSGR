@@ -284,7 +284,7 @@ class DecisiveBattle():
     def go_fleet_page(self):
         if (self.detect('running') == 'map'):
             self.timer.Android.click(900 * .75, 667 * .75)
-            self.timer.wait_images(IMG.identify_images['fight_prepare_page'], timeout=4)
+            self.timer.wait_images(IMG.identify_images['fight_prepare_page'], timeout=5, after_get_delay=1)
 
     def repair(self):
         self.go_fleet_page()
@@ -294,8 +294,8 @@ class DecisiveBattle():
     def next(self):
         res = self.stats.next()
         if res in ['next', 'quit']:
-            self.timer.ConfirmOperation()
-            self.timer.ConfirmOperation()
+            self.timer.ConfirmOperation(timeout=5, must_confirm=1) # 确认通关
+            self.timer.ConfirmOperation(timeout=5, must_confirm=1) # 确认领取奖励
             get_ship(self.timer, 5)
         return res
 
@@ -380,14 +380,19 @@ class DecisiveBattle():
             if (stats == 'refreshed'):
                 # 选用上一次的舰船并进入
                 self.timer.Android.click(500, 500, delay=.25)
-                self.timer.click_image(IMG.decisive_battle_image[7], timeout=12, must_click=True)
-                self.timer.Android.click(873, 500)
+                for i in range(5):
+                    self.timer.click_image(IMG.decisive_battle_image[7], timeout=12, must_click=True)
+                    self.timer.Android.click(873, 500)
+                    if self.timer.wait_images([IMG.decisive_battle_image[1], IMG.decisive_battle_image[6]], timeout=10, gap=.03) is not None:
+                        break
+                if i > 3:
+                    raise TimeoutError("选择决战舰船失败")
             else:
                 self.timer.Android.click(500, 500, delay=0)
         else:
             self.detect()
             self.timer.Android.click(500, 500, delay=0)
-        res = self.timer.wait_images([IMG.decisive_battle_image[1], IMG.decisive_battle_image[6]], timeout=5, gap=.03)
+        res = self.timer.wait_images([IMG.decisive_battle_image[1], IMG.decisive_battle_image[6]], timeout=10, gap=.03)
         if res is None:
             raise ImageNotFoundErr("Can't Identify on enter_map")
         return "other chapter is running" if (res == 1) else "ok"

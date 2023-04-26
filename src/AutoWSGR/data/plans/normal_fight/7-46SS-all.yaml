@@ -28,5 +28,10 @@ node_defaults:
 
 node_args:
   M:
+    enemy_rules:
+      - [SAP < 1, retreat]
     formation: 4 # 阵型选择，1-5
     night: True
+  I:
+    enemy_rules:
+      - [SAP < 1, retreat]

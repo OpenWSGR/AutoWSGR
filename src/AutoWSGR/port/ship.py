@@ -63,7 +63,9 @@ class Fleet():
     def change_ship(self, position, ship_name, search_method='word'):
         self.ships[position] = ship_name
         self.timer.Android.click(*FLEET_POSITION[position], delay=0)
-        res = self.timer.wait_images(IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]], after_get_delay=.4, gap=0)
+        res = self.timer.wait_images(IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]], after_get_delay=.4, gap=0, timeout=16)
+        if res == None:
+            raise TimeoutError("选择舰船时点击超时")
         if ship_name is None:
             self.timer.Android.click(83, 167, delay=0)
         else:

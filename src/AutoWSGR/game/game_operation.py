@@ -32,9 +32,14 @@ class Expedition:
 
         Args:
             force (bool): 是否强制检查
+        Returns:
+            bool: 是否进行了收远征操作
         """
         self.update(force=force)
+        flag = False
         while self.is_ready:
+            flag = True
+            self.timer.last_expedition_check_time = time.time()
             self.timer.goto_game_page('expedition_page')
             pos = self.timer.wait_image(IMG.game_ui[6], timeout=2)
             if pos:
@@ -45,7 +50,7 @@ class Expedition:
                 self.update()
             else:
                 break
-
+        return flag
 
 def get_ship(timer: Timer, max_times=1):
     times = 0
@@ -163,6 +168,12 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
             2: 快修，修大破
     """
     ShipStats = DetectShipStats(timer)
+    if [0, 1, 2] not in ShipStats:
+        time.sleep(1)
+        ShipStats = DetectShipStats(timer)
+    if [0, 1, 2] not in ShipStats:
+        timer.logger.warning("执行修理操作时没有成功检测到舰船")
+    
     assert type(repair_mode) in [int, list, tuple]
     if type(repair_mode) == int:  # 指定所有统一修理方案
         repair_mode = [repair_mode for _ in range(6)]
