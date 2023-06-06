@@ -52,7 +52,7 @@ class NormalFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 10]],
+                "no": [["result", 15]],
             },
             "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],  # 两页战果
             "get_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
@@ -247,7 +247,7 @@ class NormalFightPlan(FightPlan):
     def _make_decision(self):  # sourcery skip: extract-duplicate-method
 
         if self.config.SHOW_FIGHT_STAGE:
-            self.timer.logger.debug(self.fight_recorder.last_stage)
+            self.timer.logger.debug(str(self.fight_recorder.last_stage))
         state = self.update_state()
         # 进行MapLevel的决策
         if state == "map_page":

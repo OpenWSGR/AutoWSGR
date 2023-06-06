@@ -118,7 +118,7 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
         if (x != NO):
             timer.enemy_type_count["ALL"] += 1
 
-    timer.enemy_type_count[NAP] -= timer.enemy_type_count['AP'] - timer.enemy_type_count[SAP]
+    timer.enemy_type_count[NAP] = timer.enemy_type_count['AP'] - timer.enemy_type_count[SAP]
 
     if (timer.config.DEBUG):
         for key, value in timer.enemy_type_count.items():

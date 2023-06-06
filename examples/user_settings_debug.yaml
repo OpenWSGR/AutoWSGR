@@ -12,7 +12,7 @@ password:
 
 # ========== Logger设置 ==========
 DEBUG: True
-SHOW_MAP_NODE: True
+SHOW_MAP_NODE: False # 黄色舰船图标位置
 SHOW_ANDROID_INPUT: True
 SHOW_ENEMY_RULES: True
 SHOW_FIGHT_STAGE: True

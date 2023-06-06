@@ -418,13 +418,13 @@ class Timer(Emulator):
         Returns:
             bool:True 为成功,False 为失败
         """
-        pos = self.wait_images(IMG.confirm_image[1:], confidence, timeout=timeout)
+        pos = self.wait_images(IMG.confirm_image[1:], confidence=confidence, timeout=timeout)
         if pos is None:
             if (must_confirm == 1):
                 raise ImageNotFoundErr("no confirm image found")
             else:
                 return False
-        res = self.get_image_position(IMG.confirm_image[pos + 1], 0)
+        res = self.get_image_position(IMG.confirm_image[pos + 1], confidence=confidence, need_screen_shot=0)
         self.Android.click(res[0], res[1], delay=delay)
         return True
 

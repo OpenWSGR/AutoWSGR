@@ -1,7 +1,8 @@
 import threading as th
 import time
 
-from airtest.core.api import shell, start_app, text
+from airtest.core.api import shell, start_app, stop_app, text
+from airtest.core.helper import G
 from AutoWSGR.utils.api_image import convert_position, relative_to_absolute
 
 
@@ -9,7 +10,6 @@ class AndroidController:
     def __init__(self, config, logger) -> None:
         self.config = config
         self.logger = logger
-
         self.resolution = config.resolution
 
     def ShellCmd(self, cmd, *args, **kwargs):
@@ -19,14 +19,22 @@ class AndroidController:
         """
         return shell(cmd)
 
+    def start_background_app(self, package_name):
+        start_app(package_name)
+        self.ShellCmd("input keyevent 3")
+
     def start_app(self, package_name):
         start_app(package_name)
+    
+    def stop_app(self, package_name):
+        stop_app(package_name)
 
     def is_game_running(self):
         apps = self.ShellCmd("ps")
         return "zhanjian2" in apps
 
     def text(self, t):
+        self.logger.debug(f"Typing:{t}")
         text(t)
 
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):

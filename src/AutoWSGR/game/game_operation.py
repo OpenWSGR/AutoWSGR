@@ -103,7 +103,7 @@ def verify_team(timer: Timer):
     if timer.process_bad_network():
         return verify_team(timer)
 
-    timer.timer.log_screen()
+    timer.logger.log_screen()
     raise ImageNotFoundErr()
 
 
@@ -168,10 +168,10 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
             2: 快修，修大破
     """
     ShipStats = DetectShipStats(timer)
-    if [0, 1, 2] not in ShipStats:
+    if not any(x in ShipStats for x in [0, 1, 2]):
         time.sleep(1)
         ShipStats = DetectShipStats(timer)
-    if [0, 1, 2] not in ShipStats:
+    if not any(x in ShipStats for x in [0, 1, 2]):
         timer.logger.warning("执行修理操作时没有成功检测到舰船")
     
     assert type(repair_mode) in [int, list, tuple]
