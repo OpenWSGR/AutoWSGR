@@ -39,4 +39,4 @@ daily_automation:
 
 # 数据信息设置
 SHIP_NAME_PATH: ""
-PLAN_ROOT: "" # 计划根目录, 如果缺省则默认为 [python packages 目录]/AutoWSGR/data/plans
+PLAN_ROOT: # 计划根目录, 如果缺省则默认为 [python packages 目录]/AutoWSGR/data/plans

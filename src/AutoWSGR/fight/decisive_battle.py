@@ -201,12 +201,7 @@ class Logic(_Logit):
 
 class DecisiveBattle():
     """决战控制模块
-    目前仅支持 E5, E6
-
-    Methods:
-         start_fight(): 开始战斗, 直到打完第三张图的最后一关停止
-         buy_ticket(): 兑换磁盘
-         reset(): 重置除了章节之外的所有信息,重置后再调用 start_fight() 则从 chapter-1-A 开始打
+    目前仅支持 E5, E6, E4
     """
     def run_for_times(self, times=1):
         assert(times >= 1)
@@ -495,7 +490,7 @@ class DecisiveBattle():
         """使用磁盘重置关卡, 并重置状态
         """
         # Todo: 缺少磁盘报错
-        self.stats.reset()
+        self.reset()
         self.move_chapter()
         self.timer.Android.click(500, 500)
         self.timer.ConfirmOperation()

@@ -243,7 +243,7 @@ class FightRecorder():
 
 class FightPlan(ABC):
     def __init__(self, timer: Timer):
-        # 把timer引用作为内置对象，减少函数调用的时候所需传入的参数
+        # 把 timer 引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
         self.config = timer.config
         self.logger = timer.logger
@@ -304,7 +304,7 @@ class FightPlan(ABC):
         elif ret == literals.BATTLE_TIMES_EXCEED:
             return ret
         else:
-            self.logger.error("无法进入战斗,原因未知! 屏幕状态已记录")
+            self.logger.error("无法进入战斗, 原因未知! 屏幕状态已记录")
             self.timer.log_screen()
             raise BaseException(str(time.time()) + "enter fight error")
 

@@ -53,15 +53,14 @@ class Timer(Emulator):
         self.fight_result = None
         self.last_mission_completed = 0
         self.last_expedition_check_time = time.time()
-
-        if not self.config.PLAN_ROOT:
-            self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
         
+        if not self.config.PLAN_ROOT:
+            self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")
+            self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
         try:
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
         except:
-            self.logger.warning(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}")
-            self.logger.warning(f"Default shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
+            self.logger.warning(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}\nDefault shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
             ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
             self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
             

@@ -23,6 +23,10 @@ def start_script(settings_path=None):
     if settings_path is not None:
         user_settings = yaml_to_dict(settings_path)
         config = recursive_dict_update(config, user_settings)
+    else:
+        print("========Warning========")
+        print(f"No user_settings file specified, default settings {os.path.join(os.path.dirname(AutoWSGR.__file__), 'data', 'default_settings.yaml')} will be used.")
+        print("=========End===========")
 
     # set logger
     config['log_dir'] = os.path.join(config['LOG_PATH'], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))

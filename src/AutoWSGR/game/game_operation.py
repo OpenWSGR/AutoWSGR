@@ -11,6 +11,7 @@ from .get_game_info import CheckSupportStats, DetectShipStats
 
 
 class Expedition:
+    
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
         self.is_ready = False
@@ -167,43 +168,46 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
             1: 快修，修中破
             2: 快修，修大破
     """
-    ShipStats = DetectShipStats(timer)
-    if not any(x in ShipStats for x in [0, 1, 2]):
-        time.sleep(1)
+    arg = repair_mode
+    try:
         ShipStats = DetectShipStats(timer)
-    if not any(x in ShipStats for x in [0, 1, 2]):
-        timer.logger.warning("执行修理操作时没有成功检测到舰船")
-    
-    assert type(repair_mode) in [int, list, tuple]
-    if type(repair_mode) == int:  # 指定所有统一修理方案
-        repair_mode = [repair_mode for _ in range(6)]
+        if not any(x in ShipStats for x in [0, 1, 2]):
+            time.sleep(1)
+            ShipStats = DetectShipStats(timer)
+        if not any(x in ShipStats for x in [0, 1, 2]):
+            timer.logger.warning("执行修理操作时没有成功检测到舰船")
+        
+        assert type(repair_mode) in [int, list, tuple]
+        if type(repair_mode) == int:  # 指定所有统一修理方案
+            repair_mode = [repair_mode for _ in range(6)]
 
-    assert len(repair_mode) == 6
-    need_repair = [False for _ in range(6)]
-    for i, x in enumerate(repair_mode):
-        assert x in [1, 2]
-        if x == 1:
-            need_repair[i] = ShipStats[i+1] not in [-1, 0]
-        elif x == 2:
-            need_repair[i] = ShipStats[i+1] not in [-1, 0, 1]
+        assert len(repair_mode) == 6
+        need_repair = [False for _ in range(6)]
+        for i, x in enumerate(repair_mode):
+            assert x in [1, 2]
+            if x == 1:
+                need_repair[i] = ShipStats[i+1] not in [-1, 0]
+            elif x == 2:
+                need_repair[i] = ShipStats[i+1] not in [-1, 0, 1]
 
-    if (timer.config.DEBUG):
-        timer.logger.debug("ShipStats:", ShipStats)
-    if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
+        if (timer.config.DEBUG):
+            timer.logger.debug("ShipStats:", ShipStats)
+        if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
 
-        timer.Android.click(420, 420, times=2, delay=0.8)   # 进入修理页面
-        # 快修已经开始泡澡的船
-        pos = timer.get_image_position(IMG.repair_image[1])
-        while (pos != None):
-            timer.Android.click(pos[0], pos[1], delay=1)
+            timer.Android.click(420, 420, times=2, delay=0.8)   # 进入修理页面
+            # 快修已经开始泡澡的船
             pos = timer.get_image_position(IMG.repair_image[1])
-        # 按逻辑修理
-        for i in range(1, 7):
-            if need_repair[i-1]:
-                timer.logger.info("WorkInfo:" + str(kwargs))
-                timer.logger.info(str(i)+" Repaired")
-                timer.Android.click(BLOOD_BAR_POSITION[0][i][0], BLOOD_BAR_POSITION[0][i][1], delay=1.5)
-
+            while (pos != None):
+                timer.Android.click(pos[0], pos[1], delay=1)
+                pos = timer.get_image_position(IMG.repair_image[1])
+            # 按逻辑修理
+            for i in range(1, 7):
+                if need_repair[i-1]:
+                    timer.logger.info("WorkInfo:" + str(kwargs))
+                    timer.logger.info(str(i)+" Repaired")
+                    timer.Android.click(BLOOD_BAR_POSITION[0][i][0], BLOOD_BAR_POSITION[0][i][1], delay=1.5)
+    except AssertionError:
+        raise ValueError(f"修理舰船的参数不合法, 请检查你的参数:{arg}")
 
 def GainBounds(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取

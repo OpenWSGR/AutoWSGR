@@ -8,7 +8,7 @@ from AutoWSGR.constants import literals
 from types import SimpleNamespace as SN
 
 
-class DailyOperation:
+class DailyOperation():
     def __init__(self, setting_path) -> None:
         self.timer = start_script(setting_path)
         
