@@ -3,7 +3,6 @@ import re
 
 from airtest.core.cv import (MATCHING_METHODS, ST, InvalidMatchingMethodError,
                              TargetPos, Template)
-from airtest.core.helper import G
 from airtest.core.settings import Settings as ST
 
 from .data_roots import IMG_ROOT
@@ -12,7 +11,6 @@ from .data_roots import IMG_ROOT
 class MyTemplate(Template):
     def match_in(self, screen, this_methods=None):
         match_result = self._cv_match(screen, this_methods)
-        G.LOGGING.debug("match result: %s", match_result)
         if not match_result:
             return None
         focus_pos = TargetPos().getXY(match_result, self.target_pos)

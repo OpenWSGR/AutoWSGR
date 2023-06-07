@@ -34,18 +34,8 @@ def start_script(settings_path=None):
     config['log_dir'] = os.path.join(config['LOG_PATH'], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     os.makedirs(config['log_dir'], exist_ok=True)
     logger = Logger(config)
-
     config = SN(**config)
     timer = Timer(config, logger)
     config_str = logger.save_config(config)
     timer.logger.reset_level() # sb airtest reset all the fucking log level
-    app_list = timer.Android.ShellCmd("ps")
-    # yose_start = False
-    # for app in app_list:
-    #     if "com.netease.nie.yosemite" in app:
-    #         yose_start = True
-    # if not yose_start:
-    #     timer.logger.info("Yosemite not running, starting")
-    #     timer.Android.start_background_app("com.netease.nie.yosemite")
-    #     timer.Android.start_app("com.huanmeng.zhanjian2")
     return timer

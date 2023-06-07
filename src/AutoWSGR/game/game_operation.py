@@ -1,6 +1,5 @@
 import time
 
-from airtest.core.api import text
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
@@ -198,7 +197,7 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
         raise ValueError(f"修理舰船的参数不合法, 请检查你的参数:{arg}")
 
 
-def GainBounds(timer: Timer):
+def get_rewards(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取
     """
     timer.goto_game_page('main_page')

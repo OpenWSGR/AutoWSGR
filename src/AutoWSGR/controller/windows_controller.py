@@ -1,5 +1,4 @@
 import os
-import shutil
 import time
 import subprocess
 import airtest.core.android.android

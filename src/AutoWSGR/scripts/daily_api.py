@@ -2,7 +2,7 @@ import time
 
 from AutoWSGR.fight.battle import BattlePlan
 from AutoWSGR.fight.normal_fight import NormalFightPlan
-from AutoWSGR.game.game_operation import Expedition, GainBounds, RepairByBath
+from AutoWSGR.game.game_operation import Expedition, get_rewards, RepairByBath
 from AutoWSGR.scripts.main import start_script
 from AutoWSGR.constants import literals
 from types import SimpleNamespace as SN
@@ -76,7 +76,7 @@ class DailyOperation():
 
     def _gain_bonus(self):
         if self.config.auto_gain_bonus:
-            GainBounds(self.timer)
+            get_rewards(self.timer)
 
     def _bath_repair(self):
         if self.config.auto_bath_repair:

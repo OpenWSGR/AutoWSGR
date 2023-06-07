@@ -4,7 +4,6 @@ import time
 from typing import Iterable, Tuple
 
 import cv2
-from airtest.core.helper import G
 
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.utils.api_image import (MyTemplate, convert_position,

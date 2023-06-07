@@ -2,8 +2,6 @@ import os
 import threading as th
 import time
 
-from airtest.core.api import text
-
 from AutoWSGR.constants.custom_exceptions import (CriticalErr,
                                                   ImageNotFoundErr, NetworkErr)
 from AutoWSGR.constants.data_roots import DATA_ROOT
@@ -65,18 +63,23 @@ class Timer(Emulator):
     def init(self):
         """初始化游戏状态, 以便进一步的控制
         """
+        # ========== 启动游戏 ==========
         if self.config.account is not None and self.config.password != None:
             self.restart(account=self.config.account, password=self.config.password)
         if self.Android.is_game_running() == False:
             self.start_game()
         self.Android.start_app("com.huanmeng.zhanjian2")
+        
+        # ========== 检查游戏页面状态 ============
+        
         try:
             self.set_page()
+            self.logger.info(f"启动成功, 当前位置: {self.now_page.name}")
         except:
             self.logger.warning("无法确定当前页面, 尝试重启游戏")
             self.restart()
             self.set_page()
-        self.logger.info(f"启动成功, 当前位置: {self.now_page.name}")
+        
         
     def log_in(self, account, password):
         pass
@@ -113,14 +116,14 @@ class Timer(Emulator):
                 p = th.Thread(target=lambda: self.Android.ShellCmd('input keyevent 67'))
                 p.start()
             p.join()
-            text(str(account))
+            self.Android.text(str(account))
             self.Android.click(540, 260)
             for _ in range(20):
                 p = th.Thread(target=lambda: self.Android.ShellCmd('input keyevent 67'))
                 p.start()
             p.join()
             time.sleep(0.5)
-            text(str(password))
+            self.Android.text(str(password))
             self.Android.click(400, 330)
             res = self.wait_images([IMG.start_image[5], IMG.start_image[2]])
             if res is None:

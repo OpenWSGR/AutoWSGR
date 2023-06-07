@@ -1,7 +1,6 @@
 import threading as th
 import time
 
-from airtest.core.helper import G
 from airtest.core.android.android import Android
 from AutoWSGR.utils.api_image import convert_position, relative_to_absolute
 
