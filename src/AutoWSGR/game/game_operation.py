@@ -4,13 +4,13 @@ from airtest.core.api import text
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
-from AutoWSGR.controller.run_timer import Timer
+from AutoWSGR.controller.run_timer import Timer, try_to_get_expedition
 from AutoWSGR.ocr.ship_name import recognize_single_number
 
-from .get_game_info import CheckSupportStats, DetectShipStats
+from .get_game_info import check_support_stats, detect_ship_stats
 
 
-class Expedition:
+class Expedition():
     
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
@@ -29,30 +29,18 @@ class Expedition:
             self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
 
     def run(self, force=False):
-        """检查远征,如果有未收获远征,则全部收获并用原队伍继续
+        """检查远征, 如果有未收获远征, 则全部收获并用原队伍继续
 
         Args:
             force (bool): 是否强制检查
         Returns:
-            bool: 是否进行了收远征操作
+            bool: 是否进行了远征操作
         """
         self.update(force=force)
-        flag = False
-        while self.is_ready:
-            flag = True
-            self.timer.last_expedition_check_time = time.time()
+        if self.is_ready:
             self.timer.goto_game_page('expedition_page')
-            pos = self.timer.wait_image(IMG.game_ui[6], timeout=2)
-            if pos:
-                self.timer.Android.click(pos[0], pos[1], delay=1)
-                self.timer.wait_image(IMG.fight_image[3], after_get_delay=.25)
-                self.timer.Android.click(900, 500, delay=1)
-                self.timer.ConfirmOperation(must_confirm=1, delay=.5, confidence=.9)
-                self.update()
-            else:
-                break
-        return flag
-
+            flag = try_to_get_expedition(self.timer)
+            self.timer.last_expedition_check_time = time.time()
 
 def get_ship(timer: Timer, max_times=1):
     times = 0
@@ -147,19 +135,19 @@ def SetSupport(timer: Timer, target, try_times=0):
     # if(bool(timer.check_pixel((623, 75), )) == ):
     #
     # 支援次数已用尽
-    if (CheckSupportStats(timer) != target):
+    if (check_support_stats(timer) != target):
         timer.Android.click(628, 82, delay=1)
         timer.Android.click(760, 273, delay=1)
         timer.Android.click(480, 270, delay=1)
 
-    if timer.is_bad_network(0) or CheckSupportStats(timer) != target:
+    if timer.is_bad_network(0) or check_support_stats(timer) != target:
         if timer.process_bad_network('set_support'):
             SetSupport(timer, target)
         else:
             raise ValueError("can't set right support")
 
 
-def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
+def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
     """战斗界面的快速修理
     Args:
         timer (Timer): _description_
@@ -169,11 +157,12 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
     """
     arg = repair_mode
     try:
-        ShipStats = DetectShipStats(timer)
-        if not any(x in ShipStats for x in [0, 1, 2]):
+        if ship_stats == None:
+            ship_stats = detect_ship_stats(timer)
+        if not any(x in ship_stats for x in [0, 1, 2]):
             time.sleep(1)
-            ShipStats = DetectShipStats(timer)
-        if not any(x in ShipStats for x in [0, 1, 2]):
+            ship_stats = detect_ship_stats(timer)
+        if not any(x in ship_stats for x in [0, 1, 2]):
             timer.logger.warning("执行修理操作时没有成功检测到舰船")
         
         assert type(repair_mode) in [int, list, tuple]
@@ -185,12 +174,12 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
         for i, x in enumerate(repair_mode):
             assert x in [1, 2]
             if x == 1:
-                need_repair[i] = ShipStats[i+1] not in [-1, 0]
+                need_repair[i] = ship_stats[i+1] not in [-1, 0]
             elif x == 2:
-                need_repair[i] = ShipStats[i+1] not in [-1, 0, 1]
+                need_repair[i] = ship_stats[i+1] not in [-1, 0, 1]
 
         if (timer.config.DEBUG):
-            timer.logger.debug("ShipStats:", ShipStats)
+            timer.logger.debug("ship_stats:", ship_stats)
         if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
 
             timer.Android.click(420, 420, times=2, delay=0.8)   # 进入修理页面
@@ -276,7 +265,7 @@ def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
         Supply(timer, ship_ids, try_times + 1)
 
 
-def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, detect_ship_stats=True):
+def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_stats = None):
     """切换舰船(不支持第一舰队)
 
     """
@@ -290,9 +279,9 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, detect
 
     # 切换单船
     # 懒得做 OCR 所以默认第一个
-    if (detect_ship_stats):
-        DetectShipStats(timer)
-    if name is None and timer.ship_stats[ship_id] == -1:
+    if ship_stats is None:
+        ship_stats = detect_ship_stats(timer)
+    if name is None and ship_stats[ship_id] == -1:
         return
     timer.Android.click(110 * ship_id, 250, delay=0)
     res = timer.wait_images([IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=.4, gap=0)
@@ -309,7 +298,7 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, detect
 
     timer.Android.text(name)
     timer.Android.click(50, 50, delay=.5)
-    if (timer.ship_stats[ship_id] == -1):
+    if (ship_stats[ship_id] == -1):
         timer.Android.click(83, 167, delay=0)
     else:
         timer.Android.click(183, 167, delay=0)
@@ -322,9 +311,10 @@ def ChangeShips(timer: Timer, fleet_id, ship_names):
 
     Args:
         fleet_id (int): 2~4,表示舰队编号
+        
         ship_names (舰船名称列表): 
 
-    For instance:
+    For example:
         ChangeShips(timer, 2, [None, "萤火虫", "伏尔塔", "吹雪", "明斯克", None, None])
 
     """
@@ -334,18 +324,18 @@ def ChangeShips(timer: Timer, fleet_id, ship_names):
         MoveTeam(timer, fleet_id)
     if fleet_id == 1:
         raise ValueError("change member of fleet 1 is unsupported")
-    DetectShipStats(timer)
+    ship_stats = detect_ship_stats(timer)
     for i in range(1, 7):
-        if (timer.ship_stats[i] != -1):
-            ChangeShip(timer, fleet_id, 1, None, detect_ship_stats=False)
+        if (ship_stats[i] != -1):
+            ChangeShip(timer, fleet_id, 1, None, ship_stats=ship_stats)
     ship_names = ship_names + [None] * 6
     for i in range(len(ship_names)):
         if ship_names[i] == "":
             ship_names[i] = None
     time.sleep(.3)
-    DetectShipStats(timer)
+    ship_stats = detect_ship_stats(timer)
     for i in range(1, 7):
-        ChangeShip(timer, fleet_id, i, ship_names[i], detect_ship_stats=False)
+        ChangeShip(timer, fleet_id, i, ship_names[i], ship_stats=ship_stats)
 
 
 def get_new_things(timer: Timer, lock=0):

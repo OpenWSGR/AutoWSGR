@@ -17,7 +17,7 @@ from .windows_controller import WindowsController
 
 
 class Emulator():
-    """模拟器管理单位,可以用于其它游戏
+    """模拟器管理单位, 可以用于其它游戏, 对 AndroidController 的进一步封装
     """
 
     def __init__(self, config, logger: Logger):
@@ -27,18 +27,83 @@ class Emulator():
         self.Windows = WindowsController(config.emulator, logger)
 
         # 初始化android控制器
-        self.Windows.connect_android()
+        dev = self.Windows.connect_android()
+        self.Android = AndroidController(config, logger, dev)
         self.update_screen()
         self.config.resolution = self.screen.shape[:2]
         self.config.resolution = self.config.resolution[::-1]  # 转换为 （宽x高）
         self.logger.info(f"resolution:{str(self.config.resolution)}")
-        self.Android = AndroidController(config, logger)
 
-    def update_screen(self):
-        """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 RD.screen
+    
+    # ===========命令函数===========
+    
+    def shell(self, cmd, *args, **kwargs):
+        """向链接的模拟器发送 adb shell 命令"""
+        return self.Android.ShellCmd(cmd)
+
+    def get_frontend_app(self):
+        """获取前台应用的包名"""
+        return self.shell("dumpsys window | grep mCurrentFocus")
+
+    def start_app(self, package_name):
+        """启动应用"""
+        self.Android.start_app(package_name)
+    
+    def stop_app(self, package_name):
+        """停止应用"""
+        self.Android.stop_app(package_name)
+
+    def list_apps(self):
+        """列出所有正在运行的应用"""
+        return self.shell("ps")
+    
+    def is_running(self, app="zhanjian2"):
+        """检查一个应用是否在运行
+
+        Args:
+            app (str, optional): 应用名, 默认为 "战舰少女R".
+
+        Returns:
+            bool: 
         """
-        self.screen = G.DEVICE.snapshot(filename=None, quality=99)
+        
+        return "zhanjian2" in self.list_apps()
+    
+    # ===========控制函数============
+    
+    def text(self, str):
+        """输入文本
 
+        需要焦点在输入框时才能输入
+        """
+        self.Android.text(str)
+    
+    def click(self, x, y):
+        """点击模拟器坐标
+        Args:
+            x (int): 相对横坐标(标准为 960x540 大小的屏幕)
+            y (int): 相对纵坐标
+        Examples:
+            >>> emulator=Emulator(config, logger)
+            >>> emulator.click(432, 221)
+        """
+        self.Android.click(x, y, delay=0.1)
+    
+    def swipe(self, x0, y0, x1, y1, duration=0.5):
+        """从 (x0, y0) 滑动到 (x1, y1)
+        Args:
+            x0: 相对横坐标(标准为 960x540 大小的屏幕)
+            
+            duration (float): 滑动时间, 单位为秒 
+        """
+        self.Android.swipe(x0, y0, x1, y1, duration=duration, delay=0.1)
+    
+    # ===========图像函数============
+    
+    def update_screen(self):
+        """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 self.screen"""
+        self.screen = self.Android.snapshot()
+ 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
         if (need_screen_shot):
             self.update_screen()
@@ -46,11 +111,9 @@ class Emulator():
     
     def get_pixel(self, x, y, screen_shot=False) -> list:
         """获取当前屏幕相对坐标 (x,y) 处的像素值
-
         Args:
             x (int): [0, 960)
             y (int): [0, 549)
-
         Returns:
             list[]: RGB 格式的像素值
         """
@@ -209,10 +272,14 @@ class Emulator():
 
     def click_image(self, image, must_click=False, timeout=0, delay=0.5):
         """点击一张图片的中心位置
+        
         Args:
             image (MyTemplate): 目标图片
+            
             must_click (bool, optional): 如果为 True,点击失败则抛出异常. Defaults to False.
+            
             timeout (int, optional): 等待延时. Defaults to 0.
+            
             delay (float, optional): 点击后延时. Defaults to 0.5.
 
         Raises:
@@ -220,31 +287,6 @@ class Emulator():
         """
         pos = self.wait_images_position(image, gap=.03, timeout=timeout)
         if (pos == False):
-            if (must_click == False):
-                return False
-            else:
-                raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
-
-        self.Android.click(*pos, delay=delay)
-        return True
-
-    def click_image(self, image: MyTemplate, must_click=False, timeout=0, delay=0.5):
-        """点击一张图片的中心位置
-        Args:
-            image (MyTemplate): 目标图片
-            must_click (bool, optional): 如果为 True,点击失败则抛出异常. Defaults to False.
-            timeout (int, optional): 等待延时. Defaults to 0.
-            delay (float, optional): 点击后延时. Defaults to 0.5.
-
-        Raises:
-            NotFoundErr: 如果在 timeout 时间内未找到则抛出该异常
-        """
-        if (timeout < 0):
-            raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
-        if (delay < 0):
-            raise ValueError("arg 'delay' should at least be 0 but is ", str(delay))
-        pos = self.wait_image(image, timeout=timeout)
-        if pos == False:
             if (must_click == False):
                 return False
             else:

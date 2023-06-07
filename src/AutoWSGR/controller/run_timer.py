@@ -16,43 +16,38 @@ from AutoWSGR.utils.operator import unzip_element
 from .emulator import Emulator
 
 
+def try_to_get_expedition(timer:Emulator):
+    timer.logger.info("Getting Expedition Rewards....")
+    get, pos = False, timer.wait_image(IMG.game_ui[6], timeout=2)
+    while pos:
+        timer.Android.click(pos[0], pos[1], delay=1)
+        timer.wait_image(IMG.fight_image[3], after_get_delay=.25)
+        timer.Android.click(900, 500, delay=1)
+        timer.ConfirmOperation(must_confirm=1, delay=.5, confidence=.9)
+        pos, get = timer.wait_image(IMG.game_ui[6], timeout=2), True
+    return get
+
+
 class Timer(Emulator):
-    """ 程序运行记录器,用于记录和传递部分数据,同时用于区分多开 """
+    """ 程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用 """
 
+    # 战舰少女R专用控制器
+    everyday_check = True
+    ui = WSGR_UI
+    ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
+    enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
+    now_page = None  # 当前所在 UI 名
+    resources = None # 当前四项资源量
+    """
+    以上时能用到的
+    以下是暂时用不到的
+    """
+    last_mission_completed = 0
+    last_expedition_check_time = time.time()
+    
     def __init__(self, config, logger):
-        """Todo
-        参考银河远征的战斗模拟写一个 Ship 类,更好的保存信息
-        """
-        # 模拟器通用设置
+        
         super().__init__(config, logger)
-
-        # 战舰少女R专用
-        self.everyday_check = True
-        self.now_page = None
-        self.ui = WSGR_UI
-        self.ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
-        self.enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
-        self.now_page = None  # 当前所在节点名
-        self.expedition_stats = None  # 远征状态记录器
-        self.team = 1  # 当前队伍名
-        self.ammo = 10
-        self.oil = 10
-        self.resources = None
-        self.last_error_time = time.time() - 1800
-        self.decisive_battle_data = None
-        """
-        以上时能用到的
-        以下是暂时用不到的
-        """
-
-        self.friends = []
-        self.enemies = []
-        self.enemy_ship_type = [None, NO, NO, NO, NO, NO, NO]
-        self.friend_ship_type = [None, NO, NO, NO, NO, NO, NO]
-        self.default_repair_logic = None
-        self.fight_result = None
-        self.last_mission_completed = 0
-        self.last_expedition_check_time = time.time()
         
         if not self.config.PLAN_ROOT:
             self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")
@@ -63,27 +58,26 @@ class Timer(Emulator):
             self.logger.warning(f"Failed to load ship_name file:{config.SHIP_NAME_PATH}\nDefault shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used")
             ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
             self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
-            
+        
+        self.init()
+
+    # ========================= 初级游戏控制 =========================
+    def init(self):
+        """初始化游戏状态, 以便进一步的控制
+        """
         if self.config.account is not None and self.config.password != None:
             self.restart(account=self.config.account, password=self.config.password)
         if self.Android.is_game_running() == False:
             self.start_game()
-
-        self.ammo = 10
-        # self.resources = Resources(self)
-        if not config.DEBUG:
-            self.go_main_page()
+        self.Android.start_app("com.huanmeng.zhanjian2")
         try:
             self.set_page()
         except:
-            if self.config.DEBUG:
-                self.set_page('main_page')
-            else:
-                self.restart()
-                self.set_page()
-        self.logger.info(f"Now at: {self.now_page}")
-
-    # ========================= 初级游戏控制 =========================
+            self.logger.warning("无法确定当前页面, 尝试重启游戏")
+            self.restart()
+            self.set_page()
+        self.logger.info(f"启动成功, 当前位置: {self.now_page.name}")
+        
     def log_in(self, account, password):
         pass
 
@@ -93,14 +87,7 @@ class Timer(Emulator):
         pass
 
     def start_game(self, account=None, password=None, delay=1.0):
-        """启动游戏(实现不优秀,需重写)
-
-        Args:
-            timer (Timer): _description_
-            TryTimes (int, optional): _description_. Defaults to 0.
-
-        Raises:
-            NetworkErr: _description_
+        """启动游戏
         """
         self.Android.start_app("com.huanmeng.zhanjian2")
         res = self.wait_images([IMG.start_image[2]] + IMG.confirm_image[1:], 0.85, gap=1, timeout=70 * delay)
@@ -111,6 +98,9 @@ class Timer(Emulator):
             self.ConfirmOperation()
             if self.wait_image(IMG.start_image[2], timeout=200) == False:
                 raise TimeoutError("resource downloading timeout")
+            
+        # ========= 登录 =========
+        
         if account != None and password != None:
             self.Android.click(75, 450)
             if self.wait_image(IMG.start_image[3]) == False:
@@ -137,6 +127,9 @@ class Timer(Emulator):
                 raise TimeoutError("login timeout")
             if res == 0:
                 raise BaseException("password or account is wrong")
+         
+        # =========== 开始游戏 ===========
+           
         delay = 15
         while self.image_exist(IMG.start_image[2]):
             self.click_image(IMG.start_image[2])
@@ -145,8 +138,11 @@ class Timer(Emulator):
             delay *= 2
             if (delay > 30):
                 raise ImageNotFoundErr("can't start game")
+        # ============ 关闭新闻, 领取每日奖励 =============
+        
         try:
             if self.everyday_check:
+                self.logger.info("正在尝试关闭新闻, 领取奖励")
                 if (self.wait_image(IMG.start_image[6], timeout=2) != False):  # 新闻与公告,设为今日不再显示
                     if (not self.check_pixel((70, 485), (201, 129, 54))):
                         self.Android.click(70, 485)
@@ -156,6 +152,7 @@ class Timer(Emulator):
                     self.ConfirmOperation(must_confirm=1, timeout=2)
                 self.everyday_check = False
             self.go_main_page()
+            self.logger.info("游戏启动成功!")
         except:
             raise BaseException("fail to start game")
 
@@ -290,7 +287,8 @@ class Timer(Emulator):
                 self.logger.debug(f"Go page: {self.now_page.name}, but arrive: {edge.other_dst.name}")
                 self.now_page = self.ui.get_node_by_name([self.now_page.name, edge.other_dst.name][dst - 1])
                 self.logger.debug(f"Now page: {self.now_page.name}")
-
+                if self.now_page.name == "expedition_page":
+                    try_to_get_expedition(self)
                 self.operate(end)
                 return
             else:
@@ -303,7 +301,7 @@ class Timer(Emulator):
             now_page = self.get_now_page()
 
             if now_page is None:
-                raise ImageNotFoundErr("Can't identify the page")
+                raise ImageNotFoundErr("无法识别该页面")
             else:
                 if (now_page != 'unknown_page'):
                     self.now_page = self.ui.get_node_by_name(now_page)
@@ -361,7 +359,6 @@ class Timer(Emulator):
 
     def go_main_page(self, QuitOperationTime=0, List=[], ExList=[]):
         """回退到游戏主页
-
         Args:
             timer (Timer): _description_
             QuitOperationTime (int, optional): _description_. Defaults to 0.

@@ -1,33 +1,47 @@
 import threading as th
 import time
 
-from airtest.core.api import shell, start_app, stop_app, text
 from airtest.core.helper import G
+from airtest.core.android.android import Android
 from AutoWSGR.utils.api_image import convert_position, relative_to_absolute
 
 
-class AndroidController:
-    def __init__(self, config, logger) -> None:
+class AndroidController():
+    """安卓控制器
+    
+    用于提供底层的控制接口
+    """
+    def __init__(self, config, logger, dev:Android) -> None:
         self.config = config
         self.logger = logger
-        self.resolution = config.resolution
+        self.dev = dev
+        self.resolution = self.snapshot().shape[:2]
+        self.resolution = self.resolution[::-1] 
 
+    def snapshot(self):
+        return self.dev.snapshot(quality=99)
+    
     def ShellCmd(self, cmd, *args, **kwargs):
         """向链接的模拟器发送 shell 命令
         Args:
             cmd (str):命令字符串
         """
-        return shell(cmd)
+        return self.dev.shell(cmd)
+
+    def get_frontend_app(self):
+        """获取前台应用的包名
+        """
+        return self.ShellCmd("dumpsys window | grep mCurrentFocus")
 
     def start_background_app(self, package_name):
-        start_app(package_name)
+        self.dev.start_app(package_name)
         self.ShellCmd("input keyevent 3")
 
     def start_app(self, package_name):
-        start_app(package_name)
+        self.dev.start_app(package_name)
     
     def stop_app(self, package_name):
-        stop_app(package_name)
+        self.dev.stop_app(package_name)
 
     def is_game_running(self):
         apps = self.ShellCmd("ps")
@@ -35,21 +49,25 @@ class AndroidController:
 
     def text(self, t):
         self.logger.debug(f"Typing:{t}")
-        text(t)
+        self.dev.text(t)
 
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):
         """点击模拟器相对坐标 (x,y).
         Args:
             x:相对横坐标  (相对 960x540 屏幕)
-            y:相对纵坐标  (相对 960x540 屏幕)
+            
+            y: 相对纵坐标  (相对 960x540 屏幕)
+            
             delay:点击后延时(单位为秒)
+            
             enable_subprocess:是否启用多线程加速
+            
             Note:
                 if 'enable_subprocess' is True,arg 'times' must be 1 
         Returns:
             enable_subprocess == False:None
-            enable_subprocess == True:
-                A class threading.Thread refers to this click subprocess
+            
+            enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
         if self.config.SHOW_ANDROID_INPUT and "not_show" not in kwargs:
             self.logger.debug("click:", time.time(), x, y)

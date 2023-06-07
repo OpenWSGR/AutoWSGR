@@ -6,8 +6,8 @@ from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.fight.battle import BattleInfo, BattlePlan
 from AutoWSGR.fight.common import start_march
-from AutoWSGR.game.game_operation import QuickRepair, get_ship
-from AutoWSGR.game.get_game_info import DetectShipStats
+from AutoWSGR.game.game_operation import quick_repair, get_ship
+from AutoWSGR.game.get_game_info import detect_ship_stats
 from AutoWSGR.ocr.ship_name import _recognize_ship, recognize_number
 from AutoWSGR.port.ship import Fleet, count_ship
 from AutoWSGR.utils.io import count, yaml_to_dict
@@ -82,42 +82,7 @@ class DecisiveStats():
         return self.node == 'A' and self.map == 1
 
 
-class _Logit():
-    """暂时不启用
-    """
-
-    def __init__(self, stats: DecisiveStats, level1: list, level2: list, flagship_priority: list):
-        pass
-
-    def _choose_ship(self, must=False):
-        pass
-
-    def _use_skill(self):
-        pass
-
-    def need_repair(self):
-        pass
-
-    def _up_level(self):
-        pass
-
-    def formation(self):
-        pass
-
-    def night(self):
-        pass
-
-    def get_best_fleet(self):
-        pass
-
-    def _retreat(self):
-        pass
-
-    def _leave(self):
-        pass
-
-
-class Logic(_Logit):
+class Logic():
     """决战逻辑模块
     """
 
@@ -283,8 +248,8 @@ class DecisiveBattle():
 
     def repair(self):
         self.go_fleet_page()
-        QuickRepair(self.timer, 1) # TODO：我的中破比很高，先改成只修大破控制一下用桶
-        # QuickRepair(self.timer, 2)
+        quick_repair(self.timer, 1) # TODO：我的中破比很高，先改成只修大破控制一下用桶
+        # quick_repair(self.timer, 2)
 
     def next(self):
         res = self.stats.next()
@@ -347,17 +312,17 @@ class DecisiveBattle():
         self.timer.Android.click(36, 33)
         self.timer.Android.click(360, 300)
 
-    def get_chapter(self):
+    def _get_chapter(self):
         return int(recognize_number(self.timer.get_screen()[588:618, 1046:1110], "Ex-X")[0][1][-1])
 
-    def move_chapter(self):
-        if (self.get_chapter() < self.stats.chapter):
+    def _move_chapter(self):
+        if (self._get_chapter() < self.stats.chapter):
             self.timer.Android.click(900, 507)
-        elif (self.get_chapter() > self.stats.chapter):
+        elif (self._get_chapter() > self.stats.chapter):
             self.timer.Android.click(788, 507)
         else:
             return
-        self.move_chapter()
+        self._move_chapter()
 
     def enter_decisive_battle(self):
         self.timer.goto_game_page("decisive_battle_entrance")
@@ -368,7 +333,7 @@ class DecisiveBattle():
         if (check_map):
             self.enter_decisive_battle()
             stats = self.detect()
-            self.move_chapter()
+            self._move_chapter()
             if (stats == 'refresh'):
                 self.reset_chapter()
                 stats = 'refreshed'
@@ -397,7 +362,7 @@ class DecisiveBattle():
         self.timer.Android.click(36, 33)
         self.timer.Android.click(600, 300)
 
-    def get_exp(self):
+    def _get_exp(self):
         src = recognize_number(self.timer.get_screen()[592:615, 48:118], "(/)")[0][1]
         self.stats.exp = 0
         self.stats.need = 20
@@ -409,20 +374,20 @@ class DecisiveBattle():
         except:
             pass
 
-    def before_fight(self):
+    def _before_fight(self):
         if (self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False):
             self.timer.Android.click(300, 225)  # 选上中下路
             self.timer.ConfirmOperation(must_confirm=1)
         if (self.timer.wait_image([IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=5)):
             self.choose()  # 获取战备舰队
-        self.get_exp()
+        self._get_exp()
         while (self.logic._up_level()):
             self.up_level_assistant()
-            self.get_exp()
+            self._get_exp()
         if (self.logic._use_skill()):
             self.use_skill(self.logic._use_skill())
         if (self.stats.fleet.empty() and not self.stats.is_begin()):
-            self.check_fleet()
+            self._check_fleet()
         _fleet = self.logic.get_best_fleet()
         if (self.logic._retreat()):
             self.retreat()
@@ -431,34 +396,36 @@ class DecisiveBattle():
             self.leave()
             return 'leave'
         if (self.stats.fleet != _fleet):
-            self.change_fleet(_fleet)
-            self.stats.ship_stats = DetectShipStats(self.timer)
+            self._change_fleet(_fleet)
+            self.stats.ship_stats = detect_ship_stats(self.timer)
         if (self.logic.need_repair()):
             self.repair()
 
-    def after_fight(self):
+    def _after_fight(self):
         self.stats.ship_stats = self.timer.ship_stats
         self.timer.logger.info(self.stats.ship_stats)
 
-    def check_fleet(self):
+    def _check_fleet(self):
         self.go_fleet_page()
         self.stats.fleet.detect()
         for ship in self.stats.fleet.ships:
             self.stats.ships.add(ship)
-        self.stats.ship_stats = DetectShipStats(self.timer)
+        self.stats.ship_stats = detect_ship_stats(self.timer)
 
-    def during_fight(self):
+    def _during_fight(self):
         formation = get_formation(self.stats.fleet, self.stats.enemy_now)
         night = self.stats.node in self.stats.key_points[self.stats.chapter][self.stats.map]
-        DecisiveBattlePlan(self.timer, decision_block=DB(formation=formation, night=night)).run()
+        plan = DecisiveBattlePlan(self.timer, formation=formation, night=night, ship_stats=self.stats.ship_stats)
+        plan.run()
+        self.stats.ship_stats = plan.Info.fight_history.get_fight_results()[-1].ship_stats
 
-    def change_fleet(self, fleet):
+    def _change_fleet(self, fleet):
         self.go_fleet_page()
         self.stats.fleet.set_ship(fleet, order=True, search_method=None)
 
     def fight(self):
         # try:
-        res = self.before_fight()
+        res = self._before_fight()
         # except BaseException as e:
         #     print(e)
         #     if self.stats.map == 1 and self.stats.node == 'A':
@@ -466,15 +433,15 @@ class DecisiveBattle():
         #         print(e, "Temporary Game BUG, Processing...")
         #         self.timer.restart()
         #         self.enter_map()
-        #         self.reset()
+        #         self._reset()
         #         return 'continue'
 
         if (res == 'retreat'):
             self.enter_map(check_map=False)
-            self.reset()
+            self._reset()
             return self.fight()
-        self.during_fight()
-        self.after_fight()
+        self._during_fight()
+        self._after_fight()
         return self.next()
 
     def start_fight(self):
@@ -490,20 +457,23 @@ class DecisiveBattle():
         """使用磁盘重置关卡, 并重置状态
         """
         # Todo: 缺少磁盘报错
-        self.reset()
-        self.move_chapter()
+        self._reset()
+        self._move_chapter()
         self.timer.Android.click(500, 500)
         self.timer.ConfirmOperation()
 
-    def reset(self):
+    def _reset(self):
         self.stats.reset()
 
 
 class DecisiveBattlePlan(BattlePlan):
 
-    def __init__(self, timer: Timer, decision_block=None):
-        super().__init__(timer, None, decision_block=decision_block)
+    def __init__(self, timer: Timer, formation, night, ship_stats):
+        super().__init__(timer, None)
         self.Info = DecisiveBattleInfo(timer)
+        self.Info.ship_stats = ship_stats
+        self.node.config.formation = formation
+        self.node.config.night = night
 
     def _enter_fight(self, *args, **kwargs):
         return start_march(self.timer)

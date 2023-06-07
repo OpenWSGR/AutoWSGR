@@ -7,7 +7,8 @@ from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES, SAP
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import Expedition, get_ship, DestroyShip
+from AutoWSGR.game.game_operation import Expedition, get_ship, DestroyShip, detect_ship_stats
+from AutoWSGR.game.get_game_info import get_enemy_condition
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.utils.math_functions import get_nearest
 from AutoWSGR.utils.operator import remove_0_value_from_dict
@@ -53,50 +54,32 @@ class Ship():
         self.friendliness = 0  # 舰船好感度
 
 
-class FightResult():
-    def __init__(self, timer: Timer):
-        self.timer = timer
-        self.logger = timer.logger
-        self.result = 'D'
-        self.mvp = 0
-        self.experiences = [None, 0, 0, 0, 0, 0, 0]
-
-    def detect_result(self):
-        mvp_pos = self.timer.get_image_position(IMG.fight_image[14])
+class FightResultInfo():
+    
+    def __init__(self, timer:Timer, ship_stats) -> None:
+        mvp_pos = timer.get_image_position(IMG.fight_image[14])
         self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
-        self.result = self.timer.wait_images(IMG.fight_result, timeout=5)
-        if (self.timer.image_exist(IMG.fight_result['SS'], need_screen_shot=False)):
+        self.result = timer.wait_images(IMG.fight_result, timeout=5)
+        self.ship_stats = detect_ship_stats(timer, 'sumup', ship_stats)
+        if (timer.image_exist(IMG.fight_result['SS'], need_screen_shot=False)):
             self.result = 'SS'
         if self.result is None:
-            self.timer.log_screen()
-            self.timer.logger.warning("can't identify fight result, screen logged")
-            # raise ImageNotFoundErr("can't identify fight result")
-        return self
-
-    # TODO：获得经验
-    def detect_experiences(self):
-        pass
-
-
-class FightResultInfo():
-    def __init__(self, fight_result:FightResult) -> None:
-        self.mvp = fight_result.mvp
-        self.experiences = fight_result.experiences
-        self.result = fight_result.result
+            timer.log_screen()
+            timer.logger.warning("can't identify fight result, screen logged")
     
     def __str__(self):
-        return "mvp:{mvp},result:{result}".format(mvp=str(self.mvp), result=str(self.result))
-
+        return f"MVP 为 {self.mvp} 号位, 战果为 {self.result}"
+    
     def __lt__(self, other):    # <
         order = ["D", "C", "B", "A", "S", "SS"]
-        if (isinstance(other, FightResult)):
+        if (isinstance(other, FightResultInfo)):
             other = other.result
 
         order.index(self.result) < order.index(other)
 
     def __le__(self, other):    # <=
         order = ["D", "C", "B", "A", "S", "SS"]
-        if (isinstance(other, FightResult)):
+        if (isinstance(other, FightResultInfo)):
             other = other.result
 
         order.index(self.result) <= order.index(other)
@@ -108,6 +91,86 @@ class FightResultInfo():
         return not (self < other)
 
 
+class FightEvent():
+    """战斗事件类
+    事件列表: 战况选择, 获取资源, 索敌成功, 迂回, 阵型选择, 进入战斗, 是否夜战, 战斗结算, 获取舰船, 继续前进, 自动回港
+    
+    状态: 一个字典, 一共三种键值
+        position: 位置, 所有事件均存在
+        
+        ship_stats: 我方舰船状态(仅在 "继续前进" 事件存在)
+        
+        enemys: 敌方舰船(仅在 "索敌成功" 事件存在), 字典或 "索敌失败"
+        
+        info: 其它额外信息(仅在 "自动回港" 事件存在)
+    
+    动作: 一个字符串
+        "继续": 获取资源, 迂回, 战斗结算, 获取舰船, 自动回港等不需要决策的操作
+        
+        数字字符串: 战况选择的决策
+        
+        "SL"/数字字符串: 阵型选择的决策
+        
+        "继续"/ "SL": 进入战斗后的决策
+        
+        "战斗"/"撤退"/"迂回": 索敌成功的决策
+        
+        "追击"/"撤退": 夜战的决策
+        
+        "回港/前进": 是否前进的选择(战斗结算完毕后)
+    
+    结果: 一个字符串
+        "无": 战况选择, 获取资源, 索敌成功, 阵型选择, 进入战斗, 是否夜战, 继续前进, 自动回港, 
+        
+        (FightResultInfo): 表示战果信息, 战果结算
+        
+        舰船名: 获取舰船
+    """
+
+    def __init__(self, event, stats, action="继续", result="无"):
+        self.event = event
+        self.stats = stats
+        self.action = action
+        self.result = result
+    
+    def __str__(self) -> str:
+        return f"事件:{self.event}, 状态:{self.stats}, 动作:{self.action}, 结果:{str(self.result)}"
+    
+    def __repr__(self) -> str:
+        return f"FightEvent({self.event}, {self.stats}, {self.action}, {self.result})"
+
+
+class FightHistory():
+    """记录并处理战斗历史信息
+    """
+    events = []
+    def __init__(self) -> None:
+        pass
+    
+    def add_event(self, event, point, action="继续", result="无"):
+        self.events.append(FightEvent(event, point, action, result))
+    
+    def reset(self):
+        self.events = []
+    
+    def get_fight_results(self):
+        results_dict = {}
+        results_list = []
+        for event in self.events:
+            if event.event == "战果结算":
+                if event.stats["position"].isalpha():
+                    results_dict[event.stats["position"]] = event.result
+                else:
+                    results_list.append(event.result)
+        return results_list if len(results_list) else results_dict
+    
+    def get_last_point(self):
+        return self.events[-1].stats["position"]
+    
+    def __str__(self) -> str:
+        return "".join(str(event) + "\n" for event in self.events)
+        
+    
 class FightInfo(ABC):
     """ 存储战斗中需要用到的所有状态信息, 以及更新逻辑 """
 
@@ -122,7 +185,11 @@ class FightInfo(ABC):
         self.last_state = ""
         self.last_action = ""
         self.state = ""
-        self.fight_result = FightResult(self.timer)  # 战斗结果记录
+        self.enemys = {} # 敌方舰船列表
+        self.ship_stats = [] # 我方舰船血量列表
+        self.oil = 10 # 我方剩余油量
+        self.ammo = 10 # 我方剩余弹药量
+        self.fight_history = FightHistory()  # 战斗结果记录
 
     def update_state(self):
 
@@ -173,82 +240,33 @@ class FightInfo(ABC):
             self.logger.log_image(image, f"match_{str(time.time())}.PNG")
         raise ImageNotFoundErr()
 
+    def _before_match(self):
+        """ 每一轮尝试匹配状态前执行的操作 """
+        pass
+
+    def _after_match(self):
+        """ 匹配到状态后执行的操作 """
+        if self.state == "spot_enemy_success":
+            self.enemys = get_enemy_condition(self.timer, 'fight')
+        if self.state == 'result':
+            result = FightResultInfo(self.timer, self.ship_stats)
+            self.ship_stats = result.ship_stats
+            self.fight_history.add_event("战果结算", {"position":self.node if "node" in self.__dict__ else f'此类战斗({type(self)})不支持节点信息'}, result=result)
+
     @abstractmethod
     def reset(self):
         """ 需要记录与初始化的战斗信息 """
         pass
 
-    @abstractmethod
-    def _before_match(self):
-        """ 每一轮尝试匹配状态前执行的操作 """
-        pass
-
-    @abstractmethod
-    def _after_match(self):
-        """ 匹配到状态后执行的操作 """
-        pass
-
-
-class StageRecorder():
-    def __str__(self):
-        return f"(stage:{self.stage_name},action:{self.action_name},point:{self.point},info:" + str(self.info) + ")"
-
-    def __init__(self, Info: FightInfo, timer: Timer, no_action=False):
-        self.stage_name = str(Info.state)
-        self.action_name = 'None' if no_action else str(Info.last_action)
-        self.point = Info.node
-        self.info = "no info"
-        if self.stage_name == 'spot_enemy_success' and self.action_name == 'retreat':
-            self.info = remove_0_value_from_dict(timer.enemy_type_count)
-        if self.stage_name == 'fight_period':
-            self.info = remove_0_value_from_dict(timer.enemy_type_count)
-        if self.stage_name == "result":
-            self.info = FightResultInfo(Info.fight_result)
-        if self.stage_name == 'proceed':
-            self.info = timer.ship_stats
-
-
-class FightRecorder():
-    def __init__(self):
-        self.sr = []
-
-    def reset(self):
-        self.sr = []
-
-    def add_stage(self, stage, action, timer: Timer):
-        self.append(StageRecorder(stage, action, timer))
-
-    def append(self, stage: StageRecorder):
-        self.sr.append(stage)
-
-    def get_fight_infos(self, stage):
-        return [x.info for x in self.sr if x.stage_name == stage]
-
-    @property
-    def fight_results(self):
-        return self.get_fight_infos("result")
-
-    @property
-    def enemies(self):
-        return self.get_fight_infos("fight_period")
-
-    @property
-    def last_stage(self):
-        return None if len(self.sr) == 0 else self.sr[-1]
-
-    def __str__(self):
-        res = "".join(str(x) + "\n" for x in self.sr)
-        return res
-
 
 class FightPlan(ABC):
+    
     def __init__(self, timer: Timer):
         # 把 timer 引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
         self.config = timer.config
         self.logger = timer.logger
-
-        self.fight_recorder = FightRecorder()
+        self.fight_logs = []
 
     def fight(self):
         self.Info.reset()  # 初始化战斗信息
@@ -257,20 +275,26 @@ class FightPlan(ABC):
             if ret == literals.FIGHT_CONTINUE_FLAG:
                 continue
             elif ret == "need SL":
-                self.SL()
+                self._SL()
                 return "SL"
             elif ret == literals.FIGHT_END_FLAG:
                 self.timer.set_page(self.Info.end_page)
+                self.fight_logs.append(self.Info.fight_history)
                 return 'success'
-
 
     def run_for_times(self, times, gap=1800):
         """多次执行同一任务, 自动进行远征操作
         Args:
             times (int): 任务执行总次数
+            
             gap (int): 强制远征检查的间隔时间
         Raise:
             RuntimeError: 战斗进行时出现错误
+        Returns:
+            str:
+                "OK": 任务正常结束
+                
+                "dock is full" 因为船坞已满并且没有设置解装因此退出任务
         """
         assert (times >= 1)
         expedition = Expedition(self.timer)
@@ -279,15 +303,18 @@ class FightPlan(ABC):
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
                 last_flag = False
+            elif self.timer.now_page.name == "map_page":
+                expedition.run(False)
+                self.timer.goto_game_page("map_page")
             
             fight_flag = self.run(last_flag)
             last_flag = fight_flag != 'SL'
             
             if fight_flag not in ["SL", "success"]:
+                if fight_flag == "dock is full":
+                    return "dock is full"
                 raise RuntimeError(f"战斗进行时出现异常, 信息为 {fight_flag}")
-            
-            if expedition.run(False):
-                last_flag = True
+        return "OK"
 
     def run(self, same_work=False):
         """ 主函数，负责一次完整的战斗. 
@@ -296,14 +323,17 @@ class FightPlan(ABC):
         Returns:
             str: 
                 'dock is full': 船坞已满并且没有设置自动解装
+                
                 'fight end': 战斗结束标志, 一般不返回这个, 和 success 相同
+                
                 'out of times': 战斗超时
+                
                 'SL': 进行了 SL 操作
+                
                 'success': 战斗流程正常结束(到达了某个结束点或者选择了回港)
       
         """
         # 战斗前逻辑
-        self.fight_recorder.reset()
         ret = self._enter_fight(same_work)
         
         if ret == literals.OPERATION_SUCCESS_FLAG:
@@ -330,13 +360,22 @@ class FightPlan(ABC):
         return self.fight()
 
     def run_for_times_condition(self, times, last_point, result='S', insist_time=900):
-        """有战果要求的多次运行
-        :使用前务必检查参数是否有误, 防止死循环
-        :Args
-            times : 次数
+        """有战果要求的多次运行, 使用前务必检查参数是否有误, 防止死循环
+        
+        Args:
+            times: 次数
+            
             last_point: 最后一个点
+            
             result: 战果要求
+            
             insist_time: 如果大于这个时间工作量未减少则退出工作
+        
+        Returns:
+            str:
+                "OK": 任务顺利结束
+                
+                "dock is full": 因为船坞已满并且不允许解装所以停止
         """
         if not isinstance(result, str) or not isinstance(last_point, str):
             raise TypeError(f"last_point, result must be str,but is {type(last_point)}, {type(result)}")
@@ -347,17 +386,22 @@ class FightPlan(ABC):
         import time
         start_time, run = time.time(), False
         while times:
-            self.run(run)
-            run = True
-            if last_point != self.Info.node or self.fight_recorder.fight_results[-1] < result:
+            ret = self.run(run)
+            run = ret != 'SL'
+            if run == "dock is full":
+                return run
+            
+            self.logger.info("战斗信息:\n" + str(self.Info.fight_history))
+            fight_results = sorted(self.Info.fight_history.get_fight_results().items())
+            finish = len(fight_results) and fight_results[-1][0] == last_point and fight_results[-1][1] >= result
+            if not finish:
+                self.timer.logger.info("不满足预设条件, 此次战斗不计入次数")
                 if time.time() - start_time > insist_time:
                     return False
-                continue
-            self.timer.logger.info(f"over, last_point:{self.Info.node}, result:{self.fight_recorder.fight_results[-1].result}")
-            start_time = time.time()
-            times -= 1
-            self.timer.logger.info(f"one fight finished, rest:{times}")
-        return True
+            else:
+                start_time, times = time.time(), times - 1
+                self.timer.logger.info(f"完成了一次满足预设条件的战斗, 剩余战斗次数:{times}")
+        return "OK"
 
     def update_state(self):
         try:
@@ -389,7 +433,7 @@ class FightPlan(ABC):
         pass
 
     # =============== 战斗中通用的操作 ===============
-    def SL(self):
+    def _SL(self):
         self.timer.restart()
         self.timer.go_main_page()
         self.timer.set_page('main_page')
@@ -409,7 +453,7 @@ class DecisionBlock():
         self.set_formation_by_rule = False
         self.formation_by_rule = 0
 
-    def check_rules(self):
+    def _check_rules(self, enemys:dict):
         for rule in self.enemy_rules:
             condition, act = rule
             rcondition = ""
@@ -418,7 +462,7 @@ class DecisionBlock():
                 if ord(ch) > ord("Z") or ord(ch) < ord("A"):
                     if last != i:
                         if condition[last:i] in ALL_SHIP_TYPES:
-                            rcondition += f"self.timer.enemy_type_count.get('{condition[last:i]}', 0)"
+                            rcondition += f"enemys.get('{condition[last:i]}', 0)"
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch
@@ -429,28 +473,32 @@ class DecisionBlock():
             if eval(rcondition):
                 return act
 
-    def make_decision(self, state, last_state, last_action, _action=None):
+    def make_decision(self, state, last_state, last_action, Info:FightInfo):
         # sourcery skip: extract-method
+        """单个节点的决策
         """
-        Args:
-            _action: 用于强行指定夜战和阵型参数. Defaults to None.
-        """
+        enemys = Info.enemys
         if state in ["fight_period", "night_fight_period"]:
             if (self.SL_when_enter_fight == True):
+                Info.fight_history.add_event("进入战斗", {"position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, "SL")
                 return None, "need SL"
             return None, literals.FIGHT_CONTINUE_FLAG
+        
         elif state == "spot_enemy_success":
-            retreat = self.supply_ship_mode == 1 and self.timer.enemy_type_count[SAP] == 0  # 功能：遇到补给舰则战斗，否则撤退
+            retreat = self.supply_ship_mode == 1 and enemys[SAP] == 0  # 功能: 遇到补给舰则战斗，否则撤退
             can_detour = self.timer.image_exist(IMG.fight_image[13])  # 判断该点是否可以迂回
-            detour = can_detour and self.detour  # 由Node指定是否要迂回
+            detour = can_detour and self.detour  # 由 Node 指定是否要迂回
 
-            # 功能，根据敌方阵容进行选择
-            act = self.check_rules()
+            # 功能, 根据敌方阵容进行选择
+            act = self._check_rules(enemys=enemys)
 
             if act == "retreat":
                 retreat = True
             elif act == "detour":
-                assert can_detour, "该点无法迂回，但是规则中指定了迂回"
+                try:
+                    assert can_detour, "该点无法迂回, 但是规则中指定了迂回"
+                except AssertionError:
+                    raise ValueError("该点无法迂回, 但在规则中指定了迂回")
                 detour = True
             elif isinstance(act, int):
                 self.set_formation_by_rule = True
@@ -458,45 +506,49 @@ class DecisionBlock():
 
             if retreat:
                 self.timer.Android.click(677, 492, delay=0.2)
+                Info.fight_history.add_event("索敌成功",{"position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, "撤退")
                 return "retreat", literals.FIGHT_END_FLAG
             elif detour:
                 self.timer.Android.click(540, 500, delay=0.2)
+                Info.fight_history.add_event("索敌成功",{"position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, "迂回")
                 return "detour", literals.FIGHT_CONTINUE_FLAG
 
+            Info.fight_history.add_event("索敌成功",{"position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, "战斗")
             self.timer.Android.click(855, 501, delay=0.2)
             # self.timer.Android.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
             return "fight", literals.FIGHT_CONTINUE_FLAG
         elif state == "formation":
             spot_enemy = last_state == "spot_enemy_success"
             value = self.formation
-            if (_action is not None):
-                value = _action
             if spot_enemy:
                 if self.SL_when_detour_fails and last_action == "detour":
+                    Info.fight_history.add_event("迂回", {"position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, result="失败")
+                    Info.fight_history.add_event("阵型选择", {"enemys": enemys, "position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, action="SL")
                     return None, "need SL"
 
                 if self.set_formation_by_rule:
                     self.logger.debug("set formation by rule:", self.formation_by_rule)
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
-
             else:
                 if self.SL_when_spot_enemy_fails:
+                    Info.fight_history.add_event("阵型选择", {"enemys": "索敌失败", "position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, action="SL")
                     return None, "need SL"
                 if self.formation_when_spot_enemy_fails != False:
                     value = self.formation_when_spot_enemy_fails
+            Info.fight_history.add_event("阵型选择", {"enemys":enemys if last_state == "spot_enemy_success" else "索敌失败", "position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, action=value)
             self.timer.Android.click(573, value * 100 - 20, delay=2)
             return value, literals.FIGHT_CONTINUE_FLAG
         elif state == "night":
             is_night = self.night
-            if (_action is not None):
-                is_night = _action
+            Info.fight_history.add_event("是否夜战", {"position":Info.node if 'node' in Info.__dict__ else f'此类战斗({type(Info)})不包含节点信息'}, action="追击" if is_night else "撤退")
             if is_night:
                 self.timer.Android.click(325, 350)
                 return "yes", literals.FIGHT_CONTINUE_FLAG
             else:
                 self.timer.Android.click(615, 350)
                 return "no", literals.FIGHT_CONTINUE_FLAG
+            
         elif state == "result":
             time.sleep(1.5)
             self.timer.Android.click(900, 500, 2, 0.16)
@@ -511,7 +563,7 @@ class DecisionBlock():
 
 class IndependentFightPlan(FightPlan):
     def __init__(self, timer: Timer, end_image, plan_path=None, default_path='plans/default.yaml', *args, **kwargs):
-        """创建一个独立战斗模块,处理从形如战役点击出征到收获舰船(或战果结算)的整个过程
+        """创建一个独立战斗模块, 处理从形如战役点击出征到收获舰船(或战果结算)的整个过程
         Args:
             end_image (MyTemplate): 整个战斗流程结束后的图片
         """
@@ -532,7 +584,7 @@ class IndependentFightPlan(FightPlan):
             return literals.FIGHT_END_FLAG
 
         # 进行通用NodeLevel决策
-        action, fight_stage = self.decision_block.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action)
+        action, fight_stage = self.decision_block.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action, self.Info)
         self.Info.last_action = action
         return fight_stage
 
@@ -553,7 +605,7 @@ class IndependentFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["night_fight_period"],
-                "no": [["result", 5]],
+                "no": [["result", 15]],
             },
             "night_fight_period": ["result"],
             "result": ["battle_page"],    # 两页战果

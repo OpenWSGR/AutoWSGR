@@ -14,8 +14,10 @@ script_end = 0
 
 
 def start_script(settings_path=None):
-    """启动脚本,返回一个 Timer 记录器
-
+    """启动脚本, 返回一个 Timer 记录器.
+    :如果模拟器没有运行, 会尝试启动模拟器, 
+    :如果游戏没有运行, 会自动启动游戏,
+    :如果游戏在后台, 会将游戏转到前台
     Returns:
         Timer: 该模拟器的记录器
     """

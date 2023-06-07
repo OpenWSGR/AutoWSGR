@@ -6,7 +6,7 @@ from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.fight.battle import BattleInfo, BattlePlan
 from AutoWSGR.fight.common import start_march
 from AutoWSGR.fight.normal_fight import NormalFightInfo, NormalFightPlan
-from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
+from AutoWSGR.game.game_operation import MoveTeam, quick_repair, detect_ship_stats
 from AutoWSGR.utils.math_functions import CalcDis
 
 from AutoWSGR.fight.event.event import PatrollingEvent
@@ -67,7 +67,8 @@ class EventFightPlan20220928_2(PatrollingEvent, BattlePlan):
         self.timer.Android.click(900, 500)
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
         MoveTeam(self.timer, self.fleet_id)
-        QuickRepair(self.timer, self.repair_mode)
+        self.Info.ship_stats = detect_ship_stats(self.timer)
+        quick_repair(self.timer, self.repair_mode, self.Info.ship_stats)
         return start_march(self.timer)
     
 class EventFightInfo20220928_2(PatrollingEvent, BattleInfo):

@@ -6,7 +6,7 @@ from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.fight.battle import BattleInfo, BattlePlan
 from AutoWSGR.fight.common import start_march
 from AutoWSGR.fight.normal_fight import NormalFightInfo, NormalFightPlan
-from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
+from AutoWSGR.game.game_operation import MoveTeam, quick_repair, detect_ship_stats
 from AutoWSGR.utils.math_functions import CalcDis
 
 from AutoWSGR.fight.event.event import PatrollingEvent
@@ -28,8 +28,8 @@ class EventFightPlan20230117(PatrollingEvent, NormalFightPlan):
         self.Info = EventFightInfo20230117(self.timer, self.chapter, self.map)
         self.Info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
      
-    def change_fight_map(self, chapter_id, map_id):
-        """对 normal_fight 的 change_fight_map 的重写
+    def _change_fight_map(self, chapter_id, map_id):
+        """对 normal_fight 的 _change_fight_map 的重写
         """
         self.enter_map(chapter_id, map_id)
         while(self.timer.image_exist(self.common_image['little_monster']) == False): # 找到小怪物图标,点击下方进入主力决战
@@ -73,7 +73,8 @@ class EventFightPlan20230117_2(PatrollingEvent, BattlePlan):
         self.timer.Android.click(900, 500)
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
         MoveTeam(self.timer, self.fleet_id)
-        QuickRepair(self.timer, self.repair_mode)
+        self.Info.ship_stats = detect_ship_stats(self.timer)
+        quick_repair(self.timer, self.repair_mode, self.Info.ship_stats)
         return start_march(self.timer)
     
     

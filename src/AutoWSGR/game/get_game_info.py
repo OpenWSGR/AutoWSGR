@@ -69,19 +69,22 @@ class Resources():
         return self.resources.get(name)
 
 
-def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
-    """获取敌方舰船类型数据并更新到 timer.enemy_type_count
-    timer.enemy_type_count 为一个记录了敌方情况的字典
-    使用了一个 C++ 写的识别程序叫 source.exe 在 .\\Data\\Tunnel\\ 下
-    具体实现不介绍,当黑箱使用
+def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
+    """获取敌方舰船类型数据并返回一个字典, 具体图像识别为黑箱, 采用 C++ 实现
 
     Args:
         type (str, optional): 描述情景. Defaults to 'exercise'.
-            values:
-                'exercise': 演习点击挑战后的一横排舰船
-                'fight': 索敌成功后的两列三行
+            'exercise': 演习点击挑战后的一横排舰船
+            
+            'fight': 索敌成功后的两列三行
+    
+    Returs:
+        dict: {[SHIP_TYPE]:[SHIP_AMOUNT]}
+
+        example return: {"CV":1, "BB":3, "DD": 2}
     """
-    timer.enemy_type_count = {CV: 0, BB: 0, SS: 0, BC: 0, NAP: 0, DD: 0, ASDG: 0, AADG: 0, CL: 0, CA: 0, CLT: 0, CVL: 0, NO: 0, "all": 0, CAV: 0, AV: 0, BM: 0, SAP: 0, BG: 0, CBG: 0, SC: 0, BBV: 0, 'AP': 0}
+    
+    enemy_type_count = {CV: 0, BB: 0, SS: 0, BC: 0, NAP: 0, DD: 0, ASDG: 0, AADG: 0, CL: 0, CA: 0, CLT: 0, CVL: 0, NO: 0, "all": 0, CAV: 0, AV: 0, BM: 0, SAP: 0, BG: 0, CBG: 0, SC: 0, BBV: 0, 'AP': 0}
 
     if (type == 'exercise'):
         type = 0
@@ -90,69 +93,55 @@ def GetEnemyCondition(timer: Timer, type='exercise', *args, **kwargs):
 
     if (timer.image_exist(IMG.fight_image[12])):
         # 特殊补给舰
-        timer.enemy_type_count[SAP] = 1
+        enemy_type_count[SAP] = 1
 
+    # 处理图像并将参数传递给识别图像的程序
     img = PIM.fromarray(timer.screen).convert("L")
     img = img.resize((960, 540))
-
     input_path = os.path.join(TUNNEL_ROOT, "args.in")
     output_path = os.path.join(TUNNEL_ROOT, "res.out")
-
     delete_file(output_path)
     args = "recognize\n6\n"
-
     for i, area in enumerate(TYPE_SCAN_AREA[type]):
         arr = np.array(img.crop(area))
         args += matrix_to_str(arr)
-    
     with open(input_path, 'w') as f:
         f.write(args)
-        
     recognize_enemy_exe = os.path.join(TUNNEL_ROOT, "recognize_enemy.exe")
     subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
+    
+    # 获取并解析结果
     res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()
-    timer.enemy_type_count["ALL"] = 0
+    enemy_type_count["ALL"] = 0
     for i, x in enumerate(res):
-        timer.enemy_ship_type[i]=x
-        timer.enemy_type_count[x] += 1
+        enemy_type_count[x] += 1
         if (x != NO):
-            timer.enemy_type_count["ALL"] += 1
+            enemy_type_count["ALL"] += 1
+    enemy_type_count[NAP] = enemy_type_count['AP'] - enemy_type_count[SAP]
+    count = {}
+    for key, value in enemy_type_count.items():
+        if value:
+            count[key] = value
+    timer.logger.debug("enemys:" + str(count))
+    return count
 
-    timer.enemy_type_count[NAP] = timer.enemy_type_count['AP'] - timer.enemy_type_count[SAP]
 
-    if (timer.config.DEBUG):
-        for key, value in timer.enemy_type_count.items():
-            if (value != 0 and key != 'AP'):
-                print(key, ':', value, end=',')
-        print("")
-
-
-def DetectShipStats(timer: Timer, type='prepare'):
-    """检查我方舰船的血量状况(精确到红血黄血绿血)并更新到 timer.ship_stats
-
-    timer.ship_stats:一个表示舰船血量状态的列表,从 1 开始编号.
-
-        For Example:
-        [-1, 0, 0, 1, 1, 2, 2] 表示 1,2 号位绿血,3,4 号位中破,5,6 号位大破
-
-        values:
-            -1:不存在该舰船
-            0:绿血
-            1:中破
-            2:大破
-
+def detect_ship_stats(timer: Timer, type='prepare', previous=None):
+    """检查我方舰船的血量状况(精确到红血黄血绿血)并返回
+    
     Args:
-        type (str, optional): 描述在哪个界面检查. Defaults to 'prepare'.
-            values:
-                'prepare': 战斗准备界面
-                'sumup': 单场战斗结算界面
+        type (str, optional): 描述在哪个界面检查. .
+            'prepare': 战斗准备界面
+            
+            'sumup': 单场战斗结算界面
+    Returns:
+        list: 表示血量状态
+        
+        example: [-1, 0, 0, 1, 1, 2, -1] 表示 1-2 号位绿血 3-4 号位中破, 5 号位大破, 6 号位不存在
 
     """
-    """ToDo:
-    血量检测精确到是否满血和是否触发中破保护
-    血量检测精确到数值, 相对误差少于 3%
-    """
-
+    # Todo: 检测是否满血/触发中保, 精确到数值的检测, 战斗结算时检测不依赖先前信息
+    
     timer.update_screen()
     result = [-1, 0, 0, 0, 0, 0, 0]
     for i in range(1, 7):
@@ -160,39 +149,38 @@ def DetectShipStats(timer: Timer, type='prepare'):
             pixel = timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
             result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[0])
             if result[i] in [3, 2]:
-                result[i]=2
+                result[i] = 2
             elif result[i] == 0:
-                result[i]=0
+                result[i] = 0
             elif result[i] == 4:
-                result[i]=-1
+                result[i] = -1
             else:
-                result[i]=1
+                result[i] = 1
         elif type == 'sumup':
-            if timer.ship_stats[i] == -1:
-                result[i]=-1
+            if previous and previous[i] == -1:
+                result[i] = -1
                 continue
-            pixel=timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
+            pixel = timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
             result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[1])
-    timer.ship_stats = result
-    if timer.config.DEBUG:
-        timer.logger.debug(type + ":ship_stats =" + str(result))
+            if result[i] == 4:
+                result[i] = -1
     return result
 
 
-def DetectShipType(timer: Timer):
+def detect_ship_type(timer: Timer):
     """ToDo
     在出征准备界面读取我方所有舰船类型并返回该列表
     """
 
 
 def get_exercise_stats(timer: Timer, robot=None):
-    """检查演习界面,第 position 个位置,是否为可挑战状态,强制要求屏幕中只有四个目标
+    """检查演习界面, 第 position 个位置,是否为可挑战状态, 强制要求屏幕中只有四个目标
 
     Args:
-        position (_type_): 编号从屏幕中的位置编起,如果滑动显示了第 2-5 个敌人,那么第二个敌人编号为 1
+        position (_type_): 编号从屏幕中的位置编起, 如果滑动显示了第 2-5 个敌人, 那么第二个敌人编号为 1
 
     Returns:
-        bool: 如果可挑战,返回 True ,否则为 False,1-based
+        bool: 如果可挑战, 返回 True , 否则为 False, 1-index
     """
     timer.update_screen()
     up=timer.check_pixel((933, 59), (177, 171, 176), distance=60)
@@ -226,7 +214,7 @@ def get_exercise_stats(timer: Timer, robot=None):
         return result
 
 
-def CheckSupportStats(timer: Timer):
+def check_support_stats(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 
     Returns:

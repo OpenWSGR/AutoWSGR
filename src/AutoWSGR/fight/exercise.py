@@ -3,8 +3,8 @@ import os
 
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import MoveTeam
-from AutoWSGR.game.get_game_info import (DetectShipStats, GetEnemyCondition,
+from AutoWSGR.game.game_operation import MoveTeam, quick_repair, detect_ship_stats
+from AutoWSGR.game.get_game_info import (get_enemy_condition,
                                          get_exercise_stats)
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 
@@ -18,13 +18,13 @@ from AutoWSGR.constants import literals
 
 class ExerciseDecisionBlock(DecisionBlock):
 
-    def make_decision(self, state, last_state, last_action):
+    def make_decision(self, state, last_state, last_action, Info:FightInfo):
         if state == "rival_info":
             max_times = self.max_refresh_times
             self.formation_chosen = self.formation
             while max_times >= 0:
-                GetEnemyCondition(self.timer)
-                act = self.check_rules()
+                Info.enemys = get_enemy_condition(self.timer)
+                act = self._check_rules(Info.enemys)
                 if act == "refresh":
                     if max_times > 0:
                         max_times -= 1
@@ -45,8 +45,10 @@ class ExerciseDecisionBlock(DecisionBlock):
 
         elif state == "fight_prepare_page":
             MoveTeam(self.timer, self.fleet_id)
+            Info.ship_stats = detect_ship_stats(self.timer)
+            quick_repair(self.timer, ship_stats=Info.ship_stats)
             if start_march(self.timer) != literals.OPERATION_SUCCESS_FLAG:
-                return self.make_decision(state, last_state, last_action)
+                return self.make_decision(state, last_state, last_action, Info)
             return None, literals.FIGHT_CONTINUE_FLAG
 
         elif state == "spot_enemy_success":
@@ -57,7 +59,7 @@ class ExerciseDecisionBlock(DecisionBlock):
             self.timer.Android.click(573, self.formation_chosen * 100 - 20, delay=2)
             return None, literals.FIGHT_CONTINUE_FLAG
 
-        return super().make_decision(state, last_state, last_action)
+        return super().make_decision(state, last_state, last_action, Info)
 
 
 class NormalExerciseInfo(FightInfo):
@@ -80,7 +82,7 @@ class NormalExerciseInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["night_fight_period"],
-                "no": [["result", 10]],
+                "no": [["result", 15]],
             },
             "night_fight_period": ["result"],
             "result": ["exercise_page"],    # 两页战果
@@ -103,6 +105,7 @@ class NormalExerciseInfo(FightInfo):
         }
 
     def reset(self):
+        self.fight_history.reset()
         self.state = "rival_info"  # 初始状态等同于 "rival_info" 选择 'discard'
         self.last_action = 'discard'
         # TODO: 舰船信息，暂时不用
@@ -116,10 +119,6 @@ class NormalExerciseInfo(FightInfo):
 
         self.timer.update_screen()
 
-    def _after_match(self):
-        if self.state == "result":
-            DetectShipStats(self.timer, 'sumup')
-            self.fight_result.detect_result()
 
     @property
     def node(self):
@@ -162,7 +161,7 @@ class NormalExercisePlan(FightPlan):
         """
         if (same_work == False):
             self.timer.goto_game_page('exercise_page')
-
+        
         self._exercise_times = self.exercise_times
         self.exercise_stats = [None, None]
         return literals.OPERATION_SUCCESS_FLAG
@@ -190,6 +189,6 @@ class NormalExercisePlan(FightPlan):
                 return literals.FIGHT_END_FLAG
 
         # 进行通用NodeLevel决策
-        action, fight_stage = self.nodes[self.rival].make_decision(state, self.Info.last_state, self.Info.last_action)
+        action, fight_stage = self.nodes[self.rival].make_decision(state, self.Info.last_state, self.Info.last_action, self.Info)
         self.Info.last_action = action
         return fight_stage

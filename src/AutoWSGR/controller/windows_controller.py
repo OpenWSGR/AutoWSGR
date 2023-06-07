@@ -2,10 +2,11 @@ import os
 import shutil
 import time
 import subprocess
+import airtest.core.android.android
 
 from subprocess import check_output
 
-from airtest.core.api import auto_setup
+from airtest.core.api import connect_device
 from AutoWSGR.constants.custom_exceptions import CriticalErr
 from AutoWSGR.constants.data_roots import ADB_ROOT
 from AutoWSGR.utils.function_wrapper import try_for_times
@@ -19,6 +20,7 @@ class WindowsController:
         self.logger = logger
 
         self.emulator = config["type"]  # 模拟器类型
+        self.emulator_name = config["emulator_name"]
         self.start_cmd = config["start_cmd"]  # 模拟器启动命令
         if self.emulator == "蓝叠 Hyper-V":
             assert config["config_file"], "Bluestacks 需要提供配置文件"
@@ -47,41 +49,19 @@ class WindowsController:
         return False
 
     # ======================== 模拟器 ========================
-    def GetAndroidInfo(self):
-        """还没写好"""
-        """返回所有在线设备的编号
-
-        Returns:
-            list:一个包含所有设备信息的列表
-        """
-        info = os.popen(f"{ADB_ROOT}/adb.exe devices -l")
-        time.sleep(1)
-        info = os.popen(f"{ADB_ROOT}/adb.exe devices -l")
-        res = []
-        get = 0
-        for x in info:
-            if (get == 0):
-                get = 1
-                continue
-            if (len(x.split()) == 0):
-                break
-            a = x.split()[0]
-            res.append(a)
-        self.logger.debug(f"Devices list: {res}")
-        return res
 
     # @try_for_times()
-    def connect_android(self):
+    def connect_android(self) -> airtest.core.android.android.Android:
         """连接指定安卓设备
-        Args:
+        Returns:
+            dev: airtest.
         """
         if not self.is_android_online():
             self.restart_android()
             time.sleep(15)
 
         if self.emulator == "雷电":
-            dev_name = "emulator-5554"
-            cap_method = "MINICAP"
+            dev_name = f"ANDROID:///{self.emulator_name}"
         elif self.emulator == "蓝叠 Hyper-V":
             with open(self.emulator_config_file, 'r') as f:
                 lines = f.readlines()
@@ -89,7 +69,6 @@ class WindowsController:
                 if line.startswith("bst.instance.Pie64.status.adb_port="):
                     port = line.split("=")[-1].strip()[1:-1]
                     dev_name = f"127.0.0.1:{port}"
-            cap_method = "JAVACAP"
 
         from logging import ERROR, getLogger
         getLogger("airtest").setLevel(ERROR)
@@ -97,10 +76,9 @@ class WindowsController:
         start_time = time.time()
         while time.time() - start_time <= 30:
             try:
-                auto_setup(__file__, devices=[
-                    f"android://127.0.0.1:5037/{dev_name}?cap_method={cap_method}&&ori_method=MINICAPORI&&touch_methoda"])
-                self.logger.info("Hello,I am WSGR auto commanding system")
-                return
+                dev = connect_device(dev_name)
+                self.logger.info("Android Connected!")
+                return dev
             except:
                 pass
         
@@ -110,7 +88,7 @@ class WindowsController:
     def is_android_online(self):
         """判断 timer 给定的设备是否在线
         Returns:
-            bool: 在线返回 True,否则返回 False
+            bool: 在线返回 True, 否则返回 False
         """
         raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode('gbk')  # TODO: 检查是否所有windows版本返回都是中文
         return "PID" in raw_res

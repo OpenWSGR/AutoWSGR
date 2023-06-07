@@ -2,8 +2,8 @@ import os
 
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.game.game_operation import QuickRepair, get_ship
-from AutoWSGR.game.get_game_info import DetectShipStats
+from AutoWSGR.game.game_operation import quick_repair, get_ship
+from AutoWSGR.game.get_game_info import detect_ship_stats
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
 from AutoWSGR.constants import literals
 
@@ -30,7 +30,7 @@ class BattleInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 10]],
+                "no": [["result", 15]],
             },
             "night_fight_period": ["result"],
             "result": ["battle_page"],    # 两页战果
@@ -51,6 +51,7 @@ class BattleInfo(FightInfo):
         }
 
     def reset(self):
+        self.fight_history.reset()
         self.last_state = ""
         self.last_action = ""
         self.state = "proceed"
@@ -58,20 +59,18 @@ class BattleInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed"]:
-            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
+            self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
         self.timer.update_screen()
 
     def _after_match(self):
-        if self.state == "result":
-            DetectShipStats(self.timer, 'sumup')
-            self.fight_result.detect_result()
-        elif self.state == 'get_ship':
+        if self.state == 'get_ship':
             get_ship(self.timer)
+        super()._after_match()
 
 
 class BattlePlan(FightPlan):
 
-    def __init__(self, timer, plan_path=None, decision_block=None) -> None:
+    def __init__(self, timer, plan_path=None) -> None:
         super().__init__(timer)
 
         # 加载默认配置
@@ -95,9 +94,8 @@ class BattlePlan(FightPlan):
             node_args = node_defaults
         self.node = DecisionBlock(timer, node_args)
         self.Info = BattleInfo(timer)
-        self.decision_block = decision_block
 
-    def go_fight_prepare_page(self):
+    def _go_fight_prepare_page(self):
         self.timer.goto_game_page("battle_page")
         now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
         hard = self.map > 5
@@ -106,21 +104,19 @@ class BattlePlan(FightPlan):
 
     def _enter_fight(self, same_work=False) -> str:
         if (same_work == False):
-            self.go_fight_prepare_page()
+            self._go_fight_prepare_page()
         self.timer.Android.click(180 * ((self.map - 1) % 5 + 1), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=.15)
-        QuickRepair(self.timer, self.repair_mode)
+        self.Info.ship_stats = detect_ship_stats(self.timer)
+        quick_repair(self.timer, self.repair_mode, ship_stats=self.Info.ship_stats)
         return start_march(self.timer)
 
     def _make_decision(self) -> str:
-
-        _action = None
         self.update_state()
         if self.Info.state == "battle_page":
             return literals.FIGHT_END_FLAG
-        if (self.decision_block is not None):
-            _action = self.decision_block.make_decision(self.Info.state)
-        # 进行通用NodeLevel决策
-        action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action, _action)
+        
+        # 进行通用 NodeLevel 决策
+        action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action, self.Info)
         self.Info.last_action = action
         return fight_stage

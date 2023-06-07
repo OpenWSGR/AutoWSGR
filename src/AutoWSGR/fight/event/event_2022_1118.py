@@ -5,7 +5,7 @@ from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.constants.data_roots import MAP_ROOT
 from AutoWSGR.fight.common import start_march
 from AutoWSGR.fight.normal_fight import NormalFightInfo, NormalFightPlan
-from AutoWSGR.game.game_operation import MoveTeam, QuickRepair
+from AutoWSGR.game.game_operation import MoveTeam, quick_repair
 from AutoWSGR.utils.math_functions import CalcDis
 
 from AutoWSGR.fight.event.event import Event
@@ -32,7 +32,7 @@ class EventFightPlan20221118(Event, NormalFightPlan):
         """ 选择并进入战斗地图(chapter-map) """
         self.change_difficulty(chapter_id)
     
-    def go_fight_prepare_page(self) -> None:
+    def _go_fight_prepare_page(self) -> None:
         if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
             self.timer.Android.click(*NODE_POSITION[self.map])
         self.timer.wait_image(self.event_image[1])
