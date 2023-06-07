@@ -269,6 +269,8 @@ class FightPlan(ABC):
         Args:
             times (int): 任务执行总次数
             gap (int): 强制远征检查的间隔时间
+        Raise:
+            RuntimeError: 战斗进行时出现错误
         """
         assert (times >= 1)
         expedition = Expedition(self.timer)
@@ -277,13 +279,29 @@ class FightPlan(ABC):
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
                 last_flag = False
-                
-            last_flag = self.run(last_flag) != 'SL'
+            
+            fight_flag = self.run(last_flag)
+            last_flag = fight_flag != 'SL'
+            
+            if fight_flag not in ["SL", "success"]:
+                raise RuntimeError(f"战斗进行时出现异常, 信息为 {fight_flag}")
+            
             if expedition.run(False):
                 last_flag = True
 
     def run(self, same_work=False):
-        """ 主函数，负责一次完整的战斗. """
+        """ 主函数，负责一次完整的战斗. 
+        Args:
+            same_work: 如果为 True, 则说明上一次战斗和当前执行的战斗相同并且上一次战斗正常退出, 用于简化操作流程
+        Returns:
+            str: 
+                'dock is full': 船坞已满并且没有设置自动解装
+                'fight end': 战斗结束标志, 一般不返回这个, 和 success 相同
+                'out of times': 战斗超时
+                'SL': 进行了 SL 操作
+                'success': 战斗流程正常结束(到达了某个结束点或者选择了回港)
+      
+        """
         # 战斗前逻辑
         self.fight_recorder.reset()
         ret = self._enter_fight(same_work)
@@ -293,9 +311,9 @@ class FightPlan(ABC):
         elif ret == literals.DOCK_FULL_FLAG:
             # 自动解装功能
             if self.config.dock_full_destroy:
-                self.timer.Android.relative_click(0.38-0.5, 0.565-0.5)
+                self.timer.Android.relative_click(0.38 - 0.5, 0.565 - 0.5)
                 DestroyShip(self.timer)
-                return self.run(same_work)
+                return self.run(False)
             else:
                 return ret
         elif ret == literals.FIGHT_END_FLAG:

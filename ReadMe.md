@@ -8,7 +8,7 @@
 
 ## 近期更新
 
-![image-20230226001532677](assets/image-20230226001532677.png)
+![image-20230226001532677](/.assets/GUI.png)
 - 支持开发, 建造, 用餐功能 *2023/4/26*
 - GUI上线测试，详情请见：[AutoWSGR-GUI](https://github.com/Nickydusk/AutoWSGR-GUI) - *2023/2/26*
 - 支持了当前活动 "炽热星辰行动" - *2023/1/20*

@@ -53,6 +53,7 @@ class Expedition:
                 break
         return flag
 
+
 def get_ship(timer: Timer, max_times=1):
     times = 0
     timeout = 5
@@ -135,7 +136,6 @@ def MoveTeam(timer: Timer, target, try_times=0):
 
 def SetSupport(timer: Timer, target, try_times=0):
     """启用战役支援
-
     Args:
         timer (Timer): _description_
         target (bool, int): 目标状态
@@ -161,7 +161,6 @@ def SetSupport(timer: Timer, target, try_times=0):
 
 def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
     """战斗界面的快速修理
-
     Args:
         timer (Timer): _description_
         repair_mode:
@@ -209,11 +208,9 @@ def QuickRepair(timer: Timer, repair_mode=2, *args, **kwargs):
     except AssertionError:
         raise ValueError(f"修理舰船的参数不合法, 请检查你的参数:{arg}")
 
+
 def GainBounds(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取
-
-    Args:
-        timer (Timer): _description_
     """
     timer.goto_game_page('main_page')
     if not timer.check_pixel((694, 457), bgr_color=(45, 89, 255)):
@@ -232,7 +229,6 @@ def GainBounds(timer: Timer):
 
 def RepairByBath(timer: Timer):
     """使用浴室修理修理时间最长的单位
-
     Args:
         timer (Timer): _description_
     """
@@ -257,8 +253,7 @@ def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
 
     Args:
         timer (Timer): _description_
-        ship_ids (list, optional): 补给舰船列表,可以为单个整数. Defaults to [1, 2, 3, 4, 5, 6].
-        try_times (int, optional): _description_. Defaults to 0.
+        ship_ids (list, optional): 补给舰船列表, 可以为单个整数表示单艘舰船. Defaults to [1, 2, 3, 4, 5, 6].
 
     Raises:
         ValueError: 补给失败
@@ -358,6 +353,12 @@ def get_new_things(timer: Timer, lock=0):
 
 
 def detect_resources(timer:Timer, position=None) -> list:
+    """检查四项资源余量, 实验性功能
+    Args:
+        position (int, optional): 具体哪一项资源 [0,3], 默认为空则检测四项. Defaults to None.
+    Returns:
+        list: 四个元素的列表, 分别表示油弹钢铝的余量
+    """
     screen = timer.get_screen(need_screen_shot=True)
     res = [0] * 4
     r = len(screen) / 540
