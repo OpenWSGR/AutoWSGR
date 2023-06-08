@@ -30,7 +30,7 @@ class BattleInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 15]],
+                "no": [["result", 7]],
             },
             "night_fight_period": ["result"],
             "result": ["battle_page"],    # 两页战果
@@ -47,7 +47,7 @@ class BattleInfo(FightInfo):
         }
         
         self.after_match_delay = {
-            "night":1,
+            "night":1.75,
         }
 
     def reset(self):

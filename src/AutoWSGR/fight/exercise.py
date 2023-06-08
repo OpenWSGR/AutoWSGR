@@ -82,7 +82,7 @@ class NormalExerciseInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["night_fight_period"],
-                "no": [["result", 15]],
+                "no": [["result", 7]],
             },
             "night_fight_period": ["result"],
             "result": ["exercise_page"],    # 两页战果
@@ -101,7 +101,7 @@ class NormalExerciseInfo(FightInfo):
         }
         
         self.after_match_delay = {
-            "night":1,
+            "night":1.75,
         }
 
     def reset(self):

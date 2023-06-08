@@ -402,7 +402,6 @@ class DecisiveBattle():
             self.repair()
 
     def _after_fight(self):
-        self.stats.ship_stats = self.timer.ship_stats
         self.timer.logger.info(self.stats.ship_stats)
 
     def _check_fleet(self):

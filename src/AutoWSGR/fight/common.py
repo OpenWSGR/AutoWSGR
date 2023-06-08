@@ -605,7 +605,7 @@ class IndependentFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["night_fight_period"],
-                "no": [["result", 15]],
+                "no": [["result", 7]],
             },
             "night_fight_period": ["result"],
             "result": ["battle_page"],    # 两页战果

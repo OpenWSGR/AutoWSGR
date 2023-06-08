@@ -52,7 +52,7 @@ class NormalFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 15]],
+                "no": [["result", 5]],
             },
             "result": ["proceed", "map_page", "get_ship", "flagship_severe_damage"],  # 两页战果
             "get_ship": ["proceed", "map_page", "flagship_severe_damage"],  # 捞到舰船
@@ -73,7 +73,7 @@ class NormalFightInfo(FightInfo):
         }
 
         self.after_match_delay = {
-            "night": 1,
+            "night":1.75,
             "proceed": .5
         }
 
