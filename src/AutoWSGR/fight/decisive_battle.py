@@ -471,8 +471,8 @@ class DecisiveBattlePlan(BattlePlan):
         super().__init__(timer, None)
         self.Info = DecisiveBattleInfo(timer)
         self.Info.ship_stats = ship_stats
-        self.node.config.formation = formation
-        self.node.config.night = night
+        self.node.formation = formation
+        self.node.night = night
 
     def _enter_fight(self, *args, **kwargs):
         return start_march(self.timer)
