@@ -24,6 +24,12 @@ SHOW_DECISIVE_BATTLE_INFO: False
 SHOW_OCR_INFO: False
 log_level: INFO # 调试模式 log_level 应该设置为 DEBUG
 
+
+# ========== 调试设置 ==============
+
+CHECK_PAGE: True
+
+
 # ========== 解装设置 ===========
 
 dock_full_destroy: True # 船坞已满时自动清空，若设置为false则船坞已满后终止所有常规出征任务

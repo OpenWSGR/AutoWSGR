@@ -101,8 +101,8 @@ def make_map(image_path, dict_dir):
             continue
         name = f.stem
         dict_value = SetPoints(name, cv2.imread(file))
-        dict_to_yaml(dict_value, os.path.join(dict_dir, name + '.yaml'))
-        
+        dict_to_yaml(dict_value, os.path.join(dict_dir, 'E-' + name[1:] + '.yaml'))
+        dict_to_yaml(dict_value, os.path.join(dict_dir, 'H-' + name[1:] + '.yaml'))
 
 if __name__ == "__main__":
     print("""Input operation type:
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         get_image()
     elif oper == "2":
         print("Enter image_path:")
-        image_path = input().split()[0]
+        image_path = input()
         print("Enter dict_path")
-        dict_path = input().split()[0]
+        dict_path = input()
         make_map(image_path, dict_path)

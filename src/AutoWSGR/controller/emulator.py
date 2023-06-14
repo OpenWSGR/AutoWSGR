@@ -112,7 +112,7 @@ class Emulator():
         """获取当前屏幕相对坐标 (x,y) 处的像素值
         Args:
             x (int): [0, 960)
-            y (int): [0, 549)
+            y (int): [0, 540)
         Returns:
             list[]: RGB 格式的像素值
         """
@@ -123,6 +123,16 @@ class Emulator():
         return [self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0]]
 
     def check_pixel(self, position, bgr_color, distance=30, screen_shot=False) -> bool:
+        """检查像素点是否满足要求
+        Args:
+            position (_type_): (x, y) 坐标, x 是长, 相对 960x540 的值, x \in [0, 960)
+            
+            bgr_color (_type_): 三元组, 顺序为 blue green red, 值为像素值
+            
+            distance (int, optional): 最大相差欧氏距离. Defaults to 30.
+            
+            screen_shot (bool, optional): 是否重新截图. Defaults to False.
+        """
         color = self.get_pixel(*position, screen_shot)
         color.reverse()
         return CalcDis(color, bgr_color) < distance ** 2

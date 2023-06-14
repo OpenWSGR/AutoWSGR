@@ -6,6 +6,7 @@ from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
 from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES, SAP
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
+from AutoWSGR.constants.ui import Node
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import Expedition, get_ship, DestroyShip, detect_ship_stats
 from AutoWSGR.game.get_game_info import get_enemy_condition
@@ -303,7 +304,7 @@ class FightPlan(ABC):
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
                 last_flag = False
-            elif self.timer.now_page.name == "map_page":
+            elif isinstance(self.timer.now_page, Node) and self.timer.now_page.name == "map_page":
                 expedition.run(False)
                 self.timer.goto_game_page("map_page")
             

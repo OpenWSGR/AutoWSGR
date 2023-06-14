@@ -176,7 +176,7 @@ class NormalFightPlan(FightPlan):
         # 从配置文件加载计划
         default_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, "default.yaml"))
         plan_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, plan_path))
-
+        
         # 从参数加载计划
         if fleet_id is not None:
             plan_args['fleet_id'] = fleet_id  # 舰队编号
@@ -185,7 +185,7 @@ class NormalFightPlan(FightPlan):
 
         # 检查参数完整情况
         if "fleet_id" not in plan_args:
-            self.logger.warning("fleet_id not set" + "Default arg 1 will be used")
+            self.logger.warning(f"未指定作战舰队, 默认采用第 {default_args['fleet_id']} 舰队作战")
 
         # 从默认参数加载
         plan_defaults = default_args["normal_fight_defaults"]

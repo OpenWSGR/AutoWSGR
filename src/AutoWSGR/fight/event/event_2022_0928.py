@@ -21,7 +21,7 @@ class EventFightPlan20220928(PatrollingEvent, NormalFightPlan):
         NormalFightPlan.__init__(self, timer, plan_path, fleet_id=fleet_id)
         PatrollingEvent.__init__(self, timer, event, MAP_POSITIONS)
         
-    def load_fight_info(self):
+    def _load_fight_info(self):
         self.Info = EventFightInfo20220928(self.timer, self.chapter, self.map)
         self.Info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
      
@@ -57,7 +57,7 @@ class EventFightPlan20220928_2(PatrollingEvent, BattlePlan):
         PatrollingEvent.__init__(self, timer, event, MAP_POSITIONS)
 
     def _enter_fight(self, same_work=False):
-        self.go_map_page()
+        self._go_map_page()
         self.enter_map(self.chapter, self.map)
         assert(self.timer.wait_image(self.event_image[2]) is not False)
         self.find(self.enemy_image[self.target])

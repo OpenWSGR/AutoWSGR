@@ -22,7 +22,7 @@ class EventFightPlan20230117(PatrollingEvent, NormalFightPlan):
         NormalFightPlan.__init__(self, timer, plan_path, fleet_id=fleet_id)
         PatrollingEvent.__init__(self, timer, event, MAP_POSITIONS)
         
-    def load_fight_info(self):
+    def _load_fight_info(self):
         # 地图文件位置: AutoWSGR/data/map/event/{event_name}
         # event_name 通常采用活动开始日期
         self.Info = EventFightInfo20230117(self.timer, self.chapter, self.map)
@@ -63,7 +63,7 @@ class EventFightPlan20230117_2(PatrollingEvent, BattlePlan):
         PatrollingEvent.__init__(self, timer, event, MAP_POSITIONS)
 
     def _enter_fight(self, same_work=False):
-        self.go_map_page()
+        self._go_map_page()
         self.enter_map(self.chapter, self.map)
         assert(self.timer.wait_image(self.event_image[2]) is not False)
         self.find(self.enemy_image[self.target])

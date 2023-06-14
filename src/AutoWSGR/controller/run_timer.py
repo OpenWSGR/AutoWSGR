@@ -76,9 +76,12 @@ class Timer(Emulator):
             self.set_page()
             self.logger.info(f"启动成功, 当前位置: {self.now_page.name}")
         except:
-            self.logger.warning("无法确定当前页面, 尝试重启游戏")
-            self.restart()
-            self.set_page()
+            if "CHECK_PAGE" in self.config.__dict__ and self.config.CHECK_PAGE:
+                self.logger.warning("无法确定当前页面, 尝试重启游戏")
+                self.restart()
+                self.set_page()
+            else:
+                self.logger.warning("在无法确定页面的情况下继续.")
         
         
     def log_in(self, account, password):

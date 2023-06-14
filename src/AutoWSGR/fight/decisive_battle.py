@@ -236,7 +236,7 @@ class DecisiveBattle():
                                          IMG.identify_images['fight_prepare_page'], gap=.03, after_get_delay=.2)
         return _res[res]
 
-    def go_map_page(self):
+    def _go_map_page(self):
         if (self.detect('running') == 'fight_prepare'):
             self.timer.Android.click(30, 30)
             self.timer.wait_image(IMG.decisive_battle_image[1])
@@ -358,7 +358,7 @@ class DecisiveBattle():
         return "other chapter is running" if (res == 1) else "ok"
 
     def retreat(self):
-        self.go_map_page()
+        self._go_map_page()
         self.timer.Android.click(36, 33)
         self.timer.Android.click(600, 300)
 

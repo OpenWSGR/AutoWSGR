@@ -25,7 +25,7 @@ class Event():
 
         self.common_image['monster'] = self.common_image['little_monster'] + self.common_image["big_monster"]
 
-    def go_map_page(self):
+    def _go_map_page(self):
         self.timer.go_main_page()
         self.timer.Android.click(849, 261)
 
@@ -33,7 +33,7 @@ class Event():
         """获取难度信息
         Returns:
             简单 0,困难 1
-        这里同时有检查 go_map_page 是否成功的功能
+        这里同时有检查 _go_map_page 是否成功的功能
         """
         res = self.timer.wait_images(self.common_image['hard'] + self.common_image['easy'])
         if res is None:
