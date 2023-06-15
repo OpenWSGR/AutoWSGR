@@ -48,6 +48,7 @@ class BattleInfo(FightInfo):
         
         self.after_match_delay = {
             "night":1.75,
+            "get_ship":1,
         }
 
     def reset(self):

@@ -74,14 +74,15 @@ class NormalFightInfo(FightInfo):
 
         self.after_match_delay = {
             "night":1.75,
-            "proceed": .5
+            "proceed": .5,
+            "get_ship":1,
         }
 
     def reset(self):
         self.fight_history.reset()
         self.last_state = "proceed"
         self.last_action = "yes"
-        self.state = "proceed"  # 初始状态等同于 proceed选择yes
+        self.state = "proceed"  # 初始状态等同于 proceed 选择 yes
 
     def _before_match(self):
         # 点击加速
@@ -166,6 +167,7 @@ class NormalFightPlan(FightPlan):
 
         Args:
             fleet_id: 指定舰队编号, 如果为 None 则使用计划中的参数
+            
             fleet: 舰队成员, ["", "1号位", "2号位", ...], 如果为 None 则全部不变, 为 "" 则该位置无舰船, 为 -1 则不覆盖 yaml 文件中的参数
         Raises:
             BaseException: _description_

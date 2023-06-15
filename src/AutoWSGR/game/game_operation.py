@@ -42,14 +42,9 @@ class Expedition():
             self.timer.last_expedition_check_time = time.time()
 
 def get_ship(timer: Timer, max_times=1):
-    times = 0
-    timeout = 5
-    while (timer.wait_image(IMG.symbol_image[8], timeout=timeout) and times < max_times):
-        timer.Android.click(900, 500, delay=.25)
-        timeout = 2
-        times += 1
-        if timer.ConfirmOperation(timeout=2):
-            timer.Android.click(900, 500, delay=.25)
+    timer.wait_image(IMG.symbol_image[8])
+    while timer.wait_image(IMG.symbol_image[8], timeout=0.5):
+        timer.Android.click(900, 500, delay=.25, times=2)
 
 
 def DestroyShip(timer: Timer):
