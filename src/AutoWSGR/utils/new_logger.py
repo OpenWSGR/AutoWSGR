@@ -77,7 +77,7 @@ class Logger:
 
         # File
         self.log_file_path = os.path.join(self.log_dir, "console.log")
-        ch = logging.FileHandler(self.log_file_path)
+        ch = logging.FileHandler(self.log_file_path, encoding='utf-8')
         ch.setFormatter(ch_formatter)
         logger.addHandler(ch)
 
