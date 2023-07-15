@@ -41,7 +41,7 @@ class Emulator():
     # ==========初始化函数==========
     
     def _add_extra_images(self):
-        if "EXTRA_IMAGE_ROOT" in self.config.__dict__:
+        if "EXTRA_IMAGE_ROOT" in self.config.__dict__ and self.config.EXTRA_IMAGE_ROOT is not None:
             if os.path.isdir(self.config.EXTRA_IMAGE_ROOT):
                 self.images = make_dir_templates(self.config.EXTRA_IMAGE_ROOT)
                 self.logger.info(f"Extra Images Loaded:{len(self.images)}")
