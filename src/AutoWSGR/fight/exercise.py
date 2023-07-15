@@ -30,7 +30,8 @@ class ExerciseDecisionBlock(DecisionBlock):
                         max_times -= 1
                         self.timer.Android.click(665, 400, delay=0.75)
                     else:
-                        if self.discard:
+                        if False:
+                        # if self.discard:
                             self.timer.Android.click(878, 136, delay=1)
                             return "discard", literals.FIGHT_CONTINUE_FLAG
                         else:

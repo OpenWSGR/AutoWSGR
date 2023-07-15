@@ -1,11 +1,12 @@
 import copy
 import datetime
 import time
-from typing import Iterable, Tuple
-
 import cv2
+import os
 
+from typing import Iterable, Tuple
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
+from AutoWSGR.constants.image_templates import make_dir_templates
 from AutoWSGR.utils.api_image import (MyTemplate, convert_position,
                                       locateCenterOnImage)
 from AutoWSGR.utils.math_functions import CalcDis
@@ -24,6 +25,9 @@ class Emulator():
         self.config = config
         self.logger = logger
         self.Windows = WindowsController(config.emulator, logger)
+        
+        # 获取额外图像数据
+        self._add_extra_images()
 
         # 初始化android控制器
         dev = self.Windows.connect_android()
@@ -33,6 +37,16 @@ class Emulator():
         self.config.resolution = self.config.resolution[::-1]  # 转换为 （宽x高）
         self.logger.info(f"resolution:{str(self.config.resolution)}")
 
+    
+    # ==========初始化函数==========
+    
+    def _add_extra_images(self):
+        if "EXTRA_IMAGE_ROOT" in self.config.__dict__:
+            if os.path.isdir(self.config.EXTRA_IMAGE_ROOT):
+                self.images = make_dir_templates(self.config.EXTRA_IMAGE_ROOT)
+                self.logger.info(f"Extra Images Loaded:{len(self.images)}")
+            elif self.config.EXTRA_IMAGE_ROOT is not None:
+                self.logger.warning("配置文件参数 EXTRA_IMAGE_ROOT 存在但不是合法的路径")
     
     # ===========命令函数===========
     

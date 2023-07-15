@@ -25,7 +25,7 @@ def start_march(timer: Timer, position=(900, 500)):
             time.sleep(1)
         if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
             return literals.DOCK_FULL_FLAG
-        if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0):
+        if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0, confidence=.8):
             time.sleep(1)
             return literals.BATTLE_TIMES_EXCEED
         if time.time() - start_time > 15:

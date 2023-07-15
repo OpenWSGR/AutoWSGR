@@ -40,7 +40,7 @@ class MyTemplate(Template):
 
 
 def make_dir_templates(path):
-    """ 建立path目录下所有图片的模板字典 """
+    """ 建立 path 目录下所有图片的模板字典 """
     # 不处理二级目录和非 .png 文件
     all_files = [file for file in os.listdir(path) if not (os.path.isdir(file or file.split('.')[-1].lower() != "png"))]
 
@@ -57,13 +57,15 @@ def make_dir_templates(path):
         for file in all_files:
             file_path = os.path.join(path, file)
             key_name = file.split('.')[0]
+            if key_name.isdecimal():
+                res[int(key_name)] = MyTemplate(file_path, 0.9, resolution=(960, 540))
             res[key_name] = MyTemplate(file_path, 0.9, resolution=(960, 540))
 
     return res
 
 
 def make_dir_templates_without_number(path):
-    """给定路径,返回一个字典    
+    """给定路径, 返回一个字典    
 
     字典的键为路径下所有图片的英文字母文件名(不含后缀)
 
