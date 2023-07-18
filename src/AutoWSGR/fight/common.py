@@ -486,7 +486,7 @@ class DecisionBlock():
             return None, literals.FIGHT_CONTINUE_FLAG
         
         elif state == "spot_enemy_success":
-            retreat = self.supply_ship_mode == 1 and enemys[SAP] == 0  # 功能: 遇到补给舰则战斗，否则撤退
+            retreat = self.supply_ship_mode == 1 and enemys.get(SAP, 0) == 0  # 功能: 遇到补给舰则战斗，否则撤退
             can_detour = self.timer.image_exist(IMG.fight_image[13])  # 判断该点是否可以迂回
             detour = can_detour and self.detour  # 由 Node 指定是否要迂回
 
