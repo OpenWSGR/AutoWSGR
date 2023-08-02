@@ -2,14 +2,14 @@
 #include<bits/stdc++.h>
 using namespace std;
 /*function:
-	recognize them when enemys were spotted 
+	recognize them when enemys were spotted
 */
 /*compile:
 	g++ -Wl,--stack=998244353 -std=c++17 -O3 recognize_enemy.cpp -o recognize_enemy.exe
 */
 
 struct Image{
-	//Default index start with 0 
+	//Default index start with 0
 	//For grey image
 	int n,m;
 	double Brightness;
@@ -37,7 +37,7 @@ struct Image{
 		fin>>n>>m;
 		int sum=0;
 		//Image of size n rows and m columns
-		//n * m		
+		//n * m
 		for(int i=0;i<n;i++)
 			for(int j=0;j<m;j++){
 				fin>>a[i][j];
@@ -45,13 +45,13 @@ struct Image{
 			}
 		Brightness=sum;
 		turn();
-		
+
 	}
 }Tem[100],Tar[100];
 set<string> S1,S2,S3,S4;
 char *ROOT;
 template<typename T1, typename T2>
-bool in(const T1 &Object, const T2 &Container){	
+bool in(const T1 &Object, const T2 &Container){
 	return Container.find(Object)!=Container.end();
 }
 double CalcImageSimilarity(Image a,Image b){
@@ -73,7 +73,7 @@ double CalcImageSimilarity(Image a,Image b){
 					if(!(pb1<n&&pb2<m&&pb1>=0&&pb2>=0))
 						continue;
 					now+=abs(1.0*a.a[pa1][pa2]-1.0*b.a[pb1][pb2]);
-				}	
+				}
 			res=min(res,now);
 		}
 	return res;
@@ -121,11 +121,11 @@ void recognize(ifstream &ain)
 		fout<<now.Name<<' ';
 	}
 	fout.close();
-	fin.close(); 
+	fin.close();
 }
 signed main(int argc, char** args)
 {
-	//Args given in the tunnel,file "args.in" 
+	//Args given in the tunnel,file "args.in"
 	//The exe will be put in the tunnel
 	//S1:CA,CL,CAV,CLT,CBG,BC
 	//S2:CV,CVL,AV
@@ -136,8 +136,8 @@ signed main(int argc, char** args)
 	S2.insert("CV"),S2.insert("AV"),S2.insert("CVL");
 	S3.insert("BB"),S3.insert("BC");
 	S4.insert("CL"),S4.insert("CVL");
-	
-	
+
+
 	ifstream ain(merge(ROOT, "/args.in"));
 //	cout<<merge(ROOT, "/args.in")<<endl;
 	string name;

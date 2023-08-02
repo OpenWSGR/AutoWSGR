@@ -1,8 +1,13 @@
 import os
 import re
 
-from airtest.core.cv import (MATCHING_METHODS, ST, InvalidMatchingMethodError,
-                             TargetPos, Template)
+from airtest.core.cv import (
+    MATCHING_METHODS,
+    ST,
+    InvalidMatchingMethodError,
+    TargetPos,
+    Template,
+)
 from airtest.core.settings import Settings as ST
 
 from .data_roots import IMG_ROOT
@@ -30,33 +35,55 @@ class MyTemplate(Template):
                     f"Undefined method in CVSTRATEGY: '{method}', try 'kaze'/'brisk'/'akaze'/'orb'/'surf'/'sift'/'brief' instead."
                 )
             if method in ["mstpl", "gmstpl"]:
-                ret = self._try_match(func, ori_image, screen, threshold=self.threshold, rgb=self.rgb, record_pos=self.record_pos,
-                                      resolution=self.resolution, scale_max=self.scale_max, scale_step=self.scale_step)
+                ret = self._try_match(
+                    func,
+                    ori_image,
+                    screen,
+                    threshold=self.threshold,
+                    rgb=self.rgb,
+                    record_pos=self.record_pos,
+                    resolution=self.resolution,
+                    scale_max=self.scale_max,
+                    scale_step=self.scale_step,
+                )
             else:
-                ret = self._try_match(func, image, screen, threshold=self.threshold, rgb=self.rgb)
+                ret = self._try_match(
+                    func, image, screen, threshold=self.threshold, rgb=self.rgb
+                )
             if ret:
                 break
         return ret
 
 
 def make_dir_templates(path):
-    """ 建立 path 目录下所有图片的模板字典 """
+    """建立 path 目录下所有图片的模板字典"""
     # 不处理二级目录和非 .png 文件
-    all_files = [file for file in os.listdir(path) if not (os.path.isdir(file or file.split('.')[-1].lower() != "png"))]
+    all_files = [
+        file
+        for file in os.listdir(path)
+        if not (os.path.isdir(file or file.split(".")[-1].lower() != "png"))
+    ]
 
-    if all(file.split('.')[0].isdecimal() for file in all_files):
-        res = [None, ]
+    if all(file.split(".")[0].isdecimal() for file in all_files):
+        res = [
+            None,
+        ]
         for file in all_files:
-            key = int(file.split('.')[0])
+            key = int(file.split(".")[0])
             if key >= len(res):
-                res.extend([None, ] * (key - len(res) + 1))
+                res.extend(
+                    [
+                        None,
+                    ]
+                    * (key - len(res) + 1)
+                )
             file_path = os.path.join(path, file)
             res[key] = MyTemplate(file_path, 0.9, resolution=(960, 540))
     else:
         res = {}
         for file in all_files:
             file_path = os.path.join(path, file)
-            key_name = file.split('.')[0]
+            key_name = file.split(".")[0]
             if key_name.isdecimal():
                 res[int(key_name)] = MyTemplate(file_path, 0.9, resolution=(960, 540))
             res[key_name] = MyTemplate(file_path, 0.9, resolution=(960, 540))
@@ -65,7 +92,7 @@ def make_dir_templates(path):
 
 
 def make_dir_templates_without_number(path):
-    """给定路径, 返回一个字典    
+    """给定路径, 返回一个字典
 
     字典的键为路径下所有图片的英文字母文件名(不含后缀)
 
@@ -73,19 +100,21 @@ def make_dir_templates_without_number(path):
     """
     res = {}
     for file in os.listdir(path):
-        filename = file.split('.')[0]
-        key_name = re.findall(r'[^0-9]*', filename)[0]
-        if (key_name not in res.keys()):
+        filename = file.split(".")[0]
+        key_name = re.findall(r"[^0-9]*", filename)[0]
+        if key_name not in res.keys():
             res[key_name] = []
         file_path = os.path.join(path, file)
         res[key_name].append(MyTemplate(file_path, 0.9, resolution=(960, 540)))
     return res
 
 
-class ImageSet():
+class ImageSet:
     def __init__(self):
         # identify_images 多图识别，单独处理
-        self.identify_images = make_dir_templates_without_number(f"{IMG_ROOT}/identify_images")
+        self.identify_images = make_dir_templates_without_number(
+            f"{IMG_ROOT}/identify_images"
+        )
 
         for sub_folder in os.listdir(IMG_ROOT):
             if sub_folder not in self.__dict__:

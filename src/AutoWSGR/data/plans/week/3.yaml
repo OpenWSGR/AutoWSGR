@@ -18,4 +18,3 @@ node_defaults:
 node_args:
   G:
     night: True
-

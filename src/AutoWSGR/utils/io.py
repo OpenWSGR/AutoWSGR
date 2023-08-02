@@ -5,6 +5,7 @@ import yaml
 from cv2 import imwrite
 from PIL import Image as PIM
 
+
 def listdir(path):
     """返回指定目录下所有文件路径的列表(含 path 前缀)
     Args:
@@ -21,14 +22,14 @@ def all_in(elements, set):
 
 
 def yaml_to_dict(yaml_file):
-    """ 将yaml文件转换为字典 """
-    with open(yaml_file, 'r', encoding='utf-8') as f:
+    """将yaml文件转换为字典"""
+    with open(yaml_file, "r", encoding="utf-8") as f:
         return yaml.load(f, Loader=yaml.FullLoader)
 
 
 def dict_to_yaml(dict_data, yaml_file):
-    """ 将字典转换为yaml文件 """
-    with open(yaml_file, 'w') as f:
+    """将字典转换为yaml文件"""
+    with open(yaml_file, "w") as f:
         yaml.dump(dict_data, f)
 
 
@@ -60,9 +61,9 @@ def get_file_suffix_name(path):
     Returns:
         str: 表示后缀名
     """
-    if (os.path.exists(path) == False):
+    if os.path.exists(path) == False:
         raise FileNotFoundError("file " + os.path.abspath(path) + " not found")
-    if (os.path.isdir(path)):
+    if os.path.isdir(path):
         raise ValueError("arg 'path' is not a file but a dir")
     file = os.path.basename(path)
     return os.path.splitext(file)[-1][1:]
@@ -81,22 +82,22 @@ def read_file(path):
     Returns:
         _type_: _description_
     """
-    if (os.path.exists(path) == False):
+    if os.path.exists(path) == False:
         raise FileNotFoundError("file " + os.path.abspath(path) + " not found")
-    with open(path, mode='r') as f:
+    with open(path, mode="r") as f:
         return f.read()
 
 
 def create_file_with_path(path):
     """给定一个不存在文件的相对路径并创建路径和该文件
     Args:
-        path (str):需要创建的文件路径 
+        path (str):需要创建的文件路径
     """
     dirname = os.path.dirname(path)
-    if (dirname != ''):
+    if dirname != "":
         os.makedirs(dirname, exist_ok=True)
-    if (os.path.exists(path) == False):
-        file = open(path, 'w')
+    if os.path.exists(path) == False:
+        file = open(path, "w")
         file.close()
 
 
@@ -116,11 +117,11 @@ def save_image(path, image, ignore_existed_image=False, *args, **kwargs):
     Raises:
         FileExistsError: 如果未忽略已存在图片并且图片已存在
     """
-    if (ignore_existed_image == False and os.path.exists(path)):
+    if ignore_existed_image == False and os.path.exists(path):
         raise FileExistsError("该图片已存在")
-    if (isinstance(image, PIM.Image)):
+    if isinstance(image, PIM.Image):
         image.save(os.path.abspath(path))
-    if (isinstance(image, np.ndarray)):
+    if isinstance(image, np.ndarray):
         imwrite(path, image)
 
 
@@ -135,4 +136,3 @@ def get_all_files(dir):
 def count(keys, iter):
     res = sum(1 for it in iter if (it in keys))
     return res
-

@@ -1,4 +1,2 @@
-
-
-class Bathroom():
+class Bathroom:
     pass

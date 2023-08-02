@@ -11,7 +11,7 @@ repair_mode: 1
 node_defaults:
   # 索敌成功阶段
   detour: False # 是否迂回
-  enemy_rules: 
+  enemy_rules:
     - [DD + CL <= 1, 4]
     - [CVL == 1 and CV == 0, 4]
   # 阵型选择阶段
@@ -34,5 +34,3 @@ node_args:
   M:
     formation: 4
     night: True
-  
-

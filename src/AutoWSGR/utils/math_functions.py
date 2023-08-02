@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def CalcDis(p1, p2):
     """计算两个点的欧几里得距离的平方
     Args:
@@ -62,13 +63,13 @@ def matrix_to_str(matrix: np.ndarray):
         str: 结果字符串
     """
     shape = matrix.shape
-    if (len(shape) != 2):
+    if len(shape) != 2:
         raise ValueError("matrix must be a 2D ndarray")
-    res = str(len(matrix))+" "+str(len(matrix[0]))+"\n"
+    res = str(len(matrix)) + " " + str(len(matrix[0])) + "\n"
     for i in range(len(matrix)):
         x = matrix[i]
         for j in range(len(x)):
             y = x[j]
-            res += str(y)+" "
+            res += str(y) + " "
         res += "\n"
     return res

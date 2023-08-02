@@ -1,11 +1,11 @@
 import os
-import time
 import subprocess
-import airtest.core.android.android
-
+import time
 from subprocess import check_output
 
+import airtest.core.android.android
 from airtest.core.api import connect_device
+
 from AutoWSGR.constants.custom_exceptions import CriticalErr
 from AutoWSGR.constants.data_roots import ADB_ROOT
 from AutoWSGR.utils.function_wrapper import try_for_times
@@ -37,10 +37,9 @@ class WindowsController:
         return os.system("ping www.moefantasy.com") == 0
 
     def wait_network(self, timeout=1000):
-        """等待到网络恢复
-        """
+        """等待到网络恢复"""
         start_time = time.time()
-        while (time.time() - start_time <= timeout):
+        while time.time() - start_time <= timeout:
             if self.check_network():
                 return True
             time.sleep(10)
@@ -62,7 +61,7 @@ class WindowsController:
         if self.emulator == "雷电":
             dev_name = f"ANDROID:///{self.emulator_name}"
         elif self.emulator == "蓝叠 Hyper-V":
-            with open(self.emulator_config_file, 'r') as f:
+            with open(self.emulator_config_file, "r") as f:
                 lines = f.readlines()
             for line in lines:
                 if line.startswith("bst.instance.Pie64.status.adb_port="):
@@ -70,8 +69,9 @@ class WindowsController:
                     dev_name = f"127.0.0.1:{port}"
 
         from logging import ERROR, getLogger
+
         getLogger("airtest").setLevel(ERROR)
-        
+
         start_time = time.time()
         while time.time() - start_time <= 30:
             try:
@@ -80,7 +80,7 @@ class WindowsController:
                 return dev
             except:
                 pass
-        
+
         self.logger.error("连接模拟器失败！")
         raise CriticalErr("连接模拟器失败！")
 
@@ -89,7 +89,9 @@ class WindowsController:
         Returns:
             bool: 在线返回 True, 否则返回 False
         """
-        raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode('gbk')  # TODO: 检查是否所有windows版本返回都是中文
+        raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode(
+            "gbk"
+        )  # TODO: 检查是否所有windows版本返回都是中文
         return "PID" in raw_res
 
     def kill_android(self):

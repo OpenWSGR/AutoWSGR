@@ -1,23 +1,28 @@
-import os, sys, re
+import os
 import pathlib
+import re
+import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(__file__))) 
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from AutoWSGR.scripts.main import start_script
-from AutoWSGR.controller.run_timer import Timer
-from AutoWSGR.utils.io import listdir, dict_to_yaml, yaml_to_dict
-from AutoWSGR.utils.api_image import relative_to_absolute
-import easyocr 
-import keyboard
 import cv2
+import easyocr
+import keyboard
+
+from AutoWSGR.controller.run_timer import Timer
+from AutoWSGR.scripts.main import start_script
+from AutoWSGR.utils.api_image import relative_to_absolute
+from AutoWSGR.utils.io import dict_to_yaml, listdir, yaml_to_dict
+
 # en_reader = easyocr.Reader(['en'], gpu=False)
 timer = None
-point = 'A'
+point = "A"
 screen_shot_count = 0
+
 
 def ocr(image):
     img = cv2.imread(image)
-    
+
     # cv2.imshow("window", img)
     # cv2.waitKey(0)
     # result = en_reader.readtext(img)
@@ -26,26 +31,26 @@ def ocr(image):
     pass
 
 
-def log_image(event:keyboard.KeyboardEvent):
+def log_image(event: keyboard.KeyboardEvent):
     global screen_shot_count
     assert type(timer) == Timer
-    if(event.event_type != 'down' or event.name != 'P'):
-        return 
+    if event.event_type != "down" or event.name != "P":
+        return
     print("Screen Processing:", screen_shot_count)
     screen_shot_count += 1
     timer.update_screen()
     timer.log_screen()
-    
+
 
 def SetPoints(windowname, img):
     """
     输入图片，打开该图片进行标记点，返回的是标记的几个点的字符串
     """
     global point
-    point = 'A'
-    print('(提示：单击需要标记的坐标，Enter确定，Esc跳过，其它重试。)')
+    point = "A"
+    print("(提示：单击需要标记的坐标，Enter确定，Esc跳过，其它重试。)")
     points = {}
-    
+
     def onMouse(event, x, y, flags, param):
         global point
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -60,18 +65,18 @@ def SetPoints(windowname, img):
     cv2.setMouseCallback(windowname, onMouse)
     key = cv2.waitKey(0)
     if key == 13:  # Enter
-        print('坐标为：', points)
+        print("坐标为：", points)
         del temp_img
         cv2.destroyAllWindows()
         str(points)
     elif key == 27:  # ESC
-        print('跳过该张图片')
+        print("跳过该张图片")
         del temp_img
         cv2.destroyAllWindows()
     else:
-        print('重试!')
+        print("重试!")
         SetPoints(windowname, img)
-    
+
     print(points)
     return points
 
@@ -82,6 +87,7 @@ def get_image():
     print("HOOKED")
     keyboard.hook(callback=log_image)
     import time
+
     time.sleep(1000)
 
 
@@ -96,18 +102,22 @@ def make_map(image_path, dict_dir):
     dict_dir = dict_dir
     for file in files:
         import pathlib
+
         f = pathlib.Path(file)
-        if f.suffix != '.PNG':
+        if f.suffix != ".PNG":
             continue
         name = f.stem
         dict_value = SetPoints(name, cv2.imread(file))
-        dict_to_yaml(dict_value, os.path.join(dict_dir, 'E-' + name[1:] + '.yaml'))
-        dict_to_yaml(dict_value, os.path.join(dict_dir, 'H-' + name[1:] + '.yaml'))
+        dict_to_yaml(dict_value, os.path.join(dict_dir, "E-" + name[1:] + ".yaml"))
+        dict_to_yaml(dict_value, os.path.join(dict_dir, "H-" + name[1:] + ".yaml"))
+
 
 if __name__ == "__main__":
-    print("""Input operation type:
+    print(
+        """Input operation type:
           1: log image when 'P' pressed.
-          2: make map .yaml files""")
+          2: make map .yaml files"""
+    )
     oper = input().split()[0]
     if oper == "1":
         get_image()

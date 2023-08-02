@@ -10,12 +10,12 @@ using cv::waitKey;
 /*compile:
 	current path: ./c_src
 	general:
-		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I {your_opencv_include} -L {your_opencv_lib} -l libopencv_core454 -l libopencv_imgcodecs454 
+		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I {your_opencv_include} -L {your_opencv_lib} -l libopencv_core454 -l libopencv_imgcodecs454
 	for me(huan_yp):
-		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I H:/opencv/opencv-4.5.4mingw/include -L H:/opencv/opencv-4.5.4mingw/lib -l libopencv_core454 -l libopencv_imgcodecs454 
+		g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I H:/opencv/opencv-4.5.4mingw/include -L H:/opencv/opencv-4.5.4mingw/lib -l libopencv_core454 -l libopencv_imgcodecs454
 	for me(huan_yp2023):
 		 g++.exe -std=c++17 -O3 locator.cpp -o locator.exe -I C:\Develop\opencv\opencv-4.5.4-mingw64\include -L C:\Develop\opencv\opencv-4.5.4-mingw64\lib -l libopencv_core454 -l libopencv_imgcodecs454
-*/	
+*/
 /*function:
 	locate the blue textbox and write other pixel (255,255,255)
 	output to "1.PNG" and the textbox position
@@ -23,7 +23,7 @@ using cv::waitKey;
 /*call:
 	{abspath or path}/locator.exe [IO directory]
 	[IO directory]: where the file "locator.in" and output "1.PNG", and output "res.out"
-*/ 
+*/
 const int MAX_HEIGHT = 1000, MAX_WIDTH = 2000;
 const int KEY_COLOR_COUNT = 3;
 const vector<vector<int>> BGR_COLOR({{162, 98, 18}, {173, 103, 17}, {196, 116, 16}});
@@ -74,11 +74,11 @@ int main(int argc, char **args){
 	for(int i=0;i<image.rows;i++){
 		uchar* ptr = image.ptr<uchar>(i);
 		for(int j=0;j<image.cols;j++){
-		
+
 			is_key[i][j] = is_key_color(ptr, BGR_COLOR, 20.0, 3);
-			
+
 			ptr += 3;
-		}	
+		}
 	}
 	int n = image.rows, m = image.cols;
 	vector<pair<int,int>> segments[MAX_HEIGHT];
@@ -102,13 +102,13 @@ int main(int argc, char **args){
 		int cnt1=0,cnt2=0;
 		for(int j=-8;j<=-1;j++)if(i + j > 0 && i + j < n)
 			cnt1 += cmp_line(segments[i], segments[i + j]);
-		
+
 		for(int j=1;j<=8;j++)if(i + j > 0 && i + j < n)
 			cnt2 += cmp_line(segments[i], segments[i + j]);
-		
+
 		if(max(cnt1, cnt2) >= 6)
-			is_line_legal[i] = true; 
-		
+			is_line_legal[i] = true;
+
 	}
 	vector<pair<int,int>> lines;
 	int lst = -1;
@@ -126,7 +126,7 @@ int main(int argc, char **args){
 		}
 	}
 
-	
+
 	out << lines.size() << endl;
 	for(auto v:lines)
 	out << v.first << ' ' << v.second << endl;

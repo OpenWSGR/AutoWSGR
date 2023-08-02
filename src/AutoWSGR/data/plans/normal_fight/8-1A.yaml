@@ -27,4 +27,3 @@ node_defaults:
   supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退
 
 node_args:
-

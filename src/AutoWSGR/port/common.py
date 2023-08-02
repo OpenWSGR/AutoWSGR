@@ -1,4 +1,2 @@
-
-
-class Port():
+class Port:
     pass

@@ -6,5 +6,5 @@ MAP_ROOT = join(DATA_ROOT, "map")
 SETTING_ROOT = join(DATA_ROOT, "settings")
 
 BIN_ROOT = join(dirname(DATA_ROOT), "bin")
-TUNNEL_ROOT = join(BIN_ROOT, 'image_recognize')
-ADB_ROOT = join(BIN_ROOT, 'adb')
+TUNNEL_ROOT = join(BIN_ROOT, "image_recognize")
+ADB_ROOT = join(BIN_ROOT, "adb")

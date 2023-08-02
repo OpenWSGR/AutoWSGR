@@ -16,4 +16,3 @@ node_defaults:
   proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
 
 node_args:
-

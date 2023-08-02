@@ -1,9 +1,10 @@
 import numpy as np
+
 from AutoWSGR.constants.image_templates import MyTemplate
 
 
 def relative_to_absolute(record_pos, resolution=(960, 540)):
-    """ 将相对坐标转换为绝对坐标 """
+    """将相对坐标转换为绝对坐标"""
     delta_x, delta_y = record_pos
     _w, _h = resolution
     target_x = _w * (0.5 + delta_x)
@@ -12,7 +13,7 @@ def relative_to_absolute(record_pos, resolution=(960, 540)):
 
 
 def absolute_to_relative(absolute_pos, resolution=(960, 540)):
-    """ 将绝对坐标转换为相对坐标 """
+    """将绝对坐标转换为相对坐标"""
     _w, _h = resolution
     delta_x = (absolute_pos[0] - _w * 0.5) / _w
     delta_y = (absolute_pos[1] - _h * 0.5) / _h
@@ -20,13 +21,13 @@ def absolute_to_relative(absolute_pos, resolution=(960, 540)):
 
 
 def crop_image(image, pos1, pos2, resolution=(960, 540)):
-    """ 按照给定的位置裁剪图片, pos1 左下角, pos2 右上角 """
+    """按照给定的位置裁剪图片, pos1 左下角, pos2 右上角"""
     x1, y2 = map(int, relative_to_absolute(pos1, resolution))
     x2, y1 = map(int, relative_to_absolute(pos2, resolution))
     return image[y1:y2, x1:x2]
 
 
-def convert_position(x, y, resolution, mode='960_to_this'):
+def convert_position(x, y, resolution, mode="960_to_this"):
     """转化坐标格式(放缩)
 
     Args:
@@ -45,14 +46,14 @@ def convert_position(x, y, resolution, mode='960_to_this'):
         ValueError:如果不支持这个模式
     """
 
-    if (mode == '960_to_this'):
+    if mode == "960_to_this":
         return (int(x / 960 * resolution[0]), int(y / 540 * resolution[1]))
-    if (mode == 'this_to_960'):
+    if mode == "this_to_960":
         return (int(x * 960 / resolution[0]), int(y * 540 / resolution[1]))
     raise ValueError("unsupported mode " + str(mode))
 
 
-def convert_area(area, resolution, mode='960_to_this'):
+def convert_area(area, resolution, mode="960_to_this"):
     """转化矩阵格式(放缩)
 
     Args:
@@ -70,7 +71,9 @@ def convert_area(area, resolution, mode='960_to_this'):
     return (left, top, right, button)
 
 
-def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, this_methods=None):
+def locateCenterOnImage(
+    image: np.ndarray, query: MyTemplate, confidence=0.85, this_methods=None
+):
     """从原图像中尝试找出一个置信度相对于模板图像最高的矩阵区域的中心坐标
 
     Args:
@@ -82,10 +85,10 @@ def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, t
     Returns:
         如果匹配结果中有超过阈值的,返回置信度最高的结果的中心绝对坐标:Tuple(int,int)
 
-        否则返回 None 
+        否则返回 None
     """
     if this_methods is None:
-        this_methods = ['tpl']
+        this_methods = ["tpl"]
     query.threshold = confidence
     match_pos = query.match_in(image, this_methods=this_methods)
     return match_pos or None

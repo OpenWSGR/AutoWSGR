@@ -1,17 +1,17 @@
 import time
-
-from AutoWSGR.fight.battle import BattlePlan
-from AutoWSGR.fight.normal_fight import NormalFightPlan
-from AutoWSGR.game.game_operation import Expedition, get_rewards, RepairByBath
-from AutoWSGR.scripts.main import start_script
-from AutoWSGR.constants import literals
 from types import SimpleNamespace as SN
 
+from AutoWSGR.constants import literals
+from AutoWSGR.fight.battle import BattlePlan
+from AutoWSGR.fight.normal_fight import NormalFightPlan
+from AutoWSGR.game.game_operation import Expedition, RepairByBath, get_rewards
+from AutoWSGR.scripts.main import start_script
 
-class DailyOperation():
+
+class DailyOperation:
     def __init__(self, setting_path) -> None:
         self.timer = start_script(setting_path)
-        
+
         self.config = SN(**self.timer.config.daily_automation)
         self.config.DEBUG = False
 
@@ -19,13 +19,21 @@ class DailyOperation():
             self.expedition_plan = Expedition(self.timer)
 
         if self.config.auto_battle:
-            self.battle_plan = BattlePlan(self.timer, plan_path=f'battle/{self.config.battle_type}.yaml')
+            self.battle_plan = BattlePlan(
+                self.timer, plan_path=f"battle/{self.config.battle_type}.yaml"
+            )
 
         if self.config.auto_normal_fight:
             self.fight_plans = []
             self.fight_complete_times = []
             for plan in self.config.normal_fight_tasks:
-                self.fight_plans.append(NormalFightPlan(self.timer, plan_path=f"normal_fight/{plan[0]}.yaml", fleet_id=plan[1]))
+                self.fight_plans.append(
+                    NormalFightPlan(
+                        self.timer,
+                        plan_path=f"normal_fight/{plan[0]}.yaml",
+                        fleet_id=plan[1],
+                    )
+                )
                 self.fight_complete_times.append([0, plan[2]])  # 二元组， [已完成次数, 目标次数]
 
         self.start_time = self.last_time = time.time()
@@ -69,7 +77,7 @@ class DailyOperation():
         for i, times in enumerate(self.fight_complete_times):
             if times[0] < times[1]:
                 return i
-    
+
     def _expedition(self):
         if self.config.auto_expedition:
             self.expedition_plan.run(True)

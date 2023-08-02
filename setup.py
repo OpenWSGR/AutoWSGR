@@ -10,13 +10,13 @@ def get_version() -> str:
 
 
 setup(
-    name='AutoWSGR',
+    name="AutoWSGR",
     version=get_version(),
     description="All in one Warship Girls python package",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/huan-yp/Auto-WSGR",
-    setup_requires=['setuptools_scm'],
+    setup_requires=["setuptools_scm"],
     use_scm_version=False,
     include_package_data=True,
     install_requires=[
@@ -27,5 +27,6 @@ setup(
         "keyboard",
         "easyocr",
         "streamlit",
+        "pre-commit",
     ],
 )

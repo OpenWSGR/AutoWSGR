@@ -1,6 +1,7 @@
-import re
-import requests
 import os
+import re
+
+import requests
 
 os.environ["https_proxy"] = "127.0.0.1:7890"
 os.environ["http_proxy"] = "127.0.0.1:7890"
@@ -18,6 +19,7 @@ REPLACE = {
     1054: "重庆",
 }
 
+
 def get_source():
     if UPDATE:
         response = requests.get(URL)
@@ -28,29 +30,30 @@ def get_source():
         with open(HTML_PATH, mode="r", encoding="utf-8") as f:
             html = f.read()
     return html
-    
+
+
 def extract(str):
     re_rk_wsrwiki = r'</tr><tr><td width="162"><center><b>.{0,100}</b></center></td>'
     re_name_wsrwiki = r'</tr><tr><td width="162" height="56"><center><b><a href="/wiki/.{0,100} title=.{0,100}</a></b></center></td>'
     res = ""
-    rks = re.findall(re_rk_wsrwiki,str)
-    names = re.findall(re_name_wsrwiki,str)
+    rks = re.findall(re_rk_wsrwiki, str)
+    names = re.findall(re_name_wsrwiki, str)
     print(len(rks), len(names))
-    
+
     for rk, name in zip(rks, names):
-        rk = rk[40:rk.find("</b>")]
+        rk = rk[40 : rk.find("</b>")]
         _title_idx = name.find("title") + 7
         name = name[_title_idx:]
-        name = name[:name.index("\"")]
+        name = name[: name.index('"')]
         if int(rk) in REPLACE:
             name = REPLACE[int(rk)]
-        if name.find('(') != -1:
-            _name = name[:name.find('(')]
+        if name.find("(") != -1:
+            _name = name[: name.find("(")]
         else:
             _name = name
         res += f"No.{rk}: # {name}\n"
-        res += f"  - \"{_name}\"\n"
-    
+        res += f'  - "{_name}"\n'
+
     res += """Other: # 战例
   - 肌肉记忆
   - 长跑训练
@@ -61,9 +64,9 @@ def extract(str):
   - 守护之盾
   - 抱头蹲防
   - 关键一击
-  - 久远的加护"""    
+  - 久远的加护"""
     return res
 
 
-with open(YAML_PATH, mode="w+", encoding='utf-8') as f:
+with open(YAML_PATH, mode="w+", encoding="utf-8") as f:
     f.write(extract(get_source()))

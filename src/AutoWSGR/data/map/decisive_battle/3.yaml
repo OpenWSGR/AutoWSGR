@@ -27,13 +27,13 @@ map_end:
   - " HHJ"
   - " HHJ"
   - " HJJ"
-  - " JJJ" 
+  - " JJJ"
 enemy:
   - ""
   - ""
   - ""
   - ""
-  - 
+  -
     - ""
     -
       A: ['', 'CL', 'CL', 'DD']
@@ -44,7 +44,7 @@ enemy:
       F: ['', 'CV', 'BC', 'CL', 'DD', 'DD', 'AADG']
       G: ['', 'BC', 'CBG', 'CA', 'CA', 'CL', 'DD']
       H: ['', 'CV', 'CV', 'CVL', 'CL', 'BBV', 'BBV']
-    - 
+    -
       A: ['', 'BC', 'CV', 'CV', 'CL', 'DD', 'DD']
       B: ['', 'BB', 'BC', 'BC', 'CA', 'DD', 'SS']
       C: ['', 'CV', 'CV', 'BB', 'CLT', 'CL', 'CL']
@@ -65,9 +65,9 @@ enemy:
       I: ['', 'BB', 'BG', 'CV', 'CA', 'CA', 'CL']
       J: ['', 'BB', 'CA', 'BBV', 'BBV', 'SS', 'BC']
 
-  - 
+  -
     - ""
-    - 
+    -
       A: ['', 'DD', 'SS', '', '', '', '']
       B: ['', 'CA', 'CL', 'AADG', '', '', '']
       C: ['', 'BB', 'CA', 'DD', '', '', '']
@@ -76,7 +76,7 @@ enemy:
       F: ['', 'CV', 'CV', 'CL', 'CL', 'DD', 'DD']
       G: ['', 'BC', 'CVL', 'CA', 'CL', 'DD', 'AADG']
       H: ['', 'AV', 'CV', 'CV', 'BB', 'DD', 'BBV']
-    - 
+    -
       A: ['', 'BB', 'CV', 'CV', 'CVL', 'CL', 'CL']
       B: ['', 'CV', 'BB', 'BB', 'CA', 'CL', 'CL']
       C: ['', 'BC', 'BB', 'BB', 'CA', 'CL', 'SS']
@@ -87,7 +87,7 @@ enemy:
       H: ['', 'BB', 'BB', 'BB', 'ASDG', 'CL', 'CL']
       I: ['', 'CV', 'BB', 'BB', 'CL', 'AADG', 'AADG']
       J: ['', 'AV', 'AF', 'BC', 'BB', 'CLT', 'CLT']
-    - 
+    -
       A: ['', 'CV', 'CV', 'BC', 'CA', 'CL', 'SS']
       B: ['', 'BB', 'BB', 'BC', 'CL', 'CL', 'ASDG']
       C: ['', 'BB', 'BG', 'BC', 'BC', 'CL', 'CL']
@@ -98,7 +98,7 @@ enemy:
       H: ['', 'CV', 'BC', 'BB', 'BC', 'CA', 'CL']
       I: ['', 'BB', 'BB', 'BB', 'BB', 'CL', 'CL']
       J: ['', 'BB', 'BC', 'BC', 'CA', 'CA', 'DD']
-  
+
   -
     - ""
     - A : ['', 'CL', 'CL']
@@ -122,7 +122,7 @@ enemy:
       H: ["", BB, BB, CV, BC, CA, ASDG]
       I: ["", CV, CVL, BB, BB, CA, SS]
       J: ["", AV, CV, CV, AF, CVL, DD]
-    -   
+    -
       A: ["", CV, BC, BB, BB, CL, AADG]
       B: ["", BB, BC, BB, BB, CA, SS]
       C: ["", BB, BC, BB, CBG, CBG, CL]

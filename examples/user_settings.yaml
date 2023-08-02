@@ -4,7 +4,7 @@ emulator:
   start_cmd: "C:/leidian/LDPlayer9/dnplayer.exe"
   config_file: ""
   emulator_name: emulator-5554 # 雷电模拟器使用多开器请填写该项, 不多开默认为 "emulator-5554"
-  
+
 
 LOG_PATH: "log"
 DELAY: 1.5

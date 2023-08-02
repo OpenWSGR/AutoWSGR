@@ -1,26 +1,46 @@
 import math
 import os
-import time
 import subprocess
+import time
 
 import numpy as np
-from AutoWSGR.constants.image_templates import IMG
+from PIL import Image as PIM
+
 from AutoWSGR.constants.colors import COLORS
 from AutoWSGR.constants.data_roots import TUNNEL_ROOT
-from AutoWSGR.constants.other_constants import (AADG, ASDG, AV, BB, BBV, BC,
-                                                BG, BM, CA, CAV, CBG, CL, CLT,
-                                                CV, CVL, DD, NAP, NO,
-                                                RESOURCE_NAME, SAP, SC, SS)
+from AutoWSGR.constants.image_templates import IMG
+from AutoWSGR.constants.other_constants import (
+    AADG,
+    ASDG,
+    AV,
+    BB,
+    BBV,
+    BC,
+    BG,
+    BM,
+    CA,
+    CAV,
+    CBG,
+    CL,
+    CLT,
+    CV,
+    CVL,
+    DD,
+    NAP,
+    NO,
+    RESOURCE_NAME,
+    SAP,
+    SC,
+    SS,
+)
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.ocr.digit import get_resources
 from AutoWSGR.utils.io import delete_file, read_file
 from AutoWSGR.utils.math_functions import CalcDis, CheckColor, matrix_to_str
-from PIL import Image as PIM
 
 
-class Resources():
-
+class Resources:
     def __init__(self, timer: Timer):
         self.timer = timer
         self.resources = {}
@@ -28,20 +48,20 @@ class Resources():
     def detect_resources(self, name=None):
         timer = self.timer
         if name is not None:
-            if name in ('normal', 'oil', 'ammo', 'steel', 'aluminum'):
-                self.timer.goto_game_page('main_page')
+            if name in ("normal", "oil", "ammo", "steel", "aluminum"):
+                self.timer.goto_game_page("main_page")
                 self.detect_resources()
-            if name == 'quick_repair':
-                self.timer.goto_game_page('choose_repair_page')
+            if name == "quick_repair":
+                self.timer.goto_game_page("choose_repair_page")
                 self.detect_resources()
-            if name == 'quick_build':
-                self.timer.goto_game_page('build_page')
+            if name == "quick_build":
+                self.timer.goto_game_page("build_page")
                 self.detect_resources()
-            if name == 'ship_blueprint':
-                self.timer.goto_game_page('build_page')
+            if name == "ship_blueprint":
+                self.timer.goto_game_page("build_page")
                 self.detect_resources()
-            if name == 'equipment_blueprint':
-                self.timer.goto_game_page('develop_page')
+            if name == "equipment_blueprint":
+                self.timer.goto_game_page("develop_page")
                 self.detect_resources()
         else:
             result = get_resources(timer)
@@ -61,37 +81,61 @@ class Resources():
         Returns:
             int: 资源量
         """
-        if (name not in RESOURCE_NAME):
+        if name not in RESOURCE_NAME:
             raise ValueError("Unsupported resource name")
-        if (detect or name not in self.resources.keys()):
+        if detect or name not in self.resources.keys():
             self.detect_resources(name)
 
         return self.resources.get(name)
 
 
-def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
+def get_enemy_condition(timer: Timer, type="exercise", *args, **kwargs):
     """获取敌方舰船类型数据并返回一个字典, 具体图像识别为黑箱, 采用 C++ 实现
 
     Args:
         type (str, optional): 描述情景. Defaults to 'exercise'.
             'exercise': 演习点击挑战后的一横排舰船
-            
+
             'fight': 索敌成功后的两列三行
-    
+
     Returs:
         dict: {[SHIP_TYPE]:[SHIP_AMOUNT]}
 
         example return: {"CV":1, "BB":3, "DD": 2}
     """
-    
-    enemy_type_count = {CV: 0, BB: 0, SS: 0, BC: 0, NAP: 0, DD: 0, ASDG: 0, AADG: 0, CL: 0, CA: 0, CLT: 0, CVL: 0, NO: 0, "all": 0, CAV: 0, AV: 0, BM: 0, SAP: 0, BG: 0, CBG: 0, SC: 0, BBV: 0, 'AP': 0}
 
-    if (type == 'exercise'):
+    enemy_type_count = {
+        CV: 0,
+        BB: 0,
+        SS: 0,
+        BC: 0,
+        NAP: 0,
+        DD: 0,
+        ASDG: 0,
+        AADG: 0,
+        CL: 0,
+        CA: 0,
+        CLT: 0,
+        CVL: 0,
+        NO: 0,
+        "all": 0,
+        CAV: 0,
+        AV: 0,
+        BM: 0,
+        SAP: 0,
+        BG: 0,
+        CBG: 0,
+        SC: 0,
+        BBV: 0,
+        "AP": 0,
+    }
+
+    if type == "exercise":
         type = 0
-    if (type == 'fight'):
+    if type == "fight":
         type = 1
 
-    if (timer.image_exist(IMG.fight_image[12])):
+    if timer.image_exist(IMG.fight_image[12]):
         # 特殊补给舰
         enemy_type_count[SAP] = 1
 
@@ -105,19 +149,19 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     for i, area in enumerate(TYPE_SCAN_AREA[type]):
         arr = np.array(img.crop(area))
         args += matrix_to_str(arr)
-    with open(input_path, 'w') as f:
+    with open(input_path, "w") as f:
         f.write(args)
     recognize_enemy_exe = os.path.join(TUNNEL_ROOT, "recognize_enemy.exe")
     subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
-    
+
     # 获取并解析结果
     res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()
     enemy_type_count["ALL"] = 0
     for i, x in enumerate(res):
         enemy_type_count[x] += 1
-        if (x != NO):
+        if x != NO:
             enemy_type_count["ALL"] += 1
-    enemy_type_count[NAP] = enemy_type_count['AP'] - enemy_type_count[SAP]
+    enemy_type_count[NAP] = enemy_type_count["AP"] - enemy_type_count[SAP]
     count = {}
     for key, value in enemy_type_count.items():
         if value:
@@ -126,26 +170,26 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     return count
 
 
-def detect_ship_stats(timer: Timer, type='prepare', previous=None):
+def detect_ship_stats(timer: Timer, type="prepare", previous=None):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并返回
-    
+
     Args:
         type (str, optional): 描述在哪个界面检查. .
             'prepare': 战斗准备界面
-            
+
             'sumup': 单场战斗结算界面
     Returns:
         list: 表示血量状态
-        
+
         example: [-1, 0, 0, 1, 1, 2, -1] 表示 1-2 号位绿血 3-4 号位中破, 5 号位大破, 6 号位不存在
 
     """
     # Todo: 检测是否满血/触发中保, 精确到数值的检测, 战斗结算时检测不依赖先前信息
-    
+
     timer.update_screen()
     result = [-1, 0, 0, 0, 0, 0, 0]
     for i in range(1, 7):
-        if type == 'prepare':
+        if type == "prepare":
             pixel = timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
             result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[0])
             if result[i] in [3, 2]:
@@ -156,7 +200,7 @@ def detect_ship_stats(timer: Timer, type='prepare', previous=None):
                 result[i] = -1
             else:
                 result[i] = 1
-        elif type == 'sumup':
+        elif type == "sumup":
             if previous and previous[i] == -1:
                 result[i] = -1
                 continue
@@ -183,31 +227,58 @@ def get_exercise_stats(timer: Timer, robot=None):
         bool: 如果可挑战, 返回 True , 否则为 False, 1-index
     """
     timer.update_screen()
-    up=timer.check_pixel((933, 59), (177, 171, 176), distance=60)
-    down=timer.check_pixel((933, 489), (177, 171, 176), distance=60)
-    assert ((up and down) == False)
+    up = timer.check_pixel((933, 59), (177, 171, 176), distance=60)
+    down = timer.check_pixel((933, 489), (177, 171, 176), distance=60)
+    assert (up and down) == False
 
-    result=[None, ]
-    if (up == False and down == False):
+    result = [
+        None,
+    ]
+    if up == False and down == False:
         timer.Android.swipe(800, 200, 800, 400)  # 上滑
         timer.update_screen()
-        up=True
-    if (up):
+        up = True
+    if up:
         for position in range(1, 5):
-            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
+            result.append(
+                math.sqrt(
+                    CalcDis(
+                        timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE
+                    )
+                )
+                <= 50
+            )
         timer.Android.swipe(800, 400, 800, 200)  # 下滑
         timer.update_screen()
-        result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
+        result.append(
+            math.sqrt(
+                CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)
+            )
+            <= 50
+        )
         return result
     if down:
         for position in range(1, 5):
-            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
-        if (robot is not None):
+            result.append(
+                math.sqrt(
+                    CalcDis(
+                        timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE
+                    )
+                )
+                <= 50
+            )
+        if robot is not None:
             result.insert(1, robot)
         else:
             timer.Android.swipe(800, 200, 800, 400)  # 上滑
             timer.update_screen()
-            result.insert(1, math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
+            result.insert(
+                1,
+                math.sqrt(
+                    CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)
+                )
+                <= 50,
+            )
 
             timer.Android.swipe(800, 400, 800, 200)  # 下滑
 
@@ -221,7 +292,7 @@ def check_support_stats(timer: Timer):
         bool: 如果开启了返回 True,否则返回 False
     """
     timer.update_screen()
-    pixel=timer.get_pixel(623, 75)
+    pixel = timer.get_pixel(623, 75)
     d1 = CalcDis(pixel, COLORS.SUPPORT_ENABLE)
     d2 = CalcDis(pixel, COLORS.SUPPORT_DISABLE)
     return d1 < d2

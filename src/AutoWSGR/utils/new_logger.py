@@ -2,16 +2,16 @@ import json
 import logging
 import os
 import sys
+
 import streamlit as st
 
 from AutoWSGR.utils.io import save_image
 
 
-
 class Logger:
     def __init__(self, config):
         self.config = config
-        self.log_dir = config['log_dir']
+        self.log_dir = config["log_dir"]
         if "log_level" in config.keys():
             log_level = config["log_level"]
         else:
@@ -21,14 +21,16 @@ class Logger:
 
     def save_config(self, config):
         # write config file
-        config_str = json.dumps(vars(config), ensure_ascii=False, indent=4, sort_keys=True)
+        config_str = json.dumps(
+            vars(config), ensure_ascii=False, indent=4, sort_keys=True
+        )
         with open(os.path.join(self.log_dir, "config.json"), "w") as f:
             f.write(config_str)
         return config_str
 
     def reset_level(self):
         self.console_logger.setLevel(self.log_level)
-    
+
     def debug(self, *args):
         self.console_logger.debug(str(args))
 
@@ -48,20 +50,34 @@ class Logger:
         self.console_logger.error("====================END====================")
         st.write(string)
 
-    def log_stat(self, key, value, t, tag='train'):
+    def log_stat(self, key, value, t, tag="train"):
         self.info(f"{tag} {key}: {value:.4f}")
 
-    def log_image(self, image, name, ndarray_mode="BGR", ignore_existed_image=False, *args, **kwargs):
+    def log_image(
+        self,
+        image,
+        name,
+        ndarray_mode="BGR",
+        ignore_existed_image=False,
+        *args,
+        **kwargs,
+    ):
         """向默认数据记录路径记录图片
-    Args:
-        image: 图片,PIL.Image.Image 格式或者 numpy.ndarray 格式
-        name (str): 图片文件名
+        Args:
+            image: 图片,PIL.Image.Image 格式或者 numpy.ndarray 格式
+            name (str): 图片文件名
         """
-        if ('png' not in name and 'PNG' not in name):
-            name += '.PNG'
+        if "png" not in name and "PNG" not in name:
+            name += ".PNG"
         path = os.path.join(self.log_dir, name)
 
-        save_image(path=path, image=image, ignore_existed_image=ignore_existed_image, *args, **kwargs)
+        save_image(
+            path=path,
+            image=image,
+            ignore_existed_image=ignore_existed_image,
+            *args,
+            **kwargs,
+        )
 
     def _get_logger(self, log_level="INFO") -> logging.Logger:
         logger = logging.getLogger("AutoWSGR")
@@ -70,14 +86,16 @@ class Logger:
         logger.setLevel(log_level)
 
         # Stream
-        ch_formatter = logging.Formatter('[%(levelname)s %(asctime)s %(name)s] %(message)s', '%H:%M:%S')
+        ch_formatter = logging.Formatter(
+            "[%(levelname)s %(asctime)s %(name)s] %(message)s", "%H:%M:%S"
+        )
         ch = logging.StreamHandler(sys.stderr)
         ch.setFormatter(ch_formatter)
         logger.addHandler(ch)
 
         # File
         self.log_file_path = os.path.join(self.log_dir, "console.log")
-        ch = logging.FileHandler(self.log_file_path, encoding='utf-8')
+        ch = logging.FileHandler(self.log_file_path, encoding="utf-8")
         ch.setFormatter(ch_formatter)
         logger.addHandler(ch)
 
