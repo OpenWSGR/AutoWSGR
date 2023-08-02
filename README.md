@@ -1,4 +1,6 @@
-## AutoWSGR
+![image-20230226001532677](/.assets/logo.png)
+
+## 项目简介
 
 ![](https://img.shields.io/github/repo-size/huan-yp/Auto-WSGR) ![](https://img.shields.io/pypi/v/AutoWSGR) ![](https://img.shields.io/pypi/dm/AutoWSGR) ![](https://img.shields.io/github/issues/huan-yp/Auto-WSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
 
