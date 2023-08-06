@@ -1,4 +1,4 @@
-![image-20230226001532677](/.assets/logo.png)
+![image-20230226001532677](.assets/logo.png#pic_center)
 
 ## 项目简介
 
