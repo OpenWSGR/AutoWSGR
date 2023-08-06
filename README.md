@@ -1,4 +1,6 @@
-![image-20230226001532677](.assets/logo.png#pic_center)
+<div align=center>
+<img src="https://raw.githubusercontent.com/huan-yp/Auto-WSGR/main/.assets/logo.png">
+</div>
 
 ## 项目简介
 
