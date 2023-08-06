@@ -14,7 +14,7 @@ repair_mode: [1, 2, 1, 2, 2, 2]
 # NodeLevel
 node_args:
   A:
-    formation: 1
+    formation: 2
     night: False
     enemy_rules:
       - [DD + CL > 1, retreat]

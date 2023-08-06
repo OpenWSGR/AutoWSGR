@@ -66,7 +66,7 @@ class WindowsController:
             for line in lines:
                 if line.startswith("bst.instance.Pie64.status.adb_port="):
                     port = line.split("=")[-1].strip()[1:-1]
-                    dev_name = f"127.0.0.1:{port}"
+                    dev_name = f"ANDROID:///127.0.0.1:{port}"
 
         from logging import ERROR, getLogger
 
