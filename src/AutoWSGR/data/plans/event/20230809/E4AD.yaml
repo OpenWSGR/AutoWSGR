@@ -1,0 +1,8 @@
+# E10 AD 双连夜战练级
+# 均速 A点战列大于等于1，D点重巡大于等于2
+chapter: E
+map: 4
+selected_nodes: [A, D]
+node_defaults:
+  proceed: False
+  formation: 4
