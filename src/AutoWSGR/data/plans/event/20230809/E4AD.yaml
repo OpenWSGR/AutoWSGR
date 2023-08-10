@@ -4,5 +4,5 @@ chapter: E
 map: 4
 selected_nodes: [A, D]
 node_defaults:
-  proceed: False
+  proceed: True
   formation: 4
