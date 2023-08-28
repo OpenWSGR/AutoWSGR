@@ -53,7 +53,7 @@ class Expedition:
 def get_ship(timer: Timer, max_times=1):
     timer.wait_image(IMG.symbol_image[8])
     while timer.wait_image(IMG.symbol_image[8], timeout=0.5):
-        timer.Android.click(900, 500, delay=0.25, times=2)
+        timer.Android.click(910, 510, delay=0.25, times=1)
 
 
 def DestroyShip(timer: Timer):
