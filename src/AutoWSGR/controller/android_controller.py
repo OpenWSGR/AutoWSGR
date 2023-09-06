@@ -69,8 +69,6 @@ class AndroidController:
 
             enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
-        if self.config.SHOW_ANDROID_INPUT and "not_show" not in kwargs:
-            self.logger.debug("click:", time.time(), x, y)
 
         if times < 1:
             raise ValueError("invalid arg 'times' " + str(times))
@@ -87,20 +85,21 @@ class AndroidController:
             )
         if delay < 0:
             raise ValueError("arg 'delay' should be positive or 0")
+        original_x, original_y = x, y  # 保存原始坐标用来输出日志
         x, y = convert_position(x, y, self.resolution)
         if enable_subprocess == 1:
             p = th.Thread(target=lambda: self.ShellCmd(f"input tap {str(x)} {str(y)}"))
             p.start()
             return p
         for _ in range(times):
+            if self.config.SHOW_ANDROID_INPUT and "not_show" not in kwargs:
+                self.logger.debug("click:", time.time(), original_x, original_y)
             self.ShellCmd(f"input tap {str(x)} {str(y)}")
             time.sleep(delay * self.config.DELAY)
 
     def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False):
         x, y = relative_to_absolute((x, y), self.resolution)
 
-        if self.config.SHOW_ANDROID_INPUT:
-            self.logger.debug("click:", time.time(), x, y)
 
         if times < 1:
             raise ValueError("invalid arg 'times' " + str(times))
@@ -116,6 +115,8 @@ class AndroidController:
             return p
 
         for _ in range(times):
+            if self.config.SHOW_ANDROID_INPUT:
+                self.logger.debug("click:", time.time(), x, y)
             self.ShellCmd(f"input tap {str(x)} {str(y)}")
             time.sleep(delay * self.config.DELAY)
 
