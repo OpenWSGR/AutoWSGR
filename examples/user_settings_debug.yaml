@@ -29,7 +29,7 @@ daily_automation:
   auto_expedition: True # 自动重复远征
   auto_gain_bonus: True # 当有任务完成时自动点击
   auto_bath_repair: True # 空闲时自动澡堂修理
-
+  auto_set_support: False # 自动设置支援舰队
   dock_full_destroy: True # 船坞已满时自动清空，若设置为false则船坞已满后终止所有常规出征任务
 
   auto_battle: True # 自动打完每日战役次数

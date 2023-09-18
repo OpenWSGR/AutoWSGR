@@ -6,6 +6,7 @@ class COLORS:
     CHALLENGE_BLUE = (33, 132, 226)  # 演习界面,挑战按钮的颜色
     SUPPORT_ENABLE = (228, 182, 60)  # 支援启用的黄色
     SUPPORT_DISABLE = (44, 142, 239)  # 支援禁用的蓝色
+    SUPPORT_ENLESS = (143, 145, 154)  # 支援次数用尽的灰色
     BLOOD_COLORS = [
         [
             (69, 162, 117),

@@ -289,10 +289,15 @@ def check_support_stats(timer: Timer):
     """在出征准备界面检查是否开启了战役支援(有开始出征按钮的界面)
 
     Returns:
-        bool: 如果开启了返回 True,否则返回 False
+        bool: 先判断是否为灰色，如果为灰色则返回True，然后判断是否开启，如果开启则返回True，否则返回False
     """
     timer.update_screen()
     pixel = timer.get_pixel(623, 75)
-    d1 = CalcDis(pixel, COLORS.SUPPORT_ENABLE)
-    d2 = CalcDis(pixel, COLORS.SUPPORT_DISABLE)
-    return d1 < d2
+    d1 = CalcDis(pixel, COLORS.SUPPORT_ENABLE)  # 支援启用的黄色
+    d2 = CalcDis(pixel, COLORS.SUPPORT_DISABLE)  # 支援禁用的蓝色
+    d3 = CalcDis(pixel, COLORS.SUPPORT_ENLESS)  # 支援次数用尽的灰色
+    if d1 > d3 and d2 > d3:
+        timer.logger.info("战役支援次数已用尽")
+        return True
+    else:
+        return d1 < d2

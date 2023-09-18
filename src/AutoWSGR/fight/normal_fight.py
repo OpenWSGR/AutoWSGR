@@ -60,7 +60,7 @@ class NormalFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["result"],
-                "no": [["result", 5]],
+                "no": [["result", 10]],
             },
             "result": [
                 "proceed",

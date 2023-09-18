@@ -4,7 +4,12 @@ from types import SimpleNamespace as SN
 from AutoWSGR.constants import literals
 from AutoWSGR.fight.battle import BattlePlan
 from AutoWSGR.fight.normal_fight import NormalFightPlan
-from AutoWSGR.game.game_operation import Expedition, RepairByBath, get_rewards
+from AutoWSGR.game.game_operation import (
+    Expedition,
+    RepairByBath,
+    SetSupport,
+    get_rewards,
+)
 from AutoWSGR.scripts.main import start_script
 
 
@@ -44,6 +49,10 @@ class DailyOperation:
             ret = literals.OPERATION_SUCCESS_FLAG
             while ret == literals.OPERATION_SUCCESS_FLAG:
                 ret = self.battle_plan.run()
+
+        # 自动开启支援
+        if self.config.auto_set_support:
+            SetSupport(self.timer, True)
 
         # 自动出征
         if self.config.auto_normal_fight:

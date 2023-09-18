@@ -51,9 +51,27 @@ class Expedition:
 
 
 def get_ship(timer: Timer, max_times=1):
+    """获取掉落舰船"""
     timer.wait_image(IMG.symbol_image[8])
     while timer.wait_image(IMG.symbol_image[8], timeout=0.5):
-        timer.Android.click(910, 510, delay=0.25, times=1)
+        timer.Android.click(915, 515, delay=0.25, times=1)
+
+
+def match_night(timer: Timer, is_night):
+    """匹配夜战按钮并点击"""
+    timer.wait_image(IMG.fight_image[6])
+    while timer.wait_image(IMG.fight_image[6], timeout=0.5):
+        if is_night:
+            timer.Android.click(325, 350, delay=0.5, times=1)
+        else:
+            timer.Android.click(615, 350, delay=0.5, times=1)
+
+
+def click_result(timer: Timer, max_times=1):
+    """点击加速两页战果界面"""
+    timer.wait_image(IMG.fight_image[14])
+    while timer.wait_image(IMG.fight_image[14], timeout=0.5):
+        timer.Android.click(900, 500, delay=0.25, times=1)
 
 
 def DestroyShip(timer: Timer):
@@ -136,13 +154,12 @@ def SetSupport(timer: Timer, target, try_times=0):
     """
     target = bool(target)
     timer.goto_game_page("fight_prepare_page")
-    # if(bool(timer.check_pixel((623, 75), )) == ):
-    #
-    # 支援次数已用尽
+
     if check_support_stats(timer) != target:
         timer.Android.click(628, 82, delay=1)
         timer.Android.click(760, 273, delay=1)
         timer.Android.click(480, 270, delay=1)
+        timer.logger.info("开启支援状态成功")
 
     if timer.is_bad_network(0) or check_support_stats(timer) != target:
         if timer.process_bad_network("set_support"):

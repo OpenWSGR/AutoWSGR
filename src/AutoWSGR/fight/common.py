@@ -12,8 +12,10 @@ from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import (
     DestroyShip,
     Expedition,
+    click_result,
     detect_ship_stats,
     get_ship,
+    match_night,
 )
 from AutoWSGR.game.get_game_info import get_enemy_condition
 from AutoWSGR.utils.io import recursive_dict_update, yaml_to_dict
@@ -664,16 +666,19 @@ class DecisionBlock:
                 },
                 action="追击" if is_night else "撤退",
             )
+
+            match_night(self.timer, is_night)
             if is_night:
-                self.timer.Android.click(325, 350)
+                # self.timer.Android.click(325, 350)
                 return "yes", literals.FIGHT_CONTINUE_FLAG
             else:
-                self.timer.Android.click(615, 350)
+                # self.timer.Android.click(615, 350)
                 return "no", literals.FIGHT_CONTINUE_FLAG
 
         elif state == "result":
-            time.sleep(1.5)
-            self.timer.Android.click(900, 500, 2, 0.16)
+            # time.sleep(1.5)
+            # self.timer.Android.click(900, 500, times=2, delay=0.2)
+            click_result(self.timer)
             return None, literals.FIGHT_CONTINUE_FLAG
         elif state == "get_ship":
             get_ship(self.timer)
@@ -737,7 +742,7 @@ class IndependentFightInfo(FightInfo):
             "fight_period": ["night", "result"],
             "night": {
                 "yes": ["night_fight_period"],
-                "no": [["result", 7]],
+                "no": [["result", 8]],
             },
             "night_fight_period": ["result"],
             "result": ["battle_page"],  # 两页战果
