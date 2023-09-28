@@ -141,7 +141,7 @@ class NormalFightInfo(FightInfo):
         for i in range(26):
             ch = chr(ord("A") + i)
             if ch not in self.point_positions.keys():
-                break
+                continue
             if CalcDis(self.point_positions[ch], self.ship_position) < CalcDis(
                 self.point_positions[self.node], self.ship_position
             ):
