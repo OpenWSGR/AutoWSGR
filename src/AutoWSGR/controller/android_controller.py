@@ -88,6 +88,8 @@ class AndroidController:
         original_x, original_y = x, y  # 保存原始坐标用来输出日志
         x, y = convert_position(x, y, self.resolution)
         if enable_subprocess == 1:
+            if self.config.SHOW_ANDROID_INPUT and "not_show" not in kwargs:
+                self.logger.debug("click:", time.time(), original_x, original_y)
             p = th.Thread(target=lambda: self.ShellCmd(f"input tap {str(x)} {str(y)}"))
             p.start()
             return p

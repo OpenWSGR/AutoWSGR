@@ -1,0 +1,13 @@
+# E10 AD两点夜战，此次活动跟之前的设置不一样
+# 本次活动E6-E9设置map为1-4
+# E10的四个入口 阿尔法-德尔塔分别设置map为5-8
+# from_which_entrance也设置为相应的1-4
+
+chapter: E
+map: 7
+from_which_entrance: 2
+selected_nodes: [A,D]
+repair_mode: 2
+
+node_defaults:
+  formation: 4

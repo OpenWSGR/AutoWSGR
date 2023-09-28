@@ -42,6 +42,8 @@ node_defaults: #
 
   # 特殊情况
   supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退
+  #远程导弹支援
+  long_missile_support: False
 
 exercise_defaults:
   chapter: 'exercise' # 不要改动

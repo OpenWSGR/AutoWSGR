@@ -8,6 +8,7 @@ from AutoWSGR.constants.image_templates import IMG
 from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES, SAP
 from AutoWSGR.constants.positions import BLOOD_BAR_POSITION
 from AutoWSGR.constants.ui import Node
+from AutoWSGR.controller.emulator import Emulator
 from AutoWSGR.controller.run_timer import Timer
 from AutoWSGR.game.game_operation import (
     DestroyShip,
@@ -200,6 +201,7 @@ class FightInfo(ABC):
         self.oil = 10  # 我方剩余油量
         self.ammo = 10  # 我方剩余弹药量
         self.fight_history = FightHistory()  # 战斗结果记录
+        self.timer.got_ship_num = 0  # 获得的船只数量
 
     def update_state(self):
         self.last_state = self.state
@@ -297,6 +299,7 @@ class FightPlan(ABC):
         self.config = timer.config
         self.logger = timer.logger
         self.fight_logs = []
+        # self.timer.got_ship_num = 0
 
     def fight(self):
         self.Info.reset()  # 初始化战斗信息
@@ -574,7 +577,15 @@ class DecisionBlock:
                 )
                 return "retreat", literals.FIGHT_END_FLAG
             elif detour:
-                self.timer.Android.click(540, 500, delay=0.2)
+                try:
+                    image_detour = IMG.fight_image[13]
+                    Emulator.click_image(self.timer, image=image_detour)
+                    self.timer.logger.info("成功执行迂回操作")
+                except:
+                    self.timer.logger.error("未找到迂回按钮")
+                    self.timer.log_screen(True)
+                    raise ImageNotFoundErr("can't found image")
+                # self.timer.Android.click(540, 500, delay=0.2)
                 Info.fight_history.add_event(
                     "索敌成功",
                     {
@@ -595,6 +606,13 @@ class DecisionBlock:
                 },
                 "战斗",
             )
+            if self.long_missile_support == True:
+                try:
+                    image_missile_support = IMG.fight_image[17]
+                    Emulator.click_image(self.timer, image=image_missile_support)
+                    self.timer.logger.info("成功开启远程导弹支援")
+                except:
+                    self.timer.logger.error("未找到远程支援按钮")
             self.timer.Android.click(855, 501, delay=0.2)
             # self.timer.Android.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
             return "fight", literals.FIGHT_CONTINUE_FLAG
