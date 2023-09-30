@@ -55,7 +55,9 @@ class DailyOperation:
         if self.config.auto_set_support:
             SetSupport(self.timer, True)
 
-        get_loot_and_ship(self.timer)  # 获取胖次掉落和船只掉落数据
+        if self.config.stop_maxship:
+            self.config.stop_maxship = False
+            # get_loot_and_ship(self.timer)  # 获取胖次掉落和船只掉落数据
 
         # 自动出征
         if self.config.auto_normal_fight:

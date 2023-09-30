@@ -1,5 +1,6 @@
 import os
 
+import easyocr
 import numpy as np
 
 from AutoWSGR.controller.run_timer import Timer
@@ -49,7 +50,11 @@ def get_resources(timer: Timer):
     for key in POS["main_page"]["resources"]:
         # image_crop = crop_image(image, *POS["main_page"]["resources"][key])
         # raw_str = pytesseract.image_to_string(image_crop).strip()  # 原始字符串
-        image_crop = crop_image(image, *POS["main_page"]["resources"][key])
+        image_crop = crop_image(
+            image,
+            *POS["main_page"]["resources"][key],
+            resolution=timer.config.resolution,
+        )
         ex_list = "KM/.mk."
         raw_str = recognize_number(image_crop, ex_list=ex_list)
         try:
@@ -64,8 +69,8 @@ def get_resources(timer: Timer):
                 num = raw_str
                 unit = 1
 
-                ret[key] = eval(num) * unit
-                timer.logger.info(f"{key}:{ret[key]}")
+            ret[key] = eval(num) * unit
+            timer.logger.info(f"{key}:{ret[key]}")
         except NameError:
             # 容错处理，如果监测出来不是数字则出错了
             timer.logger.error(f"读取资源失败：{raw_str}")
@@ -84,7 +89,9 @@ def get_loot_and_ship(timer: Timer):
         # raw_str = pytesseract.image_to_string(image_crop).strip()  # 原始字符串
         # easyocr 识别
         ex_list = "/"
-        image_crop = crop_image(image, *POS["map_page"][key])
+        image_crop = crop_image(
+            image, *POS["map_page"][key], resolution=timer.config.resolution
+        )
         raw_str = recognize_number(image_crop, ex_list=ex_list)
 
         try:

@@ -96,7 +96,11 @@ class EventFightPlan20230927(Event, NormalFightPlan):
 
         self.timer.wait_image(self.event_image[1])
         self.timer.Android.click(850, 490)
-        self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
+        try:
+            self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
+        except:
+            self._go_map_page()
+            self._go_fight_prepare_page()
 
 
 class EventFightInfo20230927(Event, NormalFightInfo):
