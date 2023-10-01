@@ -1,4 +1,5 @@
 import os
+import time
 
 from AutoWSGR.constants.custom_exceptions import ImageNotFoundErr
 from AutoWSGR.constants.data_roots import MAP_ROOT
@@ -287,9 +288,15 @@ class DecisiveBattle:
     def go_fleet_page(self):
         if self.detect("running") == "map":
             self.timer.Android.click(900 * 0.75, 667 * 0.75)
-            self.timer.wait_images(
-                IMG.identify_images["fight_prepare_page"], timeout=5, after_get_delay=1
-            )
+            try:
+                self.timer.wait_images(
+                    IMG.identify_images["fight_prepare_page"],
+                    timeout=5,
+                    after_get_delay=1,
+                )
+            except:
+                self.timer.logger.warning("进入出征准备页面失败，正在重试")
+                self.go_fleet_page()
 
     def repair(self):
         self.go_fleet_page()
@@ -454,16 +461,24 @@ class DecisiveBattle:
         self.timer.Android.click(600, 300)
 
     def _get_exp(self):
-        src = recognize_number(self.timer.get_screen()[592:615, 48:118], "(/)")[0][1]
-        self.stats.exp = 0
-        self.stats.need = 20
         try:
-            i1 = src.index("(")
-            i2 = src.index("/")
-            self.stats.exp = int(src[i1 + 1 : i2])
-            self.stats.need = int(src[i2 + 1 : -1])
+            src = recognize_number(self.timer.get_screen()[592:615, 48:118], "(/)")[0][
+                1
+            ]
+            self.stats.exp = 0
+            self.stats.need = 20
+            try:
+                i1 = src.index("(")
+                i2 = src.index("/")
+                self.stats.exp = int(src[i1 + 1 : i2])
+                self.stats.need = int(src[i2 + 1 : -1])
+            except:
+                pass
         except:
-            pass
+            self.timer.logger.warning("读取exp失败，五秒后重试")
+            self.timer.Android.click(580, 500)
+            time.sleep(5)
+            self._get_exp()
 
     def _before_fight(self):
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False:
