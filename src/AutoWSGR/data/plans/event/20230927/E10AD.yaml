@@ -6,7 +6,7 @@
 chapter: E
 map: 6
 from_which_entrance: 2
-selected_nodes: [A,D]
+selected_nodes: [A, D]
 repair_mode: 2
 
 node_defaults:
