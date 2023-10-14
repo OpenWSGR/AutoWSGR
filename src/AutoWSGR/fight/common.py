@@ -201,7 +201,7 @@ class FightInfo(ABC):
         self.oil = 10  # 我方剩余油量
         self.ammo = 10  # 我方剩余弹药量
         self.fight_history = FightHistory()  # 战斗结果记录
-        self.timer.got_ship_num = 0  # 获得的船只数量
+        # self.timer.got_ship_num = 0  # 获得的船只数量
 
     def update_state(self):
         self.last_state = self.state

@@ -21,5 +21,4 @@ node_args:
     proceed_stop: [2, 2, 2, 2, 2, 2]
   F:
     formation: 5
-    night: True
-    proceed: False
+    night: False

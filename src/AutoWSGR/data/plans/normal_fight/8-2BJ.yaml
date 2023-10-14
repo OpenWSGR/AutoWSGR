@@ -9,7 +9,8 @@
 chapter: 8
 map: 2
 selected_nodes: [B, J]
-fight_condition: 4 # 瞄准
+fight_condition: 4 # 战况选择
+repair_mode: 1 #维修策略：1为中破就修，2为大破就修
 
 # NodeLevel
 node_args:

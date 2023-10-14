@@ -20,6 +20,7 @@ class DailyOperation:
 
         self.config = SN(**self.timer.config.daily_automation)
         self.config.DEBUG = False
+        self.timer.got_ship_num = 0
 
         if self.config.auto_expedition:
             self.expedition_plan = Expedition(self.timer)

@@ -9,6 +9,7 @@
 chapter: 8
 map: 5
 selected_nodes: [A, I]
+repair_mode: 1 #维修策略：1为中破就修，2为大破就修
 
 # NodeLevel
 node_args:
