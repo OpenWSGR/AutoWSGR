@@ -1,5 +1,5 @@
-from AutoWSGR.fight.event.event_2023_0809 import EventFightPlan20230809
-from AutoWSGR.scripts.main import start_script
+from autowsgr.fight.event.event_2023_0809 import EventFightPlan20230809
+from autowsgr.scripts.main import start_script
 
 timer = start_script()
 plan = EventFightPlan20230809(timer, "event/20230809/E10AD.yaml", fleet_id=4)

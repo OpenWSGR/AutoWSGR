@@ -3,7 +3,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "AutoWSGR"
+name = "autowsgr"
 version = "0.0.0.1"
 description = "战舰少女R全家桶"
 readme = "README.md"

@@ -3,8 +3,8 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from AutoWSGR.constants.other_constants import ALL_SHIP_TYPES_CN, CN_TYPE_TO_EN_TYPE
-from AutoWSGR.ocr.ship_name import get_allow, recognize
+from autowsgr.constants.other_constants import ALL_SHIP_TYPES_CN, CN_TYPE_TO_EN_TYPE
+from autowsgr.ocr.ship_name import get_allow, recognize
 
 DEBUG = False
 

@@ -1,5 +1,5 @@
-from AutoWSGR.fight import DecisiveBattle
-from AutoWSGR.scripts.main import start_script
+from autowsgr.fight import DecisiveBattle
+from autowsgr.scripts.main import start_script
 
 timer = start_script()
 decisive_battle = DecisiveBattle(

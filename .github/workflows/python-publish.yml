@@ -10,7 +10,7 @@ on:
     branches:
       - main
     paths:
-      - AutoWSGR/__init__.py
+      - autowsgr/__init__.py
 
 permissions:
   contents: read

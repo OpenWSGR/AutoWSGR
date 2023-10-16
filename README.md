@@ -4,7 +4,7 @@
 
 ## 项目简介
 
-![](https://img.shields.io/github/repo-size/huan-yp/Auto-WSGR) ![](https://img.shields.io/pypi/v/AutoWSGR) ![](https://img.shields.io/pypi/dm/AutoWSGR) ![](https://img.shields.io/github/issues/huan-yp/Auto-WSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
+![](https://img.shields.io/github/repo-size/huan-yp/Auto-WSGR) ![](https://img.shields.io/pypi/v/autowsgr) ![](https://img.shields.io/pypi/dm/autowsgr) ![](https://img.shields.io/github/issues/huan-yp/Auto-WSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
 
 用 python 与 c++ 实现的 战舰少女R 的自动化流水线 & 数据统计一体化脚本, 提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口.
 
@@ -28,7 +28,7 @@
 
 欢迎热爱“战舰少女R”以及有一定python基础的同学加入开发，共同完善这个项目。您可以实现新的功能，也可以改进现有功能，或者修复bug。如果您有好的想法，也可以提出issue或加qq群讨论。
 
-本项目已设置好poetry进行版本管理，pre-commit进行代码格式化。开发者请**不要用pip安装AutoWSGR**，改为执行以下命令以开发模式在本地安装（全程需要代理）：
+本项目已设置好poetry进行版本管理，pre-commit进行代码格式化。开发者请**不要用pip安装autowsgr**，改为执行以下命令以开发模式在本地安装（全程需要代理）：
 ```
 git clone https://github.com/huan-yp/Auto-WSGR
 cd Auto-WSGR

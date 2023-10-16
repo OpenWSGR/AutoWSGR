@@ -1,13 +1,13 @@
 import os
 from os.path import dirname, join
 
-import AutoWSGR.fight.battle as bf
-import AutoWSGR.fight.decisive_battle as df
-import AutoWSGR.fight.exercise as ef
-import AutoWSGR.fight.normal_fight as nf
-import AutoWSGR.scripts.daily_api as da
-from AutoWSGR.game.game_operation import build, cook
-from AutoWSGR.scripts.main import start_script
+import autowsgr.fight.battle as bf
+import autowsgr.fight.decisive_battle as df
+import autowsgr.fight.exercise as ef
+import autowsgr.fight.normal_fight as nf
+import autowsgr.scripts.daily_api as da
+from autowsgr.game.game_operation import build, cook
+from autowsgr.scripts.main import start_script
 
 my_df_level1 = ["肥鱼", "U-1206", "狼群47", "射水鱼", "U-96", "U-1405"]
 my_df_level2 = ["U-81", "大青花鱼"]
@@ -34,9 +34,7 @@ dcf4 = df.DecisiveBattle(
     level2=my_df_level2,
     flagship_priority=my_df_fs,
 )
-nf741 = nf.NormalFightPlan(
-    timer, "normal_fight/7-46SS-all.yaml", fleet_id=2, fleet=None
-)
+nf741 = nf.NormalFightPlan(timer, "normal_fight/7-46SS-all.yaml", fleet_id=2, fleet=None)
 nf742 = nf.NormalFightPlan(timer, "week/7.yaml", fleet_id=2, fleet=None)
 nf91 = nf.NormalFightPlan(timer, "normal_fight/9-1A.yaml", fleet_id=4, fleet=None)
 nf92 = nf.NormalFightPlan(timer, "week/9.yaml", fleet_id=3, fleet=None)
@@ -66,7 +64,5 @@ def day():
         build(timer, "equipment", [10, 90, 90, 30])
 
 
-operation = da.DailyOperation(
-    f"{os.path.dirname(os.path.abspath(__file__))}/user_settings/user_settings.yaml"
-)
+operation = da.DailyOperation(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings/user_settings.yaml")
 operation.run()

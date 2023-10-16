@@ -1,5 +1,5 @@
-from AutoWSGR.game.game_operation import build
-from AutoWSGR.scripts.main import start_script
+from autowsgr.game.game_operation import build
+from autowsgr.scripts.main import start_script
 
 timer = start_script()
 build(timer, "ship", [120, 30, 120, 30], force=True)
