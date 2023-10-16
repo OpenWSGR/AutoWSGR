@@ -2,13 +2,15 @@
 log/
 tmp/
 tests/
-user_settings/
-release/
 .vscode/
-src/AutoWSGR/bin/image_recognize/*.PNG
-src/AutoWSGR/bin/image_recognize/*.in
-src/AutoWSGR/bin/image_recognize/*.out
+autowsgr/bin/image_recognize/*.PNG
+autowsgr/bin/image_recognize/*.in
+autowsgr/bin/image_recognize/*.out
 system_test.py
+
+# Package Release
+poetry.toml
+poetry.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

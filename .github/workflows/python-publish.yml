@@ -10,36 +10,28 @@ on:
     branches:
       - main
     paths:
-      - '**/__init__.py'
-    
+      - AutoWSGR/__init__.py
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-
-    #runs-on: ubuntu-latest
-    runs-on: windows-latest
-
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.9'
-    - name: Install Poetry
-      run: |
-        pip install --upgrade pip
-        pip install poetry
-        poetry config virtualenvs.create false
-        poetry install
-    - name: Build package
-      run: poetry build
-    - name: Publish package
-      run: |
-        pip install twine
-        twine upload dist/*
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+      - name: Install Poetry
+        run: |
+          pip install --upgrade pip
+          pip install poetry
+          poetry config virtualenvs.create false --local
+          poetry self add poetry-version-plugin
+          echo "========pwd:========"
+          pwd
+          echo "========ls:========"
+          ls
+          poetry publish --build -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}

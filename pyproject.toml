@@ -1,6 +1,10 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "AutoWSGR"
-version = "0.2.2.2"
+version = "0.0.0.1"
 description = "战舰少女R全家桶"
 readme = "README.md"
 authors = ["Phantom_Peng"]
@@ -8,19 +12,19 @@ license = "MIT"
 
 
 [tool.poetry.dependencies]
-python = "^3.7"
-numpy = { version = "*", python = ">=3.7,<3.11" }
-opencv-python = "==4.5.4.60"
-opencv-contrib-python = "==4.5.4.60"
-opencv-python-headless = "==4.5.4.60"
-airtest = "*"
-keyboard = "*"
-easyocr = "*"
-streamlit = "*"
-pre-commit = "*"
+python = "^3.9"
+pre-commit = "^3.5.0"
+opencv-python = "4.5.4.60"
+opencv-contrib-python = "4.5.4.60"
+opencv-python-headless = "4.5.4.60"
+airtest = "^1.3.1"
+easyocr = "^1.7.1"
+keyboard = "^0.13.5"
 
 
+[tool.poetry-version-plugin]
+source = "init"
 
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 128

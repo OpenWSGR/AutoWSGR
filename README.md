@@ -17,8 +17,6 @@
 - 设置文件格式有小幅度调整, 增加新配置`auto_set_support`，默认为False，开启后每日会尝试开启战役支援. - *2023/9/11*
 - 设置文件格式有小幅度调整, `dock_full_destroy` 参数位置发生了改变, 请对比自己的文件和默认文件. - *2023/6/9*
 - 支持开发, 建造, 用餐功能 *2023/4/26*
-- GUI上线测试，详情请见：[AutoWSGR-GUI](https://github.com/Nickydusk/AutoWSGR-GUI) - *2023/2/26*
-![image-20230226001532677](/.assets/GUI.png)
 
 ## 使用本项目
 
@@ -30,9 +28,11 @@
 
 欢迎热爱“战舰少女R”以及有一定python基础的同学加入开发，共同完善这个项目。您可以实现新的功能，也可以改进现有功能，或者修复bug。如果您有好的想法，也可以提出issue或加qq群讨论。
 
-本项目已设置好pre-commit进行代码格式化，请在commit前执行以下操作以启用该功能：
+本项目已设置好poetry进行版本管理，pre-commit进行代码格式化。开发者请**不要用pip安装AutoWSGR**，改为执行以下命令以开发模式在本地安装（全程需要代理）：
 ```
-pre-commit install
+git clone https://github.com/huan-yp/Auto-WSGR
+cd Auto-WSGR
+./develop_install.bat
 ```
 
 未来开发任务大致按优先级排序：
