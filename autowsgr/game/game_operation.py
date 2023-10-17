@@ -48,10 +48,10 @@ class Expedition:
 
 def get_ship(timer: Timer, max_times=1):
     """获取掉落舰船"""
-    if timer.got_ship_num == None:
-        timer.got_ship_num = 0
-    timer.got_ship_num += 1
-    timer.logger.info(f"已获得舰船：{timer.got_ship_num}")
+    #if timer.got_ship_num == None:
+    #    timer.got_ship_num = 0
+    #timer.got_ship_num += 1
+    #timer.logger.info(f"已获得舰船：{timer.got_ship_num}")
     timer.wait_image(IMG.symbol_image[8])
     while timer.wait_image(IMG.symbol_image[8], timeout=0.5):
         timer.Android.click(915, 515, delay=0.25, times=1)
