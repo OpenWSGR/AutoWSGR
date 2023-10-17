@@ -43,6 +43,7 @@ daily_automation:
   stop_maxship: False # 捞满500船时自动停止
   auto_battle: True # 自动打完每日战役次数
   battle_type: "困难潜艇" # 打哪个。可选名称参考"plans/battle/"
+  auto_exercise: True #自动打完每日的三次演习
 
   auto_normal_fight: True # 按自定义任务进行常规战
   normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。plan名参考"plans/normal_fight/"

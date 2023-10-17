@@ -44,6 +44,8 @@ class Timer(Emulator):
     以下是暂时用不到的
     """
     last_mission_completed = 0
+    got_ship_num = 0
+    got_loot_num = 0
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
