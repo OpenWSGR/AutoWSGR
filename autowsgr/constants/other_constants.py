@@ -154,4 +154,7 @@ RESOURCE_NAME = {
 # 船舱容量,装备容量
 PORT_FACILITIES = {"ship_limit", "ship_amount", "equipment_limit", "equipment_amount"}
 
-# 维修船坞,建造位,开发位
+# 维修船坞, 建造位, 开发位
+
+CHAPTER_NODE_COUNT = [0, 5, 6, 4, 4, 5, 4, 5, 5, 2]
+# 常规图节点数

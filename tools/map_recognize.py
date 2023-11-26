@@ -83,11 +83,9 @@ def SetPoints(windowname, img):
 
 def get_image():
     global timer
-    timer = start_script(settings_path="user_settings/user_settings.yaml")
-    print("HOOKED")
-    keyboard.hook(callback=log_image)
+    timer = start_script()
     import time
-
+    keyboard.hook(log_image)
     time.sleep(1000)
 
 
