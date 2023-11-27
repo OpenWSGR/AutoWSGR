@@ -44,8 +44,8 @@ class Timer(Emulator):
     以下是暂时用不到的
     """
     last_mission_completed = 0
-    got_ship_num = 0
-    got_loot_num = 0
+    got_ship_num = 0  # 当天已掉落的船
+    got_loot_num = 0  # 当天已掉落的胖次
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
@@ -68,12 +68,13 @@ class Timer(Emulator):
     # ========================= 初级游戏控制 =========================
     def init(self):
         """初始化游戏状态, 以便进一步的控制"""
+        self.which_app = self.which_app()
         # ========== 启动游戏 ==========
         if self.config.account is not None and self.config.password != None:
             self.restart(account=self.config.account, password=self.config.password)
         if self.Android.is_game_running() == False:
             self.start_game()
-        self.Android.start_app("com.huanmeng.zhanjian2")
+        self.Android.start_app(self.which_app)
 
         # ========== 检查游戏页面状态 ============
 
@@ -97,7 +98,7 @@ class Timer(Emulator):
 
     def start_game(self, account=None, password=None, delay=1.0):
         """启动游戏"""
-        self.Android.start_app("com.huanmeng.zhanjian2")
+        self.Android.start_app(self.which_app)
         res = self.wait_images(
             [IMG.start_image[2]] + IMG.confirm_image[1:],
             0.85,
@@ -171,7 +172,7 @@ class Timer(Emulator):
 
     def restart(self, times=0, *args, **kwargs):
         try:
-            self.Android.ShellCmd("am force-stop com.huanmeng.zhanjian2")
+            self.Android.ShellCmd(f"am force-stop {self.which_app}")
             self.Android.ShellCmd("input keyevent 3")
             self.start_game(**kwargs)
         except:
@@ -434,6 +435,15 @@ class Timer(Emulator):
         res = self.get_image_position(IMG.confirm_image[pos + 1], confidence=confidence, need_screen_shot=0)
         self.Android.click(res[0], res[1], delay=delay)
         return True
+
+    def which_app(self):
+        if self.config.game_app == "官服":
+            start_game_app = "com.huanmeng.zhanjian2"
+        elif self.config.game_app == "应用宝":
+            start_game_app = "com.tencent.tmgp.zhanjian2"
+        elif self.config.game_app == "小米":
+            start_game_app = "com.tencent.tmgp.zhanjian2"
+        return start_game_app
 
 
 def process_error(timer: Timer):
