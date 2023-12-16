@@ -70,7 +70,7 @@ def click_result(timer: Timer, max_times=1):
     """点击加速两页战果界面"""
     timer.wait_image(IMG.fight_image[14])
     while timer.wait_image(IMG.fight_image[14], timeout=0.5):
-        timer.Android.click(900, 500, delay=0.25, times=1)
+        timer.Android.click(915, 515, delay=0.25, times=1)
 
 
 def DestroyShip(timer: Timer):
