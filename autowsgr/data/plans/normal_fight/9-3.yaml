@@ -1,0 +1,15 @@
+# 功能：9-3航空点测试用，要求最低航速低于27
+
+# MapLevel
+chapter: 9
+map: 3
+selected_nodes: [A]
+
+# NodeLevel
+node_args:
+  A:
+    detour: False
+    formation: 4
+    proceed: False
+    long_missile_support: False
+

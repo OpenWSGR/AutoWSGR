@@ -5,7 +5,7 @@ emulator:
   config_file: ""
   emulator_name: emulator-5554 # 雷电模拟器使用多开器请填写该项, 不多开默认为 "emulator-5554"
 
-game_app: "官服" #官服 小米(暂不支持) 应用宝
+game_app: "官服" #官服 小米 应用宝
 
 LOG_PATH: "log"
 DELAY: 1.5

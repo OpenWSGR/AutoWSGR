@@ -210,6 +210,7 @@ class DecisiveBattle:
         level2=["U-81", "大青花鱼"],
         flagship_priority=["U-1405", "U-47", "U-96", "U-1206"],
         logic=None,
+        repair_level = 1,
         *args,
         **kwargs,
     ):
@@ -233,6 +234,7 @@ class DecisiveBattle:
         """
         self.timer = timer
         self.config = timer.config
+        self.repair_strategy = repair_level
         assert chapter <= 6 and chapter >= 1
         self.stats = DecisiveStats(timer, chapter, map, node, version)
         if logic is None:
@@ -289,7 +291,7 @@ class DecisiveBattle:
 
     def repair(self):
         self.go_fleet_page()
-        quick_repair(self.timer, 1)  # TODO：我的中破比很高，先改成只修大破控制一下用桶
+        quick_repair(self.timer, self.repair_strategy)  # TODO：我的中破比很高，先改成只修大破控制一下用桶
         # quick_repair(self.timer, 2)
 
     def next(self):
