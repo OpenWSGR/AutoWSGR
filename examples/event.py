@@ -7,7 +7,6 @@ from autowsgr.scripts.daily_api import DailyOperation
 import os
 
 timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml")
-SetSupport(timer,True)
 plan = EventFightPlan20240206(timer, "event/20240206/E10IJ.yaml", fleet_id=3)
 plan.run_for_times(500)  # 第一个参数是战斗次数,还有个可选参数为检查远征时间，默认为1800S
 
