@@ -3,10 +3,10 @@ import re
 
 import requests
 
-os.environ["https_proxy"] = "127.0.0.1:7890"
-os.environ["http_proxy"] = "127.0.0.1:7890"
+#os.environ["https_proxy"] = "127.0.0.1:7890"
+#os.environ["http_proxy"] = "127.0.0.1:7890"
 
-UPDATE = False
+UPDATE = True
 URL = "https://www.zjsnrwiki.com/wiki/%E8%88%B0%E5%A8%98%E5%9B%BE%E9%89%B4#searchInput"
 HTML_PATH = "other_data/ship_name.html"
 YAML_PATH = "other_data/ship_name_example.yaml"
@@ -17,6 +17,8 @@ REPLACE = {
     1456: "塔林",
     1169: "丹阳",
     1054: "重庆",
+    1058: "奥希金斯",
+    1185: "机灵",
 }
 
 
@@ -33,18 +35,27 @@ def get_source():
 
 
 def extract(str):
-    re_rk_wsrwiki = r'</tr><tr><td width="162"><center><b>.{0,100}</b></center></td>'
-    re_name_wsrwiki = r'</tr><tr><td width="162" height="56"><center><b><a href="/wiki/.{0,100} title=.{0,100}</a></b></center></td>'
+    re_rk_wsrwiki = r'<td width="162"><center><b>.{0,1000}</b></center></td>'
+    re_name_wsrwiki = r'<td width="162" height="56"><center><b><a href="/wiki/.{0,1000} title=.{0,1000}</a></b></center></td>'
     res = ""
     rks = re.findall(re_rk_wsrwiki, str)
     names = re.findall(re_name_wsrwiki, str)
+    #print(rks)
+    #print(names)
     print(len(rks), len(names))
 
     for rk, name in zip(rks, names):
-        rk = rk[40 : rk.find("</b>")]
+        rk = rk[30 : rk.find("</b>")].strip()  # 添加.strip()以去除可能的空格和换行符
         _title_idx = name.find("title") + 7
         name = name[_title_idx:]
+        #获取改后名字
+        start_index = name.find('>') + 1
+        end_index = name.find('<', start_index)
+        substring = name[start_index:end_index]
+        #获取改前名字
         name = name[: name.index('"')]
+        if substring!=name:
+            print(f"{name} : {substring}")
         if int(rk) in REPLACE:
             name = REPLACE[int(rk)]
         if name.find("(") != -1:
@@ -53,6 +64,7 @@ def extract(str):
             _name = name
         res += f"No.{rk}: # {name}\n"
         res += f'  - "{_name}"\n'
+
 
     res += """Other: # 战例
   - 肌肉记忆
