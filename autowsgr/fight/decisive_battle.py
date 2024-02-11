@@ -430,7 +430,7 @@ class DecisiveBattle:
         self.timer.Android.click(36, 33)
         self.timer.Android.click(600, 300)
 
-    def _get_exp(self):
+    def _get_exp(self, retry=0):
         try:
             src = recognize_number(self.timer.get_screen()[592:615, 48:118], "(/)")[0][1]
             self.stats.exp = 0
@@ -443,10 +443,14 @@ class DecisiveBattle:
             except:
                 pass
         except:
+            if retry > 3:
+                self.timer.logger.error("重新读取 exp 失败, 退出逻辑")
+                raise BaseException() # ToDo: 定义对应的 Exception
+                
             self.timer.logger.warning("读取exp失败，五秒后重试")
             self.timer.Android.click(580, 500)
             time.sleep(5)
-            self._get_exp()
+            self._get_exp(retry + 1)
 
     def _before_fight(self):
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False:
