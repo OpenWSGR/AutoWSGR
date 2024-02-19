@@ -46,6 +46,9 @@ class Timer(Emulator):
     last_mission_completed = 0
     got_ship_num = 0  # 当天已掉落的船
     got_loot_num = 0  # 当天已掉落的胖次
+    got_ship_name = None
+    ship_type = None
+    ship_star = None
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):

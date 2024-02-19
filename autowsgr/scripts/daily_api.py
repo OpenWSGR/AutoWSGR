@@ -3,7 +3,6 @@ from types import SimpleNamespace as SN
 
 from autowsgr.constants import literals
 from autowsgr.fight.battle import BattlePlan
-from autowsgr.fight.exercise import NormalExercisePlan
 from autowsgr.fight.normal_fight import NormalFightPlan
 from autowsgr.game.game_operation import (
     Expedition,
@@ -11,7 +10,9 @@ from autowsgr.game.game_operation import (
     SetSupport,
     get_rewards,
 )
+from autowsgr.ocr.digit import get_loot_and_ship, get_resources
 from autowsgr.scripts.main import start_script
+from autowsgr.fight.exercise import NormalExercisePlan
 
 
 class DailyOperation:
@@ -20,14 +21,15 @@ class DailyOperation:
 
         self.config = SN(**self.timer.config.daily_automation)
         self.config.DEBUG = False
-        self.complete_time = None
+        self.complete_time = None        
 
         if self.config.auto_expedition:
             self.expedition_plan = Expedition(self.timer)
 
         if self.config.auto_battle:
-            self.battle_plan = BattlePlan(self.timer, plan_path=f"battle/{self.config.battle_type}.yaml")
-
+            self.battle_plan = BattlePlan(
+                self.timer, plan_path=f"battle/{self.config.battle_type}.yaml"
+            )
         if self.config.auto_exercise:
             self.exercise_plan = NormalExercisePlan(self.timer, "exercise/plan_1.yaml")
 
@@ -53,9 +55,12 @@ class DailyOperation:
             while ret == literals.OPERATION_SUCCESS_FLAG:
                 ret = self.battle_plan.run()
 
-        # 自动开启支援
+        # 自动开启战役支援
         if self.config.auto_set_support:
             SetSupport(self.timer, True)
+
+        get_loot_and_ship(self.timer)  # 获取胖次掉落和船只掉落数据
+        get_resources(self.timer)
 
         # 自动演习
         if self.config.auto_exercise:
@@ -63,7 +68,7 @@ class DailyOperation:
 
         # 自动出征
         if self.config.auto_normal_fight:
-            while self._has_unfinished():
+            while self._has_unfinished() and self._ship_max():
                 task_id = self._get_unfinished()
 
                 plan = self.fight_plans[task_id]
@@ -83,9 +88,9 @@ class DailyOperation:
 
         # 自动远征
         while True:
-            self._bath_repair()
             if self.config.auto_exercise:
                 self.check_exercise()
+            self._bath_repair()
             self._expedition()
             self._gain_bonus()
             time.sleep(360)
@@ -110,9 +115,18 @@ class DailyOperation:
         if self.config.auto_bath_repair:
             RepairByBath(self.timer)
 
-    # 检查是否可以执行演习任务
+    def _ship_max(self):
+        if self.config.stop_maxship:
+            if self.timer.got_ship_num < 500:
+                self.timer.logger.info(f'已掉落船数量:{self.timer.got_ship_num}')
+                return True
+            else:
+                return False
+        else:
+            return True
+    
     def check_exercise(self):
-        # 判断在哪个时间段
+        #判断在哪个时间段
         now_time = time.localtime(time.time())
         hour = now_time.tm_hour
         if 0 <= hour < 12:
@@ -121,7 +135,7 @@ class DailyOperation:
             self.new_time_period = "12:00-18:00"
         else:
             self.new_time_period = "18:00-23:59"
-        # 判断当前时间段是否执行过任务了
+
         if self.new_time_period != self.complete_time:
             self.timer.logger.info("即将执行演习任务")
             self.exercise_plan.run()
