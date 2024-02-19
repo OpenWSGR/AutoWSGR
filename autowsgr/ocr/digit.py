@@ -2,17 +2,14 @@ import os
 
 import numpy as np
 
-from AutoWSGR.controller.run_timer import Timer
+from autowsgr.controller.run_timer import Timer
+from autowsgr.ocr.paddle__ocr import paddle_ocr
+from autowsgr.ocr.ship_name import recognize_number
 
 # import pytesseract
-#from AutoWSGR.ocr.ship_name import recognize_number
-from AutoWSGR.utils.api_image import crop_image
-from AutoWSGR.utils.io import yaml_to_dict
-from AutoWSGR.ocr.ship_name import recognize_number
-
-from AutoWSGR.ocr.paddle__ocr import paddle_ocr
-
-
+# from AutoWSGR.ocr.ship_name import recognize_number
+from autowsgr.utils.api_image import crop_image
+from autowsgr.utils.io import yaml_to_dict
 
 POS = yaml_to_dict(os.path.join(os.path.dirname(__file__), "relative_location.yaml"))
 
@@ -52,7 +49,7 @@ def get_resources(timer: Timer):
     image = timer.screen
     ret = {}
     for key in POS["main_page"]["resources"]:
-        image_crop = crop_image(image, *POS["main_page"]["resources"][key],resolution=timer.config.resolution)
+        image_crop = crop_image(image, *POS["main_page"]["resources"][key], resolution=timer.config.resolution)
         raw_str = paddle_ocr(image_crop)
         try:
             raw_str = raw_str[0][1][0]
@@ -82,7 +79,7 @@ def get_loot_and_ship(timer: Timer):
     image = timer.screen
     ret = {}
     for key in POS["map_page"]:
-        image_crop = crop_image(image, *POS['map_page'][key],resolution= timer.config.resolution)
+        image_crop = crop_image(image, *POS["map_page"][key], resolution=timer.config.resolution)
         raw_str = paddle_ocr(image_crop)
         try:
             raw_str = raw_str[0][1][0]
@@ -110,5 +107,6 @@ def get_loot_and_ship(timer: Timer):
     timer.logger.info(f"已掉落舰船:{timer.got_ship_num}")
     return ret
 
+
 def get_flop_ship(timer: Timer):
-    pass    
+    pass

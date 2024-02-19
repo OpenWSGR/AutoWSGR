@@ -1,0 +1,33 @@
+# 功能：飞铝速刷胖次
+# 带路条件：装母>=2
+# 索敌条件：
+# 推荐配置：赤城基阿特鞍山大凤G6G15 攻略参考https://bbs.nga.cn/read.php?tid=19809146
+# 同时可以使用这个脚本在9-2倒油完成特建任务
+
+# MapLevel
+chapter: 9
+map: 2
+selected_nodes: [A, D, G, H, M]
+repair_mode: 1   #1中破修，2大破修
+# NodeLevel
+node_defaults:
+  enemy_rules:
+    - [SAP != 1, detour]
+  formation: 2 # 正常情况阵型选择, 1-5
+  # 夜战选择阶段
+  night: False # 是否夜战
+  SL_when_detour_fails: True # 是否迂回失败后退出
+  # 前进选择阶段
+  proceed: True # 结束后是否继续
+  proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
+
+node_args:
+  M:
+    enemy_rules:
+    - [SAP != 1, detour]
+  formation: 2 # 正常情况阵型选择, 1-5
+  # 夜战选择阶段
+  night: False # 是否夜战
+  SL_when_detour_fails: True # 是否迂回失败后退出
+  # 前进选择阶段
+  proceed: False # 结束后是否继续
