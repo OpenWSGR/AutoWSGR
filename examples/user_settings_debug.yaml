@@ -41,7 +41,7 @@ daily_automation:
   auto_gain_bonus: True # 当有任务完成时自动点击
   auto_bath_repair: True # 空闲时自动澡堂修理
   auto_set_support: False # 自动开启战役支援
-  stop_maxship: True # 捞满500船时自动停止
+  # stop_maxship: False # 捞满500船时自动停止
   auto_battle: True # 自动打完每日战役次数
   battle_type: "困难潜艇" # 打哪个。可选名称参考"plans/battle/"
 

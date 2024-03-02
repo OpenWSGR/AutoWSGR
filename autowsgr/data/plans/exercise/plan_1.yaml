@@ -1,6 +1,7 @@
 # 功能: 演习默认模块
 exercise_times: 4
 robot: True
+fleet_id: 2
 node_defaults: # 如果部分参数没有指定,将继承默认模块中的值
   night: True
 node_args:

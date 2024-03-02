@@ -3,7 +3,6 @@ import os
 import numpy as np
 
 from autowsgr.controller.run_timer import Timer
-from autowsgr.ocr.paddle__ocr import paddle_ocr
 from autowsgr.ocr.ship_name import recognize_number
 
 # import pytesseract
@@ -50,7 +49,7 @@ def get_resources(timer: Timer):
     ret = {}
     for key in POS["main_page"]["resources"]:
         image_crop = crop_image(image, *POS["main_page"]["resources"][key], resolution=timer.config.resolution)
-        raw_str = paddle_ocr(image_crop)
+        # raw_str = paddle_ocr(image_crop)
         try:
             raw_str = raw_str[0][1][0]
             if raw_str[-1] == "K":
@@ -80,7 +79,7 @@ def get_loot_and_ship(timer: Timer):
     ret = {}
     for key in POS["map_page"]:
         image_crop = crop_image(image, *POS["map_page"][key], resolution=timer.config.resolution)
-        raw_str = paddle_ocr(image_crop)
+        # raw_str = paddle_ocr(image_crop)
         try:
             raw_str = raw_str[0][1][0]
             ret[key] = eval(raw_str.split("/")[0])  # 当前值

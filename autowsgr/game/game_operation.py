@@ -7,10 +7,8 @@ from autowsgr.controller.run_timer import Timer, try_to_get_expedition
 from autowsgr.ocr.ship_name import recognize_single_number
 from autowsgr.utils.api_image import crop_image
 
-
 from .get_game_info import check_support_stats, detect_ship_stats
 
-from autowsgr.ocr.paddle__ocr import paddle_ocr
 
 class Expedition:
     def __init__(self, timer: Timer) -> None:
@@ -52,24 +50,9 @@ class Expedition:
 def get_ship(timer: Timer, max_times=1):
     """获取掉落舰船"""
     timer.got_ship_num += 1
-    #got_ship_ocr(timer) 识别掉落数据，后续补充相关内容
     timer.wait_image(IMG.symbol_image[8])
     while timer.wait_image(IMG.symbol_image[8], timeout=0.5):
         timer.Android.click(915, 515, delay=0.25, times=1)
-
-def got_ship_ocr(timer: Timer ):
-    """
-    识别获得舰船的名字，返回识别结果,
-    """
-    image = timer.screen
-    image_crop = crop_image(image,pos1=[0.015625, -0.1027], pos2 = [0.49, -0.49] ,resolution=timer.config.resolution)
-    result = paddle_ocr(image_crop, language = "ch")
-    timer.got_ship_name = result[0][1][0]
-    timer.ship_type = result[1][1][0]
-    # timer.ship_star = len(result[2][1][0]) 星级识别暂时有点问题
-    #输出日志
-    timer.logger.info(f"已获得舰船数量：{timer.got_ship_num}, 舰船名称：{timer.got_ship_name}, 舰种：{timer.ship_type}")
-    return result
 
 
 def match_night(timer: Timer, is_night):
