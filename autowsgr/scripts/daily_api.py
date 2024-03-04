@@ -100,7 +100,7 @@ class DailyOperation:
         for i, times in enumerate(self.fight_complete_times):
             if times[0] < times[1]:
                 self.timer.logger.info(
-                    f"正在执行的PLAN：{self.fight_complete_times[i][2]}，已出击次数：{self.fight_complete_times[i][0]}，目标次数：{self.fight_complete_times[i][1]}"
+                    f"正在执行的PLAN：{self.fight_complete_times[i][2]}，已出击次数：{self.fight_complete_times[i][0]}，目标次数：{self.fight_complete_times[i][1]}，消耗快修数量：{self.timer.quick_repaired_cost}"
                 )
                 return i
 

@@ -46,9 +46,10 @@ class Timer(Emulator):
     last_mission_completed = 0
     got_ship_num = 0  # 当天已掉落的船
     got_loot_num = 0  # 当天已掉落的胖次
-    got_ship_name = None
-    ship_type = None
-    ship_star = None
+    quick_repaired_cost = 0  # 消耗快修数量
+    got_ship_name = None  # 掉落船的名字
+    ship_type = None  # 掉落船的类型
+    ship_star = None  # 掉落船的星级
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
@@ -438,6 +439,7 @@ class Timer(Emulator):
         res = self.get_image_position(IMG.confirm_image[pos + 1], confidence=confidence, need_screen_shot=0)
         self.Android.click(res[0], res[1], delay=delay)
         return True
+
     @property
     def which_app(self):
         if self.config.game_app == "官服":

@@ -14,7 +14,7 @@ repair_mode: [1, 2, 1, 2, 2, 2] #单独对每个位置设置维修策略
 # NodeLevel
 node_args:
   A:
-    formation: 2
+    formation: 4
     night: False
     enemy_rules:
       - [DD + CL > 1, retreat]

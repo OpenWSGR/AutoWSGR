@@ -14,7 +14,7 @@ repair_mode: 1 #维修策略：1为中破就修，2为大破就修
 # NodeLevel
 node_args:
   A:
-    formation: 2
+    formation: 4
     night: False
     proceed: True
   I:

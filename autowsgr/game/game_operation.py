@@ -211,6 +211,7 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
                 if need_repair[i - 1]:
                     timer.logger.info("WorkInfo:" + str(kwargs))
                     timer.logger.info(str(i) + " Repaired")
+                    timer.quick_repaired_cost += 1
                     timer.Android.click(
                         BLOOD_BAR_POSITION[0][i][0],
                         BLOOD_BAR_POSITION[0][i][1],

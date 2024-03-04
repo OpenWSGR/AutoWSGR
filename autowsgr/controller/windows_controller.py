@@ -27,7 +27,8 @@ class WindowsController:
             self.emulator_config_file = config["config_file"]
 
         self.exe_name = os.path.basename(self.start_cmd)  # 自动获得模拟器的进程名
-        self.emulator_index = (int(re.search(r'\d+', self.emulator_name).group()) - 5554) / 2
+        if self.emulator == "雷电":
+            self.emulator_index = (int(re.search(r"\d+", self.emulator_name).group()) - 5554) / 2
 
     # ======================== 网络 ========================
     def check_network(self):
@@ -66,11 +67,20 @@ class WindowsController:
         :rtype: str
         """
         console_dir = os.path.join(os.path.dirname(self.start_cmd), "ldconsole.exe")
+
         if not global_command:
-            ret = os.popen(console_dir + " " + command + " --index " + str(self.emulator_index) + " " + command_arg)
+            cmd = [console_dir, command, "--index", str(self.emulator_index), command_arg]
         else:
-            ret = os.popen(console_dir + " " + command_arg)
-        return ret.read()
+            cmd = [console_dir, command_arg]
+
+        # 使用subprocess.Popen来执行命令
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        output, error = process.communicate()
+
+        # 获取命令执行的输出
+        result = output.decode("utf-8", errors="replace") if output else error.decode("utf-8", errors="replace")
+
+        return result
 
     # @try_for_times()
     def connect_android(self) -> airtest.core.android.android.Android:
@@ -113,17 +123,30 @@ class WindowsController:
         Returns:
             bool: 在线返回 True, 否则返回 False
         """
-        raw_res = self.ldconsole("isrunning")
-        self.logger.info("Emulator status: " + raw_res)
-        return raw_res == 'running'
+        if self.emulator == "雷电":
+            raw_res = self.ldconsole("isrunning")
+            self.logger.info("Emulator status: " + raw_res)
+            return raw_res == "running"
+        else:
+            raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode("gbk")  # TODO: 检查是否所有windows版本返回都是中文
+            return "PID" in raw_res
 
     def kill_android(self):
-        self.ldconsole("quit")
+        try:
+            if self.emulator == "雷电":
+                self.ldconsole("quit")
+            elif self.emulator == "蓝叠 Hyper-V":
+                subprocess.run(["taskkill", "-f", "-im", self.exe_name])
+        except:
+            pass
 
     def start_android(self):
         try:
-            self.ldconsole("launch")
-            self.logger.info("Emulator launched")
+            if self.emulator == "雷电":
+                self.ldconsole("launch")
+                self.logger.info("Emulator launched")
+            elif self.emulator == "蓝叠 Hyper-V":
+                os.popen(self.start_cmd)
             start_time = time.time()
             while not self.is_android_online():
                 time.sleep(1)
