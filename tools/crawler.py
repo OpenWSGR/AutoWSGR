@@ -8,8 +8,8 @@ import requests
 
 UPDATE = True
 URL = "https://www.zjsnrwiki.com/wiki/%E8%88%B0%E5%A8%98%E5%9B%BE%E9%89%B4#searchInput"
-HTML_PATH = "other_data/ship_name.html"
-YAML_PATH = "other_data/ship_name_example.yaml"
+HTML_PATH = "../other_data/ship_name.html"
+YAML_PATH = "../other_data/ship_name_example.yaml"
 REPLACE = {
     1097: "长春",
     1125: "埃罗芒什",

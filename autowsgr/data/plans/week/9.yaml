@@ -5,7 +5,7 @@ selected_nodes: [A, D, G, H, M, O] # 选择要打的节点，白名单模式，�
 repair_mode: 1
 fleet_id: 2
 fight_condition: 3
-fleet: ["", "飞龙", "U-1206", "U-47", "射水鱼", "U-96", "肥鱼"]
+fleet: ["", "飞龙", "U-1206", "狼群47", "射水鱼", "U-96", "肥鱼"]
 
 node_defaults:
   detour: True # 是否迂回

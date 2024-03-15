@@ -5,7 +5,7 @@ map: 5 # 地图
 selected_nodes: [C, F, I] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
 repair_mode: 1
 fleet_id: 2
-fleet: ["", "U-1405", "U-1206", "U-47", "射水鱼", "U-96", "肥鱼"]
+fleet: ["", "U-1405", "U-1206", "狼群47", "射水鱼", "U-96", "肥鱼"]
 
 node_defaults:
   formation: 2 # 正常情况阵型选择，1-5

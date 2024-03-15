@@ -395,6 +395,7 @@ class FightPlan(ABC):
             raise ValueError("last_point should be a uppercase within 'A' to 'Z'")
         import time
 
+        result_list = ["SS", "S", "A", "B", "C", "D"]
         start_time, run = time.time(), False
         while times:
             ret = self.run(run)
@@ -404,7 +405,11 @@ class FightPlan(ABC):
 
             self.logger.info("战斗信息:\n" + str(self.Info.fight_history))
             fight_results = sorted(self.Info.fight_history.get_fight_results().items())
-            finish = len(fight_results) and fight_results[-1][0] == last_point and fight_results[-1][1] >= result
+            finish = (
+                len(fight_results)
+                and fight_results[-1][0] == last_point
+                and result_list.index(str(fight_results[-1][1])[-1]) <= result_list.index(result)
+            )  # 转化为字符串之后取最后一个字符在result_list查找索引
             if not finish:
                 self.timer.logger.info("不满足预设条件, 此次战斗不计入次数")
                 if time.time() - start_time > insist_time:
