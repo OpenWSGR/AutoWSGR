@@ -111,6 +111,7 @@ class DailyOperation:
     def _gain_bonus(self):
         if self.config.auto_gain_bonus:
             get_rewards(self.timer)
+            self.timer.go_main_page()
 
     def _bath_repair(self):
         if self.config.auto_bath_repair:

@@ -22,7 +22,7 @@ class Logger:
     def save_config(self, config):
         # write config file
         config_str = json.dumps(vars(config), ensure_ascii=False, indent=4, sort_keys=True)
-        with open(os.path.join(self.log_dir, "config.json"), "w") as f:
+        with open(os.path.join(self.log_dir, "config.json"), "w", encoding="utf-8") as f:
             f.write(config_str)
         return config_str
 

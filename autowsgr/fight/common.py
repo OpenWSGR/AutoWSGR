@@ -405,13 +405,18 @@ class FightPlan(ABC):
 
             self.logger.info("战斗信息:\n" + str(self.Info.fight_history))
             fight_results = sorted(self.Info.fight_history.get_fight_results().items())
+            # 根据情况截取战果，并在result_list查找索引
+            if len(fight_results):
+                if str(fight_results[-1][1])[-2].isalpha():
+                    fight_result_index = result_list.index(str(fight_results[-1][1])[-2:])
+                else:
+                    fight_result_index = result_list.index(str(fight_results[-1][1])[-1])
+
             finish = (
-                len(fight_results)
-                and fight_results[-1][0] == last_point
-                and result_list.index(str(fight_results[-1][1])[-1]) <= result_list.index(result)
-            )  # 转化为字符串之后取最后一个字符在result_list查找索引
+                len(fight_results) and fight_results[-1][0] == last_point and fight_result_index <= result_list.index(result)
+            )
             if not finish:
-                self.timer.logger.info("不满足预设条件, 此次战斗不计入次数")
+                self.timer.logger.info(f"不满足预设条件, 此次战斗不计入次数, 剩余战斗次数:{times}")
                 if time.time() - start_time > insist_time:
                     return False
             else:
