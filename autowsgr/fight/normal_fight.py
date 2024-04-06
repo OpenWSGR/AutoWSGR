@@ -42,6 +42,7 @@ class NormalFightInfo(FightInfo):
                     "spot_enemy_success",
                     "formation",
                     "fight_period",
+                    "map_page",
                 ],
                 "no": ["map_page"],
             },
