@@ -7,7 +7,7 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
-from autowsgr.game.game_operation import get_ship, quick_repair
+from autowsgr.game.game_operation import DestroyShip, get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.ocr.ship_name import _recognize_ship, recognize_number
 from autowsgr.port.ship import Fleet, count_ship
@@ -210,7 +210,8 @@ class DecisiveBattle:
         level2=["U-81", "大青花鱼"],
         flagship_priority=["U-1405", "U-47", "U-96", "U-1206"],
         logic=None,
-        repair_level = 1,
+        repair_level=1,
+        full_destroy=False,
         *args,
         **kwargs,
     ):
@@ -228,6 +229,8 @@ class DecisiveBattle:
             level2: 第二优先舰船, Defaults Recommend
             flagship_priority: 旗舰优先级, Defaults Recommend
             logic: 逻辑模块, unsupported since now
+            repair_level: 维修策略，1为中破修，2为大破修，Defaults to 1.
+            full_destroy: 船舱满了之后是否自动解装，默认不解装.
         Examples:
             : 若当前决战进度为还没打 6-2-A, 则应填写 chapter=6, map=1, node='A'
             : 可以支持断点开始
@@ -235,6 +238,7 @@ class DecisiveBattle:
         self.timer = timer
         self.config = timer.config
         self.repair_strategy = repair_level
+        self.full_destroy = full_destroy
         assert chapter <= 6 and chapter >= 1
         self.stats = DecisiveStats(timer, chapter, map, node, version)
         if logic is None:
@@ -393,6 +397,8 @@ class DecisiveBattle:
                 stats = "refreshed"
             if stats == "refreshed":
                 # 选用上一次的舰船并进入
+                if self.check_dock_full():
+                    return "full_destroy_success"
                 self.timer.Android.click(500, 500, delay=0.25)
                 for i in range(5):
                     self.timer.click_image(IMG.decisive_battle_image[7], timeout=12, must_click=True)
@@ -416,6 +422,10 @@ class DecisiveBattle:
         else:
             self.detect()
             self.timer.Android.click(500, 500, delay=0)
+
+        if self.check_dock_full():
+            return "full_destroy_success"
+
         res = self.timer.wait_images(
             [IMG.decisive_battle_image[1], IMG.decisive_battle_image[6]],
             timeout=10,
@@ -424,6 +434,17 @@ class DecisiveBattle:
         if res is None:
             raise ImageNotFoundErr("Can't Identify on enter_map")
         return "other chapter is running" if (res == 1) else "ok"
+
+    def check_dock_full(self):
+        """
+        检查船舱是否满，船舱满了自动解装
+        """
+        if self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None and self.full_destroy:
+            self.timer.Android.relative_click(0.38 - 0.5, 0.565 - 0.5)
+            DestroyShip(self.timer)
+            self.enter_map()
+            return True
+        return False
 
     def retreat(self):
         self._go_map_page()
@@ -445,8 +466,8 @@ class DecisiveBattle:
         except:
             if retry > 3:
                 self.timer.logger.error("重新读取 exp 失败, 退出逻辑")
-                raise BaseException() # ToDo: 定义对应的 Exception
-                
+                raise BaseException()  # ToDo: 定义对应的 Exception
+
             self.timer.logger.warning("读取exp失败，五秒后重试")
             self.timer.Android.click(580, 500)
             time.sleep(5)
