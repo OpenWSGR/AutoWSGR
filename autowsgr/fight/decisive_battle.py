@@ -4,6 +4,7 @@ import time
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
+from autowsgr.controller.emulator import Emulator
 from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
@@ -325,10 +326,15 @@ class DecisiveBattle:
         screen = self.timer.get_screen()
         # 应该能保证数字读取成功...
         self.stats.score = int(recognize_number(screen[25:55, 1162:1245], min_size=5, text_threshold=0.05, low_text=0.02)[0][1])
+        self.timer.logger.debug(f"当前可用费用为：{self.stats.score}")
         costs = recognize_number(screen[550:585, 245:1031], "x")
         _costs, ships, real_position = [], [], []
         for i, cost in enumerate(costs):
-            if int(cost[1][1:]) > self.stats.score:
+            try:
+                if int(cost[1][1:]) > self.stats.score:
+                    continue
+            except Exception as e:
+                self.timer.logger.error(f"读取购买费用出错，错误如下:\n {e}")
                 continue
             ships.append(_recognize_ship(screen[488:515, DSP[i][0] : DSP[i][1]], self.timer.ship_names)[0][0])
             _costs.append(int(cost[1][1:]))
@@ -461,8 +467,9 @@ class DecisiveBattle:
                 i2 = src.index("/")
                 self.stats.exp = int(src[i1 + 1 : i2])
                 self.stats.need = int(src[i2 + 1 : -1])
+                self.timer.logger.debug(f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}")
             except:
-                pass
+                self.timer.logger.error("识别副官升级经验数值失败")
         except:
             if retry > 3:
                 self.timer.logger.error("重新读取 exp 失败, 退出逻辑")
