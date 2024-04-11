@@ -49,9 +49,12 @@ def get_resources(timer: Timer):
     ret = {}
     for key in POS["main_page"]["resources"]:
         image_crop = crop_image(image, *POS["main_page"]["resources"][key], resolution=timer.config.resolution)
-        # raw_str = paddle_ocr(image_crop)
+        raw_str_list = recognize_number(image_crop, "KM.")
         try:
-            raw_str = raw_str[0][1][0]
+            # if raw_str_list[0][2] < 0.99:
+            #     timer.logger.error(f"识别失败：{key},{raw_str_list[0][1]},confidence:{raw_str_list[0][2]}")
+            #     continue
+            raw_str = raw_str_list[0][1]
             if raw_str[-1] == "K":
                 num = raw_str[:-1]
                 unit = 1000
@@ -65,8 +68,7 @@ def get_resources(timer: Timer):
             ret[key] = eval(num) * unit
         except:
             # 容错处理，如果监测出来不是数字则出错了
-            timer.logger.error(f"读取资源失败：{raw_str}")
-            timer.logger.error(f"读取资源失败：{ret}")
+            timer.logger.error(f"读取{key}资源失败：{raw_str_list}")
     timer.logger.info(ret)
     return ret
 
@@ -79,16 +81,16 @@ def get_loot_and_ship(timer: Timer):
     ret = {}
     for key in POS["map_page"]:
         image_crop = crop_image(image, *POS["map_page"][key], resolution=timer.config.resolution)
-        # raw_str = paddle_ocr(image_crop)
+        raw_str_list = recognize_number(image_crop, "/")
         try:
-            raw_str = raw_str[0][1][0]
+            # if raw_str_list[0][2] < 0.99:
+            #     timer.logger.error(f"识别失败：{key},{raw_str_list[0][1]},confidence:{raw_str_list[0][2]}")
+            #     continue
+            raw_str = raw_str_list[0][1]
             ret[key] = eval(raw_str.split("/")[0])  # 当前值
             ret[key + "_max"] = eval(raw_str.split("/")[1])  # 最大值
         except:
-            if key == "loot":
-                timer.logger.error("读今日战利品失败！")
-            else:
-                timer.logger.error("读今日捞船数量失败！")
+            timer.logger.error(f"读取{key}数量失败：{raw_str_list}")
     try:
         timer.got_ship_num = ret.get("ship")
     except:

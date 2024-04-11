@@ -57,8 +57,8 @@ class DailyOperation:
         if self.config.auto_set_support:
             SetSupport(self.timer, True)
 
-        # get_loot_and_ship(self.timer)  # 获取胖次掉落和船只掉落数据
-        # get_resources(self.timer)
+        get_loot_and_ship(self.timer)  # 获取胖次掉落和船只掉落数据
+        get_resources(self.timer)
 
         # 自动演习
         if self.config.auto_exercise:
@@ -66,7 +66,7 @@ class DailyOperation:
 
         # 自动出征
         if self.config.auto_normal_fight:
-            while self._has_unfinished():
+            while self._has_unfinished() and self._ship_max():
                 task_id = self._get_unfinished()
 
                 plan = self.fight_plans[task_id]
@@ -118,14 +118,13 @@ class DailyOperation:
             RepairByBath(self.timer)
 
     def _ship_max(self):
-        if self.config.stop_maxship:
-            if self.timer.got_ship_num < 500:
-                self.timer.logger.info(f"已掉落船数量:{self.timer.got_ship_num}")
-                return True
-            else:
-                return False
-        else:
+        if not self.config.stop_maxship:
             return True
+        if self.timer.got_ship_num < 500:
+            self.timer.logger.info(f"已掉落船数量:{self.timer.got_ship_num}")
+            return True
+        else:
+            return False
 
     def check_exercise(self):
         # 判断在哪个时间段
