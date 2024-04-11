@@ -1,6 +1,7 @@
 import datetime
 import os
-from types import SimpleNamespace as SN
+import winreg
+from types import SimpleNamespace
 
 import keyboard as kd
 
@@ -11,6 +12,35 @@ from autowsgr.utils.new_logger import Logger
 
 event_pressed = set()
 script_end = 0
+
+
+def initialize_logger_and_config(settings_path):
+    config = yaml_to_dict(os.path.join(os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"))
+    if settings_path is not None:
+        user_settings = yaml_to_dict(settings_path)
+        config = recursive_dict_update(config, user_settings)
+    else:
+        print("========Warning========")
+        print(f"No user_settings file specified, default settings "
+              f"{os.path.join(os.path.dirname(autowsgr.__file__), 'data', 'default_settings.yaml')}"
+              f" will be used.")
+        print("=========End===========")
+
+    # reading the registry for emulator if needed
+    if config["emulator"]["start_cmd"] == "":
+        print("No emulator directory provided, reading the registry")
+        config["emulator"]["start_cmd"] = get_emulator_path(config["emulator"]["type"])
+        print("The emulator directory is " + config["emulator"]["start_cmd"])
+
+    # set logger
+    config["log_dir"] = os.path.join(config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    os.makedirs(config["log_dir"], exist_ok=True)
+    logger = Logger(config)
+    config = SimpleNamespace(**config)
+    timer = Timer(config, logger)
+    config_str = logger.save_config(config)
+    logger.reset_level()
+    return config, logger
 
 
 def start_script(settings_path=None):
@@ -33,13 +63,8 @@ def start_script(settings_path=None):
         print("=========End===========")
 
     # set logger
-    config["log_dir"] = os.path.join(config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-    os.makedirs(config["log_dir"], exist_ok=True)
-    logger = Logger(config)
-    config = SN(**config)
+    config, logger = initialize_logger_and_config(settings_path)
     timer = Timer(config, logger)
-    config_str = logger.save_config(config)
-    timer.logger.reset_level()  # sb airtest reset all the fucking log level
     return timer
 
 
@@ -48,23 +73,33 @@ def start_script_emulator(settings_path=None):
     Returns:
         Emulator: 该模拟器的记录器
     """
-    config = yaml_to_dict(os.path.join(os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"))
-    if settings_path is not None:
-        user_settings = yaml_to_dict(settings_path)
-        config = recursive_dict_update(config, user_settings)
-    else:
-        print("========Warning========")
-        print(
-            f"No user_settings file specified, default settings {os.path.join(os.path.dirname(autowsgr.__file__), 'data', 'default_settings.yaml')} will be used."
-        )
-        print("=========End===========")
+    config, logger = initialize_logger_and_config(settings_path)
+    emulator = Emulator(config, logger)
+    return emulator
 
-    # set logger
-    config["log_dir"] = os.path.join(config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-    os.makedirs(config["log_dir"], exist_ok=True)
-    logger = Logger(config)
-    config = SN(**config)
-    enmulator = Emulator(config, logger)
-    config_str = logger.save_config(config)
-    enmulator.logger.reset_level()  # sb airtest reset all the fucking log level
-    return enmulator
+
+def get_emulator_path(emulator_type):
+    try:
+        if emulator_type == "雷电":
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\leidian\ldplayer9")
+            try:
+                path, _ = winreg.QueryValueEx(key, "InstallDir")
+                return os.path.join(path, "dnplayer.exe")
+            except FileNotFoundError:
+                print("Path not found")
+            finally:
+                winreg.CloseKey(key)
+
+        elif emulator_type == "蓝叠 Hyper-V":
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt_cn")
+            try:
+                path, _ = winreg.QueryValueEx(key, "InstallDir")
+                return os.path.join(path, "HD-Player.exe")
+            except FileNotFoundError:
+                print("Path not found")
+            finally:
+                winreg.CloseKey(key)
+
+    except FileNotFoundError:
+        print("Emulator not found")
+        return None

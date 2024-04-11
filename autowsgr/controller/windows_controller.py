@@ -125,7 +125,7 @@ class WindowsController:
         """
         if self.emulator == "雷电":
             raw_res = self.ldconsole("isrunning")
-            self.logger.info("Emulator status: " + raw_res)
+            self.logger.debug("Emulator status: " + raw_res)
             return raw_res == "running"
         else:
             raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode("gbk")  # TODO: 检查是否所有windows版本返回都是中文

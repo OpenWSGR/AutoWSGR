@@ -1,7 +1,7 @@
 # ========== 游戏设置 ==========
 emulator:
   type: "雷电" # 模拟器类型
-  start_cmd: "C:/leidian/LDPlayer9/dnplayer.exe"
+  start_cmd: "" # 模拟器的地址，如果留空则自动从注册表中查询 示例: "C:/leidian/LDPlayer9/dnplayer.exe"
   config_file: ""
   emulator_name: emulator-5554 # 雷电模拟器使用多开器请填写该项, 不多开默认为 "emulator-5554"
 
