@@ -21,23 +21,26 @@ def initialize_logger_and_config(settings_path):
         config = recursive_dict_update(config, user_settings)
     else:
         print("========Warning========")
-        print(f"No user_settings file specified, default settings "
-              f"{os.path.join(os.path.dirname(autowsgr.__file__), 'data', 'default_settings.yaml')}"
-              f" will be used.")
+        print(
+            f"No user_settings file specified, default settings "
+            f"{os.path.join(os.path.dirname(autowsgr.__file__), 'data', 'default_settings.yaml')}"
+            f" will be used."
+        )
         print("=========End===========")
 
     # reading the registry for emulator if needed
     if config["emulator"]["start_cmd"] == "":
+        print("========Warning========")
         print("No emulator directory provided, reading the registry")
         config["emulator"]["start_cmd"] = get_emulator_path(config["emulator"]["type"])
         print("The emulator directory is " + config["emulator"]["start_cmd"])
+        print("=========End===========")
 
     # set logger
     config["log_dir"] = os.path.join(config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     os.makedirs(config["log_dir"], exist_ok=True)
     logger = Logger(config)
     config = SimpleNamespace(**config)
-    timer = Timer(config, logger)
     config_str = logger.save_config(config)
     logger.reset_level()
     return config, logger
@@ -51,17 +54,6 @@ def start_script(settings_path=None):
     Returns:
         Timer: 该模拟器的记录器
     """
-    config = yaml_to_dict(os.path.join(os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"))
-    if settings_path is not None:
-        user_settings = yaml_to_dict(settings_path)
-        config = recursive_dict_update(config, user_settings)
-    else:
-        print("========Warning========")
-        print(
-            f"No user_settings file specified, default settings {os.path.join(os.path.dirname(autowsgr.__file__), 'data', 'default_settings.yaml')} will be used."
-        )
-        print("=========End===========")
-
     # set logger
     config, logger = initialize_logger_and_config(settings_path)
     timer = Timer(config, logger)

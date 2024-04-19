@@ -80,7 +80,7 @@ class NormalFightInfo(FightInfo):
             "formation": [IMG.fight_image[1], 22.5],
             "fight_period": [IMG.symbol_image[4], 30],
             "night": [IMG.fight_image[6], 150],
-            "result": [IMG.fight_image[3], 90],
+            "result": [IMG.fight_image[14], 90],
             "get_ship": [IMG.symbol_image[8], 5],
             "flagship_severe_damage": [IMG.fight_image[4], 7.5],
             "map_page": [self.map_image, 7.5],

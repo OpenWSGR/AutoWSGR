@@ -16,7 +16,7 @@ from autowsgr.scripts.main import start_script
 
 
 class DailyOperation:
-    def __init__(self, setting_path) -> None:
+    def __init__(self, setting_path=None) -> None:
         self.timer = start_script(setting_path)
 
         self.config = SN(**self.timer.config.daily_automation)
@@ -142,4 +142,4 @@ class DailyOperation:
             self.exercise_plan.run()
             self.complete_time = self.new_time_period
         else:
-            self.timer.logger.info("当前时间段演习已完成")
+            self.timer.logger.debug("当前时间段演习已完成")

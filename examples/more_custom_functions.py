@@ -12,7 +12,7 @@ def week(start=1, start_times=0, fleet_id=4, change=True):
     # 完成周常任务(针对作者的船舱)
     changes = [None, -1, -1, -1, -1, None, None, None, None, -1]
     last_point = [None, "B", "F", "G", "L", "I", "J", "M", "L", "O"]
-    result = ["S"] * 9 + ["A"]
+    result = ["S"] * 9 + ["S"]
     if change:
         changes[start] = -1
     for i in range(start, 10):

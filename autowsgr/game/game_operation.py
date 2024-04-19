@@ -49,8 +49,9 @@ class Expedition:
 
 def get_ship(timer: Timer, max_times=1):
     """获取掉落舰船"""
+    if not timer.wait_image(IMG.symbol_image[8], timeout=60):
+        raise ImageNotFoundErr("got ship image not found")
     timer.got_ship_num += 1
-    timer.wait_image(IMG.symbol_image[8])
     while timer.wait_image(IMG.symbol_image[8], timeout=0.5):
         timer.Android.click(915, 515, delay=0.25, times=1)
 
@@ -67,7 +68,7 @@ def match_night(timer: Timer, is_night):
 
 def click_result(timer: Timer, max_times=1):
     """点击加速两页战果界面"""
-    timer.wait_image(IMG.fight_image[14])
+    timer.wait_images(IMG.fight_image[3])
     while timer.wait_image(IMG.fight_image[14], timeout=0.5):
         timer.Android.click(915, 515, delay=0.25, times=1)
 
