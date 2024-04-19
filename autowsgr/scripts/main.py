@@ -9,6 +9,7 @@ import autowsgr
 from autowsgr.controller.run_timer import Emulator, Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.new_logger import Logger
+from autowsgr.utils.update import check_for_updates
 
 event_pressed = set()
 script_end = 0
@@ -41,6 +42,8 @@ def initialize_logger_and_config(settings_path):
     os.makedirs(config["log_dir"], exist_ok=True)
     logger = Logger(config)
     config = SimpleNamespace(**config)
+    if config.check_update:
+        check_for_updates()
     config_str = logger.save_config(config)
     logger.reset_level()
     return config, logger
