@@ -54,7 +54,11 @@ class Event:
 
         if r_difficulty != difficulty:
             time.sleep(0.2)
-            self.timer.Android.click(66, 483)
+            if int(chapter in "Hh"):
+                self.timer.click_images(self.common_image["hard"])
+            else:
+                self.timer.click_images(self.common_image["easy"])
+
             if self.get_difficulty() != r_difficulty:
                 if retry:
                     return self.change_difficulty(chapter, False)
