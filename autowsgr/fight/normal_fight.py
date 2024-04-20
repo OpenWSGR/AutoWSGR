@@ -31,6 +31,7 @@ class NormalFightInfo(FightInfo):
         self.point_positions = None
         self.end_page = "map_page"
         self.map_image = IMG.identify_images["map_page"][0]
+        self.ship_image = [IMG.symbol_image[8]] + [IMG.symbol_image[13]]
         self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map_id  # 节点名
         self.ship_position = (0, 0)
@@ -80,8 +81,8 @@ class NormalFightInfo(FightInfo):
             "formation": [IMG.fight_image[1], 22.5],
             "fight_period": [IMG.symbol_image[4], 30],
             "night": [IMG.fight_image[6], 150],
-            "result": [IMG.fight_image[14], 90],
-            "get_ship": [IMG.symbol_image[8], 5],
+            "result": [IMG.fight_image[3], 90],
+            "get_ship": [self.ship_image, 5],
             "flagship_severe_damage": [IMG.fight_image[4], 7.5],
             "map_page": [self.map_image, 7.5],
         }

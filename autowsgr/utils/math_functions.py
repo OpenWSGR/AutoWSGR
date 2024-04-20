@@ -20,6 +20,14 @@ def CalcDis(p1, p2):
 
 
 def get_nearest(position, points):
+    """计算一个点距离points的哪个点距离更近
+    Args:
+        position : 第一个点的坐标，(x,y)
+        points : 待计算的坐标，是一个列表
+
+    Returns:
+        距离最近的点在list中位于第几个位置
+    """
     if not True:
         raise ValueError("no color template")
     result = 0 if points[0] is not None else 1

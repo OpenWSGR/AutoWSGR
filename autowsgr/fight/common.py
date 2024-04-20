@@ -65,8 +65,11 @@ class Ship:
 
 class FightResultInfo:
     def __init__(self, timer: Timer, ship_stats) -> None:
-        mvp_pos = timer.get_image_position(IMG.fight_image[14])
-        self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
+        try:
+            mvp_pos = timer.get_image_position(IMG.fight_image[14])
+            self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
+        except Exception as e:
+            timer.logger.error(f"识别MVP失败：{e}")
         self.result = timer.wait_images(IMG.fight_result, timeout=5)
         self.ship_stats = detect_ship_stats(timer, "sumup", ship_stats)
         if timer.image_exist(IMG.fight_result["SS"], need_screen_shot=False):
@@ -256,13 +259,16 @@ class FightInfo(ABC):
         if self.state == "spot_enemy_success":
             self.enemys = get_enemy_condition(self.timer, "fight")
         if self.state == "result":
-            result = FightResultInfo(self.timer, self.ship_stats)
-            self.ship_stats = result.ship_stats
-            self.fight_history.add_event(
-                "战果结算",
-                {"position": self.node if "node" in self.__dict__ else f"此类战斗({type(self)})不支持节点信息"},
-                result=result,
-            )
+            try:
+                result = FightResultInfo(self.timer, self.ship_stats)
+                self.ship_stats = result.ship_stats
+                self.fight_history.add_event(
+                    "战果结算",
+                    {"position": self.node if "node" in self.__dict__ else f"此类战斗({type(self)})不支持节点信息"},
+                    result=result,
+                )
+            except Exception as e:
+                self.logger.error(f"战果结算记录失败：{e}")
 
     @abstractmethod
     def reset(self):
