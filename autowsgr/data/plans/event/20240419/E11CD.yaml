@@ -5,5 +5,5 @@ map: 5
 selected_nodes: [C,D]
 from_alpha: False
 node_defaults:
-  proceed: True
+  proceed: False
   formation: 4

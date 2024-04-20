@@ -24,7 +24,7 @@ NODE_POSITION = (
 
 
 class EventFightPlan20240419(Event, NormalFightPlan):
-    def __init__(self, timer: Timer, plan_path, from_alpha=True, fleet_id=None, event="20240419"):
+    def __init__(self, timer: Timer, plan_path, from_alpha=None, fleet_id=None, event="20240419"):
         """
         Args:
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
@@ -51,7 +51,7 @@ class EventFightPlan20240419(Event, NormalFightPlan):
         self.change_difficulty(chapter_id)
 
     def _is_alpha(self):
-        return self.timer.check_pixel((795, 321), (38, 147, 250), screen_shot=True)
+        return self.timer.check_pixel((795, 317), (249, 146, 37), screen_shot=True)  # 蓝 绿 红
 
     def _go_fight_prepare_page(self) -> None:
         if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
@@ -59,7 +59,7 @@ class EventFightPlan20240419(Event, NormalFightPlan):
 
         # 选择入口
         if self._is_alpha() != self.from_alpha:
-            entrance_position = [(797, 317), (795, 369)]
+            entrance_position = [(797, 369), (795, 317)]
             self.timer.Android.click(*entrance_position[int(self.from_alpha)])
 
         self.timer.wait_image(self.event_image[1])
