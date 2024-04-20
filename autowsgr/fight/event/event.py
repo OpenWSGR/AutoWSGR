@@ -36,10 +36,14 @@ class Event:
         Returns:
             简单 0,困难 1
         这里同时有检查 _go_map_page 是否成功的功能
+        如果未能检测到难度图标，但是检测到进入活动地图，默认没有通过简单难度，返回简单 0.
         """
         res = self.timer.wait_images(self.common_image["hard"] + self.common_image["easy"])
         if res is None:
-            self.logger.error("ImageNotFoundErr", "difficulty image not found")
+            self.logger.error("ImageNotFoundErr: difficulty image not found")
+            if self.timer.wait_image(self.event_image[2]):
+                self.logger.info("成功进入活动页面，未检测到切换难度图标，请检查是否通关简单难度")
+                return 0
             self.timer.log_screen()
             raise ImageNotFoundErr()
 
@@ -55,7 +59,9 @@ class Event:
         if r_difficulty != difficulty:
             time.sleep(0.2)
             if int(chapter in "Hh"):
-                self.timer.click_images(self.common_image["hard"])
+                if not self.timer.click_images(self.common_image["hard"]):
+                    self.logger.error("请检查是否通关简单难度")
+                    raise ImageNotFoundErr("Can't change difficulty")
             else:
                 self.timer.click_images(self.common_image["easy"])
 
