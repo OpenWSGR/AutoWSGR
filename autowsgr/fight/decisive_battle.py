@@ -355,6 +355,7 @@ class DecisiveBattle:
         for target in choose:
             cost, p = selections[target]
             self.stats.score -= cost
+            self.timer.logger.debug(f"选择购买：{target}，花费：{cost}，点击位置：{p}")
             self.timer.Android.click(*p)
             if is_ship(target):
                 self.stats.ships.add(target)

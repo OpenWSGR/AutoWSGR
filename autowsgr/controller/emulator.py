@@ -324,8 +324,11 @@ class Emulator:
         return True
 
     def click_images(self, images, must_click=False, timeout=0, delay=0.5):
-        """点击一些图片中第一张出现的,如果有多个,点击第一个"""
-        self.click_image(images, must_click, timeout)
+        """点击一些图片中第一张出现的,如果有多个,点击第一个
+        Returns:
+            bool:如果找到图片返回true，未找到则返回false，或者抛出一个异常
+        """
+        return self.click_image(images, must_click, timeout)
 
     def log_screen(self, need_screen_shot=False, resolution=(960, 540)):
         """向默认数据记录路径记录当前屏幕数据,带时间戳保存,960x540大小
