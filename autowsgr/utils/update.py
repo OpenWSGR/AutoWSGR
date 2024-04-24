@@ -1,18 +1,19 @@
-import importlib.resources as pkg_resources
+import os
 import subprocess
-import sys
 import time
 
+import pkg_resources
 import requests
 from packaging.version import parse
 
 
 def check_for_updates():
+    print("Checking for updates...")
     # 获取本地autowsgr版本号
     local_version = get_local_version()
 
     # 发送 GET 请求获取库的元数据信息
-    response = requests.get("https://pypi.org/pypi/autowsgr/json")
+    response = requests.get("https://pypi.tuna.tsinghua.edu.cn/pypi/autowsgr/json")
     data = response.json()
 
     # 提取最新版本号
@@ -27,29 +28,23 @@ def check_for_updates():
             update_library()
             print("更新完成，稍后将自动退出，请重新启动脚本")
             time.sleep(5)
-            sys.exit(0)  # 更新成功后退出脚本
+            os._exit(0)  # 更新成功后退出脚本
     else:
         print("You are using the latest version of the library.")
 
 
 def get_local_version():
-    # 寻找本地 autowsgr 库的 __init__.py 文件并读取版本号
+    # 使用pkg_resources获取本地库的版本号
     try:
-        with pkg_resources.open_text("autowsgr", "__init__.py") as f:
-            for line in f:
-                if line.startswith("__version__"):
-                    local_version = line.split("=")[1].strip().strip('"')
-                    return local_version
-            else:
-                print("Error: Cannot find __version__ in __init__.py.")
-                return
+        version = pkg_resources.get_distribution("autowsgr").version
+        return version
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Failed to get the local version.Error: {e}")
         return
 
 
 def update_library():
-    subprocess.run(["pip", "install", "--upgrade", "autowsgr"])
+    subprocess.run(["pip", "install", "--index-url", "https://pypi.tuna.tsinghua.edu.cn/simple", "--upgrade", "autowsgr"])
 
 
 # if __name__ == "__main__":

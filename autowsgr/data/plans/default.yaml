@@ -16,7 +16,6 @@ normal_fight_defaults: # 常规战斗的默认参数(包括活动)
 battle_defaults: # 战役的默认参数
   map: 1 # 简单1-5 困难6-10
   repair_mode: 1 # 1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案 [1, 1, 1, 1, 1, 1]
-fleet_id: 3
 node_defaults: #
   # 演习特有的参数
   fleet_id: 1 # 队伍编号,可以在自己的方案中设置,机器人和玩家独立

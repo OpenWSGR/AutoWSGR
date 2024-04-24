@@ -43,7 +43,10 @@ def initialize_logger_and_config(settings_path):
     logger = Logger(config)
     config = SimpleNamespace(**config)
     if config.check_update:
-        check_for_updates()
+        try:
+            check_for_updates()
+        except Exception as e:
+            print(f"Failed to check for updates: {e}")
     config_str = logger.save_config(config)
     logger.reset_level()
     return config, logger

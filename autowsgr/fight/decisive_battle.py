@@ -4,7 +4,6 @@ import time
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
-from autowsgr.controller.emulator import Emulator
 from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march

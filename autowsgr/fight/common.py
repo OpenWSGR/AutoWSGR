@@ -8,7 +8,6 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_SHIP_TYPES, SAP
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.constants.ui import Node
-from autowsgr.controller.emulator import Emulator
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import (
     DestroyShip,
@@ -543,14 +542,14 @@ class DecisionBlock:
                 )
                 return "retreat", literals.FIGHT_END_FLAG
             elif detour:
-                try:
-                    image_detour = IMG.fight_image[13]
-                    Emulator.click_image(self.timer, image=image_detour)
+                image_detour = IMG.fight_image[13]
+                if self.timer.click_image(image=image_detour, timeout=2.5):
                     self.timer.logger.info("成功执行迂回操作")
-                except:
+                else:
                     self.timer.logger.error("未找到迂回按钮")
                     self.timer.log_screen(True)
                     raise ImageNotFoundErr("can't found image")
+
                 # self.timer.Android.click(540, 500, delay=0.2)
                 Info.fight_history.add_event(
                     "索敌成功",
@@ -565,12 +564,12 @@ class DecisionBlock:
                 "战斗",
             )
             if self.long_missile_support == True:
-                try:
-                    image_missile_support = IMG.fight_image[17]
-                    Emulator.click_image(self.timer, image=image_missile_support)
+                image_missile_support = IMG.fight_image[17]
+                if self.timer.click_image(image=image_missile_support, timeout=2.5):
                     self.timer.logger.info("成功开启远程导弹支援")
-                except:
+                else:
                     self.timer.logger.error("未找到远程支援按钮")
+                    raise ImageNotFoundErr("can't found image of long_missile_support")
             self.timer.Android.click(855, 501, delay=0.2)
             # self.timer.Android.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
             return "fight", literals.FIGHT_CONTINUE_FLAG

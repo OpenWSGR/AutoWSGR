@@ -202,7 +202,7 @@ class NormalFightPlan(FightPlan):
 
         # 检查参数完整情况
         if "fleet_id" not in plan_args:
-            self.logger.warning(f"未指定作战舰队, 默认采用第 {default_args['fleet_id']} 舰队作战")
+            self.logger.warning(f"未指定作战舰队, 默认采用第 {default_args['normal_fight_defaults']['fleet_id']} 舰队作战")
 
         # 从默认参数加载
         plan_defaults = default_args["normal_fight_defaults"]

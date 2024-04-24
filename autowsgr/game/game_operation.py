@@ -4,8 +4,8 @@ from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.controller.run_timer import Timer, try_to_get_expedition
-from autowsgr.ocr.ship_name import recognize_single_number
-from autowsgr.utils.api_image import crop_image
+from autowsgr.ocr.ship_name import recognize_ship, recognize_single_number
+from autowsgr.utils.api_image import convert_position, crop_image
 
 from .get_game_info import check_support_stats, detect_ship_stats
 
@@ -298,7 +298,6 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
             return
 
     # 切换单船
-    # 懒得做 OCR 所以默认第一个
     if ship_stats is None:
         ship_stats = detect_ship_stats(timer)
     if name is None and ship_stats[ship_id] == -1:
@@ -318,10 +317,21 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
 
     timer.Android.text(name)
     timer.Android.click(50, 50, delay=0.5)
-    if ship_stats[ship_id] == -1:
-        timer.Android.click(83, 167, delay=0)
-    else:
-        timer.Android.click(183, 167, delay=0)
+    time.sleep(0.5)
+    # OCR识别舰船
+    if not name in timer.ship_names:
+        timer.ship_names.append(name)
+    ship_info = recognize_ship(timer.get_screen()[:, :1048], timer.ship_names)
+
+    # 查找识别结果中要选的舰船
+    found_ship = next((ship for ship in ship_info if ship[0] == name), None)
+    # 点击舰船
+    if found_ship is None:
+        raise ValueError(f"Can't find ship {name}")
+
+    center = ((found_ship[1][0][0] + found_ship[1][1][0]) / 2, (found_ship[1][0][1] + found_ship[1][2][1]) / 2)
+    center = convert_position(*center, (1280, 720), "this_to_960")
+    timer.Android.click(*center)
 
     timer.wait_pages("fight_prepare_page", gap=0)
 
