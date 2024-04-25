@@ -63,12 +63,12 @@ class EventFightPlan20240419(Event, NormalFightPlan):
             entrance_position = [(797, 369), (795, 317)]
             self.timer.Android.click(*entrance_position[int(self.from_alpha)])
 
-        self.timer.wait_image(self.event_image[1])
-        self.timer.Android.click(850, 490)
+        if not self.timer.click_image(self.event_image[1], timeout=10):
+            self.timer.logger.error("进入战斗准备页面失败")
         try:
             self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
-        except:
-            self.timer.logger.warning("匹配战斗页面失败，尝试重新匹配")
+        except Exception as e:
+            self.timer.logger.warning("匹配fight_prepare_page失败，尝试重新匹配, error: %s" % e)  #
             self.timer.go_main_page()
             self._go_map_page()
             self._go_fight_prepare_page()
