@@ -72,5 +72,5 @@ def update_library(choice="PyPI"):
     subprocess.run(choice_list[choice])
 
 
-if __name__ == "__main__":
-    check_for_updates()
+# if __name__ == "__main__":
+#     check_for_updates()

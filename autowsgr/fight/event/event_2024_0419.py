@@ -25,7 +25,7 @@ NODE_POSITION = (
 
 
 class EventFightPlan20240419(Event, NormalFightPlan):
-    def __init__(self, timer: Timer, plan_path, from_alpha=None, fleet_id=None, event="20240419"):
+    def __init__(self, timer: Timer, plan_path, auto_answer_question=False, from_alpha=None, fleet_id=None, event="20240419"):
         """
         Args:
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
@@ -33,6 +33,7 @@ class EventFightPlan20240419(Event, NormalFightPlan):
             from_alpha : 指定入口, 默认为 True 表示从 alpha 进入, 如果为 False 则从 beta 进入, 优先级高于 plan 文件, 如果为 None 则使用计划文件的参数, 如果都没有指定, 默认从 alpha 进入
         """
         self.event_name = event
+        self.auto_answer_question = auto_answer_question
         NormalFightPlan.__init__(self, timer, plan_path, fleet_id=fleet_id)
         Event.__init__(self, timer, event)
 
@@ -55,6 +56,23 @@ class EventFightPlan20240419(Event, NormalFightPlan):
         return self.timer.check_pixel((795, 317), (249, 146, 37), screen_shot=True)  # 蓝 绿 红
 
     def _go_fight_prepare_page(self) -> None:
+        if self.timer.image_exist(self.Info.event_image[3], need_screen_shot=0):  # 每日答题界面
+            if self.auto_answer_question:
+                pass  # 懒得写了，具体的点和图都没截取
+                # self.timer.click_image(self.Info.event_image[4], need_screen_shot=0) # 前往答题界面
+                # # 自动答题，只管答题，不管正确率，直到答题结束
+                # while self.timer.image_exist(self.Info.event_image[5], need_screen_shot=0): # 判断是否还有下一题答题界面
+                #     self.timer.Android.click(800, 450) # 点击第一个答案
+                #     if self.timer.image_exist(self.Info.event_image[6], need_screen_shot=0): # 判断是否答题错误
+                #         self.timer.Android.click(800, 450) # 答错题选择取消看解析
+                #     else:
+                #         self.timer.ConfirmOperation() # 答对题收取奖励
+                #     self.timer.Android.click(800, 450) # 不确定是否收取奖励之后有下一题
+                # self.timer.Android.click() # 退出答题界面
+
+            else:
+                self.timer.click_image(self.event_image[4], timeout=3)  # 点击取消每日答题按钮
+
         if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
             self.timer.Android.click(*NODE_POSITION[self.map])
 
