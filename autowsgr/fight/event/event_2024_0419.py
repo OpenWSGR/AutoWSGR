@@ -73,7 +73,7 @@ class EventFightPlan20240419(Event, NormalFightPlan):
             else:
                 self.timer.click_image(self.event_image[4], timeout=3)  # 点击取消每日答题按钮
 
-        if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
+        if not self.timer.image_exist(self.Info.event_image[1]):
             self.timer.Android.click(*NODE_POSITION[self.map])
 
         # 选择入口

@@ -314,7 +314,7 @@ class Emulator:
             NotFoundErr: 如果在 timeout 时间内未找到则抛出该异常
         """
         pos = self.wait_images_position(image, gap=0.03, timeout=timeout)
-        if pos == False:
+        if pos is None:
             if must_click == False:
                 return False
             else:
