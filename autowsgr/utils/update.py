@@ -11,7 +11,7 @@ update_source = [
     inquirer.List(
         "source",
         message="Please choose the source to update",
-        choices=["北京外国语(推荐)", "清华源", "PyPI"],
+        choices=["清华源(推荐)", "北京外国语", "PyPI"],
     ),
 ]
 
@@ -22,7 +22,7 @@ def check_for_updates():
     local_version = get_local_version()
 
     # 发送 GET 请求获取库的元数据信息
-    response = requests.get("https://mirrors.bfsu.edu.cn/pypi/web/json/autowsgr")
+    response = requests.get("https://pypi.tuna.tsinghua.edu.cn/pypi/autowsgr/json")
     data = response.json()
 
     # 提取最新版本号
@@ -66,8 +66,8 @@ def get_user_choice(questions):
 def update_library(choice="PyPI"):
     choice_list = {
         "PyPI": ["pip", "install", "--upgrade", "--index-url", "https://pypi.org/simple", "autowsgr"],
-        "北京外国语(推荐)": ["pip", "install", "--index-url", "https://mirrors.bfsu.edu.cn/pypi/web/simple/", "--upgrade", "autowsgr"],
-        "清华源": ["pip", "install", "--index-url", "https://pypi.tuna.tsinghua.edu.cn/simple", "--upgrade", "autowsgr"],
+        "北京外国语": ["pip", "install", "--index-url", "https://mirrors.bfsu.edu.cn/pypi/web/simple/", "--upgrade", "autowsgr"],
+        "清华源(推荐)": ["pip", "install", "--index-url", "https://pypi.tuna.tsinghua.edu.cn/simple", "--upgrade", "autowsgr"],
     }
     subprocess.run(choice_list[choice])
 

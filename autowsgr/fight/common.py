@@ -65,10 +65,11 @@ class Ship:
 class FightResultInfo:
     def __init__(self, timer: Timer, ship_stats) -> None:
         try:
-            mvp_pos = timer.get_image_position(IMG.fight_image[14])
+            mvp_pos = timer.wait_image(IMG.fight_image[14])
             self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
         except Exception as e:
-            timer.logger.error(f"识别MVP失败：{e}")
+            timer.log_screen(name="mvp_image")
+            timer.logger.error(f"can't identify mvp, error: {e}")
         self.result = timer.wait_images(IMG.fight_result, timeout=5)
         self.ship_stats = detect_ship_stats(timer, "sumup", ship_stats)
         if timer.image_exist(IMG.fight_result["SS"], need_screen_shot=False):
