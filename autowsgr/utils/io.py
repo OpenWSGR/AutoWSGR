@@ -23,8 +23,11 @@ def all_in(elements, set):
 
 def yaml_to_dict(yaml_file):
     """将yaml文件转换为字典"""
+    # 处理yaml文件中的转义字符\
     with open(yaml_file, "r", encoding="utf-8") as f:
-        return yaml.load(f, Loader=yaml.FullLoader)
+        content = f.read()
+    content = content.replace("\\", "\\\\")
+    return yaml.load(content, Loader=yaml.FullLoader)
 
 
 def dict_to_yaml(dict_data, yaml_file):

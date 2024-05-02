@@ -315,7 +315,7 @@ class Emulator:
         """
         pos = self.wait_images_position(image, gap=0.03, timeout=timeout)
         if pos is None:
-            if must_click == False:
+            if not must_click:
                 return False
             else:
                 raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")

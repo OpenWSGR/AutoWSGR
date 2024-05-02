@@ -212,25 +212,26 @@ class Timer(Emulator):
         """
         start_time = time.time()
         while self.is_bad_network(timeout):
+            self.logger.log_image(self.update_screen, name="bad_network", ignore_existed_image=True)
             self.logger.error(f"bad network: {extra_info}")
-            while True:
-                if time.time() - start_time >= 180:
-                    raise TimeoutError("Process bad network timeout")
-                if self.Windows.check_network() != False:
-                    break
 
-            start_time2 = time.time()
-            while self.image_exist([IMG.symbol_image[10]] + [IMG.error_image["bad_network"]]):
+            # 等待网络恢复
+
+            if not self.Windows.wait_network():
+                raise NetworkErr("can't connect to www.moefantasy.com")
+
+            # 处理网络问题
+            while self.wait_images([IMG.symbol_image[10]] + [IMG.error_image["bad_network"]], timeout=3):
                 time.sleep(0.5)
-                if time.time() - start_time2 >= 60:
-                    break
+
                 if self.image_exist(IMG.error_image["bad_network"]):
-                    self.Android.click(476, 298, delay=2)
+                    self.click_image(IMG.error_image["network_retry"])
 
-            if time.time() - start_time2 < 60:
-                self.logger.debug("ok network problem solved, at", time.time())
-                return True
-
+                if not self.wait_images([IMG.symbol_image[10]] + [IMG.error_image["bad_network"]], timeout=5):
+                    self.logger.debug("ok network problem solved")
+                    return True
+                if time.time() - start_time > 1800:
+                    raise TimeoutError("process bad network timeout")
         return False
 
     # ========================= 维护当前所在游戏界面 =========================

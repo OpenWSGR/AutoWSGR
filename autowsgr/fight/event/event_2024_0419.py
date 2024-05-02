@@ -82,7 +82,10 @@ class EventFightPlan20240419(Event, NormalFightPlan):
             self.timer.Android.click(*entrance_position[int(self.from_alpha)])
 
         if not self.timer.click_image(self.event_image[1], timeout=10):
-            self.timer.logger.error("进入战斗准备页面失败")
+            self.timer.logger.error("进入战斗准备页面失败,重新尝试进入战斗准备页面")
+            self.timer.Android.click(*NODE_POSITION[self.map])
+            self.timer.click_image(self.event_image[1], timeout=10)
+
         try:
             self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
         except Exception as e:
@@ -96,6 +99,6 @@ class EventFightInfo20240419(Event, NormalFightInfo):
     def __init__(self, timer: Timer, chapter_id, map_id, event="20240419") -> None:
         NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         Event.__init__(self, timer, event)
-        self.map_image = self.common_image["easy"] + self.common_image["hard"] + [self.event_image[1]]
+        self.map_image = self.common_image["easy"] + self.common_image["hard"] + [self.event_image[1]] + [self.event_image[2]]
         self.end_page = "unknown_page"
         self.state2image["map_page"] = [self.map_image, 5]
