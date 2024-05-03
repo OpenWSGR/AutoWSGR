@@ -437,8 +437,8 @@ class FightPlan(ABC):
         except ImageNotFoundErr as _:
             # 处理点击延迟或者网络波动导致的匹配失败
             self.logger.error("Image Match Failed, Processing")
-            if self.timer.process_bad_network(timeout=2.5):
-                pass
+            if self.timer.is_bad_network(timeout=5):
+                self.timer.process_bad_network(extra_info="update_state", timeout=5)
             if self.Info.last_state == "spot_enemy_success":
                 if self.timer.image_exist(IMG.fight_image[2]):
                     self.timer.Android.click(900, 500)

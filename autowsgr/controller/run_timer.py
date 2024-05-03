@@ -201,7 +201,7 @@ class Timer(Emulator):
             self.restart(times + 1, *args, **kwargs)
 
     def is_bad_network(self, timeout=10):
-        return self.wait_images([IMG.error_image["bad_network"], IMG.symbol_image[10]], timeout=timeout) != None
+        return self.wait_images([IMG.error_image["bad_network"]] + [IMG.symbol_image[10]], timeout=timeout) != None
 
     def process_bad_network(self, extra_info="", timeout=10):
         """判断并处理网络状况问题
@@ -212,7 +212,7 @@ class Timer(Emulator):
         """
         start_time = time.time()
         while self.is_bad_network(timeout):
-            self.logger.log_image(self.update_screen, name="bad_network", ignore_existed_image=True)
+            self.logger.log_image(self.update_screen, name="bad_network.PNG", ignore_existed_image=True)
             self.logger.error(f"bad network: {extra_info}")
 
             # 等待网络恢复
@@ -230,6 +230,7 @@ class Timer(Emulator):
                 if not self.wait_images([IMG.symbol_image[10]] + [IMG.error_image["bad_network"]], timeout=5):
                     self.logger.debug("ok network problem solved")
                     return True
+
                 if time.time() - start_time > 1800:
                     raise TimeoutError("process bad network timeout")
         return False
@@ -271,6 +272,10 @@ class Timer(Emulator):
                 break
             time.sleep(gap)
 
+        if self.is_bad_network(timeout=3):
+            if self.process_bad_network("can't wait pages"):
+                res = self.wait_pages(names, timeout, gap, after_wait)
+                return res
         raise TimeoutError(f"identify timeout of{str(names)}")
 
     def get_now_page(self):
@@ -355,7 +360,7 @@ class Timer(Emulator):
         except TimeoutError as exception:
             if try_times > 3:
                 raise TimeoutError("can't access the page")
-            if self.is_bad_network(timeout=0) == False:
+            if not self.is_bad_network(timeout=2):
                 self.logger.debug("wrong path is operated,anyway we find a way to solve,processing")
                 self.logger.debug("wrong info is:", exception)
                 self.go_main_page()
@@ -386,7 +391,13 @@ class Timer(Emulator):
             ValueError: _description_
         """
         if QuitOperationTime > 200:
-            raise ValueError("Error,Couldn't go main page")
+            if self.is_bad_network(timeout=3):
+                if self.process_bad_network("can't go main page"):
+                    self.go_main_page(0, List)
+                    return
+            else:
+                self.logger.error("Unknown error,can't go main page")
+                raise ValueError("Error,Couldn't go main page")
 
         self.now_page = self.ui.get_node_by_name("main_page")
         if len(List) == 0:
