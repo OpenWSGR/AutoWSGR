@@ -202,13 +202,14 @@ class Timer(Emulator):
 
     def is_other_device_login(self, timeout=2):
         """检查是否有其他设备登录顶号"""
-        return self.wait_image(IMG.error_image["user_remote_login"], timeout=timeout) != None
+        return self.wait_images(IMG.error_image["user_remote_login"], timeout=timeout) != None
 
     def process_other_device_login(self, timeout=2):
         """处理其他设备登录顶号
         重新登录以后写，暂时留空,直接抛出错误
         """
         if self.is_other_device_login(timeout):
+            self.logger.log_image(self.update_screen, name="other_device_login.PNG", ignore_existed_image=True)
             self.logger.error("other device login")
             raise CriticalErr("other device login")
 
