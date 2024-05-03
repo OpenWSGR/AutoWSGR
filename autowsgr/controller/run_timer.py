@@ -200,7 +200,20 @@ class Timer(Emulator):
             self.Windows.connect_android()
             self.restart(times + 1, *args, **kwargs)
 
+    def is_other_device_login(self, timeout=2):
+        """检查是否有其他设备登录顶号"""
+        return self.wait_image(IMG.error_image["user_remote_login"], timeout=timeout) != None
+
+    def process_other_device_login(self, timeout=2):
+        """处理其他设备登录顶号
+        重新登录以后写，暂时留空,直接抛出错误
+        """
+        if self.is_other_device_login(timeout):
+            self.logger.error("other device login")
+            raise CriticalErr("other device login")
+
     def is_bad_network(self, timeout=10):
+        """检查是否为网络状况问题"""
         return self.wait_images([IMG.error_image["bad_network"]] + [IMG.symbol_image[10]], timeout=timeout) != None
 
     def process_bad_network(self, extra_info="", timeout=10):
@@ -276,6 +289,9 @@ class Timer(Emulator):
             if self.process_bad_network("can't wait pages"):
                 res = self.wait_pages(names, timeout, gap, after_wait)
                 return res
+        if self.is_other_device_login():
+            self.process_other_device_login()
+
         raise TimeoutError(f"identify timeout of{str(names)}")
 
     def get_now_page(self):
@@ -360,6 +376,8 @@ class Timer(Emulator):
         except TimeoutError as exception:
             if try_times > 3:
                 raise TimeoutError("can't access the page")
+            if self.is_other_device_login():
+                self.process_other_device_login()
             if not self.is_bad_network(timeout=2):
                 self.logger.debug("wrong path is operated,anyway we find a way to solve,processing")
                 self.logger.debug("wrong info is:", exception)
@@ -391,6 +409,9 @@ class Timer(Emulator):
             ValueError: _description_
         """
         if QuitOperationTime > 200:
+            if self.is_other_device_login():
+                self.process_other_device_login()
+
             if self.is_bad_network(timeout=3):
                 if self.process_bad_network("can't go main page"):
                     self.go_main_page(0, List)

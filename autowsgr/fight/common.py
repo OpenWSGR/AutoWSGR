@@ -437,6 +437,8 @@ class FightPlan(ABC):
         except ImageNotFoundErr as _:
             # 处理点击延迟或者网络波动导致的匹配失败
             self.logger.error("Image Match Failed, Processing")
+            if self.timer.is_other_device_login():
+                self.timer.process_other_device_login()  # TODO: 处理其他设备登录
             if self.timer.is_bad_network(timeout=5):
                 self.timer.process_bad_network(extra_info="update_state", timeout=5)
             if self.Info.last_state == "spot_enemy_success":
