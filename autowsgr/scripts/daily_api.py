@@ -27,7 +27,10 @@ class DailyOperation:
             self.expedition_plan = Expedition(self.timer)
 
         if self.config.auto_battle:
-            self.battle_plan = BattlePlan(self.timer, plan_path=f"battle/{self.config.battle_type}.yaml")
+            if self.config.battle_type is None:
+                raise ValueError("未设置战役类型，请检查配置文件")
+            else:
+                self.battle_plan = BattlePlan(self.timer, plan_path=f"battle/{self.config.battle_type}.yaml")
         if self.config.auto_exercise:
             self.exercise_plan = NormalExercisePlan(self.timer, "exercise/plan_1.yaml")
 
