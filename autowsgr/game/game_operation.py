@@ -327,11 +327,17 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
     found_ship = next((ship for ship in ship_info if ship[0] == name), None)
     # 点击舰船
     if found_ship is None:
-        raise ValueError(f"Can't find ship {name}")
-
-    center = ((found_ship[1][0][0] + found_ship[1][1][0]) / 2, (found_ship[1][0][1] + found_ship[1][2][1]) / 2)
-    center = convert_position(*center, (1280, 720), "this_to_960")
-    timer.Android.click(*center)
+        timer.logger.error(f"Can't find ship {name},ocr result:{ship_info}")
+        # raise ValueError(f"Can't find ship {name}")
+        timer.logger.debug("Try to click the first ship")
+        if ship_stats[ship_id] == -1:
+            timer.Android.click(83, 167, delay=0)
+        else:
+            timer.Android.click(183, 167, delay=0)
+    else:
+        center = ((found_ship[1][0][0] + found_ship[1][1][0]) / 2, (found_ship[1][0][1] + found_ship[1][2][1]) / 2)
+        center = convert_position(*center, (1280, 720), "this_to_960")
+        timer.Android.click(*center)
 
     timer.wait_pages("fight_prepare_page", gap=0)
 
