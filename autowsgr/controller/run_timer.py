@@ -7,8 +7,8 @@ from autowsgr.constants.custom_exceptions import (
     ImageNotFoundErr,
     NetworkErr,
 )
-from autowsgr.constants.data_roots import DATA_ROOT
-from autowsgr.constants.image_templates import IMG
+from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT
+from autowsgr.constants.image_templates import IMG, make_dir_templates_without_number
 from autowsgr.constants.other_constants import ALL_PAGES, NO
 from autowsgr.constants.ui import WSGR_UI, Node
 from autowsgr.utils.io import yaml_to_dict
@@ -55,6 +55,8 @@ class Timer(Emulator):
     def __init__(self, config, logger):
         super().__init__(config, logger)
 
+        common_dir = os.path.join(IMG_ROOT, "error_image")
+        self.error_image = make_dir_templates_without_number(common_dir)
         if not self.config.PLAN_ROOT:
             self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")
             self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
@@ -202,20 +204,20 @@ class Timer(Emulator):
 
     def is_other_device_login(self, timeout=2):
         """检查是否有其他设备登录顶号"""
-        return self.wait_images(IMG.error_image["user_remote_login"], timeout=timeout) != None
+        return self.wait_images(self.error_image["user_remote_login"], timeout=timeout) != None
 
     def process_other_device_login(self, timeout=2):
         """处理其他设备登录顶号
-        重新登录以后写，暂时留空,直接抛出错误
+        TODO: 重新登录以后写，暂时留空,直接抛出错误
         """
         if self.is_other_device_login(timeout):
-            self.logger.log_image(self.update_screen, name="other_device_login.PNG", ignore_existed_image=True)
+            self.log_screen(need_screen_shot=True, name="other device login.PNG")
             self.logger.error("other device login")
             raise CriticalErr("other device login")
 
     def is_bad_network(self, timeout=10):
         """检查是否为网络状况问题"""
-        return self.wait_images([IMG.error_image["bad_network"]] + [IMG.symbol_image[10]], timeout=timeout) != None
+        return self.wait_images([IMG.symbol_image[10]] + self.error_image["bad_network"], timeout=timeout) != None
 
     def process_bad_network(self, extra_info="", timeout=10):
         """判断并处理网络状况问题
@@ -226,7 +228,7 @@ class Timer(Emulator):
         """
         start_time = time.time()
         while self.is_bad_network(timeout):
-            self.logger.log_image(self.update_screen, name="bad_network.PNG", ignore_existed_image=True)
+            self.log_screen(need_screen_shot=True, name="bad_network.PNG")
             self.logger.error(f"bad network: {extra_info}")
 
             # 等待网络恢复
@@ -235,13 +237,13 @@ class Timer(Emulator):
                 raise NetworkErr("can't connect to www.moefantasy.com")
 
             # 处理网络问题
-            while self.wait_images([IMG.symbol_image[10]] + [IMG.error_image["bad_network"]], timeout=3):
+            while self.wait_images([IMG.symbol_image[10]] + self.error_image["bad_network"], timeout=3):
                 time.sleep(0.5)
 
-                if self.image_exist(IMG.error_image["bad_network"]):
-                    self.click_image(IMG.error_image["network_retry"])
+                if self.image_exist(self.error_image["bad_network"]):
+                    self.click_image(self.error_image["network_retry"])
 
-                if not self.wait_images([IMG.symbol_image[10]] + [IMG.error_image["bad_network"]], timeout=5):
+                if not self.wait_images([IMG.symbol_image[10]] + self.error_image["bad_network"], timeout=5):
                     self.logger.debug("ok network problem solved")
                     return True
 

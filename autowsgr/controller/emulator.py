@@ -330,7 +330,7 @@ class Emulator:
         """
         return self.click_image(images, must_click, timeout)
 
-    def log_screen(self, need_screen_shot=False, resolution=(960, 540), name=None):
+    def log_screen(self, need_screen_shot=False, resolution=(960, 540), ignore_existed_image=True, name=None):
         """向默认数据记录路径记录当前屏幕数据,带时间戳保存,960x540大小
         Args:
             need_screen_shot (bool, optional): 是否新截取一张图片. Defaults to False.
@@ -340,5 +340,10 @@ class Emulator:
         screen = copy.deepcopy(self.screen)
         screen = cv2.resize(screen, resolution)
         if name is None:
-            name = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        self.logger.log_image(image=screen, name=name)
+            self.logger.log_image(
+                image=screen,
+                ignore_existed_image=ignore_existed_image,
+                name=datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+            )
+        else:
+            self.logger.log_image(image=screen, ignore_existed_image=ignore_existed_image, name=name)

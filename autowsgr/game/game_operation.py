@@ -113,7 +113,7 @@ def verify_team(timer: Timer):
     if timer.process_bad_network():
         return verify_team(timer)
 
-    timer.logger.log_screen()
+    timer.log_screen()
     raise ImageNotFoundErr()
 
 
