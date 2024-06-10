@@ -11,8 +11,7 @@ import keyboard
 
 from autowsgr.controller.run_timer import Timer
 from autowsgr.scripts.main import start_script
-from autowsgr.utils.api_image import relative_to_absolute
-from autowsgr.utils.io import dict_to_yaml, listdir, yaml_to_dict
+from autowsgr.utils.io import dict_to_yaml, listdir
 
 # en_reader = easyocr.Reader(['en'], gpu=False)
 timer = None
@@ -85,6 +84,7 @@ def get_image():
     global timer
     timer = start_script()
     import time
+
     keyboard.hook(log_image)
     time.sleep(1000)
 

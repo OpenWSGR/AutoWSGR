@@ -30,7 +30,7 @@ class NormalFightInfo(FightInfo):
 
         self.point_positions = None
         self.end_page = "map_page"
-        self.map_image = IMG.identify_images["map_page"][0]
+        self.map_image = IMG.identify_images.map_page
         self.ship_image = [IMG.symbol_image[8]] + [IMG.symbol_image[13]]
         self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map_id  # 节点名
@@ -283,7 +283,9 @@ class NormalFightPlan(FightPlan):
             if state == "spot_enemy_success":
                 self.timer.Android.click(677, 492, delay=0)
                 self.Info.last_action = "retreat"
-                self.Info.fight_history.add_event("索敌成功", {"position": self.Info.node, "enemys": "不在预设点, 不进行索敌"}, "撤退")
+                self.Info.fight_history.add_event(
+                    "索敌成功", {"position": self.Info.node, "enemys": "不在预设点, 不进行索敌"}, "撤退"
+                )
                 return literals.FIGHT_END_FLAG
             # 不能撤退退游戏
             elif state == "formation":

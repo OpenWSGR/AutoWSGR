@@ -7,8 +7,12 @@ from typing import Iterable, Tuple
 import cv2
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
-from autowsgr.constants.image_templates import make_dir_templates
-from autowsgr.utils.api_image import MyTemplate, convert_position, locateCenterOnImage
+from autowsgr.utils.api_image import (
+    MyTemplate,
+    absolute_to_relative,
+    locateCenterOnImage,
+    relative_to_absolute,
+)
 from autowsgr.utils.math_functions import CalcDis
 from autowsgr.utils.new_logger import Logger
 
@@ -25,8 +29,8 @@ class Emulator:
         self.logger = logger
         self.Windows = WindowsController(config.emulator, logger)
 
-        # 获取额外图像数据
-        self._add_extra_images()
+        # # 获取额外图像数据
+        # self._add_extra_images()
 
         # 初始化android控制器
         dev = self.Windows.connect_android()
@@ -38,13 +42,13 @@ class Emulator:
 
     # ==========初始化函数==========
 
-    def _add_extra_images(self):
-        if "EXTRA_IMAGE_ROOT" in self.config.__dict__ and self.config.EXTRA_IMAGE_ROOT is not None:
-            if os.path.isdir(self.config.EXTRA_IMAGE_ROOT):
-                self.images = make_dir_templates(self.config.EXTRA_IMAGE_ROOT)
-                self.logger.info(f"Extra Images Loaded:{len(self.images)}")
-            elif self.config.EXTRA_IMAGE_ROOT is not None:
-                self.logger.warning("配置文件参数 EXTRA_IMAGE_ROOT 存在但不是合法的路径")
+    # def _add_extra_images(self):
+    #     if "EXTRA_IMAGE_ROOT" in self.config.__dict__ and self.config.EXTRA_IMAGE_ROOT is not None:
+    #         if os.path.isdir(self.config.EXTRA_IMAGE_ROOT):
+    #             self.images = make_dir_templates(self.config.EXTRA_IMAGE_ROOT)
+    #             self.logger.info(f"Extra Images Loaded:{len(self.images)}")
+    #         elif self.config.EXTRA_IMAGE_ROOT is not None:
+    #             self.logger.warning("配置文件参数 EXTRA_IMAGE_ROOT 存在但不是合法的路径")
 
     # ===========命令函数===========
 
@@ -181,14 +185,10 @@ class Emulator:
         for image in images:
             res = self.locateCenterOnScreen(image, confidence, this_methods)
             if res is not None:
-                return convert_position(res[0], res[1], self.config.resolution, mode="this_to_960")
+                rel_pos = absolute_to_relative(res, self.config.resolution)
+                abs_pos = relative_to_absolute(rel_pos, (960, 540))
+                return abs_pos
         return None
-
-    def get_images_position(self, images, need_screen_shot=1, confidence=0.85, this_methods=None):
-        """同 get_image_position"""
-        if this_methods is None:
-            this_methods = ["tpl"]
-        return self.get_image_position(images, need_screen_shot, confidence, this_methods)
 
     def image_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=None):
         """判断图像是否存在于屏幕中
@@ -202,15 +202,6 @@ class Emulator:
         if need_screen_shot:
             self.update_screen()
         return any(self.get_image_position(image, 0, confidence, this_methods) is not None for image in images)
-
-    def images_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=None):
-        """判断图像是否存在于屏幕中
-        Returns:
-            bool:如果存在为 True 否则为 False
-        """
-        if this_methods is None:
-            this_methods = ["tpl"]
-        return self.image_exist(images, need_screen_shot, confidence, this_methods)
 
     def wait_image(
         self,
@@ -312,6 +303,8 @@ class Emulator:
 
         Raises:
             NotFoundErr: 如果在 timeout 时间内未找到则抛出该异常
+        Returns:
+            bool:如果找到图片返回匹配位置，未找到则返回None
         """
         pos = self.wait_images_position(image, gap=0.03, timeout=timeout)
         if pos is None:
@@ -321,12 +314,12 @@ class Emulator:
                 raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
 
         self.Android.click(*pos, delay=delay)
-        return True
+        return pos
 
     def click_images(self, images, must_click=False, timeout=0, delay=0.5):
         """点击一些图片中第一张出现的,如果有多个,点击第一个
         Returns:
-            bool:如果找到图片返回true，未找到则返回false，或者抛出一个异常
+            bool:如果找到图片返回匹配位置，未找到则返回None
         """
         return self.click_image(images, must_click, timeout)
 

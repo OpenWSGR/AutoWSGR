@@ -4,8 +4,16 @@ from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.controller.run_timer import Timer, try_to_get_expedition
-from autowsgr.ocr.ship_name import recognize_ship, recognize_single_number
-from autowsgr.utils.api_image import convert_position, crop_image
+from autowsgr.ocr.ship_name import (
+    recognize_number,
+    recognize_ship,
+    recognize_single_number,
+)
+from autowsgr.utils.api_image import (
+    absolute_to_relative,
+    crop_image,
+    match_nearest_index,
+)
 
 from .get_game_info import check_support_stats, detect_ship_stats
 
@@ -49,10 +57,11 @@ class Expedition:
 
 def get_ship(timer: Timer, max_times=1):
     """获取掉落舰船"""
-    timer.wait_image([IMG.symbol_image[8]] + [IMG.symbol_image[13]])
+    # TODO: 返回舰船名称
     timer.got_ship_num += 1
     while timer.wait_image([IMG.symbol_image[8]] + [IMG.symbol_image[13]], timeout=1):
         timer.Android.click(915, 515, delay=0.25, times=1)
+        timer.ConfirmOperation()
 
 
 def match_night(timer: Timer, is_night):
@@ -336,8 +345,8 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
             timer.Android.click(183, 167, delay=0)
     else:
         center = ((found_ship[1][0][0] + found_ship[1][1][0]) / 2, (found_ship[1][0][1] + found_ship[1][2][1]) / 2)
-        center = convert_position(*center, (1280, 720), "this_to_960")
-        timer.Android.click(*center)
+        rel_center = absolute_to_relative(center, timer.Android.resolution)
+        timer.Android.relative_click(*rel_center)
 
     timer.wait_pages("fight_prepare_page", gap=0)
 
@@ -376,149 +385,6 @@ def ChangeShips(timer: Timer, fleet_id, ship_names):
 
 def get_new_things(timer: Timer, lock=0):
     pass
-
-
-def detect_resources(timer: Timer, position=None) -> list:
-    """检查四项资源余量, 实验性功能
-    Args:
-        position (int, optional): 具体哪一项资源 [0,3], 默认为空则检测四项. Defaults to None.
-    Returns:
-        list: 四个元素的列表, 分别表示油弹钢铝的余量
-    """
-    screen = timer.get_screen(need_screen_shot=True)
-    res = [0] * 4
-    r = len(screen) / 540
-    SIZE = (int(45 * r), int(155 * r))
-    POSITION = [
-        (int(198 * r), int(198 * r)),
-        (int(198 * r), int(566 * r)),
-        (int(415 * r), int(198 * r)),
-        (int(415 * r), int(566 * r)),
-    ]
-    if position == None:
-        for i in range(4):
-            area = screen[
-                POSITION[i][0] : POSITION[i][0] + SIZE[0],
-                POSITION[i][1] : POSITION[i][1] + SIZE[1],
-            ]
-            res[i] = recognize_single_number(area)
-        return res
-    area = screen[
-        POSITION[position][0] : POSITION[position][0] + SIZE[0],
-        POSITION[position][1] : POSITION[position][1] + SIZE[1],
-    ]
-    return recognize_single_number(area)
-
-
-def choose_resources(timer: Timer, type, resources):
-    POSITIONS = [(213, 221), (584, 221), (213, 427), (584, 427)]
-    right, gap = 55, 35
-
-    minv = 10
-    if type == "ship":
-        minv = 30
-    if min(resources) < minv:
-        timer.logger.error(f"用于 {type} 的资源 {resources} 过少, 最小值为 {minv}, 已自动取消操作")
-        return False
-
-    now_resources = detect_resources(timer)
-    timer.logger.info(f"当前 {type} 的设置: {now_resources}")
-    for rk, pos, src, dst in zip(range(4), POSITIONS, now_resources, resources):
-
-        def move(id, way, adjust=0):
-            p0 = (pos[0] + id * right, pos[1])
-            p1 = (pos[0] + id * right, pos[1] - way * (gap + adjust))
-            timer.Android.swipe(*p0, *p1, duration=0.25)
-            num = str(detect_resources(timer, rk))
-            if len(num) == 2:
-                num = "0" + num
-            num = int(num[id])
-            if num == src[id]:
-                move(id, way, adjust + 2)
-                timer.logger.debug("Move Failed, Increase Adjustment")
-            else:
-                src[id] += way
-                timer.logger.debug("Move Success")
-
-        if src == dst:
-            continue
-        src, dst = str(src), str(dst)
-        if len(src) == 2:
-            src = "0" + src
-        if len(dst) == 2:
-            dst = "0" + dst
-        src, dst = list(map(int, list(src))), list(map(int, list(dst)))
-        print(src, dst)
-        if src[0] == 0:
-            move(0, 1)
-        for i in range(2, -1, -1):
-            while src[i] < dst[i]:
-                move(i, 1)
-            while src[i] > dst[i]:
-                move(i, -1)
-    return True
-
-
-def get_build(timer: Timer, type):
-    """获取已经建造好的舰船或装备
-    Args:
-        type (str): "ship"/"equipment"
-    Returns:
-        bool: 是否获取成功
-    """
-    if type == "equipment":
-        timer.goto_game_page("develop_page")
-        imgs = IMG.build_image[:4]
-    if type == "ship":
-        timer.goto_game_page("build_page")
-        imgs = IMG.build_image[3:]
-    if not timer.image_exist(imgs[1]):
-        timer.logger.warning(f"尝试获取 {type} 但是未找到已完成的工作")
-        return False
-    try:
-        timer.click_image(imgs[1], timeout=3, must_click=False)
-    except:
-        timer.logger.error(f"无法获取 {type}, 可能是对应仓库已满")
-        return False
-    get_ship(timer)
-    return True
-
-
-def build(timer: Timer, type, resources=None, fast=False, force=False):
-    """建造操作
-    Args:
-        timer (Timer): _description_
-        type (str): "ship"/"equipment"
-        resources: 一个列表, 表示油弹钢铝四项资源. Defaults to None.
-        fast (bool, optional): 是否快速建造. Defaults to False.
-        force (bool, optional): 如果队列已满, 是否立刻结束一个以开始建造. Defaults to False.
-    """
-    if type == "equipment":
-        timer.goto_game_page("develop_page")
-        imgs = IMG.build_image[:4]
-    if type == "ship":
-        timer.goto_game_page("build_page")
-        imgs = IMG.build_image[3:]
-
-    get_build(timer, type)
-    if not timer.image_exist(imgs[2]):
-        if force:
-            timer.click_image(imgs[3])
-            timer.ConfirmOperation(must_confirm=1, timeout=3)
-            get_build(timer, type)
-        else:
-            timer.logger.error(f"{type} 队列已满")
-            return False
-    timer.click_image(imgs[2])
-    timer.wait_image(IMG.build_image[7])
-    if choose_resources(timer, type, resources):
-        if fast:
-            timer.Android.click(855, 425)
-            timer.ConfirmOperation(must_confirm=1, timeout=3)
-            get_ship(timer)
-            timer.Android.click(30, 30)
-        else:
-            timer.Android.click(850, 480)
 
 
 def cook(timer: Timer, position: int):

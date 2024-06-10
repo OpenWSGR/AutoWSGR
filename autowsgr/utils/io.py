@@ -1,4 +1,8 @@
 import os
+from functools import cmp_to_key
+from pathlib import Path
+from pprint import pprint
+from types import SimpleNamespace
 
 import numpy as np
 import yaml
@@ -139,3 +143,77 @@ def get_all_files(dir):
 def count(keys, iter):
     res = sum(1 for it in iter if (it in keys))
     return res
+
+
+class MyNamespace(SimpleNamespace):
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
+
+def namespace_to_dict(namespace):
+    """将 SimpleNamespace 对象递归转化为字典."""
+    if not isinstance(namespace, SimpleNamespace):
+        return namespace
+    return {key: namespace_to_dict(value) for key, value in namespace.__dict__.items()}
+
+
+def create_namespace(directory, template):
+    """
+    根据文件夹层次结构创建 SimpleNamespace 对象.
+
+    Args:
+        directory (str): 要遍历的根目录.
+        template (type): 用于创建 file 对象的模板.
+
+    Returns:
+        SimpleNamespace: 包含文件路径的 SimpleNamespace 对象.
+    """
+
+    def compare_length_and_alphabet(a, b):
+        """
+        比较函数,先比较字符串长度,长的排在后面,
+        如果长度相同,则比较字母序
+        """
+        if len(a.stem) == len(b.stem):
+            return 0 if a.stem == b.stem else (-1 if a.stem < b.stem else 1)
+        elif len(a.stem) < len(b.stem):
+            return -1
+        else:
+            return 1
+
+    root = Path(directory)
+    namespace = MyNamespace()
+
+    for path in sorted(root.rglob("*.png"), key=cmp_to_key(compare_length_and_alphabet)):
+        *parts, folder, filename = path.parts
+        current = namespace
+        for part in parts[len(root.parts) :]:
+            if not hasattr(current, part):
+                setattr(current, part, MyNamespace())
+            current = getattr(current, part)
+
+        filename = Path(filename).stem
+        if filename.isdigit():
+            # 1. 一个文件夹内全是数字的情况
+            if not hasattr(current, folder):
+                setattr(current, folder, [None])  # 占位符
+            getattr(current, folder).append(template(path))
+        else:
+            if not hasattr(current, folder):
+                setattr(current, folder, MyNamespace())
+            current = getattr(current, folder)
+            if filename != filename.rstrip(r"0123456789"):
+                # 2. 以数字后缀结尾的文件名情况，代表多个等价图片
+                filename = filename.rstrip(r"0123456789")
+                if not hasattr(current, filename):
+                    setattr(current, filename, [])
+                getattr(current, filename).append(template(path))
+            else:
+                # 3. 字符串文件情况
+                setattr(current, filename, template(path))
+
+    # pprint(namespace_to_dict(namespace))
+    return namespace

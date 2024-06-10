@@ -5,7 +5,7 @@ from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
 from autowsgr.ocr.ship_name import recognize_ship
-from autowsgr.utils.api_image import convert_position
+from autowsgr.utils.api_image import absolute_to_relative, relative_to_absolute
 from autowsgr.utils.operator import unorder_equal
 
 
@@ -87,8 +87,8 @@ class Fleet:
             for ship in ships:
                 if ship[0] == ship_name:
                     center = (ship[1][1][0] + 20, ship[1][1][1])
-                    center = convert_position(*center, (1280, 720), "this_to_960")
-                    self.timer.Android.click(*center)
+                    rel_center = absolute_to_relative(center, self.timer.Android.resolution)
+                    self.timer.Android.relative_click(*rel_center)
                     break
 
         self.timer.wait_pages("fight_prepare_page", gap=0)

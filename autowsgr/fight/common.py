@@ -20,7 +20,6 @@ from autowsgr.game.game_operation import (
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import get_nearest
-from autowsgr.utils.operator import remove_0_value_from_dict
 
 
 def start_march(timer: Timer, position=(900, 500)):
@@ -229,7 +228,7 @@ class FightInfo(ABC):
             self._before_match()
 
             # 尝试匹配
-            ret = [self.timer.images_exist(image, False, confidence=confidence) for image in images]
+            ret = [self.timer.image_exist(image, False, confidence=confidence) for image in images]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
                 # 查询是否有匹配后延时
@@ -444,7 +443,7 @@ class FightPlan(ABC):
             if self.Info.last_state == "spot_enemy_success":
                 if self.timer.image_exist(IMG.fight_image[2]):
                     self.timer.Android.click(900, 500)
-            if self.Info.last_state in ["proceed", "night"] and self.timer.images_exist(IMG.fight_image[5:7]):
+            if self.Info.last_state in ["proceed", "night"] and self.timer.image_exist(IMG.fight_image[5:7]):
                 if self.Info.last_action == "yes":
                     self.timer.Android.click(325, 350, times=1)
                 else:

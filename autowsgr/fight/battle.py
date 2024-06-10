@@ -44,7 +44,7 @@ class BattleInfo(FightInfo):
             "night": [IMG.fight_image[6], 150],
             "result": [IMG.fight_image[16], 75],
             "battle_page": [
-                IMG.identify_images["battle_page"][0],
+                IMG.identify_images.battle_page,
                 7.5,
             ],
         }

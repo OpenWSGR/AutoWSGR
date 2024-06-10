@@ -119,7 +119,7 @@ def compare_box(A, B):
             return 1
 
 
-def recognize(image, char_list, min_size=7, text_threshold=0.55, low_text=0.3):
+def recognize(image, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3):
     if ch_reader == None:
         load_ch_reader()
     result = ch_reader.readtext(
@@ -129,7 +129,7 @@ def recognize(image, char_list, min_size=7, text_threshold=0.55, low_text=0.3):
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    # print(result)
+    print(result)
     return result
 
 
@@ -163,7 +163,7 @@ def recognize_number(image, ex_list="", min_size=7, text_threshold=0.55, low_tex
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    # print(result)
+    print(result)
     return result
 
 

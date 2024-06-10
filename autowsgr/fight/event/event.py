@@ -59,11 +59,11 @@ class Event:
         if r_difficulty != difficulty:
             time.sleep(0.2)
             if int(chapter in "Hh"):
-                if not self.timer.click_images(self.common_image["hard"]):
+                if not self.timer.click_image(self.common_image["hard"]):
                     self.logger.error("请检查是否通关简单难度")
                     raise ImageNotFoundErr("Can't change difficulty")
             else:
-                self.timer.click_images(self.common_image["easy"])
+                self.timer.click_image(self.common_image["easy"])
 
             if self.get_difficulty() != r_difficulty:
                 if retry:
