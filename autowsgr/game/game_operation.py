@@ -140,7 +140,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
         raise ValueError("can't change team")
 
     if timer.identify_page("fight_prepare_page") == False:
-        timer.timer.log_screen()
+        timer.log_screen()
         raise ImageNotFoundErr("not on 'fight_prepare_page' ")
 
     if verify_team(timer) == target:
