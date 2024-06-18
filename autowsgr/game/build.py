@@ -3,7 +3,7 @@ import datetime
 from autowsgr.constants.image_templates import IMG
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import get_ship
-from autowsgr.ocr.ship_name import recognize, recognize_number, recognize_single_number
+from autowsgr.ocr.ship_name import recognize, recognize_single_number
 from autowsgr.utils.api_image import (
     absolute_to_relative,
     crop_image,
@@ -74,7 +74,6 @@ class BuildManager:
                 crop_image(
                     screen,
                     *ETA_AREAS[type][build_slot],
-                    self.timer.Android.resolution,
                 ),
             )
             if not ocr_result or ocr_result[0][2] <= 0.5:
@@ -139,11 +138,11 @@ class BuildManager:
                 self.timer.logger.error(f"无法获取 {type}, 可能是对应仓库已满")
                 return False
 
-            get_ship(self.timer)
+            ship_name, ship_type = get_ship(self.timer)
             slot = match_nearest_index(absolute_to_relative(pos, self.timer.Android.resolution), BUILD_POSITIONS[type])
             self.slot_eta[type][slot] = -1
 
-        return True
+        return ship_name
 
     def build(self, type="ship", resources=None, allow_fast_build=False):
         """建造操作
@@ -179,7 +178,6 @@ class BuildManager:
                     crop_image(
                         screen,
                         *RESOURCE_AREAS[resource_id],
-                        self.timer.Android.resolution,
                     )
                 )
                 return value_to_digits(value)

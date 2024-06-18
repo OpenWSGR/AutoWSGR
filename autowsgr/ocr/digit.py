@@ -13,32 +13,6 @@ from autowsgr.utils.io import yaml_to_dict
 POS = yaml_to_dict(os.path.join(os.path.dirname(__file__), "relative_location.yaml"))
 
 
-def image_to_number(image: np.ndarray):
-    """根据图片返回数字
-
-    Args:
-        image (np.ndarray): 图片
-
-    Returns:
-        int, None: 存在则返回数字,否则为 None
-    """
-    # result = pytesseract.image_to_string(image).strip()
-    result = recognize_number(image)
-    result = result[0][1]
-    if len(result) == 0:
-        return None
-    scale = 1
-
-    if "K" in result:
-        result = result[:-2]
-        scale = 1000
-    if "M" in result:
-        result = result[:-2]
-        scale = 10**6
-
-    return scale * int(result)
-
-
 def get_resources(timer: Timer):
     """根据 timer 所处界面获取对应资源数据
     部分 case 会没掉,请重写
@@ -48,7 +22,7 @@ def get_resources(timer: Timer):
     image = timer.screen
     ret = {}
     for key in POS["main_page"]["resources"]:
-        image_crop = crop_image(image, *POS["main_page"]["resources"][key], resolution=timer.config.resolution)
+        image_crop = crop_image(image, *POS["main_page"]["resources"][key])
         raw_str_list = recognize_number(image_crop, "KM.")
         try:
             # if raw_str_list[0][2] < 0.99:
@@ -80,7 +54,7 @@ def get_loot_and_ship(timer: Timer):
     image = timer.screen
     ret = {}
     for key in POS["map_page"]:
-        image_crop = crop_image(image, *POS["map_page"][key], resolution=timer.config.resolution)
+        image_crop = crop_image(image, *POS["map_page"][key])
         raw_str_list = recognize_number(image_crop, "/")
         try:
             # if raw_str_list[0][2] < 0.99:

@@ -4,18 +4,10 @@ from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.controller.run_timer import Timer, try_to_get_expedition
-from autowsgr.ocr.ship_name import (
-    recognize_number,
-    recognize_ship,
-    recognize_single_number,
-)
-from autowsgr.utils.api_image import (
-    absolute_to_relative,
-    crop_image,
-    match_nearest_index,
-)
-
-from .get_game_info import check_support_stats, detect_ship_stats
+from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
+from autowsgr.ocr.ocr import recognize_get_ship
+from autowsgr.ocr.ship_name import recognize_ship
+from autowsgr.utils.api_image import absolute_to_relative
 
 
 class Expedition:
@@ -60,8 +52,11 @@ def get_ship(timer: Timer, max_times=1):
     # TODO: 返回舰船名称
     timer.got_ship_num += 1
     while timer.wait_image([IMG.symbol_image[8]] + [IMG.symbol_image[13]], timeout=1):
+        ship_name, ship_type = recognize_get_ship(timer.screen, timer.ship_names)
         timer.Android.click(915, 515, delay=0.25, times=1)
         timer.ConfirmOperation()
+    timer.logger.info(f"获取舰船: {ship_name} {ship_type}")
+    return ship_name, ship_type
 
 
 def match_night(timer: Timer, is_night):

@@ -129,7 +129,6 @@ def recognize(image, char_list=None, min_size=7, text_threshold=0.55, low_text=0
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    print(result)
     return result
 
 
@@ -241,11 +240,6 @@ def recognize_ship(image, names, char_list=None, min_size=7, text_threshold=0.55
         )
     # print(result)
     return result
-
-
-def recover(image):
-    for p in image:
-        pass
 
 
 if __name__ == "__main__":
