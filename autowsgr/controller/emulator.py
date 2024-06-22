@@ -263,6 +263,8 @@ class Emulator:
             images = list(enumerate(images))
         elif isinstance(images, dict):
             images = images.items()
+        else:
+            images = images.__dict__.items()
 
         StartTime = time.time()
         while True:

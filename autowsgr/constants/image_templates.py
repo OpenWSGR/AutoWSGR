@@ -14,6 +14,18 @@ from autowsgr.utils.io import create_namespace
 
 
 class MyTemplate(Template):
+    def __radd__(self, other):
+        if isinstance(other, list):
+            return other + [self]  # 添加到列表开头
+        else:
+            return NotImplemented
+
+    def __add__(self, other):
+        if isinstance(other, list):
+            return [self] + other  # 添加到列表末尾
+        else:
+            return NotImplemented
+
     def match_in(self, screen, this_methods=None):
         match_result = self._cv_match(screen, this_methods)
         if not match_result:

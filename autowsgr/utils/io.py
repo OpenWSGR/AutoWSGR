@@ -174,8 +174,8 @@ def create_namespace(directory, template):
 
     def compare_length_and_alphabet(a, b):
         """
-        比较函数,先比较字符串长度,长的排在后面,
-        如果长度相同,则比较字母序
+        比较函数, 先比较字符串长度, 长的排在后面,
+        如果长度相同, 则比较字母序
         """
         if len(a.stem) == len(b.stem):
             return 0 if a.stem == b.stem else (-1 if a.stem < b.stem else 1)

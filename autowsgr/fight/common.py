@@ -69,8 +69,8 @@ class FightResultInfo:
         except Exception as e:
             timer.log_screen(name="mvp_image")
             timer.logger.error(f"can't identify mvp, error: {e}")
-        self.result = timer.wait_images(IMG.fight_result, timeout=5)
         self.ship_stats = detect_ship_stats(timer, "sumup", ship_stats)
+        self.result = timer.wait_images(IMG.fight_result, timeout=5)
         if timer.image_exist(IMG.fight_result["SS"], need_screen_shot=False):
             self.result = "SS"
         if self.result is None:

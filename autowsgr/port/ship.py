@@ -53,7 +53,7 @@ class Fleet:
 
     def detect(self):
         """在对应的战斗准备页面检查舰船"""
-        assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"][0]) != False
+        assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) != False
         if self.fleet_id is not None:
             MoveTeam(self.timer, self.fleet_id)
         ships = recognize_ship(self.timer.get_screen()[433:459], self.timer.ship_names)
