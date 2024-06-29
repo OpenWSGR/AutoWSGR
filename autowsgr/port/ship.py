@@ -4,10 +4,15 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
-from autowsgr.ocr.ship_name import recognize_ship
+from autowsgr.ocr.ship_name import recognize_ship,recognize_number
 from autowsgr.utils.api_image import absolute_to_relative, relative_to_absolute
+from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
+import os
 from autowsgr.utils.operator import unorder_equal
+from autowsgr.utils.api_image import crop_image
+from autowsgr.constants.data_roots import OCR_ROOT
 
+POS = yaml_to_dict(os.path.join(OCR_ROOT, "relative_location.yaml"))
 
 def count_ship(fleet):
     res = sum(have_ship(fleet[i]) for i in range(1, min(len(fleet), 7)))
@@ -61,6 +66,24 @@ class Fleet:
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[0]
 
+    def check_level(self, timer: Timer):
+        if timer.config.daily_automation['change_ship_level_max']:
+            timer.update_screen()
+            for i in range(1, 7):
+                try:
+                    image_crop = crop_image(timer.screen, *POS["result_page"]["ship_level"][i])
+                    raw_str = recognize_number(image_crop,ex_list="LVlv.")
+                    dot_position = raw_str[0][1].find('.')  # 找到'.'的位置
+                    number_after_dot = int(raw_str[0][1][dot_position + 1:])  # 获取'.'之后的所有字符,并转换为整数
+                    timer.ship_level[i] = number_after_dot # 将等级赋值给对应的位置
+                except:
+                    timer.ship_level[i] = 0 # 识别失败则等级为0
+                    timer.logger.error(f"识别{i}号位置等级失败")
+            timer.logger.debug(f"当前编队舰船等级为：{timer.ship_level}")
+            return timer.ship_level
+        else:
+            pass
+            
     def change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name
         self.timer.Android.click(*FLEET_POSITION[position], delay=0)

@@ -7,7 +7,7 @@ from autowsgr.constants.custom_exceptions import (
     ImageNotFoundErr,
     NetworkErr,
 )
-from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT
+from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT , OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES, NO
 from autowsgr.constants.ui import WSGR_UI, Node
@@ -37,6 +37,14 @@ class Timer(Emulator):
     ui = WSGR_UI
     ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
     enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
+    ship_level = {
+                1: 0,
+                2: 0,
+                3: 0,
+                4: 0,
+                5: 0,
+                6: 0,
+    }  # 我方舰船等级
     now_page = None  # 当前所在 UI 名
     resources = None  # 当前四项资源量
     """
@@ -59,13 +67,17 @@ class Timer(Emulator):
         if not self.config.PLAN_ROOT:
             self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")
             self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
+        else:
+            self.logger.info(f"Succeed to load PLAN_ROOT: {self.config.PLAN_ROOT}")
+
         try:
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
+            self.logger.info(f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}")
         except:
             self.logger.warning(
-                f"Failed to load ship_name file:{config.SHIP_NAME_PATH}\nDefault shipname file {os.path.join(DATA_ROOT,  'default_ship_names.yaml')} will be used"
+                f"Failed to load ship_name file:{config.SHIP_NAME_PATH}\nDefault shipname file {os.path.join(OCR_ROOT,  'ship_name.yaml')} will be used"
             )
-            ship_name_path = os.path.join(DATA_ROOT, "default_ship_names.yaml")
+            ship_name_path = os.path.join(OCR_ROOT, "ship_name.yaml")
             self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
 
         self.init()

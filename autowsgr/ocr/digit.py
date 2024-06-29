@@ -4,13 +4,13 @@ import numpy as np
 
 from autowsgr.controller.run_timer import Timer
 from autowsgr.ocr.ship_name import recognize_number
-
+from autowsgr.constants.data_roots import OCR_ROOT
 # import pytesseract
 # from AutoWSGR.ocr.ship_name import recognize_number
 from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import yaml_to_dict
 
-POS = yaml_to_dict(os.path.join(os.path.dirname(__file__), "relative_location.yaml"))
+POS = yaml_to_dict(os.path.join(OCR_ROOT, "relative_location.yaml"))
 
 
 def get_resources(timer: Timer):

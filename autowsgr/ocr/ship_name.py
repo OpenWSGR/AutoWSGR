@@ -162,7 +162,7 @@ def recognize_number(image, ex_list="", min_size=7, text_threshold=0.55, low_tex
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    print(result)
+    print(f"recognize_number的识别结果为：{result}")
     return result
 
 

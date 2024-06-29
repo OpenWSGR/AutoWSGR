@@ -20,7 +20,7 @@ from autowsgr.game.game_operation import (
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import get_nearest
-
+from autowsgr.port.ship import Fleet
 
 def start_march(timer: Timer, position=(900, 500)):
     timer.Android.click(*position, 1, delay=0)
@@ -70,6 +70,9 @@ class FightResultInfo:
             timer.log_screen(name="mvp_image")
             timer.logger.error(f"can't identify mvp, error: {e}")
         self.ship_stats = detect_ship_stats(timer, "sumup", ship_stats)
+        # TODO: 识别舰船等级
+        Fleet.check_level(self,timer)
+        
         self.result = timer.wait_images(IMG.fight_result, timeout=5)
         if timer.image_exist(IMG.fight_result["SS"], need_screen_shot=False):
             self.result = "SS"
