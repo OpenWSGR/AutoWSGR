@@ -182,7 +182,7 @@ class NormalFightPlan(FightPlan):
 
         Args:
             fleet_id: 指定舰队编号, 如果为 None 则使用计划中的参数
-
+            plan_path: 绝对路径 / 以 PLAN_ROOT 为根的相对路径
             fleet: 舰队成员, ["", "1号位", "2号位", ...], 如果为 None 则全部不变, 为 "" 则该位置无舰船, 为 -1 则不覆盖 yaml 文件中的参数
         Raises:
             BaseException: _description_
@@ -192,7 +192,10 @@ class NormalFightPlan(FightPlan):
 
         # 从配置文件加载计划
         default_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, "default.yaml"))
-        plan_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, plan_path))
+        if os.path.isabs(plan_path):
+            plan_args = yaml_to_dict(plan_path)
+        else:
+            plan_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, plan_path))
 
         # 从参数加载计划
         if fleet_id is not None:
@@ -415,12 +418,12 @@ class NormalFightPlan(FightPlan):
     def _verify_map(self, target_map, chapter, need_screen_shot=True, timeout=0):
         if timeout == 0:
             return self.timer.image_exist(
-                IMG.normal_map_image[f"{str(chapter)}-{str(target_map)}"],
+                IMG.normal_map_image[f"{str(chapter)}-"][target_map - 1],
                 need_screen_shot,
                 confidence=0.85,
             )
         return self.timer.wait_image(
-            IMG.normal_map_image[f"{str(chapter)}-{str(target_map)}"],
+            IMG.normal_map_image[f"{str(chapter)}-"][target_map - 1],
             confidence=0.85,
             timeout=timeout,
             gap=0.03,
