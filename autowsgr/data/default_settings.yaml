@@ -1,7 +1,7 @@
 # ========== 游戏设置 ==========
 emulator:
   type: "雷电" # 模拟器类型
-  start_cmd: "" # 模拟器的启动路径，默认留空会自动从注册表查找模拟器路径
+  start_cmd: "" # 模拟器的地址，如果留空则自动从注册表中查询 示例: "C:/leidian/LDPlayer9/dnplayer.exe"
   config_file: ""
   emulator_name: emulator-5554 # 雷电模拟器使用多开器请填写该项, 不多开默认为 "emulator-5554"
 
@@ -15,16 +15,16 @@ account:
 password:
 
 # ========== Logger设置 ==========
-DEBUG: False
-SHOW_MAP_NODE: False # 黄色舰船图标位置
-SHOW_ANDROID_INPUT: False
-SHOW_ENEMY_RULES: False
-SHOW_FIGHT_STAGE: False
-SHOW_CHAPTER_INFO: False
-SHOW_MATCH_FIGHT_STAGE: False
-SHOW_DECISIVE_BATTLE_INFO: False
-SHOW_OCR_INFO: False
-log_level: INFO # 调试模式 log_level 应该设置为 DEBUG
+DEBUG: True          #是否开启调试模式，如果为 True，则会输出更多的调试信息。
+SHOW_MAP_NODE: False      #是否显示地图节点信息。
+SHOW_ANDROID_INPUT: True # 是否显示 Android 输入的信息。
+SHOW_ENEMY_RULES: True # 是否显示敌人规则信息。
+SHOW_FIGHT_STAGE: True # 是否显示战斗阶段信息。
+SHOW_CHAPTER_INFO: True # 是否显示章节信息。
+SHOW_MATCH_FIGHT_STAGE: True # 是否显示当前阶段信息。
+SHOW_DECISIVE_BATTLE_INFO: True # 是否显示决战信息。
+SHOW_OCR_INFO: True    # 是否显示 OCR 识别信息。
+log_level: DEBUG # 调试模式 log_level 应该设置为 DEBUGlog
 
 
 # ========== 调试设置 ==============
@@ -42,9 +42,13 @@ daily_automation:
   auto_gain_bonus: True # 当有任务完成时自动点击
   auto_bath_repair: True # 空闲时自动澡堂修理
   auto_set_support: False # 自动开启战役支援
-  stop_maxship: False # 捞满500船时自动停止
   auto_battle: True # 自动打完每日战役次数
   battle_type: "困难潜艇" # 打哪个。可选名称参考"plans/battle/"
+  # change_ship_level_max: False # 是否满级换船，功能未完善，请勿使用
+
+  stop_maxship: False # 捞满500船时自动停止出击
+  quick_repair_limit: 50 # 使用快修的上限，一但达到上限将会停止日常出征，以防止没有更换舰队导致快修被耗尽
+
   auto_exercise: True #自动打完每日的三次演习
 
   auto_normal_fight: True # 按自定义任务进行常规战

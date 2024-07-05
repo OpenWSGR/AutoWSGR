@@ -7,7 +7,7 @@ from autowsgr.constants.custom_exceptions import (
     ImageNotFoundErr,
     NetworkErr,
 )
-from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT , OCR_ROOT
+from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT, OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES, NO
 from autowsgr.constants.ui import WSGR_UI, Node
@@ -38,12 +38,12 @@ class Timer(Emulator):
     ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
     enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
     ship_level = {
-                1: 0,
-                2: 0,
-                3: 0,
-                4: 0,
-                5: 0,
-                6: 0,
+        1: 0,
+        2: 0,
+        3: 0,
+        4: 0,
+        5: 0,
+        6: 0,
     }  # 我方舰船等级
     now_page = None  # 当前所在 UI 名
     resources = None  # 当前四项资源量

@@ -8,14 +8,13 @@ from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FIGHT_CONDITIONS_POSITION
 from autowsgr.controller.run_timer import Timer
-from autowsgr.game.game_operation import ChangeShips, MoveTeam, quick_repair
+from autowsgr.game.game_operation import ChangeShip, ChangeShips, MoveTeam, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
 from autowsgr.port.ship import Fleet
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import CalcDis
 
 from .common import DecisionBlock, FightInfo, FightPlan, FightResultInfo, start_march
-from autowsgr.game.game_operation import ChangeShip
 
 """
 常规战决策模块/地图战斗用模板
@@ -257,11 +256,11 @@ class NormalFightPlan(FightPlan):
         self.Info.ship_stats = detect_ship_stats(self.timer)
         quick_repair(self.timer, self.repair_mode, self.Info.ship_stats)
         # 满级更换舰船
-        if self.config.daily_automation['change_ship_level_max']:
-            for i in range(1,7):
-                if  self.timer.ship_level[i] >= 110 :
-                    ChangeShip(self.timer, ship_id=i, name = "U-47", fleet_id= None)  # name 为舰船名字,后续可以改为配置文件
-                    
+        # if self.config.daily_automation['change_ship_level_max']:
+        #     for i in range(1,7):
+        #         if  self.timer.ship_level[i] >= 110 :
+        #             ChangeShip(self.timer, ship_id=i, name = "U-47", fleet_id= None)  # name 为舰船名字,后续可以改为配置文件 TODO:后续要重写此函数，使其可以筛选非满级舰船
+
         # TODO: 这里应该只catch network error，太宽的catch会导致其他错误被隐藏
         # except AssertionError:
         #     if "process_err" in kwargs and kwargs["process_err"] == False:
