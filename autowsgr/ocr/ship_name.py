@@ -6,6 +6,7 @@ import cv2
 import easyocr
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.utils.io import cv_imread
 from autowsgr.utils.operator import unzip_element
 
 en_reader = None
@@ -122,6 +123,8 @@ def compare_box(A, B):
 def recognize(image, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3):
     if ch_reader == None:
         load_ch_reader()
+    if isinstance(image, str):
+        image = cv_imread(image)
     result = ch_reader.readtext(
         image,
         allowlist=char_list,
@@ -213,7 +216,7 @@ def recognize_ship(image, names, char_list=None, min_size=7, text_threshold=0.55
         image_path = os.path.abspath(image)
     else:
         image_path = os.path.join(TUNNEL_ROOT, "OCR.PNG")
-        cv2.imwrite(image_path, image)
+        cv2.imencode(".PNG", image)[1].tofile(image_path)
     if char_list is None:
         char_list = get_allow(names)
     with open(os.path.join(TUNNEL_ROOT, "locator.in"), "w+") as f:

@@ -4,9 +4,9 @@ from pathlib import Path
 from pprint import pprint
 from types import SimpleNamespace
 
+import cv2
 import numpy as np
 import yaml
-import cv2
 from PIL import Image as PIM
 
 
@@ -111,6 +111,14 @@ def create_file_with_path(path):
 def delete_file(path):
     if os.path.exists(path):
         os.remove(path)
+
+
+def cv_imread(file_path):
+    import cv2
+    import numpy
+
+    _, cv_img = cv2.imencode(".PNG", numpy.fromfile(file_path, dtype=numpy.uint8))
+    return cv_img
 
 
 def save_image(path, image, ignore_existed_image=False, *args, **kwargs):

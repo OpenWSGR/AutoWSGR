@@ -5,6 +5,7 @@ import easyocr
 from thefuzz import process
 
 from autowsgr.utils.api_image import crop_image
+from autowsgr.utils.io import cv_imread
 
 # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
 WORD_REPLACE = {
@@ -20,6 +21,9 @@ def recognize(
     candidates: List[str] = None,  # 识别结果的候选项，如果指定则匹配最接近的
 ):
     """识别图片中的文字。注意：请确保图片中有文字！总会尝试返回一个结果"""
+    if isinstance(img, str):
+        img = cv_imread(img)
+
     result = reader.readtext(
         img,
         allowlist=allowlist,
