@@ -446,7 +446,7 @@ class DecisiveBattle:
         检查船舱是否满，船舱满了自动解装
         """
         if self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None and self.full_destroy:
-            self.timer.Android.relative_click(0.38 - 0.5, 0.565 - 0.5)
+            self.timer.Android.relative_click(0.38, 0.565)
             DestroyShip(self.timer)
             self.enter_map()
             return True

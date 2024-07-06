@@ -87,11 +87,11 @@ def DestroyShip(timer: Timer):
     timer.set_page("destroy_page")
 
     timer.Android.click(90, 206, delay=1.5)  # 点添加
-    timer.Android.relative_click(0.91 - 0.5, 0.3 - 0.5, delay=1.5)  # 快速选择
-    timer.Android.relative_click(0.915 - 0.5, 0.906 - 0.5, delay=1.5)  # 确定
-    timer.Android.relative_click(0.837 - 0.5, 0.646 - 0.5, delay=1.5)  # 卸下装备
-    timer.Android.relative_click(0.9 - 0.5, 0.9 - 0.5, delay=1.5)  # 解装
-    timer.Android.relative_click(0.38 - 0.5, 0.567 - 0.5, delay=1.5)  # 四星确认
+    timer.Android.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
+    timer.Android.relative_click(0.915, 0.906, delay=1.5)  # 确定
+    timer.Android.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
+    timer.Android.relative_click(0.95, 0.9, delay=1.5)  # 解装
+    timer.Android.relative_click(0.38, 0.567, delay=1.5)  # 四星确认
 
 
 def verify_team(timer: Timer):

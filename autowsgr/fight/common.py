@@ -360,7 +360,7 @@ class FightPlan(ABC):
         elif ret == literals.DOCK_FULL_FLAG:
             # 自动解装功能
             if self.config.dock_full_destroy:
-                self.timer.Android.relative_click(0.38 - 0.5, 0.565 - 0.5)
+                self.timer.Android.relative_click(0.38, 0.565)
                 DestroyShip(self.timer)
                 return self.run(False)
             else:
