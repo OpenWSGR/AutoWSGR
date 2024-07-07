@@ -266,10 +266,10 @@ class NormalFightPlan(FightPlan):
         self.Info.ship_stats = detect_ship_stats(self.timer)
         quick_repair(self.timer, self.repair_mode, self.Info.ship_stats)
         # 满级更换舰船
-        if self.config.daily_automation["change_ship_level_max"]:
-            for i in range(1, 7):
-                if self.timer.ship_level[i] >= 110:
-                    ChangeShip(self.timer, ship_id=i, name="U-47", fleet_id=None)  # name 为舰船名字,后续可以改为配置文件
+        # if self.config.daily_automation["change_ship_level_max"]:
+        # for i in range(1, 7):
+        # if self.timer.ship_level[i] >= 110:
+        # ChangeShip(self.timer, ship_id=i, name="U-47", fleet_id=None)  # name 为舰船名字,后续可以改为配置文件
 
         # TODO: 这里应该只catch network error，太宽的catch会导致其他错误被隐藏
         # except AssertionError:

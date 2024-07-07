@@ -63,7 +63,7 @@ class Timer(Emulator):
 
     def __init__(self, config, logger):
         super().__init__(config, logger)
-        self.port = Port(self)
+        self.port = Port(logger)
 
         if not self.config.PLAN_ROOT:
             self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")

@@ -16,6 +16,7 @@ class AndroidController:
         self.config = config
         self.logger = logger
         self.dev = dev
+        self.first_type = True
         self.resolution = self.snapshot().shape[:2]
         self.resolution = self.resolution[::-1]
 
@@ -48,7 +49,13 @@ class AndroidController:
         return "zhanjian2" in apps
 
     def text(self, t):
-        self.logger.debug(f"Typing:{t}")
+        if self.first_type:
+            self.logger.debug("第一次尝试输入, 测试中...")
+            self.dev.text("T")
+            time.sleep(0.5)
+            self.dev.shell("input keyevent 67")
+            self.first_type = False
+        self.logger.debug(f"正在输入: {t}")
         self.dev.text(t)
 
     def click(self, x, y, times=1, delay=0.5, enable_subprocess=False, *args, **kwargs):

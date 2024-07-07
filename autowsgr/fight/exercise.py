@@ -8,7 +8,7 @@ from autowsgr.game.game_operation import MoveTeam, detect_ship_stats, quick_repa
 from autowsgr.game.get_game_info import get_enemy_condition, get_exercise_stats
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 
-from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
+from .common import DecisionBlock, FightInfo, FightPlan, start_march
 
 """
 演习决策模块
@@ -106,9 +106,6 @@ class NormalExerciseInfo(FightInfo):
         self.fight_history.reset()
         self.state = "rival_info"  # 初始状态等同于 "rival_info" 选择 'discard'
         self.last_action = "discard"
-        # TODO: 舰船信息，暂时不用
-        self.ally_ships = [Ship() for _ in range(6)]  # 我方舰船状态
-        self.enemy_ships = [Ship() for _ in range(6)]  # 敌方舰船状态
 
     def _before_match(self):
         # 点击加速

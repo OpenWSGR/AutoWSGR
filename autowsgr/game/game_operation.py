@@ -313,7 +313,7 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
     if name is None and ship_stats[ship_id] == -1:
         return
     timer.Android.click(110 * ship_id, 250, delay=0)
-    res = timer.wait_images([IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=0.4, gap=0)
+    res = timer.wait_images([IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=0.2, gap=0)
     if res == 1:
         timer.Android.click(839, 113)
 
@@ -323,8 +323,9 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
         return
 
     timer.Android.click(700, 30, delay=0)
-    timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=0.1)
-
+    while not timer.check_pixel((955, 500), (255, 255, 255), screen_shot=True):
+        pass
+    timer.logger.debug("输入框已经出现")
     timer.Android.text(name)
     timer.Android.click(50, 50, delay=0.5)
     time.sleep(0.5)

@@ -46,22 +46,6 @@ def start_march(timer: Timer, position=(900, 500)):
     return literals.OPERATION_SUCCESS_FLAG
 
 
-class Ship:
-    """用于表示一艘船的数据结构, 注意友方与敌方所独有的field"""
-
-    def __init__(self) -> None:
-        # 友方与敌方通用
-        self.name = ""  # 舰船名称
-        self.ship_type = 0  # TODO: 舰船类型，用字面常量实现
-        self.health = 0  # 舰船生命值
-        self.ship_stats = 0  # TODO：舰船状态，主要用于记录击沉、空位
-
-        # 友方
-        self.level = 0  # 舰船等级
-        self.exp = 0  # 舰船经验值
-        self.friendliness = 0  # 舰船好感度
-
-
 class FightResultInfo:
     def __init__(self, timer: Timer, ship_stats) -> None:
         try:
@@ -405,7 +389,7 @@ class FightPlan(ABC):
         result_list = ["SS", "S", "A", "B", "C", "D"]
         start_time, run = time.time(), False
         while times:
-            ret = self.run(run)
+            ret = self.run()
             run = ret != "SL"
             if run == "dock is full":
                 return run

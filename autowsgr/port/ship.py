@@ -10,13 +10,7 @@ from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
 from autowsgr.ocr.ship_name import recognize_number, recognize_ship
-from autowsgr.utils.api_image import (
-    absolute_to_relative,
-    crop_image,
-    crop_rectangle_relative,
-    cv_show_image,
-    relative_to_absolute,
-)
+from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.operator import unorder_equal
 
@@ -30,38 +24,6 @@ def count_ship(fleet):
 
 def have_ship(ship):
     return ship is not None and ship != ""
-
-
-class Ship:
-    def __init__(self, name) -> None:
-        self.level = 1
-        self.name = name  # 舰船名: 舰船的唯一标识
-        self.type = "DD"  # 舰船类型, 暂时没啥用
-        self.statu = 0  # 数字: 0 绿血, 1 黄血, 2 红血, 3 修理中.
-        self.repair_end_time = 0
-        self.repair_start_time = 0
-        self.waiting_repair = 0  # 是否正在修理队列中
-        self.equipments = None  # 装备状态, 暂时不用
-
-    def __str__(self) -> str:
-        table = ["绿血", "中破", "大破", "修理中"]
-        return f"舰船名:{self.name}\n舰船状态:{table[self.statu]}\n舰船等级:{self.level}\n\n"
-
-    def set_repair(self, end_time: str):
-        """设置舰船正在修理中
-        Args:
-            time_cost (str): 识别出的时间字符串
-        """
-        self.repair_start_time = time.time()
-        self.repair_end_time = end_time
-
-    def is_repairing(self):
-        if self.statu == 3:
-            if time.time() > self.repair_end_time:
-                self.statu = 0
-                return True
-        else:
-            return False
 
 
 class Fleet:
