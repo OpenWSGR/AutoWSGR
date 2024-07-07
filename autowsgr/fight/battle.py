@@ -105,9 +105,8 @@ class BattlePlan(FightPlan):
         if now_hard != hard:
             self.timer.Android.click(800, 80, delay=1)
 
-    def _enter_fight(self, same_work=False) -> str:
-        if same_work == False:
-            self._go_fight_prepare_page()
+    def _enter_fight(self) -> str:
+        self._go_fight_prepare_page()
         self.timer.Android.click(180 * ((self.map - 1) % 5 + 1), 200)
         self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
         self.Info.ship_stats = detect_ship_stats(self.timer)

@@ -1,18 +1,27 @@
+import os
+import time
 from typing import Iterable
 
+import cv2
+
+from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
-from autowsgr.ocr.ship_name import recognize_ship,recognize_number
-from autowsgr.utils.api_image import absolute_to_relative, relative_to_absolute
+from autowsgr.ocr.ship_name import recognize_number, recognize_ship
+from autowsgr.utils.api_image import (
+    absolute_to_relative,
+    crop_image,
+    crop_rectangle_relative,
+    cv_show_image,
+    relative_to_absolute,
+)
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
-import os
 from autowsgr.utils.operator import unorder_equal
-from autowsgr.utils.api_image import crop_image
-from autowsgr.constants.data_roots import OCR_ROOT
 
 POS = yaml_to_dict(os.path.join(OCR_ROOT, "relative_location.yaml"))
+
 
 def count_ship(fleet):
     res = sum(have_ship(fleet[i]) for i in range(1, min(len(fleet), 7)))
@@ -24,7 +33,35 @@ def have_ship(ship):
 
 
 class Ship:
-    pass
+    def __init__(self, name) -> None:
+        self.level = 1
+        self.name = name  # 舰船名: 舰船的唯一标识
+        self.type = "DD"  # 舰船类型, 暂时没啥用
+        self.statu = 0  # 数字: 0 绿血, 1 黄血, 2 红血, 3 修理中.
+        self.repair_end_time = 0
+        self.repair_start_time = 0
+        self.waiting_repair = 0  # 是否正在修理队列中
+        self.equipments = None  # 装备状态, 暂时不用
+
+    def __str__(self) -> str:
+        table = ["绿血", "中破", "大破", "修理中"]
+        return f"舰船名:{self.name}\n舰船状态:{table[self.statu]}\n舰船等级:{self.level}\n\n"
+
+    def set_repair(self, end_time: str):
+        """设置舰船正在修理中
+        Args:
+            time_cost (str): 识别出的时间字符串
+        """
+        self.repair_start_time = time.time()
+        self.repair_end_time = end_time
+
+    def is_repairing(self):
+        if self.statu == 3:
+            if time.time() > self.repair_end_time:
+                self.statu = 0
+                return True
+        else:
+            return False
 
 
 class Fleet:
@@ -65,25 +102,37 @@ class Fleet:
         self.ships = [None] * 7
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[0]
+        print(self.ships)
+        self.check_level()
 
-    def check_level(self, timer: Timer):
-        if timer.config.daily_automation['change_ship_level_max']:
-            timer.update_screen()
-            for i in range(1, 7):
-                try:
-                    image_crop = crop_image(timer.screen, *POS["result_page"]["ship_level"][i])
-                    raw_str = recognize_number(image_crop,ex_list="LVlv.")
-                    dot_position = raw_str[0][1].find('.')  # 找到'.'的位置
-                    number_after_dot = int(raw_str[0][1][dot_position + 1:])  # 获取'.'之后的所有字符,并转换为整数
-                    timer.ship_level[i] = number_after_dot # 将等级赋值给对应的位置
-                except:
-                    timer.ship_level[i] = 0 # 识别失败则等级为0
-                    timer.logger.error(f"识别{i}号位置等级失败")
-            timer.logger.debug(f"当前编队舰船等级为：{timer.ship_level}")
-            return timer.ship_level
-        else:
-            pass
-            
+    def check_level(self):
+        LEFT_TOPS = [(0.069, 0.565), (0.186, 0.565), (0.303, 0.565), (0.420, 0.565), (0.537, 0.565), (0.654, 0.565)]
+        SIZE = (0.023, 0.024)
+        screen = self.timer.get_screen()
+        self.levels = [None] * 7
+        for i in range(1, count_ship(self.ships) + 1):
+            img = crop_rectangle_relative(screen, LEFT_TOPS[i - 1][0], LEFT_TOPS[i - 1][1], SIZE[0], SIZE[1])
+            # cv_show_image(img)
+            self.levels[i] = recognize_number(img)[0][1]
+            # print(levels)
+
+        # if timer.config.daily_automation['change_ship_level_max']:
+        #     timer.update_screen()
+        #     for i in range(1, 7):
+        #         try:
+        #             image_crop = crop_image(timer.screen, *POS["result_page"]["ship_level"][i])
+        #             raw_str = recognize_number(image_crop,ex_list="LVlv.")
+        #             dot_position = raw_str[0][1].find('.')  # 找到'.'的位置
+        #             number_after_dot = int(raw_str[0][1][dot_position + 1:])  # 获取'.'之后的所有字符,并转换为整数
+        #             timer.ship_level[i] = number_after_dot # 将等级赋值给对应的位置
+        #         except:
+        #             timer.ship_level[i] = 0 # 识别失败则等级为0
+        #             timer.logger.error(f"识别{i}号位置等级失败")
+        #     timer.logger.debug(f"当前编队舰船等级为：{timer.ship_level}")
+        #     return timer.ship_level
+        # else:
+        #     pass
+
     def change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name
         self.timer.Android.click(*FLEET_POSITION[position], delay=0)

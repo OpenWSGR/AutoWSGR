@@ -335,10 +335,8 @@ class FightPlan(ABC):
                 raise RuntimeError(f"战斗进行时出现异常, 信息为 {fight_flag}")
         return "OK"
 
-    def run(self, same_work=False):
+    def run(self):
         """主函数，负责一次完整的战斗.
-        Args:
-            same_work: 如果为 True, 则说明上一次战斗和当前执行的战斗相同并且上一次战斗正常退出, 用于简化操作流程
         Returns:
             str:
                 'dock is full': 船坞已满并且没有设置自动解装
@@ -353,7 +351,7 @@ class FightPlan(ABC):
 
         """
         # 战斗前逻辑
-        ret = self._enter_fight(same_work)
+        ret = self._enter_fight()
 
         if ret == literals.OPERATION_SUCCESS_FLAG:
             pass
@@ -457,7 +455,7 @@ class FightPlan(ABC):
         return state
 
     @abstractmethod
-    def _enter_fight(self, same_work=False) -> str:
+    def _enter_fight(self) -> str:
         pass
 
     @abstractmethod

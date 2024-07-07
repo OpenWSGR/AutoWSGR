@@ -178,8 +178,9 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
     Args:
         timer (Timer): _description_
         repair_mode:
-            1: 快修，修中破
-            2: 快修，修大破
+            1: 快修, 修中破
+            2: 快修, 修大破
+            3: 快修, 修复所有正在修理中的船
     """
     arg = repair_mode
     try:
@@ -198,11 +199,13 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
         assert len(repair_mode) == 6
         need_repair = [False for _ in range(6)]
         for i, x in enumerate(repair_mode):
-            assert x in [1, 2]
+            assert x in [1, 2, 3]
             if x == 1:
                 need_repair[i] = ship_stats[i + 1] not in [-1, 0]
             elif x == 2:
                 need_repair[i] = ship_stats[i + 1] not in [-1, 0, 1]
+            else:
+                need_repair[i] = False
 
         if timer.config.DEBUG:
             timer.logger.debug("ship_stats:", ship_stats)

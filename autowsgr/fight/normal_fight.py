@@ -8,14 +8,13 @@ from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FIGHT_CONDITIONS_POSITION
 from autowsgr.controller.run_timer import Timer
-from autowsgr.game.game_operation import ChangeShips, MoveTeam, quick_repair
+from autowsgr.game.game_operation import ChangeShip, ChangeShips, MoveTeam, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
 from autowsgr.port.ship import Fleet
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import CalcDis
 
 from .common import DecisionBlock, FightInfo, FightPlan, FightResultInfo, start_march
-from autowsgr.game.game_operation import ChangeShip
 
 """
 常规战决策模块/地图战斗用模板
@@ -183,8 +182,11 @@ class NormalFightPlan(FightPlan):
 
         Args:
             fleet_id: 指定舰队编号, 如果为 None 则使用计划中的参数
+
             plan_path: 绝对路径 / 以 PLAN_ROOT 为根的相对路径
+
             fleet: 舰队成员, ["", "1号位", "2号位", ...], 如果为 None 则全部不变, 为 "" 则该位置无舰船, 为 -1 则不覆盖 yaml 文件中的参数
+
         Raises:
             BaseException: _description_
         """
@@ -237,31 +239,38 @@ class NormalFightPlan(FightPlan):
     def _go_fight_prepare_page(self) -> None:
         """活动多点战斗必须重写该模块"""
         """(从当前战斗结束后跳转到的页面)进入准备战斗的页面"""
+        if not self.timer.ui.is_normal_fight_prepare:
+            self.timer.goto_game_page("map_page")
         self.timer.goto_game_page("fight_prepare_page")
+        self.timer.ui.is_normal_fight_prepare = True
 
-    def _enter_fight(self, same_work=False, *args, **kwargs):
+    def _enter_fight(self, *args, **kwargs):
         """
         从任意界面进入战斗.
 
         :return: 进入战斗状态信息，包括['success', 'dock is full'].
         """
-        if not same_work:
+        if self.chapter != self.timer.port.chapter or self.map != self.timer.port.map:
             self._go_map_page()
             self._change_fight_map(self.chapter, self.map)
+            self.timer.port.chapter = self.chapter
+            self.timer.port.map = self.map
         # try:
         assert self.timer.wait_images(self.Info.map_image) != None
         self._go_fight_prepare_page()
         MoveTeam(self.timer, self.fleet_id)
-        if self.fleet is not None and same_work == False:
+        if self.fleet is not None and self.timer.port.fleet[self.fleet_id] != self.fleet:
             ChangeShips(self.timer, self.fleet_id, self.fleet)
+            self.timer.port.fleet[self.fleet_id] = self.fleet[:]
+
         self.Info.ship_stats = detect_ship_stats(self.timer)
         quick_repair(self.timer, self.repair_mode, self.Info.ship_stats)
         # 满级更换舰船
-        if self.config.daily_automation['change_ship_level_max']:
-            for i in range(1,7):
-                if  self.timer.ship_level[i] >= 110 :
-                    ChangeShip(self.timer, ship_id=i, name = "U-47", fleet_id= None)  # name 为舰船名字,后续可以改为配置文件
-                    
+        if self.config.daily_automation["change_ship_level_max"]:
+            for i in range(1, 7):
+                if self.timer.ship_level[i] >= 110:
+                    ChangeShip(self.timer, ship_id=i, name="U-47", fleet_id=None)  # name 为舰船名字,后续可以改为配置文件
+
         # TODO: 这里应该只catch network error，太宽的catch会导致其他错误被隐藏
         # except AssertionError:
         #     if "process_err" in kwargs and kwargs["process_err"] == False:

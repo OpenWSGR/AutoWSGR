@@ -61,7 +61,7 @@ class EventFightPlan20220928_2(PatrollingEvent, BattlePlan):
         BattlePlan.__init__(self, timer, plan_path)
         PatrollingEvent.__init__(self, timer, event, MAP_POSITIONS)
 
-    def _enter_fight(self, same_work=False):
+    def _enter_fight(self):
         self._go_map_page()
         self.enter_map(self.chapter, self.map)
         assert self.timer.wait_image(self.event_image[2]) is not False

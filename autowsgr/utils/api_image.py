@@ -16,6 +16,16 @@ def relative_to_absolute(record_pos, resolution=(960, 540)):
     return abs_x, abs_y
 
 
+def cv_show_image(img):
+    """调试用, 展示图像, 按任意键关闭窗口
+
+    img: numpy.ndarray 格式的图片
+    """
+    cv2.imshow("Image", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
 def absolute_to_relative(absolute_pos, resolution=(960, 540)):
     """将绝对坐标转换为相对坐标"""
     abs_x, abs_y = absolute_pos
@@ -123,6 +133,35 @@ def image_rotate_without_crop(mat, angle):
     rotated_mat = cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
 
     return rotated_mat
+
+
+def crop_rectangle_relative(image, x_ratio, y_ratio, width_ratio, height_ratio):
+    """
+    根据相对坐标和尺寸裁剪图像。
+
+    参数:
+    image -- 输入的 numpy 数组格式的图像。
+    x_ratio -- 左上角x坐标的相对位置
+    y_ratio -- 左上角y坐标的相对位置
+    width_ratio -- 裁剪区域的宽度相对图像宽度的比例
+    height_ratio -- 裁剪区域的高度相对图像高度的比例
+
+    返回:
+    cropped_image -- 裁剪后的图像。
+    """
+    # 获取图像的尺寸
+    height, width = image.shape[:2]
+
+    # 计算裁剪区域的左上角坐标和尺寸
+    start_x = int(width * x_ratio)
+    start_y = int(height * y_ratio)
+    end_x = start_x + int(width * width_ratio)
+    end_y = start_y + int(height * height_ratio)
+
+    # 裁剪图像
+    cropped_image = image[start_y:end_y, start_x:end_x]
+
+    return cropped_image
 
 
 def crop_rectangle(image, rect):

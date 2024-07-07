@@ -179,7 +179,7 @@ def detect_ship_stats(timer: Timer, type="prepare", previous=None):
 
             'sumup': 单场战斗结算界面
     Returns:
-        list: 表示血量状态
+        list: 表示血量状态, 1-index
 
         example: [-1, 0, 0, 1, 1, 2, -1] 表示 1-2 号位绿血 3-4 号位中破, 5 号位大破, 6 号位不存在
 

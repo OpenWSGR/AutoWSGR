@@ -89,7 +89,7 @@ class UI:
     def __init__(self):
         self.nodes = {}
         self.page_count = 0
-
+        self.is_normal_fight_prepare = False
         self._build_ui_tree()
 
     def get_node_by_name(self, name):

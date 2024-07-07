@@ -150,15 +150,13 @@ class NormalExercisePlan(FightPlan):
         # 构建信息存储结构
         self.Info = NormalExerciseInfo(self.timer)
 
-    def _enter_fight(self, same_work=False) -> str:
+    def _enter_fight(self) -> str:
         """
         从任意界面进入战斗.
 
         :return: 进入战斗状态信息，包括['success', 'dock is full'].
         """
-        if same_work == False:
-            self.timer.goto_game_page("exercise_page")
-
+        self.timer.goto_game_page("exercise_page")
         self._exercise_times = self.exercise_times
         self.exercise_stats = [None, None]
         return literals.OPERATION_SUCCESS_FLAG
