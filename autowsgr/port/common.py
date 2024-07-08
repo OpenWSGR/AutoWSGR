@@ -8,7 +8,7 @@ class Ship:
         self.level = 1
         self.name = name  # 舰船名: 舰船的唯一标识
         self.type = "DD"  # 舰船类型, 暂时没啥用
-        self.statu = 0  # 数字: 0 绿血, 1 黄血, 2 红血, 3 修理中.
+        self._statu = 0  # 数字: 0 绿血, 1 黄血, 2 红血, 3 修理中.
         self.repair_end_time = 0
         self.repair_start_time = 0
         self.waiting_repair = 0  # 是否正在修理队列中
@@ -18,13 +18,25 @@ class Ship:
         table = ["绿血", "中破", "大破", "修理中"]
         return f"舰船名:{self.name}\n舰船状态:{table[self.statu]}\n舰船等级:{self.level}\n\n"
 
-    def set_repair(self, end_time: str):
+    @property
+    def statu(self):
+        if self.is_repairing():
+            return 3
+        return self._statu
+
+    @statu.setter
+    def statu(self, new_statu):
+        self._statu = new_statu
+
+    def set_repair(self, time_cost):
         """设置舰船正在修理中
         Args:
             time_cost (str): 识别出的时间字符串
         """
+        self.waiting_repair = False
+        self._statu = 0
         self.repair_start_time = time.time()
-        self.repair_end_time = end_time
+        self.repair_end_time = self.repair_start_time + time_cost
 
     def is_repairing(self):
         if self.statu == 3:
@@ -37,18 +49,22 @@ class Ship:
 
 class WorkShop:
     def __init__(self) -> None:
-        self.available_time = []
+        self.available_time = None
 
-    def _time_to_seconds(time_str):
+    def _time_to_seconds(self, time_str):
         parts = time_str.split(":")
         return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
 
     def update_available_time(self, available_time):
         self.available_time = available_time
 
-    def get_waiting_time(self) -> bool:
+    def get_waiting_time(self):
+        # 如果不确定, 返回 None
+        if self.available_time == None:
+            return None
+
         waiting_time = 86400
-        for bath in self.bath_available_time:
+        for bath in self.available_time:
             if time.time() > bath:
                 return 0
             else:
@@ -89,7 +105,7 @@ class Factory(WorkShop):
         self.capacity = None
         self.waiting_destory = False
 
-    def update_capacity(self, capacity, occupation, blueprint):
+    def update_capacity(self, capacity, occupation, blueprint=None):
         """更新仓库容量状态
 
         Args:
@@ -98,7 +114,8 @@ class Factory(WorkShop):
         """
         self.capacity = capacity
         self.occupation = occupation
-        self.blueprint = blueprint
+        if blueprint is not None:
+            self.blueprint = blueprint
 
     @property
     def full(self):

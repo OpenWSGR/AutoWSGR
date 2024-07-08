@@ -140,9 +140,9 @@ def crop_rectangle_relative(image, x_ratio, y_ratio, width_ratio, height_ratio):
     根据相对坐标和尺寸裁剪图像。
 
     参数:
-    image -- 输入的 numpy 数组格式的图像。
-    x_ratio -- 左上角x坐标的相对位置
-    y_ratio -- 左上角y坐标的相对位置
+    image -- 输入的 numpy 数组格式的图像。image[row][col]
+    x_ratio -- 左上角 x 坐标的相对位置
+    y_ratio -- 左上角 y 坐标的相对位置
     width_ratio -- 裁剪区域的宽度相对图像宽度的比例
     height_ratio -- 裁剪区域的高度相对图像高度的比例
 

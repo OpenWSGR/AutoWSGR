@@ -4,7 +4,7 @@ from typing import List
 import easyocr
 from thefuzz import process
 
-from autowsgr.utils.api_image import crop_image
+from autowsgr.utils.api_image import crop_image, crop_rectangle_relative
 from autowsgr.utils.io import cv_imread
 
 # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
@@ -20,7 +20,7 @@ def recognize(
     allowlist: List[str] = None,  # 识别的字符白名单
     candidates: List[str] = None,  # 识别结果的候选项，如果指定则匹配最接近的
 ):
-    """识别图片中的文字。注意：请确保图片中有文字！总会尝试返回一个结果"""
+    """识别图片中的文字。注意：请确保图片中有文字！总会尝试返回且只返回一个结果"""
     if isinstance(img, str):
         img = cv_imread(img)
 
@@ -41,7 +41,7 @@ def recognize(
 # ===== 数字 ======
 def recognize_number(img):
     """识别图片中的单个数字"""
-    text = recognize(img, allowlist="x0123456789.KM").replace(" ", "")
+    text = recognize(img, allowlist="x0123456789.KM/").replace(" ", "")
     # 决战，费用是f"x{cost}"格式
     if text.startswith("x"):
         return eval(text[1:])
@@ -70,3 +70,15 @@ def recognize_get_ship(screen, ship_names=None):
     type = recognize(crop_image(screen, *TYPE_POSITION))
 
     return name, type
+
+
+def recognize_number_with_slash(img):
+    text = recognize(img, allowlist="0123456789/").replace(" ", "")
+    num = text.split("/")
+    return num[0], num[1]
+
+
+def recognize_number_with_colon(img):
+    text = recognize(img, allowlist="0123456789:").replace(" ", "")
+    num = text.split("/")
+    return num[0], num[1]

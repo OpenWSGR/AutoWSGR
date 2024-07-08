@@ -7,6 +7,8 @@ from typing import Iterable, Tuple
 import cv2
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
+from autowsgr.ocr.ocr import crop_rectangle_relative
+from autowsgr.ocr.ship_name import recognize
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
@@ -114,12 +116,20 @@ class Emulator:
         self.Android.swipe(x0, y0, x1, y1, duration=duration, delay=0.1)
 
     # ===========图像函数============
+    def recognize_screen_relative(self, left, top, right, buttom, update=False):
+        if update:
+            self.update_screen()
+        return recognize(crop_rectangle_relative(self.screen, left, top, right - left, buttom - top))
 
     def update_screen(self):
         """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 self.screen"""
         self.screen = self.Android.snapshot()
 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
+        """获取屏幕图片
+
+        return (ndarray): 宽x长 array[720][1280]
+        """
         if need_screen_shot:
             self.update_screen()
         return cv2.resize(self.screen, resolution)

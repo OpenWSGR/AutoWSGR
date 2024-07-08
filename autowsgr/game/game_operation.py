@@ -6,9 +6,9 @@ from autowsgr.constants.other_constants import SHIP_TYPE_CLICK
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.controller.run_timer import Timer, try_to_get_expedition
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
-from autowsgr.ocr.ocr import recognize_get_ship
+from autowsgr.ocr.ocr import recognize_get_ship, recognize_number_with_slash
 from autowsgr.ocr.ship_name import recognize_ship
-from autowsgr.utils.api_image import absolute_to_relative
+from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
 
 
 class Expedition:
@@ -88,7 +88,13 @@ def DestroyShip(timer: Timer, ship_types=None):
     timer.go_main_page()
     timer.goto_game_page("destroy_page")
     timer.set_page("destroy_page")
+
     timer.Android.click(90, 206, delay=1.5)  # 点添加
+
+    # 识别船坞容量
+    capacity, occupation = recognize_number_with_slash(crop_rectangle_relative(timer.get_screen(), 0.873, 0.035, 0.102, 0.038))
+    timer.port.ship_factory.update_capacity(capacity, occupation)
+    timer.logger.info(f"舰船容量: {capacity}/{occupation}")
 
     # 选择舰船类型
     if ship_types is not None:
@@ -96,6 +102,7 @@ def DestroyShip(timer: Timer, ship_types=None):
         for ship_type in ship_types:
             timer.Android.relative_click(*absolute_to_relative(SHIP_TYPE_CLICK[ship_type], (1280, 720)), delay=0.8)
         timer.Android.relative_click(0.9, 0.85, delay=1.5)
+
     timer.Android.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
     timer.Android.relative_click(0.915, 0.906, delay=1.5)  # 确定
     timer.Android.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
@@ -223,6 +230,7 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
             # 快修已经开始泡澡的船
             pos = timer.get_image_position(IMG.repair_image[1])
             while pos != None:
+                timer.port.bathroom.available_time = None
                 timer.Android.click(pos[0], pos[1], delay=1)
                 pos = timer.get_image_position(IMG.repair_image[1])
             # 按逻辑修理

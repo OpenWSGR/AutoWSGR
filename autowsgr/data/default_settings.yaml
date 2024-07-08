@@ -51,6 +51,11 @@ daily_automation:
   normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。plan名参考"plans/normal_fight/"
     - [8-5AI, 2, 0]
 
+# =========== 浴室信息配置 ===========
+bath:
+  bathroom_feature_count: 1 # 浴室数(购买的浴室装饰数, 最大为 3)
+  bathroom_count: 2 # 修理位置总数(最大为 12)
+
 # =========== 数据信息设置 =============
 SHIP_NAME_PATH: ""
 PLAN_ROOT: # 计划根目录, 如果缺省则默认为 [python packages 目录]/autowsgr/data/plans
