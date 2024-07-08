@@ -10,7 +10,11 @@ from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
 from autowsgr.ocr.ship_name import recognize_number, recognize_ship
-from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
+from autowsgr.utils.api_image import (
+    absolute_to_relative,
+    crop_rectangle_relative,
+    cv_show_image,
+)
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.operator import unorder_equal
 
@@ -68,32 +72,16 @@ class Fleet:
         self.check_level()
 
     def check_level(self):
-        LEFT_TOPS = [(0.069, 0.565), (0.186, 0.565), (0.303, 0.565), (0.420, 0.565), (0.537, 0.565), (0.654, 0.565)]
+        LEFT_TOPS = [(0.069, 0.566), (0.186, 0.566), (0.303, 0.566), (0.420, 0.566), (0.537, 0.566), (0.653, 0.566)]
         SIZE = (0.023, 0.024)
         screen = self.timer.get_screen()
         self.levels = [None] * 7
         for i in range(1, count_ship(self.ships) + 1):
             img = crop_rectangle_relative(screen, LEFT_TOPS[i - 1][0], LEFT_TOPS[i - 1][1], SIZE[0], SIZE[1])
+            img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
-            self.levels[i] = recognize_number(img)[0][1]
+            self.levels[i] = int(recognize_number(img, min_size=3)[0][1])
             # print(levels)
-
-        # if timer.config.daily_automation['change_ship_level_max']:
-        #     timer.update_screen()
-        #     for i in range(1, 7):
-        #         try:
-        #             image_crop = crop_image(timer.screen, *POS["result_page"]["ship_level"][i])
-        #             raw_str = recognize_number(image_crop,ex_list="LVlv.")
-        #             dot_position = raw_str[0][1].find('.')  # 找到'.'的位置
-        #             number_after_dot = int(raw_str[0][1][dot_position + 1:])  # 获取'.'之后的所有字符,并转换为整数
-        #             timer.ship_level[i] = number_after_dot # 将等级赋值给对应的位置
-        #         except:
-        #             timer.ship_level[i] = 0 # 识别失败则等级为0
-        #             timer.logger.error(f"识别{i}号位置等级失败")
-        #     timer.logger.debug(f"当前编队舰船等级为：{timer.ship_level}")
-        #     return timer.ship_level
-        # else:
-        #     pass
 
     def change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name

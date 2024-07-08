@@ -340,6 +340,7 @@ class FightPlan(ABC):
         if ret == literals.OPERATION_SUCCESS_FLAG:
             pass
         elif ret == literals.DOCK_FULL_FLAG:
+            self.timer.go_main_page()
             return ret
         elif ret == literals.FIGHT_END_FLAG:
             self.timer.set_page(self.Info.end_page)

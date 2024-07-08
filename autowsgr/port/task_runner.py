@@ -4,7 +4,13 @@ import time
 from autowsgr.constants import literals
 from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.normal_fight import NormalFightPlan
-from autowsgr.game.game_operation import DestroyShip, detect_ship_stats, quick_repair
+from autowsgr.game.game_operation import (
+    ChangeShip,
+    DestroyShip,
+    MoveTeam,
+    detect_ship_stats,
+    quick_repair,
+)
 from autowsgr.ocr.ocr import recognize
 from autowsgr.ocr.ship_name import _recognize_ship
 from autowsgr.port.common import Port, Ship
@@ -14,8 +20,8 @@ from autowsgr.utils.io import yaml_to_dict
 
 
 class Task:
-    def __init__(self, port: Port, timer: Timer) -> None:
-        self.port = port
+    def __init__(self, timer: Timer) -> None:
+        self.port = timer.port
         self.timer = timer
 
     def run(self):
@@ -27,7 +33,7 @@ class Task:
 
 
 class FightTask(Task):
-    def __init__(self, port, timer: Timer, file_path="", *args, **kwargs) -> None:
+    def __init__(self, timer: Timer, file_path="", *args, **kwargs) -> None:
         """
         Args:
             banned_ship (list(list(str))): 1-index 的列表, banned_ship[i] 表示第 i 号位不允许的舰船
@@ -54,7 +60,7 @@ class FightTask(Task):
 
             destroy_ship_types: 解装舰船
         """
-        super().__init__(port)
+        super().__init__(timer)
         self.quick_repair = False
         self.destroy_ship_types = None
         self.default_level_limit = 2
@@ -78,7 +84,7 @@ class FightTask(Task):
             fleet.detect()
             if any([ship in self.all_ships for ship in fleet.ships]):
                 self.timer.logger.info("该舰队中处于修复状态的舰船正在被快速修复")
-                quick_repair(self.timer, 3)
+                quick_repair(self.timer, 3, switch_back=True)
 
             for i, ship in enumerate(fleet.ships):
                 if ship in self.all_ships and not self.port.have_ship(ship):
@@ -91,7 +97,8 @@ class FightTask(Task):
                 if not self.port.have_ship(ship):  #
                     self.timer.logger.info(f"正在尝试注册 {ship}")
                     try:
-                        fleet.change_ship(1, ship)
+                        ChangeShip(self.timer, self.fleet_id, 1, ship)
+                        quick_repair(timer, 3, switch_back=True)
                     except:
                         raise BaseException(f"未找到 {ship} 舰船")
                     tmp = self.port.register_ship(ship)
@@ -116,7 +123,7 @@ class FightTask(Task):
                         ships.remove(ship)
                         break
 
-            return fleet if fleet[-1] is not None else None
+            return None if any([ship is None for ship in fleet[1 : self.ship_count + 1]]) else fleet
 
         if self.ship_count not in range(1, 7):
             raise ValueError(f"舰队舰船数量设置错误或者未设置, 当前设置的舰船数量为 {self.ship_count}")
@@ -124,7 +131,7 @@ class FightTask(Task):
         self.all_ships = [
             ship
             for ship in self.all_ships
-            if self.port.get_ship_by_name(ship).level >= self.level_limit.get(ship, self.default_level_limit)
+            if self.port.get_ship_by_name(ship).level < self.level_limit.get(ship, self.default_level_limit)
         ]
         fleet = _build_fleet(self.all_ships)
         if fleet is None:
@@ -137,10 +144,11 @@ class FightTask(Task):
                 ship
                 for ship in self.all_ships
                 if (
-                    ignore_statu == False
-                    and self.port.get_ship_by_name(ship).statu >= self.repair_mode.get(ship, self.default_repair_mode)
-                    or ignore_statu == True
-                    and self.port.get_ship_by_name(ship).statu != 3
+                    (
+                        ignore_statu == False
+                        and self.port.get_ship_by_name(ship).statu < self.repair_mode.get(ship, self.default_repair_mode)
+                    )
+                    or (ignore_statu == True)
                 )
             ]
         )
@@ -160,25 +168,25 @@ class FightTask(Task):
                 else:
                     ship.waiting_repair = True
                     self.timer.logger.info(f"添加舰船 {name} 到修理队列.")
-                    tasks.append(RepairTask(self.port, self.timer, ship))
+                    tasks.append(RepairTask(self.timer, ship))
         return tasks
 
     def run(self):
-        statu, fleet = self.build_fleet()
         # 应该退出的情况: 1.等级限制 2.不允许快修, 需要等待 3. 船坞已满, 需清理
+        statu, fleet = self.build_fleet()
         if statu == 1:
             return True, []
         if statu == 2 and not self.quick_repair:
             return False, self.check_repair() + [self]
         if self.port.ship_factory.full:
-            tasks = tasks + [OtherTask(self.port, self.timer, "destroy", destroy_ship_types=self.destroy_ship_types)]
+            tasks = tasks + [OtherTask(self.timer, "destroy", destroy_ship_types=self.destroy_ship_types)]
             return False, tasks
 
-        plan = NormalFightPlan(self.timer, self.plan_path, self.fleet_id)
+        plan = NormalFightPlan(self.timer, self.plan_path, self.fleet_id, fleet=fleet)
         plan.repair_mode = [3] * 6
         # 设置战时快修
         if statu == 2:
-            statu, fleet = self.build_fleet()
+            statu, fleet = self.build_fleet(True)
             for i, name in enumerate(fleet):
                 ship = self.port.get_ship_by_name(name)
                 if ship.statu >= self.repair_mode.get(name, self.default_repair_mode):
@@ -187,20 +195,23 @@ class FightTask(Task):
                     plan.repair_mode[i] = ship.statu
         # 执行战斗
         ret = plan.run()
-        # 更新舰船状态
-        if len(plan.Info.fight_history.events):
-            ship_stats = plan.Info.fight_history.events[-1].stats
-            for i in range(1, 7):
-                if ship_stats[i] == -1:
-                    continue
-                ship = self.port.get_ship_by_name(fleet[i])
-                ship.statu = ship_stats[i]
         # 处理船坞已满
         if ret == literals.DOCK_FULL_FLAG:
-            tasks.append(OtherTask(self.port, self.timer, "destroy", destroy_ship_types=self.destroy_ship_types))
-            return False, [self]
+            return False, [OtherTask(self.timer, "destroy", destroy_ship_types=self.destroy_ship_types)]
         self.times -= 1
-        return True, [self.check_repair(), self]
+        # 更新舰船状态
+        self.timer.goto_game_page("fight_prepare_page")
+        MoveTeam(self.timer, self.fleet_id)
+        fleet = Fleet(self.timer)
+        fleet.detect()
+        ship_stats = detect_ship_stats(self.timer)
+        for i, name in enumerate(fleet.ships):
+            ship = self.port.get_ship_by_name(name)
+            if ship is not None:
+                ship.level = fleet.levels[i]
+                ship.statu = ship_stats[i]
+
+        return True, self.check_repair() + [self]
 
 
 class BuildTask(Task):
@@ -209,8 +220,8 @@ class BuildTask(Task):
 
 
 class RepairTask(Task):
-    def __init__(self, port: Port, timer: Timer, ship: Ship, *args, **kwargs) -> None:
-        super().__init__(port, timer)
+    def __init__(self, timer: Timer, ship: Ship, *args, **kwargs) -> None:
+        super().__init__(timer)
         self.max_repiar_time = 1e9
         self.__dict__.update(kwargs)
         self.ship = ship
@@ -251,6 +262,7 @@ class RepairTask(Task):
             info = str(
                 [datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S") for timestamp in available_time]
             )
+            self.port.bathroom.update_available_time(available_time)
             timer.logger.info(f"浴室信息检查完毕:{info}")
 
         # 扫描等待修理列表
@@ -261,17 +273,17 @@ class RepairTask(Task):
             for time_cost in time_costs:
                 self.timer.update_screen()
                 text = time_cost[1].replace(" ", "")
-                if text.startwith("耗时") and len(text) == 11:
+                if text.startswith("耗时") and len(text) == 11:
                     # 整个图像截取完全
                     x = 0.041 + time_cost[0][0][0] / self.timer.screen.shape[1]
                     y = 0.741
-                    img = crop_rectangle_relative(img, x, y, 0.12, 0.042)
-                    name = _recognize_ship(1, self.timer.ship_names)
+                    img = crop_rectangle_relative(self.timer.screen, x, y, 0.12, 0.042)
+                    name = _recognize_ship(img, self.timer.ship_names)
                     if len(name) == 0:
                         # 单字船名识别失败
                         continue
                     name = name[0][0]
-                    seconds = self.port.bathroom._time_to_seconds(time_cost[1][3:])
+                    seconds = self.port.bathroom._time_to_seconds(text[3:])
                     if name == self.ship.name:
                         if self.max_repiar_time <= seconds:
                             # 快速修复
@@ -283,21 +295,27 @@ class RepairTask(Task):
 
                         if not self.port.bathroom.is_available():
                             self.timer.logger.info("当前浴场已满, 不允许快速修复, 此任务延后")
-                            return False, [self]
+                            return False, []
 
-                        self.port.bathroom.add_repair(time_cost[1][3:], self.ship)
+                        self.port.bathroom.add_repair(text[3:])
                         self.timer.Android.relative_click(x, y)
+                        self.timer.set_page("bath_page")
                         self.ship.set_repair(seconds)
+                        self.port.bathroom.add_repair(text[3:])
                         return True, []
 
+                    else:
+                        self.timer.logger.debug(f"识别到舰船: {name}")
+
             self.timer.Android.relative_swipe(0.33, 0.5, 0.66, 0.5, delay=1)
+            time.sleep(0.5)
             if time_costs == last_result:
                 raise BaseException("未找到目标舰船")
             last_result = time_costs
 
 
 class OtherTask(Task):
-    def __init__(self, port: Port, timer: Timer, type, *args, **kwargs) -> None:
+    def __init__(self, timer: Timer, type, *args, **kwargs) -> None:
         """其它类型的任务
         Args:
             type (str): 任务类型
@@ -306,12 +324,12 @@ class OtherTask(Task):
 
 
         """
-        super().__init__(port, timer)
+        super().__init__(timer)
         self.type = type
-        if type == "destory":
+        if type == "destroy":
             self.destroy_ship_types = kwargs["destroy_ship_types"]
             timer.logger.info("船舱已满, 添加解装任务中...")
-            if port.ship_factory.waiting_destory:
+            if timer.port.ship_factory.waiting_destory:
                 timer.logger.info("任务队列中已经有解装任务, 跳过")
                 self.run = lambda self: None
 
@@ -334,9 +352,9 @@ class TaskRunner:
             while id < len(self.tasks):
                 task = self.tasks[id]
                 statu, new_tasks = task.run()
-                self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
                 if statu:
-                    self.tasks = self.tasks[1:]
+                    self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
                     break
                 else:
+                    self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]
                     id += 1

@@ -1,0 +1,71 @@
+# 高级功能-任务调度
+# 使用提示:
+# 1. 所有涉及的舰船名至少两个字
+# 2. 不能之前的 autodaily fightplan 混用
+# 3. 舰船名是区分舰船的唯一表示, 请保证没有任何两条舰船重名。
+#    参与调度的舰船如果有重名, 则默认选取第一个(等级最高者)。
+#    不建议让 1 级舰船参与调度
+# 4. 编写配置文件时注意缩进
+
+# 下面是 FightTask 配置模板
+
+# all_ship: 该任务中所有参与调度舰船名
+all_ships: []
+
+# banned_ship 一共七项, 第零项忽略留空, 其余第 i 表示 i 号位置不允许的舰船
+banned_ship:
+ - []
+ - []
+ - []
+ - []
+ - []
+ - []
+ - []
+
+# 默认等级限制
+default_level_limit: 111
+
+# 特定等级限制, 指定一艘船参与调度的最大等级.
+# 如果该舰船等级达到或者超过最大等级, 则不参与调度.
+# 没有指定使用默认限制
+# 例子
+# level_limit:{
+#   吹雪:110
+#   U-1206:111
+# }
+#
+level_limit: {
+
+}
+
+# 默认修理方式 1 为中破修, 2 为大破修
+default_repair_mode: 2
+
+# 特定修理方式, 规则参考 level_limit
+repair_mode:
+
+# 此次任务的舰队舰船数量, 调度器根据数量和可调度舰船自动安排舰队
+ship_count: 6
+
+# 使用的舰队编号, 忽视 fight_plan 中的对应参数, 不能用第一舰队
+fleet_id: 2
+
+# 战斗策略文件位置, 参考 NormalFightPlan 的规范
+plan_path: path
+
+# 任务重复次数
+times: 1
+
+# 超出该时间(秒)使用快修
+max_repair_time: 3600
+
+# 因为舰船未修复的原因无法安排舰队时是否使用快修
+# True / False
+quick_repair: True
+
+# 船仓已满时需要解装的舰船类型
+# 例子
+# destroy_ship_types:
+#   - 航母
+#   - 重巡
+destroy_ship_types:

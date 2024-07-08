@@ -91,11 +91,6 @@ def DestroyShip(timer: Timer, ship_types=None):
 
     timer.Android.click(90, 206, delay=1.5)  # 点添加
 
-    # 识别船坞容量
-    capacity, occupation = recognize_number_with_slash(crop_rectangle_relative(timer.get_screen(), 0.873, 0.035, 0.102, 0.038))
-    timer.port.ship_factory.update_capacity(capacity, occupation)
-    timer.logger.info(f"舰船容量: {capacity}/{occupation}")
-
     # 选择舰船类型
     if ship_types is not None:
         timer.Android.relative_click(0.912, 0.681)
@@ -108,6 +103,13 @@ def DestroyShip(timer: Timer, ship_types=None):
     timer.Android.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
     timer.Android.relative_click(0.9, 0.9, delay=1.5)  # 解装
     timer.Android.relative_click(0.38, 0.567, delay=1.5)  # 四星确认
+
+    # 识别船坞容量
+    timer.Android.click(90, 206, delay=1.5)  # 点添加
+    capacity, occupation = recognize_number_with_slash(crop_rectangle_relative(timer.get_screen(), 0.873, 0.035, 0.102, 0.038))
+    timer.port.ship_factory.update_capacity(capacity, occupation)
+    timer.logger.info(f"舰船容量: {capacity}/{occupation}")
+    timer.go_main_page
 
 
 def verify_team(timer: Timer):
@@ -189,7 +191,7 @@ def SetSupport(timer: Timer, target, try_times=0):
             raise ValueError("can't set right support")
 
 
-def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
+def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, switch_back=False, *args, **kwargs):
     """战斗界面的快速修理
     Args:
         timer (Timer): _description_
@@ -244,6 +246,8 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
                         BLOOD_BAR_POSITION[0][i][1],
                         delay=1.5,
                     )
+            if switch_back:
+                timer.Android.click(200, 420, times=2, delay=1.5)  # 返回正常切换页面
     except AssertionError:
         raise ValueError(f"修理舰船的参数不合法, 请检查你的参数:{arg}")
 

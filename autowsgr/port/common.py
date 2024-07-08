@@ -39,12 +39,7 @@ class Ship:
         self.repair_end_time = self.repair_start_time + time_cost
 
     def is_repairing(self):
-        if self.statu == 3:
-            if time.time() > self.repair_end_time:
-                self.statu = 0
-                return True
-        else:
-            return False
+        return time.time() < self.repair_end_time
 
 
 class WorkShop:
@@ -69,6 +64,7 @@ class WorkShop:
                 return 0
             else:
                 waiting_time = min(waiting_time, bath - time.time() + 0.1)
+        return waiting_time
 
     def is_available(self):
         return self.get_waiting_time() == 0
@@ -94,14 +90,12 @@ class WorkShop:
 
 
 class BathRoom(WorkShop):
-    def add_repair(self, time_cost: str, ship: Ship) -> bool:
-        _, end_time = super().add_work(time_cost)
-        ship.set_repair(end_time)
+    def add_repair(self, time_cost: str) -> bool:
+        super().add_work(time_cost)
 
 
 class Factory(WorkShop):
     def __init__(self) -> None:
-        self.factories_available_time = []
         self.capacity = None
         self.waiting_destory = False
 
@@ -119,7 +113,7 @@ class Factory(WorkShop):
 
     @property
     def full(self):
-        if self.capacity is None:
+        if self.capacity is not None:
             return self.occupation >= self.capacity
         return False
 
@@ -157,7 +151,7 @@ class Port:
             for ship in self.ships:
                 if ship.name == name:
                     return ship
-        raise BaseException(f"舰船 {ship} 未注册")
+        return None
 
     def show_fleet(self):
         self.logger.info("当前已经注册的舰船如下:")
