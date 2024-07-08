@@ -1,6 +1,7 @@
+from autowsgr.constants import literals
 from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.normal_fight import NormalFightPlan
-from autowsgr.game.game_operation import detect_ship_stats, quick_repair
+from autowsgr.game.game_operation import DestroyShip, detect_ship_stats, quick_repair
 from autowsgr.port.common import Port
 from autowsgr.port.ship import Fleet
 from autowsgr.utils.io import yaml_to_dict
@@ -15,11 +16,12 @@ class Task:
         """执行任务
         Returns:
             bool: 任务是否结束
+            list:
         """
 
 
 class FightTask(Task):
-    def __init__(self, port, file_path="", *args, **kwargs) -> None:
+    def __init__(self, port, timer: Timer, file_path="", *args, **kwargs) -> None:
         """
         Args:
             banned_ship (list(list(str))): 1-index 的列表, banned_ship[i] 表示第 i 号位不允许的舰船
@@ -133,15 +135,23 @@ class FightTask(Task):
 
     def run(self):
         statu, fleet = self.build_fleet()
-        tasks = self.check_repair()
+        tasks = [self]
+        tasks += self.check_repair()
         if statu == 1:
-            return True
+            return True, tasks
         if statu == 2:
-            return False
+            return False, tasks
+        if self.port.ship_factory.full:
+            tasks.append(OtherTask(self.port, self.timer, "destroy"))
+            return False, tasks
+
         self.times -= 1
         plan = NormalFightPlan(self.timer, self.plan_path, self.fleet_id)
-        plan.run()
-        return self.times == 0
+        ret = plan.run()
+        if ret == literals.DOCK_FULL_FLAG:
+            tasks.append(OtherTask(self.port, self.timer, "destroy"))
+            return False, tasks
+        return True, tasks
 
 
 class BuildTask(Task):
@@ -150,8 +160,28 @@ class BuildTask(Task):
 
 
 class OtherTask(Task):
-    def __init__(self, port, type, *args, **kwargs) -> None:
-        super().__init__(port)
+    def __init__(self, port: Port, timer: Timer, type, *args, **kwargs) -> None:
+        """其它类型的任务
+        Args:
+            type (str): 任务类型
+                "destroy": 舰船解装
+                "empty": 不执行任何操作
+
+
+        """
+        super().__init__(port, timer)
+        self.type = type
+        if type == "destory":
+            timer.logger.info("船舱已满, 添加解装任务中...")
+            if port.ship_factory.waiting_destory:
+                timer.logger.info("任务队列中已经有解装任务, 跳过")
+                self.run = lambda self: None
+
+    def run(self):
+        if self.type == "destroy":
+            timer = self.timer
+
+        return True
 
 
 class TaskRunner:
@@ -159,10 +189,16 @@ class TaskRunner:
         self.tasks = []
         pass
 
-    def add_task():
-        pass
-
     def run(self):
         while True:
-            for task in self.tasks:
-                statu, new_task = task.run()
+            # 调度逻辑: 依次尝试任务列表中的每个任务, 如果任务正常结束, 则从头开始, 否则找下一个任务.
+            # 每个任务尝试执行后, 会向任务列表中添加一些新任务.
+            id = 0
+            while id < len(self.tasks):
+                task = self.tasks[id]
+                statu, new_tasks = task.run()
+                self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
+                if statu:
+                    break
+                else:
+                    id += 1

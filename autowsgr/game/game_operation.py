@@ -2,6 +2,7 @@ import time
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.image_templates import IMG
+from autowsgr.constants.other_constants import SHIP_TYPE_CLICK
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.controller.run_timer import Timer, try_to_get_expedition
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
@@ -56,6 +57,8 @@ def get_ship(timer: Timer, max_times=1):
             ship_name, ship_type = recognize_get_ship(timer.screen, timer.ship_names)
         except:
             ship_name, ship_type = "识别失败", "识别失败"
+        if timer.port.ship_factory.capacity is not None:
+            timer.port.ship_factory.occupation += 1
         timer.Android.click(915, 515, delay=0.25, times=1)
         timer.ConfirmOperation()
     timer.logger.info(f"获取舰船: {ship_name} {ship_type}")
@@ -79,19 +82,25 @@ def click_result(timer: Timer, max_times=1):
         timer.Android.click(915, 515, delay=0.25, times=1)
 
 
-def DestroyShip(timer: Timer):
+def DestroyShip(timer: Timer, ship_types=None):
     """解装舰船，目前仅支持：全部解装+保留装备"""
 
-    if not timer.identify_page("destroy_page"):
-        timer.goto_game_page("destroy_page")
+    timer.go_main_page()
+    timer.goto_game_page("destroy_page")
     timer.set_page("destroy_page")
-
     timer.Android.click(90, 206, delay=1.5)  # 点添加
-    timer.Android.relative_click(0.91 - 0.5, 0.3 - 0.5, delay=1.5)  # 快速选择
-    timer.Android.relative_click(0.915 - 0.5, 0.906 - 0.5, delay=1.5)  # 确定
-    timer.Android.relative_click(0.837 - 0.5, 0.646 - 0.5, delay=1.5)  # 卸下装备
-    timer.Android.relative_click(0.9 - 0.5, 0.9 - 0.5, delay=1.5)  # 解装
-    timer.Android.relative_click(0.38 - 0.5, 0.567 - 0.5, delay=1.5)  # 四星确认
+
+    # 选择舰船类型
+    if ship_types is not None:
+        timer.Android.relative_click(0.912, 0.681)
+        for ship_type in ship_types:
+            timer.Android.relative_click(*absolute_to_relative(SHIP_TYPE_CLICK[ship_type], (1280, 720)), delay=0.8)
+        timer.Android.relative_click(0.9, 0.85, delay=1.5)
+    timer.Android.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
+    timer.Android.relative_click(0.915, 0.906, delay=1.5)  # 确定
+    timer.Android.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
+    timer.Android.relative_click(0.9, 0.9, delay=1.5)  # 解装
+    timer.Android.relative_click(0.38, 0.567, delay=1.5)  # 四星确认
 
 
 def verify_team(timer: Timer):

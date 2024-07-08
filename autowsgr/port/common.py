@@ -86,6 +86,8 @@ class BathRoom(WorkShop):
 class Factory(WorkShop):
     def __init__(self) -> None:
         self.factories_available_time = []
+        self.capacity = None
+        self.waiting_destory = False
 
     def update_capacity(self, capacity, occupation, blueprint):
         """更新仓库容量状态
@@ -97,6 +99,12 @@ class Factory(WorkShop):
         self.capacity = capacity
         self.occupation = occupation
         self.blueprint = blueprint
+
+    @property
+    def full(self):
+        if self.capacity is None:
+            return self.occupation >= self.capacity
+        return False
 
 
 class Port:
