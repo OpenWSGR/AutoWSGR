@@ -106,7 +106,7 @@ def DestroyShip(timer: Timer, ship_types=None):
 
     # 识别船坞容量
     timer.Android.click(90, 206, delay=1.5)  # 点添加
-    capacity, occupation = recognize_number_with_slash(crop_rectangle_relative(timer.get_screen(), 0.873, 0.035, 0.102, 0.038))
+    occupation, capacity = recognize_number_with_slash(crop_rectangle_relative(timer.get_screen(), 0.873, 0.035, 0.102, 0.038))
     timer.port.ship_factory.update_capacity(capacity, occupation)
     timer.logger.info(f"舰船容量: {capacity}/{occupation}")
     timer.go_main_page

@@ -179,7 +179,7 @@ class FightTask(Task):
         if statu == 2 and not self.quick_repair:
             return False, self.check_repair() + [self]
         if self.port.ship_factory.full:
-            tasks = tasks + [OtherTask(self.timer, "destroy", destroy_ship_types=self.destroy_ship_types)]
+            tasks = [OtherTask(self.timer, "destroy", destroy_ship_types=self.destroy_ship_types)]
             return False, tasks
 
         plan = NormalFightPlan(self.timer, self.plan_path, self.fleet_id, fleet=fleet)
@@ -188,6 +188,8 @@ class FightTask(Task):
         if statu == 2:
             statu, fleet = self.build_fleet(True)
             for i, name in enumerate(fleet):
+                if name == None:
+                    continue
                 ship = self.port.get_ship_by_name(name)
                 if ship.statu >= self.repair_mode.get(name, self.default_repair_mode):
                     self.timer.logger.info(f"舰船 {name} 的状态已经标记为修复")
@@ -336,7 +338,7 @@ class OtherTask(Task):
     def run(self):
         if self.type == "destroy":
             DestroyShip(self.timer, ship_types=self.destroy_ship_types)
-        return True
+        return True, []
 
 
 class TaskRunner:

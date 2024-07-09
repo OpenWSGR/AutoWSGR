@@ -106,8 +106,8 @@ class Factory(WorkShop):
             capacity : 总容量
             occupation : 总占用量
         """
-        self.capacity = capacity
-        self.occupation = occupation
+        self.capacity = int(capacity)
+        self.occupation = int(occupation)
         if blueprint is not None:
             self.blueprint = blueprint
 
@@ -151,6 +151,8 @@ class Port:
             for ship in self.ships:
                 if ship.name == name:
                     return ship
+        self.show_fleet()
+        self.logger.info(f"需要查找的舰船 {name} 未找到")
         return None
 
     def show_fleet(self):

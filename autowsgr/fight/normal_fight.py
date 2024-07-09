@@ -256,7 +256,7 @@ class NormalFightPlan(FightPlan):
             self.timer.port.chapter = self.chapter
             self.timer.port.map = self.map
         # try:
-        assert self.timer.wait_images(self.Info.map_image) != None
+        # assert self.timer.wait_images(self.Info.map_image) != None
         self._go_fight_prepare_page()
         MoveTeam(self.timer, self.fleet_id)
         if self.fleet is not None and self.timer.port.fleet[self.fleet_id] != self.fleet:
