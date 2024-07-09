@@ -193,8 +193,8 @@ class FightTask(Task):
                 ship = self.port.get_ship_by_name(name)
                 if ship.statu >= self.repair_mode.get(name, self.default_repair_mode):
                     self.timer.logger.info(f"舰船 {name} 的状态已经标记为修复")
-                    ship.set_repair(0)
                     plan.repair_mode[i] = ship.statu
+                    ship.set_repair(0)
         # 执行战斗
         ret = plan.run()
         # 处理船坞已满
