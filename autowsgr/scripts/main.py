@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import keyboard as kd
 
 import autowsgr
-from autowsgr.controller.run_timer import Emulator, Timer
+from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
-from autowsgr.utils.new_logger import Logger
+from autowsgr.utils.logger import Logger
 from autowsgr.utils.update import check_for_updates
 
 event_pressed = set()
@@ -64,16 +64,6 @@ def start_script(settings_path=None):
     config, logger = initialize_logger_and_config(settings_path)
     timer = Timer(config, logger)
     return timer
-
-
-def start_script_emulator(settings_path=None):
-    """启动脚本, 返回一个 Emulator 记录器, 用于操作模拟器
-    Returns:
-        Emulator: 该模拟器的记录器
-    """
-    config, logger = initialize_logger_and_config(settings_path)
-    emulator = Emulator(config, logger)
-    return emulator
 
 
 def get_emulator_path(emulator_type):

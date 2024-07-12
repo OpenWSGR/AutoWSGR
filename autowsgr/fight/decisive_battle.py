@@ -4,13 +4,13 @@ import time
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
-from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
 from autowsgr.game.game_operation import DestroyShip, get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
-from autowsgr.ocr.ship_name import _recognize_ship, recognize_number
 from autowsgr.port.ship import Fleet, count_ship
+from autowsgr.timer import Timer
+from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import count, yaml_to_dict
 
 """决战结构:
@@ -152,7 +152,7 @@ class Logic:
 
     def get_best_fleet(self):
         ships = self.stats.ships
-        self.logger.debug(f"ALL SHIPS: {ships}")
+        self.logger.debug(f"拥有舰船: {ships}")
         best_ships = [
             "",
         ]
@@ -174,7 +174,7 @@ class Logic:
 
         for _ in range(len(best_ships), 7):
             best_ships.append("")
-        self.logger.debug(f"BEST FLEET: {best_ships}")
+        self.logger.debug(f"当前最优：{best_ships}")
         return best_ships
 
     def _retreat(self):
@@ -248,9 +248,9 @@ class DecisiveBattle:
     def buy_ticket(self, use="steel", times=3):
         self.enter_decisive_battle()
         position = {"oil": 184, "ammo": 235, "steel": 279, "aluminum": 321}
-        self.timer.Android.click(458 * 0.75, 665 * 0.75, delay=1.5)
-        self.timer.Android.click(638, position[use], delay=1, times=times)
-        self.timer.Android.click(488, 405)
+        self.timer.click(458 * 0.75, 665 * 0.75, delay=1.5)
+        self.timer.click(638, position[use], delay=1, times=times)
+        self.timer.click(488, 405)
 
     def detect(self, type="enter_map"):
         """检查当前关卡状态
@@ -277,12 +277,12 @@ class DecisiveBattle:
 
     def _go_map_page(self):
         if self.detect("running") == "fight_prepare":
-            self.timer.Android.click(30, 30)
+            self.timer.click(30, 30)
             self.timer.wait_image(IMG.decisive_battle_image[1])
 
     def go_fleet_page(self):
         if self.detect("running") == "map":
-            self.timer.Android.click(900 * 0.75, 667 * 0.75)
+            self.timer.click(900 * 0.75, 667 * 0.75)
             try:
                 self.timer.wait_images(
                     IMG.identify_images["fight_prepare_page"],
@@ -303,94 +303,126 @@ class DecisiveBattle:
         if res in ["next", "quit"]:
             self.timer.ConfirmOperation(timeout=5, must_confirm=1)  # 确认通关
             self.timer.ConfirmOperation(timeout=5, must_confirm=1)  # 确认领取奖励
-            get_ship(self.timer, 5)
+            get_ship(self.timer)
         return res
 
     def choose(self, refreshed=False, rec_only=False):
         # ===================获取备选项信息======================
-        DSP = [
-            (250, 390),
-            (410, 550),
-            (570, 710),
-            (730, 870),
-            (890, 1030),
-        ]  # 扫描战备舰队获取的位置 (1280x720)
-        CHOOSE_POSITION = [
-            (320 * 0.75, 251),
-            (490 * 0.75, 251),
-            (645 * 0.75, 251),
-            (812 * 0.75, 251),
-            (956 * 0.75, 251),
+        # 右上角资源位置
+        RESOURCE_AREA = ((0.911, 0.082), (0.974, 0.037))
+        # 船名位置
+        SHIP_X = [
+            (0.195, 0.305),
+            (0.318, 0.429),
+            (0.445, 0.555),
+            (0.571, 0.677),
+            (0.695, 0.805),
         ]
+        SHIP_Y = (0.715, 0.685)
+        # 船的费用
+        COST_AREA = ((0.195, 0.808), (0.805, 0.764))
+        # 选择位置
+        CHOOSE_X = [0.25, 0.375, 0.5, 0.625, 0.75]
+        CHOOSE_Y = 0.5
+
         screen = self.timer.get_screen()
-        # 应该能保证数字读取成功...
-        self.stats.score = int(recognize_number(screen[25:55, 1162:1245], min_size=5, text_threshold=0.05, low_text=0.02)[0][1])
+        try:
+            self.stats.score = self.timer.recognize_number(
+                crop_image(screen, *RESOURCE_AREA),
+            )[1]
+        except:
+            # TODO: 提高OCR对单个数字的识别率
+            self.timer.logger.error("读取资源数值失败")
+            self.stats.score = 0
         self.timer.logger.debug(f"当前可用费用为：{self.stats.score}")
-        costs = recognize_number(screen[550:585, 245:1031], "x")
+        results = self.timer.recognize_number(
+            crop_image(screen, *COST_AREA),
+            extra_chars="x",
+            multiple=True,
+        )
+        costs = [t[1] for t in results]
         _costs, ships, real_position = [], [], []
         for i, cost in enumerate(costs):
             try:
-                if int(cost[1][1:]) > self.stats.score:
+                if cost > self.stats.score:
                     continue
             except Exception as e:
                 self.timer.logger.error(f"读取购买费用出错，错误如下:\n {e}")
                 continue
-            ships.append(_recognize_ship(screen[488:515, DSP[i][0] : DSP[i][1]], self.timer.ship_names)[0][0])
-            _costs.append(int(cost[1][1:]))
+            ships.append(
+                self.timer.recognize(
+                    crop_image(screen, (SHIP_X[i][0], SHIP_Y[0]), (SHIP_X[i][1], SHIP_Y[1])), candidates=self.timer.ship_names
+                )[1]
+            )
+            _costs.append(cost)
             real_position.append(i)
         # print("Scan result:", costs)
         costs = _costs
-        selections = {ships[i]: (costs[i], CHOOSE_POSITION[real_position[i]]) for i in range(len(costs))}
+        selections = {ships[i]: (costs[i], (CHOOSE_X[real_position[i]], CHOOSE_Y)) for i in range(len(costs))}
         if rec_only:
             return
         # ==================做出决策===================
         self.stats.selections = selections
-        self.timer.logger.debug(selections)
+        self.timer.logger.debug("选择舰船：", selections)
         choose = self.logic._choose_ship(must=(self.stats.map == 1 and self.stats.node == "A" and refreshed == True))
         if len(choose) == 0 and refreshed == False:
-            self.timer.Android.click(380, 500)  # 刷新备选舰船
+            self.timer.click(380, 500)  # 刷新备选舰船
             return self.choose(True)
 
         for target in choose:
             cost, p = selections[target]
             self.stats.score -= cost
             self.timer.logger.debug(f"选择购买：{target}，花费：{cost}，点击位置：{p}")
-            self.timer.Android.click(*p)
+            self.timer.relative_click(*p)
             if is_ship(target):
                 self.stats.ships.add(target)
-        self.timer.Android.click(580, 500)  # 关闭/确定
+        self.timer.click(580, 500)  # 关闭/确定
 
     def up_level_assistant(self):
-        self.timer.Android.click(75, 667 * 0.75)
+        self.timer.click(75, 667 * 0.75)
         self.stats.score -= 5
 
     def use_skill(self, type=3):
-        self.timer.Android.click(275 * 0.75, 644 * 0.75)
+        SKILL_POS = (0.2143, 0.894)
+        SHIP_AREA = ((0.26, 0.715), (0.74, 0.685))
+
+        self.timer.relative_click(*SKILL_POS)
         if type == 3:
-            ships = _recognize_ship(self.timer.get_screen()[488:515], self.timer.ship_names)
+            ship_results = self.timer.recognize(
+                crop_image(self.timer.get_screen(), *SHIP_AREA),
+                candidates=self.timer.ship_names,
+                multiple=True,
+            )
+            ships = [ship[1] for ship in ship_results]
+            self.timer.logger.info(f"使用技能获得: {ships}")
             for ship in ships:
-                self.stats.ships.add(ship[0])
-        self.timer.Android.click(275 * 0.75, 644 * 0.75, times=2, delay=0.3)
+                self.stats.ships.add(ship)
+        self.timer.relative_click(*SKILL_POS, times=2, delay=0.3)
 
     def leave(self):
-        self.timer.Android.click(36, 33)
-        self.timer.Android.click(360, 300)
+        self.timer.click(36, 33)
+        self.timer.click(360, 300)
 
     def _get_chapter(self):
-        return int(recognize_number(self.timer.get_screen()[588:618, 1046:1110], "Ex-X")[0][1][-1])
+        CHAPTER_AREA = ((0.818, 0.867), (0.871, 0.826))
+        text = self.timer.recognize(
+            crop_image(self.timer.get_screen(), *CHAPTER_AREA),
+            allowlist="Ex-0123456789",
+        )[1]
+        return int(text[-1])
 
     def _move_chapter(self):
         if self._get_chapter() < self.stats.chapter:
-            self.timer.Android.click(900, 507)
+            self.timer.click(900, 507)
         elif self._get_chapter() > self.stats.chapter:
-            self.timer.Android.click(788, 507)
+            self.timer.click(788, 507)
         else:
             return
         self._move_chapter()
 
     def enter_decisive_battle(self):
         self.timer.goto_game_page("decisive_battle_entrance")
-        self.timer.Android.click(115, 113, delay=1.5)
+        self.timer.click(115, 113, delay=1.5)
         self.detect()
 
     def enter_map(self, check_map=True):
@@ -405,10 +437,10 @@ class DecisiveBattle:
                 # 选用上一次的舰船并进入
                 if self.check_dock_full():
                     return "full_destroy_success"
-                self.timer.Android.click(500, 500, delay=0.25)
+                self.timer.click(500, 500, delay=0.25)
                 for i in range(5):
                     self.timer.click_image(IMG.decisive_battle_image[7], timeout=12, must_click=True)
-                    self.timer.Android.click(873, 500)
+                    self.timer.click(873, 500)
                     if (
                         self.timer.wait_images(
                             [
@@ -424,10 +456,10 @@ class DecisiveBattle:
                 if i > 3:
                     raise TimeoutError("选择决战舰船失败")
             else:
-                self.timer.Android.click(500, 500, delay=0)
+                self.timer.click(500, 500, delay=0)
         else:
             self.detect()
-            self.timer.Android.click(500, 500, delay=0)
+            self.timer.click(500, 500, delay=0)
 
         if self.check_dock_full():
             return "full_destroy_success"
@@ -446,7 +478,7 @@ class DecisiveBattle:
         检查船舱是否满，船舱满了自动解装
         """
         if self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None and self.full_destroy:
-            self.timer.Android.relative_click(0.38, 0.565)
+            self.timer.relative_click(0.38, 0.565)
             DestroyShip(self.timer)
             self.enter_map()
             return True
@@ -454,15 +486,19 @@ class DecisiveBattle:
 
     def retreat(self):
         self._go_map_page()
-        self.timer.Android.click(36, 33)
-        self.timer.Android.click(600, 300)
+        self.timer.click(36, 33)
+        self.timer.click(600, 300)
 
     def _get_exp(self, retry=0):
+        EXP_AREA = ((0.018, 0.854), (0.092, 0.822))
         try:
-            src = recognize_number(self.timer.get_screen()[592:615, 48:118], "(/)")[0][1]
             self.stats.exp = 0
             self.stats.need = 20
             try:
+                src = self.timer.recognize(
+                    crop_image(self.timer.get_screen(), *EXP_AREA),
+                    allowlist="Lv.(/)0123456789",
+                )[1]
                 i1 = src.index("(")
                 i2 = src.index("/")
                 self.stats.exp = int(src[i1 + 1 : i2])
@@ -476,13 +512,13 @@ class DecisiveBattle:
                 raise BaseException()  # ToDo: 定义对应的 Exception
 
             self.timer.logger.warning("读取exp失败，五秒后重试")
-            self.timer.Android.click(580, 500)
+            self.timer.click(580, 500)
             time.sleep(5)
             self._get_exp(retry + 1)
 
     def _before_fight(self):
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False:
-            self.timer.Android.click(300, 225)  # 选上中下路
+            self.timer.click(300, 225)  # 选上中下路
             self.timer.ConfirmOperation(must_confirm=1)
         if self.timer.wait_image([IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=5):
             self.choose()  # 获取战备舰队
@@ -568,8 +604,8 @@ class DecisiveBattle:
         # Todo: 缺少磁盘报错
         self._reset()
         self._move_chapter()
-        self.timer.Android.click(500, 500)
-        self.timer.ConfirmOperation()
+        self.timer.relative_click(0.5, 0.925)
+        self.timer.ConfirmOperation(must_confirm=True)
 
     def _reset(self):
         self.stats.reset()

@@ -7,10 +7,10 @@ from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FIGHT_CONDITIONS_POSITION
-from autowsgr.controller.run_timer import Timer
-from autowsgr.game.game_operation import ChangeShip, ChangeShips, MoveTeam, quick_repair
+from autowsgr.game.game_operation import ChangeShips, MoveTeam, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
 from autowsgr.port.ship import Fleet
+from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import CalcDis
 
@@ -102,7 +102,7 @@ class NormalFightInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.last_state in ["proceed", "fight_condition"] or self.last_action == "detour":
-            self.timer.Android.click(250, 520, delay=0, enable_subprocess=True)
+            self.timer.click(250, 520, delay=0, enable_subprocess=True)
 
         self.timer.update_screen()
 
@@ -280,7 +280,7 @@ class NormalFightPlan(FightPlan):
 
         elif state == "fight_condition":
             value = self.fight_condition
-            self.timer.Android.click(*FIGHT_CONDITIONS_POSITION[value])
+            self.timer.click(*FIGHT_CONDITIONS_POSITION[value])
             self.Info.last_action = value
             self.Info.fight_history.add_event("战况选择", {"position": self.Info.node}, value)
             # self.fight_recorder.append(StageRecorder(self.Info, self.timer))
@@ -290,7 +290,7 @@ class NormalFightPlan(FightPlan):
         if self.Info.node not in self.selected_nodes:
             # 可以撤退点撤退
             if state == "spot_enemy_success":
-                self.timer.Android.click(677, 492, delay=0)
+                self.timer.click(677, 492, delay=0)
                 self.Info.last_action = "retreat"
                 self.Info.fight_history.add_event(
                     "索敌成功", {"position": self.Info.node, "enemys": "不在预设点, 不进行索敌"}, "撤退"
@@ -310,7 +310,7 @@ class NormalFightPlan(FightPlan):
             )
 
             if is_proceed:
-                self.timer.Android.click(325, 350)
+                self.timer.click(325, 350)
                 self.Info.last_action = "yes"
                 self.Info.fight_history.add_event(
                     "继续前进",
@@ -319,7 +319,7 @@ class NormalFightPlan(FightPlan):
                 )
                 return literals.FIGHT_CONTINUE_FLAG
             else:
-                self.timer.Android.click(615, 350)
+                self.timer.click(615, 350)
                 self.Info.last_action = "no"
                 self.Info.fight_history.add_event(
                     "继续前进",
@@ -386,28 +386,28 @@ class NormalFightPlan(FightPlan):
             if now_chapter > target_chapter:
                 if now_chapter - target_chapter >= 3:
                     now_chapter -= 3
-                    self.timer.Android.click(95, 97, delay=0)
+                    self.timer.click(95, 97, delay=0)
 
                 elif now_chapter - target_chapter == 2:
                     now_chapter -= 2
-                    self.timer.Android.click(95, 170, delay=0)
+                    self.timer.click(95, 170, delay=0)
 
                 elif now_chapter - target_chapter == 1:
                     now_chapter -= 1
-                    self.timer.Android.click(95, 229, delay=0)
+                    self.timer.click(95, 229, delay=0)
 
             else:
                 if now_chapter - target_chapter <= -3:
                     now_chapter += 3
-                    self.timer.Android.click(95, 485, delay=0)
+                    self.timer.click(95, 485, delay=0)
 
                 elif now_chapter - target_chapter == -2:
                     now_chapter += 2
-                    self.timer.Android.click(95, 416, delay=0)
+                    self.timer.click(95, 416, delay=0)
 
                 elif now_chapter - target_chapter == -1:
                     now_chapter += 1
-                    self.timer.Android.click(95, 366, delay=0)
+                    self.timer.click(95, 366, delay=0)
 
             if not self.timer.wait_image(IMG.chapter_image[now_chapter]):
                 raise ImageNotFoundErr("after 'move chapter' operation but the chapter do not move")
@@ -470,13 +470,13 @@ class NormalFightPlan(FightPlan):
                 self.timer.logger.debug("now_map:", now_map)
             if target_map > now_map:
                 for i in range(target_map - now_map):
-                    self.timer.Android.swipe(715, 147, 552, 147, duration=0.25)
+                    self.timer.swipe(715, 147, 552, 147, duration=0.25)
                     if not self._verify_map(now_map + (i + 1), chapter, timeout=4):
                         raise ImageNotFoundErr("after 'move map' operation but the chapter do not move")
                     time.sleep(0.15)
             else:
                 for i in range(now_map - target_map):
-                    self.timer.Android.swipe(552, 147, 715, 147, duration=0.25)
+                    self.timer.swipe(552, 147, 715, 147, duration=0.25)
                     if not self._verify_map(now_map - (i + 1), chapter, timeout=4):
                         raise ImageNotFoundErr("after 'move map' operation but the chapter do not move")
                     time.sleep(0.15)

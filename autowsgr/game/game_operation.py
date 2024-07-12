@@ -3,60 +3,32 @@ import time
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
-from autowsgr.controller.run_timer import Timer, try_to_get_expedition
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
-from autowsgr.ocr.ocr import recognize_get_ship
-from autowsgr.ocr.ship_name import recognize_ship
-from autowsgr.utils.api_image import absolute_to_relative
+from autowsgr.timer import Timer
+from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
-class Expedition:
-    def __init__(self, timer: Timer) -> None:
-        self.timer = timer
-        self.is_ready = False
-        self.last_check = time.time()
-
-    def update(self, force=False):
-        self.timer.update_screen()
-        if (isinstance(self.timer.now_page, str) and "unknow" in self.timer.now_page) or self.timer.now_page.name not in [
-            "expedition_page",
-            "map_page",
-            "battle_page",
-            "exercise_page",
-            "decisive_battle_entrance",
-        ]:
-            if force or time.time() - self.last_check > 1800:
-                self.timer.goto_game_page("main_page")
-            if self.timer.now_page.name == "main_page":
-                self.is_ready = self.timer.check_pixel((933, 454), bgr_color=(45, 89, 255))
-        else:
-            self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
-
-    def run(self, force=False):
-        """检查远征, 如果有未收获远征, 则全部收获并用原队伍继续
-
-        Args:
-            force (bool): 是否强制检查
-        Returns:
-            bool: 是否进行了远征操作
-        """
-        self.update(force=force)
-        if self.is_ready:
-            self.timer.goto_game_page("expedition_page")
-            flag = try_to_get_expedition(self.timer)
-            self.timer.last_expedition_check_time = time.time()
-
-
-def get_ship(timer: Timer, max_times=1):
+def get_ship(timer: Timer):
     """获取掉落舰船"""
-    # TODO: 返回舰船名称
+
+    def recognize_get_ship(timer: Timer):
+        """识别获取 舰船/装备 页面斜着的文字，对原始图片进行旋转裁切"""
+        NAME_POSITION = [(0.754, 0.268), (0.983, 0.009), 25]
+        ship_name = timer.recognize(crop_image(timer.screen, *NAME_POSITION), candidates=timer.ship_names)[1]
+
+        TYPE_POSITION = [(0.804, 0.27), (0.881, 0.167), 25]
+        ship_type = timer.recognize(crop_image(timer.screen, *TYPE_POSITION))[1]
+
+        return ship_name, ship_type
+
     timer.got_ship_num += 1
     while timer.wait_image([IMG.symbol_image[8]] + [IMG.symbol_image[13]], timeout=1):
         try:
-            ship_name, ship_type = recognize_get_ship(timer.screen, timer.ship_names)
-        except:
+            ship_name, ship_type = recognize_get_ship(timer)
+        except Exception as e:
+            print(e)
             ship_name, ship_type = "识别失败", "识别失败"
-        timer.Android.click(915, 515, delay=0.25, times=1)
+        timer.click(915, 515, delay=0.25, times=1)
         timer.ConfirmOperation()
     timer.logger.info(f"获取舰船: {ship_name} {ship_type}")
     return ship_name, ship_type
@@ -67,16 +39,16 @@ def match_night(timer: Timer, is_night):
     timer.wait_image(IMG.fight_image[6])
     while timer.wait_image(IMG.fight_image[6], timeout=0.5):
         if is_night:
-            timer.Android.click(325, 350, delay=0.5, times=1)
+            timer.click(325, 350, delay=0.5, times=1)
         else:
-            timer.Android.click(615, 350, delay=0.5, times=1)
+            timer.click(615, 350, delay=0.5, times=1)
 
 
 def click_result(timer: Timer, max_times=1):
     """点击加速两页战果界面"""
     timer.wait_images(IMG.fight_image[14])
     while timer.wait_image(IMG.fight_image[14], timeout=0.5):
-        timer.Android.click(915, 515, delay=0.25, times=1)
+        timer.click(915, 515, delay=0.25, times=1)
 
 
 def DestroyShip(timer: Timer):
@@ -86,12 +58,12 @@ def DestroyShip(timer: Timer):
         timer.goto_game_page("destroy_page")
     timer.set_page("destroy_page")
 
-    timer.Android.click(90, 206, delay=1.5)  # 点添加
-    timer.Android.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
-    timer.Android.relative_click(0.915, 0.906, delay=1.5)  # 确定
-    timer.Android.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
-    timer.Android.relative_click(0.9, 0.9, delay=1.5)  # 解装
-    timer.Android.relative_click(0.38, 0.567, delay=1.5)  # 四星确认
+    timer.click(90, 206, delay=1.5)  # 点添加
+    timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
+    timer.relative_click(0.915, 0.906, delay=1.5)  # 确定
+    timer.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
+    timer.relative_click(0.9, 0.9, delay=1.5)  # 解装
+    timer.relative_click(0.38, 0.567, delay=1.5)  # 四星确认
 
 
 def verify_team(timer: Timer):
@@ -144,7 +116,7 @@ def MoveTeam(timer: Timer, target, try_times=0):
     if verify_team(timer) == target:
         return
     timer.logger.info("正在切换队伍到:" + str(target))
-    timer.Android.click(110 * target, 81)
+    timer.click(110 * target, 81)
     if verify_team(timer) != target:
         MoveTeam(timer, target, try_times + 1)
 
@@ -161,9 +133,9 @@ def SetSupport(timer: Timer, target, try_times=0):
     timer.goto_game_page("fight_prepare_page")
 
     if check_support_stats(timer) != target:
-        timer.Android.click(628, 82, delay=1)
-        timer.Android.click(760, 273, delay=1)
-        timer.Android.click(480, 270, delay=1)
+        timer.click(628, 82, delay=1)
+        timer.click(760, 273, delay=1)
+        timer.click(480, 270, delay=1)
         timer.logger.info("开启支援状态成功")
 
     if timer.is_bad_network(0) or check_support_stats(timer) != target:
@@ -207,11 +179,11 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
         if timer.config.DEBUG:
             timer.logger.debug("ship_stats:", ship_stats)
         if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
-            timer.Android.click(420, 420, times=2, delay=0.8)  # 进入修理页面
+            timer.click(420, 420, times=2, delay=0.8)  # 进入修理页面
             # 快修已经开始泡澡的船
             pos = timer.get_image_position(IMG.repair_image[1])
             while pos != None:
-                timer.Android.click(pos[0], pos[1], delay=1)
+                timer.click(pos[0], pos[1], delay=1)
                 pos = timer.get_image_position(IMG.repair_image[1])
             # 按逻辑修理
             for i in range(1, 7):
@@ -219,7 +191,7 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
                     timer.logger.info("WorkInfo:" + str(kwargs))
                     timer.logger.info(str(i) + " Repaired")
                     timer.quick_repaired_cost += 1
-                    timer.Android.click(
+                    timer.click(
                         BLOOD_BAR_POSITION[0][i][0],
                         BLOOD_BAR_POSITION[0][i][1],
                         delay=1.5,
@@ -242,7 +214,7 @@ def get_rewards(timer: Timer):
         timer.ConfirmOperation(must_confirm=1)
         return "ok"
     return "no"
-    # timer.Android.click(774, 502)
+    # timer.click(774, 502)
 
 
 def RepairByBath(timer: Timer):
@@ -251,7 +223,7 @@ def RepairByBath(timer: Timer):
         timer (Timer): _description_
     """
     timer.goto_game_page("choose_repair_page")
-    timer.Android.click(115, 233)
+    timer.click(115, 233)
     if not timer.identify_page("choose_repair_page"):
         if timer.identify_page("bath_page"):
             timer.set_page("bath_page")
@@ -263,7 +235,7 @@ def SetAutoSupply(timer: Timer, type=1):
     timer.update_screen()
     NowType = int(timer.check_pixel((48, 508), (224, 135, 35)))
     if NowType != type:
-        timer.Android.click(44, 503, delay=0.33)
+        timer.click(44, 503, delay=0.33)
 
 
 def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
@@ -283,11 +255,11 @@ def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
     if isinstance(ship_ids, int):
         ship_ids = [ship_ids]
 
-    timer.Android.click(293, 420)
+    timer.click(293, 420)
     for x in ship_ids:
         if not isinstance(x, int):
             raise TypeError("ship must be represent as a int but get" + str(ship_ids))
-        timer.Android.click(110 * x, 241)
+        timer.click(110 * x, 241)
 
     if timer.is_bad_network(0):
         timer.process_bad_network("supply ships")
@@ -309,42 +281,42 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
         ship_stats = detect_ship_stats(timer)
     if name is None and ship_stats[ship_id] == -1:
         return
-    timer.Android.click(110 * ship_id, 250, delay=0)
+    timer.click(110 * ship_id, 250, delay=0)
     res = timer.wait_images([IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=0.4, gap=0)
     if res == 1:
-        timer.Android.click(839, 113)
+        timer.click(839, 113)
 
     if name is None:
-        timer.Android.click(83, 167, delay=0)
+        timer.click(83, 167, delay=0)
         timer.wait_pages("fight_prepare_page", gap=0)
         return
 
-    timer.Android.click(700, 30, delay=0)
+    timer.click(700, 30, delay=0)
     timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=0.1)
 
-    timer.Android.text(name)
-    timer.Android.click(50, 50, delay=0.5)
+    timer.text(name)
+    timer.click(50, 50, delay=0.5)
     time.sleep(0.5)
     # OCR识别舰船
     if not name in timer.ship_names:
         timer.ship_names.append(name)
-    ship_info = recognize_ship(timer.get_screen()[:, :1048], timer.ship_names)
+    ship_info = timer.recognize_ship(timer.get_screen()[:, :1048], timer.ship_names)
 
     # 查找识别结果中要选的舰船
-    found_ship = next((ship for ship in ship_info if ship[0] == name), None)
+    found_ship = next((ship for ship in ship_info if ship[1] == name), None)
     # 点击舰船
     if found_ship is None:
         timer.logger.error(f"Can't find ship {name},ocr result:{ship_info}")
         # raise ValueError(f"Can't find ship {name}")
         timer.logger.debug("Try to click the first ship")
         if ship_stats[ship_id] == -1:
-            timer.Android.click(83, 167, delay=0)
+            timer.click(83, 167, delay=0)
         else:
-            timer.Android.click(183, 167, delay=0)
+            timer.click(183, 167, delay=0)
     else:
-        center = ((found_ship[1][0][0] + found_ship[1][1][0]) / 2, (found_ship[1][0][1] + found_ship[1][2][1]) / 2)
-        rel_center = absolute_to_relative(center, timer.Android.resolution)
-        timer.Android.relative_click(*rel_center)
+        center = found_ship[0]
+        rel_center = absolute_to_relative(center, timer.resolution)
+        timer.relative_click(*rel_center)
 
     timer.wait_pages("fight_prepare_page", gap=0)
 
@@ -394,7 +366,7 @@ def cook(timer: Timer, position: int):
         raise ValueError(f"不支持的菜谱编号:{position}")
     POSITION = [None, (318, 276), (420, 140), (556, 217)]
     timer.goto_game_page("canteen_page")
-    timer.Android.click(*POSITION[position])
+    timer.click(*POSITION[position])
     try:
         timer.click_image(IMG.restaurant_image[1], timeout=7.5, must_click=True)
         timer.logger.info("做菜成功")

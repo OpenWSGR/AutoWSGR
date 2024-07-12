@@ -3,9 +3,9 @@ import os
 
 from autowsgr.constants import literals
 from autowsgr.constants.image_templates import IMG
-from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam, detect_ship_stats, quick_repair
 from autowsgr.game.get_game_info import get_enemy_condition, get_exercise_stats
+from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 
 from .common import DecisionBlock, FightInfo, FightPlan, Ship, start_march
@@ -26,11 +26,11 @@ class ExerciseDecisionBlock(DecisionBlock):
                 if act == "refresh":
                     if max_times > 0:
                         max_times -= 1
-                        self.timer.Android.click(665, 400, delay=0.75)
+                        self.timer.click(665, 400, delay=0.75)
                     else:
                         if False:
                             # if self.discard:
-                            self.timer.Android.click(878, 136, delay=1)
+                            self.timer.click(878, 136, delay=1)
                             return "discard", literals.FIGHT_CONTINUE_FLAG
                         else:
                             break
@@ -39,7 +39,7 @@ class ExerciseDecisionBlock(DecisionBlock):
                 elif act == None:
                     break
 
-            self.timer.Android.click(804, 390, delay=0)
+            self.timer.click(804, 390, delay=0)
             return "fight", literals.FIGHT_CONTINUE_FLAG
 
         elif state == "fight_prepare_page":
@@ -51,11 +51,11 @@ class ExerciseDecisionBlock(DecisionBlock):
             return None, literals.FIGHT_CONTINUE_FLAG
 
         elif state == "spot_enemy_success":
-            self.timer.Android.click(900, 500, delay=0)
+            self.timer.click(900, 500, delay=0)
             return None, literals.FIGHT_CONTINUE_FLAG
 
         elif state == "formation":
-            self.timer.Android.click(573, self.formation_chosen * 100 - 20, delay=2)
+            self.timer.click(573, self.formation_chosen * 100 - 20, delay=2)
             return None, literals.FIGHT_CONTINUE_FLAG
 
         return super().make_decision(state, last_state, last_action, Info)
@@ -113,7 +113,7 @@ class NormalExerciseInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["fight_prepare_page"]:
-            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
+            p = self.timer.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
 
         self.timer.update_screen()
 
@@ -172,11 +172,11 @@ class NormalExercisePlan(FightPlan):
             if self._exercise_times > 0 and any(self.exercise_stats[2:]):
                 pos = self.exercise_stats[2:].index(True)
                 self.rival = "player"
-                self.timer.Android.click(770, (pos + 1) * 110 - 10)
+                self.timer.click(770, (pos + 1) * 110 - 10)
                 return literals.FIGHT_CONTINUE_FLAG
             elif self.robot and self.exercise_stats[1]:
-                self.timer.Android.swipe(800, 200, 800, 400)  # 上滑
-                self.timer.Android.click(770, 100)
+                self.timer.swipe(800, 200, 800, 400)  # 上滑
+                self.timer.click(770, 100)
                 self.rival = "robot"
                 self.exercise_stats[1] = False
                 return literals.FIGHT_CONTINUE_FLAG

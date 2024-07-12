@@ -9,8 +9,8 @@ import cv2
 import easyocr
 import keyboard
 
-from autowsgr.controller.run_timer import Timer
 from autowsgr.scripts.main import start_script
+from autowsgr.timer import Timer
 from autowsgr.utils.io import dict_to_yaml, listdir
 
 # en_reader = easyocr.Reader(['en'], gpu=False)
@@ -50,12 +50,13 @@ def SetPoints(windowname, img):
     print("(提示：单击需要标记的坐标，Enter确定，Esc跳过，其它重试。)")
     points = {}
     relative_points = {}
+
     def onMouse(event, x, y, flags, param):
         global point
         if event == cv2.EVENT_LBUTTONDOWN:
             cv2.circle(temp_img, (x, y), 10, (102, 217, 239), -1)
             points[point] = (x, y)
-            relative_points[point] = (x/960, y/540)
+            relative_points[point] = (x / 960, y / 540)
             point = chr(ord(point) + 1)
             cv2.imshow(windowname, temp_img)
 
@@ -80,7 +81,7 @@ def SetPoints(windowname, img):
 
     print(points)
     print(relative_points)
-    return points  , relative_points
+    return points, relative_points
 
 
 def get_image():
@@ -108,7 +109,7 @@ def make_map(image_path, dict_dir):
         if f.suffix != ".PNG":
             continue
         name = f.stem
-        dict_value , relative_value = SetPoints(name, cv2.imread(file))
+        dict_value, relative_value = SetPoints(name, cv2.imread(file))
         dict_to_yaml(dict_value, os.path.join(dict_dir, "E-" + name[1:] + ".yaml"))
         dict_to_yaml(dict_value, os.path.join(dict_dir, "H-" + name[1:] + ".yaml"))
         dict_to_yaml(relative_value, os.path.join(dict_dir, "E-" + name[1:] + "_relative.yaml"))

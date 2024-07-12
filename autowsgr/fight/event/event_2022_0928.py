@@ -1,12 +1,12 @@
 import os
 
 from autowsgr.constants.data_roots import MAP_ROOT
-from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
 from autowsgr.fight.event.event import PatrollingEvent
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from autowsgr.game.game_operation import MoveTeam, detect_ship_stats, quick_repair
+from autowsgr.timer import Timer
 from autowsgr.utils.math_functions import CalcDis
 
 MAP_POSITIONS = [
@@ -38,10 +38,10 @@ class EventFightPlan20220928(PatrollingEvent, NormalFightPlan):
             if self.timer.image_exist(self.common_image["little_monster"]):
                 break
             ret = self.timer.wait_images_position(self.common_image["monster"])
-            self.timer.Android.click(*ret)
+            self.timer.click(*ret)
 
         ret = self.get_close(self.common_image["little_monster"][0])
-        self.timer.Android.click(ret[0], ret[1] + 60)
+        self.timer.click(ret[0], ret[1] + 60)
         assert self.timer.wait_image(self.event_image[1])
 
 
@@ -67,9 +67,9 @@ class EventFightPlan20220928_2(PatrollingEvent, BattlePlan):
         assert self.timer.wait_image(self.event_image[2]) is not False
         self.find(self.enemy_image[self.target])
         ret = self.get_close(self.enemy_image[self.target])
-        self.timer.Android.click(*ret)
+        self.timer.click(*ret)
         assert self.timer.wait_image(self.event_image[4]) != False
-        self.timer.Android.click(900, 500)
+        self.timer.click(900, 500)
         self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
         MoveTeam(self.timer, self.fleet_id)
         self.Info.ship_stats = detect_ship_stats(self.timer)

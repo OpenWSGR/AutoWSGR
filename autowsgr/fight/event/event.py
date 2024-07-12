@@ -8,7 +8,7 @@ from autowsgr.constants.image_templates import (
     make_dir_templates,
     make_dir_templates_without_number,
 )
-from autowsgr.controller.run_timer import Timer
+from autowsgr.timer import Timer
 from autowsgr.utils.math_functions import CalcDis
 
 
@@ -29,7 +29,7 @@ class Event:
 
     def _go_map_page(self):
         self.timer.go_main_page()
-        self.timer.Android.click(849, 261)
+        self.timer.click(849, 261)
 
     def get_difficulty(self):
         """获取难度信息
@@ -94,16 +94,16 @@ class PatrollingEvent(Event):
         assert map in range(1, 7)
         self.change_difficulty(chapter)
         if map <= 3:
-            self.timer.Android.swipe(100, 300, 600, 300, duration=0.4, delay=0.15)
-            self.timer.Android.swipe(100, 300, 600, 300, duration=0.4, delay=0.15)
+            self.timer.swipe(100, 300, 600, 300, duration=0.4, delay=0.15)
+            self.timer.swipe(100, 300, 600, 300, duration=0.4, delay=0.15)
         else:
-            self.timer.Android.swipe(600, 300, 100, 300, duration=0.4, delay=0.15)
-            self.timer.Android.swipe(600, 300, 100, 300, duration=0.4, delay=0.15)
-        self.timer.Android.click(*self.MAP_POSITIONS[map], delay=0.25)
+            self.timer.swipe(600, 300, 100, 300, duration=0.4, delay=0.15)
+            self.timer.swipe(600, 300, 100, 300, duration=0.4, delay=0.15)
+        self.timer.click(*self.MAP_POSITIONS[map], delay=0.25)
         assert self.timer.wait_image(self.event_image[2]) is not False  # 是否成功进入地图
 
     def go_fight_prepare_page(self):
-        self.timer.Android.click(789, 455)
+        self.timer.click(789, 455)
         assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) is not False
 
     def random_walk(self):
@@ -115,11 +115,11 @@ class PatrollingEvent(Event):
         position = (480, 270)
         step = (320, 180)
         end = (position[0] + step[0] * way[0], position[1] + step[1] * way[1])
-        self.timer.Android.click(*end, delay=3)
+        self.timer.click(*end, delay=3)
         if self.timer.image_exist(self.event_image[1]):
-            self.timer.Android.click(911, 37)
+            self.timer.click(911, 37)
         if self.timer.image_exist(self.event_image[3]):
-            self.timer.Android.click(30, 50)
+            self.timer.click(30, 50)
 
     def get_close(self, images):
         while True:
@@ -130,7 +130,7 @@ class PatrollingEvent(Event):
                 ret = (ret[0] - 130, ret[1])
             else:
                 ret = (ret[0] + 130, ret[1])
-            self.timer.Android.click(*ret)
+            self.timer.click(*ret)
 
     def find(self, images, max_times=20):
         for _ in range(max_times):

@@ -1,15 +1,14 @@
 """舰队问答类活动抄这个
 """
 
-
 import os
 
 from autowsgr.constants.data_roots import MAP_ROOT
-from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.common import start_march
 from autowsgr.fight.event.event import Event
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from autowsgr.game.game_operation import MoveTeam, quick_repair
+from autowsgr.timer import Timer
 from autowsgr.utils.math_functions import CalcDis
 
 NODE_POSITION = (
@@ -55,15 +54,15 @@ class EventFightPlan20230613(Event, NormalFightPlan):
 
     def _go_fight_prepare_page(self) -> None:
         if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
-            self.timer.Android.click(*NODE_POSITION[self.map])
+            self.timer.click(*NODE_POSITION[self.map])
 
         # 选择入口
         if self._is_alpha() != self.from_alpha:
             entrance_position = [(820, 377), (820, 321)]
-            self.timer.Android.click(*entrance_position[int(self.from_alpha)])
+            self.timer.click(*entrance_position[int(self.from_alpha)])
 
         self.timer.wait_image(self.event_image[1])
-        self.timer.Android.click(850, 490)
+        self.timer.click(850, 490)
         self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
 
 

@@ -1,15 +1,14 @@
 """有选择入口和常规推图的活动可以抄这个
 """
 
-
 import os
 
 from autowsgr.constants.data_roots import MAP_ROOT
-from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.common import start_march
 from autowsgr.fight.event.event import Event
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from autowsgr.game.game_operation import MoveTeam, quick_repair
+from autowsgr.timer import Timer
 from autowsgr.utils.math_functions import CalcDis
 
 NODE_POSITION = (
@@ -87,15 +86,15 @@ class EventFightPlan20230927(Event, NormalFightPlan):
 
     def _go_fight_prepare_page(self) -> None:
         if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
-            self.timer.Android.click(*NODE_POSITION[self.map])
+            self.timer.click(*NODE_POSITION[self.map])
 
         # 选择入口
         if self._check_entrance(self.from_which_entrance) == False:
             entrance_position = [None, (131, 58), (280, 54), (421, 55), (593, 51)]
-            self.timer.Android.click(*entrance_position[self.from_which_entrance])
+            self.timer.click(*entrance_position[self.from_which_entrance])
 
         self.timer.wait_image(self.event_image[1])
-        self.timer.Android.click(850, 490)
+        self.timer.click(850, 490)
         try:
             self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
         except:

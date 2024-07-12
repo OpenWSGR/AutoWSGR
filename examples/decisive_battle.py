@@ -10,7 +10,7 @@ decisive_battle = DecisiveBattle(
     6,
     1,
     "A",
-    level1=["肥鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
+    level1=["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
     level2=["U-81", "大青花鱼"],
     flagship_priority=["U-1405", "U-47"],
     repair_level=1,  # 维修策略，1为中破修，2为大破修

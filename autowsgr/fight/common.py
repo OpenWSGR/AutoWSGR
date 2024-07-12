@@ -8,10 +8,9 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_SHIP_TYPES, SAP
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.constants.ui import Node
-from autowsgr.controller.run_timer import Timer
+from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import (
     DestroyShip,
-    Expedition,
     click_result,
     detect_ship_stats,
     get_ship,
@@ -19,16 +18,17 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.port.ship import Fleet
+from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import get_nearest
 
 
 def start_march(timer: Timer, position=(900, 500)):
-    timer.Android.click(*position, 1, delay=0)
+    timer.click(*position, 1, delay=0)
     start_time = time.time()
     while timer.identify_page("fight_prepare_page"):
         if time.time() - start_time > 3:
-            timer.Android.click(*position, 1, delay=0)
+            timer.click(*position, 1, delay=0)
             time.sleep(1)
         if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
             return literals.DOCK_FULL_FLAG
@@ -360,7 +360,7 @@ class FightPlan(ABC):
         elif ret == literals.DOCK_FULL_FLAG:
             # 自动解装功能
             if self.config.dock_full_destroy:
-                self.timer.Android.relative_click(0.38, 0.565)
+                self.timer.relative_click(0.38, 0.565)
                 DestroyShip(self.timer)
                 return self.run(False)
             else:
@@ -446,12 +446,12 @@ class FightPlan(ABC):
                 self.timer.process_bad_network(extra_info="update_state", timeout=5)
             if self.Info.last_state == "spot_enemy_success":
                 if self.timer.image_exist(IMG.fight_image[2]):
-                    self.timer.Android.click(900, 500)
+                    self.timer.click(900, 500)
             if self.Info.last_state in ["proceed", "night"] and self.timer.image_exist(IMG.fight_image[5:7]):
                 if self.Info.last_action == "yes":
-                    self.timer.Android.click(325, 350, times=1)
+                    self.timer.click(325, 350, times=1)
                 else:
-                    self.timer.Android.click(615, 350, times=1)
+                    self.timer.click(615, 350, times=1)
             self.Info.update_state()
             state = self.Info.state
         return state
@@ -540,7 +540,7 @@ class DecisionBlock:
                 self.formation_by_rule = act
 
             if retreat:
-                self.timer.Android.click(677, 492, delay=0.2)
+                self.timer.click(677, 492, delay=0.2)
                 Info.fight_history.add_event(
                     "索敌成功",
                     {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
@@ -556,7 +556,7 @@ class DecisionBlock:
                     self.timer.log_screen(True)
                     raise ImageNotFoundErr("can't found image")
 
-                # self.timer.Android.click(540, 500, delay=0.2)
+                # self.timer.click(540, 500, delay=0.2)
                 Info.fight_history.add_event(
                     "索敌成功",
                     {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
@@ -576,8 +576,8 @@ class DecisionBlock:
                 else:
                     self.timer.logger.error("未找到远程支援按钮")
                     raise ImageNotFoundErr("can't found image of long_missile_support")
-            self.timer.Android.click(855, 501, delay=0.2)
-            # self.timer.Android.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
+            self.timer.click(855, 501, delay=0.2)
+            # self.timer.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
             return "fight", literals.FIGHT_CONTINUE_FLAG
         elif state == "formation":
             spot_enemy = last_state == "spot_enemy_success"
@@ -624,7 +624,7 @@ class DecisionBlock:
                 },
                 action=value,
             )
-            self.timer.Android.click(573, value * 100 - 20, delay=2)
+            self.timer.click(573, value * 100 - 20, delay=2)
             return value, literals.FIGHT_CONTINUE_FLAG
         elif state == "night":
             is_night = self.night
@@ -636,15 +636,15 @@ class DecisionBlock:
 
             match_night(self.timer, is_night)
             if is_night:
-                # self.timer.Android.click(325, 350)
+                # self.timer.click(325, 350)
                 return "yes", literals.FIGHT_CONTINUE_FLAG
             else:
-                # self.timer.Android.click(615, 350)
+                # self.timer.click(615, 350)
                 return "no", literals.FIGHT_CONTINUE_FLAG
 
         elif state == "result":
             # time.sleep(1.5)
-            # self.timer.Android.click(900, 500, times=2, delay=0.2)
+            # self.timer.click(900, 500, times=2, delay=0.2)
             click_result(self.timer)
             return None, literals.FIGHT_CONTINUE_FLAG
         elif state == "get_ship":
@@ -734,7 +734,7 @@ class IndependentFightInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed"]:
-            p = self.timer.Android.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
+            p = self.timer.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
         self.timer.update_screen()
 
     def _after_match(self):

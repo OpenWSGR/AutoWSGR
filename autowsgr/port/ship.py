@@ -1,18 +1,17 @@
+import os
 from typing import Iterable
 
+from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
-from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
-from autowsgr.ocr.ship_name import recognize_ship,recognize_number
-from autowsgr.utils.api_image import absolute_to_relative, relative_to_absolute
+from autowsgr.timer import Timer
+from autowsgr.utils.api_image import absolute_to_relative, crop_image
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
-import os
 from autowsgr.utils.operator import unorder_equal
-from autowsgr.utils.api_image import crop_image
-from autowsgr.constants.data_roots import OCR_ROOT
 
 POS = yaml_to_dict(os.path.join(OCR_ROOT, "relative_location.yaml"))
+
 
 def count_ship(fleet):
     res = sum(have_ship(fleet[i]) for i in range(1, min(len(fleet), 7)))
@@ -61,32 +60,29 @@ class Fleet:
         assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) != False
         if self.fleet_id is not None:
             MoveTeam(self.timer, self.fleet_id)
-        ships = recognize_ship(self.timer.get_screen()[433:459], self.timer.ship_names)
+        ships = self.timer.recognize_ship(self.timer.get_screen()[433:459], self.timer.ship_names)
         self.ships = [None] * 7
         for rk, ship in enumerate(ships):
-            self.ships[rk + 1] = ship[0]
+            self.ships[rk + 1] = ship[1]
 
     def check_level(self, timer: Timer):
-        if timer.config.daily_automation['change_ship_level_max']:
+        if timer.config.daily_automation["change_ship_level_max"]:
             timer.update_screen()
             for i in range(1, 7):
                 try:
                     image_crop = crop_image(timer.screen, *POS["result_page"]["ship_level"][i])
-                    raw_str = recognize_number(image_crop,ex_list="LVlv.")
-                    dot_position = raw_str[0][1].find('.')  # 找到'.'的位置
-                    number_after_dot = int(raw_str[0][1][dot_position + 1:])  # 获取'.'之后的所有字符,并转换为整数
-                    timer.ship_level[i] = number_after_dot # 将等级赋值给对应的位置
+                    timer.ship_level[i] = timer.recognize_number(image_crop, ex_list="Lv.")[1]
                 except:
-                    timer.ship_level[i] = 0 # 识别失败则等级为0
+                    timer.ship_level[i] = 0  # 识别失败则等级为0
                     timer.logger.error(f"识别{i}号位置等级失败")
             timer.logger.debug(f"当前编队舰船等级为：{timer.ship_level}")
             return timer.ship_level
         else:
             pass
-            
+
     def change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name
-        self.timer.Android.click(*FLEET_POSITION[position], delay=0)
+        self.timer.click(*FLEET_POSITION[position], delay=0)
         res = self.timer.wait_images(
             IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]],
             after_get_delay=0.4,
@@ -96,22 +92,22 @@ class Fleet:
         if res == None:
             raise TimeoutError("选择舰船时点击超时")
         if ship_name is None:
-            self.timer.Android.click(83, 167, delay=0)
+            self.timer.click(83, 167, delay=0)
         else:
             if res == 1:
-                self.timer.Android.click(839, 113)
+                self.timer.relative_click(0.875, 0.246)
             if search_method == "word":
-                self.timer.Android.click(700, 30, delay=0)
+                self.timer.relative_click(0.729, 0.056, delay=0)
                 self.timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=0.1)
-                self.timer.Android.text(ship_name)
-                self.timer.Android.click(1219 * 0.75, 667 * 0.75, delay=1)
+                self.timer.text(ship_name)
+                self.timer.click(1219 * 0.75, 667 * 0.75, delay=1)
 
-            ships = recognize_ship(self.timer.get_screen()[:, :1048], self.timer.ship_names)
+            ships = self.timer.recognize_ship(self.timer.get_screen()[:, :1048], self.timer.ship_names)
+            print("页面中舰船：", ships)
             for ship in ships:
-                if ship[0] == ship_name:
-                    center = (ship[1][1][0] + 20, ship[1][1][1])
-                    rel_center = absolute_to_relative(center, self.timer.Android.resolution)
-                    self.timer.Android.relative_click(*rel_center)
+                if ship[1] == ship_name:
+                    rel_center = absolute_to_relative(ship[0], (1280, 720))
+                    self.timer.relative_click(*rel_center)
                     break
 
         self.timer.wait_pages("fight_prepare_page", gap=0)
@@ -155,7 +151,7 @@ class Fleet:
         assert len(self.ships) == 7
         p1 = FLEET_POSITION[p1]
         p2 = FLEET_POSITION[p2]
-        self.timer.Android.swipe(*p1, *p2)
+        self.timer.swipe(*p1, *p2)
 
     def legal(self, ships):
         ok = False

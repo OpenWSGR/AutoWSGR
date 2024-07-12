@@ -5,13 +5,9 @@ from autowsgr.constants import literals
 from autowsgr.fight.battle import BattlePlan
 from autowsgr.fight.exercise import NormalExercisePlan
 from autowsgr.fight.normal_fight import NormalFightPlan
-from autowsgr.game.game_operation import (
-    Expedition,
-    RepairByBath,
-    SetSupport,
-    get_rewards,
-)
-from autowsgr.ocr.digit import get_loot_and_ship, get_resources
+from autowsgr.game.expedition import Expedition
+from autowsgr.game.game_operation import RepairByBath, SetSupport, get_rewards
+from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
 from autowsgr.scripts.main import start_script
 
 
@@ -79,7 +75,7 @@ class DailyOperation:
                     self.fight_complete_times[task_id][0] += 1
                 elif ret == literals.DOCK_FULL_FLAG:
                     break  # 不解装则结束出征
-                
+
                 if self.config.quick_repair_limit:
                     if self.timer.quick_repaired_cost >= int(self.config.quick_repair_limit):
                         self.timer.logger.info(f"快修消耗达到上限:{self.config.quick_repair_limit}，结束出征")

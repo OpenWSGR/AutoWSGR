@@ -4,7 +4,7 @@ import subprocess
 import time
 from subprocess import check_output
 
-import airtest.core.android.android
+import airtest.core.android
 from airtest.core.api import connect_device
 
 from autowsgr.constants.custom_exceptions import CriticalErr
@@ -83,7 +83,7 @@ class WindowsController:
         return result
 
     # @try_for_times()
-    def connect_android(self) -> airtest.core.android.android.Android:
+    def connect_android(self) -> airtest.core.android.Android:
         """连接指定安卓设备
         Returns:
             dev: airtest.
@@ -128,7 +128,9 @@ class WindowsController:
             self.logger.debug("Emulator status: " + raw_res)
             return raw_res == "running"
         else:
-            raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode("gbk")  # TODO: 检查是否所有windows版本返回都是中文
+            raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode(
+                "gbk"
+            )  # TODO: 检查是否所有windows版本返回都是中文
             return "PID" in raw_res
 
     def kill_android(self):

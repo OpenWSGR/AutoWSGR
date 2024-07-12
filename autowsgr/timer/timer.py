@@ -11,25 +11,13 @@ from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT, OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES, NO
 from autowsgr.constants.ui import WSGR_UI, Node
+from autowsgr.timer.backends import EasyocrBackend
+from autowsgr.timer.controllers import AndroidController, WindowsController
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.operator import unzip_element
 
-from .emulator import Emulator
 
-
-def try_to_get_expedition(timer: Emulator):
-    timer.logger.info("Getting Expedition Rewards....")
-    get, pos = False, timer.wait_image(IMG.game_ui[6], timeout=2)
-    while pos:
-        timer.Android.click(pos[0], pos[1], delay=1)
-        timer.wait_image(IMG.fight_image[3], after_get_delay=0.25)
-        timer.Android.click(900, 500, delay=1)
-        timer.ConfirmOperation(must_confirm=1, delay=0.5, confidence=0.9)
-        pos, get = timer.wait_image(IMG.game_ui[6], timeout=2), True
-    return get
-
-
-class Timer(Emulator):
+class Timer(AndroidController, WindowsController, EasyocrBackend):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
 
     # 战舰少女R专用控制器
@@ -61,9 +49,18 @@ class Timer(Emulator):
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
-        super().__init__(config, logger)
+        self.config = config
+        self.logger = logger
 
-        common_dir = os.path.join(IMG_ROOT, "error_image")
+        # 初始化android控制器
+        WindowsController.__init__(self, config.emulator, logger)
+
+        dev = self.connect_android()
+        AndroidController.__init__(self, config, logger, dev)
+
+        # TODO: 暂时只支持easyocr, 之后加入多后端切换
+        EasyocrBackend.__init__(self, config, logger)
+
         if not self.config.PLAN_ROOT:
             self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")
             self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
@@ -89,9 +86,9 @@ class Timer(Emulator):
         # ========== 启动游戏 ==========
         if self.config.account is not None and self.config.password != None:
             self.restart(account=self.config.account, password=self.config.password)
-        if self.Android.is_game_running() == False:
+        if self.is_game_running() == False:
             self.start_game()
-        self.Android.start_app(self.app_name)
+        self.start_app(self.app_name)
 
         # ========== 检查游戏页面状态 ============
 
@@ -115,7 +112,7 @@ class Timer(Emulator):
 
     def start_game(self, account=None, password=None, delay=1.0):
         """启动游戏"""
-        self.Android.start_app(self.app_name)
+        self.start_app(self.app_name)
         res = self.wait_images(
             [IMG.start_image[2]] + IMG.confirm_image[1:],
             0.85,
@@ -133,26 +130,26 @@ class Timer(Emulator):
         # ========= 登录 =========
 
         if account != None and password != None:
-            self.Android.click(75, 450)
+            self.click(75, 450)
             if self.wait_image(IMG.start_image[3]) == False:
                 raise TimeoutError("can't enter account manage page")
-            self.Android.click(460, 380)
+            self.click(460, 380)
             if self.wait_image(IMG.start_image[4]) == False:
                 raise TimeoutError("can't logout successfully")
-            self.Android.click(540, 180)
+            self.click(540, 180)
             for _ in range(20):
-                p = th.Thread(target=lambda: self.Android.ShellCmd("input keyevent 67"))
+                p = th.Thread(target=lambda: self.shell("input keyevent 67"))
                 p.start()
             p.join()
-            self.Android.text(str(account))
-            self.Android.click(540, 260)
+            self.text(str(account))
+            self.click(540, 260)
             for _ in range(20):
-                p = th.Thread(target=lambda: self.Android.ShellCmd("input keyevent 67"))
+                p = th.Thread(target=lambda: self.shell("input keyevent 67"))
                 p.start()
             p.join()
             time.sleep(0.5)
-            self.Android.text(str(password))
-            self.Android.click(400, 330)
+            self.text(str(password))
+            self.click(400, 330)
             res = self.wait_images([IMG.start_image[5], IMG.start_image[2]])
             if res is None:
                 raise TimeoutError("login timeout")
@@ -176,10 +173,10 @@ class Timer(Emulator):
                 self.logger.info("正在尝试关闭新闻, 领取奖励")
                 if self.wait_image(IMG.start_image[6], timeout=2) != False:  # 新闻与公告,设为今日不再显示
                     if not self.check_pixel((70, 485), (201, 129, 54)):
-                        self.Android.click(70, 485)
-                    self.Android.click(30, 30)
+                        self.click(70, 485)
+                    self.click(30, 30)
                 if self.wait_image(IMG.start_image[7], timeout=7) != False:  # 每日签到
-                    self.Android.click(474, 357)
+                    self.click(474, 357)
                     self.ConfirmOperation(must_confirm=1, timeout=2)
                 self.everyday_check = False
             self.go_main_page()
@@ -189,28 +186,28 @@ class Timer(Emulator):
 
     def restart(self, times=0, *args, **kwargs):
         try:
-            self.Android.ShellCmd(f"am force-stop {self.app_name}")
-            self.Android.ShellCmd("input keyevent 3")
+            self.shell(f"am force-stop {self.app_name}")
+            self.shell("input keyevent 3")
             self.start_game(**kwargs)
         except:
-            if self.Windows.is_android_online() == False:
+            if self.is_android_online() == False:
                 pass
 
             elif times == 1:
                 raise CriticalErr("on restart,")
 
-            elif self.Windows.check_network() == False:
+            elif self.check_network() == False:
                 for i in range(11):
                     time.sleep(10)
-                    if self.Windows.check_network() == True:
+                    if self.check_network() == True:
                         break
                     if i == 10:
                         raise NetworkErr()
 
-            elif self.Android.is_game_running():
+            elif self.is_game_running():
                 raise CriticalErr("CriticalErr on restart function")
 
-            self.Windows.connect_android()
+            self.connect_android()
             self.restart(times + 1, *args, **kwargs)
 
     def is_other_device_login(self, timeout=2):
@@ -244,7 +241,7 @@ class Timer(Emulator):
 
             # 等待网络恢复
 
-            if not self.Windows.wait_network():
+            if not self.wait_network():
                 raise NetworkErr("can't connect to www.moefantasy.com")
 
             # 处理网络问题
@@ -327,7 +324,7 @@ class Timer(Emulator):
             for oper in opers:
                 fun, args = oper
                 if fun == "click":
-                    self.Android.click(*args)
+                    self.click(*args)
                 else:
                     self.logger.error(f"unknown function name: {fun}")
                     raise BaseException()
@@ -448,7 +445,7 @@ class Timer(Emulator):
                 return
 
         pos = self.get_image_position(List[type], 0, 0.8)
-        self.Android.click(pos[0], pos[1])
+        self.click(pos[0], pos[1])
 
         NewList = List[1:] + [List[0]]
         self.go_main_page(QuitOperationTime + 1, NewList)
@@ -463,7 +460,7 @@ class Timer(Emulator):
         if extra_check:
             self.wait_pages(names=[self.now_page.name])
 
-    def ConfirmOperation(self, must_confirm=0, delay=0.5, confidence=0.9, timeout=0):
+    def ConfirmOperation(self, must_confirm=False, delay=0.5, confidence=0.9, timeout=0):
         """等待并点击弹出在屏幕中央的各种确认按钮
 
         Args:
@@ -478,12 +475,12 @@ class Timer(Emulator):
         """
         pos = self.wait_images(IMG.confirm_image[1:], confidence=confidence, timeout=timeout)
         if pos is None:
-            if must_confirm == 1:
+            if must_confirm:
                 raise ImageNotFoundErr("no confirm image found")
             else:
                 return False
         res = self.get_image_position(IMG.confirm_image[pos + 1], confidence=confidence, need_screen_shot=0)
-        self.Android.click(res[0], res[1], delay=delay)
+        self.click(res[0], res[1], delay=delay)
         return True
 
     @property
@@ -499,10 +496,22 @@ class Timer(Emulator):
 
 def process_error(timer: Timer):
     print("processing errors")
-    if timer.Windows.is_android_online() == False or timer.Android.is_game_running() == False:
-        timer.Windows.restart_android()
-        timer.Windows.connect_android()
+    if timer.is_android_online() == False or timer.is_game_running() == False:
+        timer.restart_android()
+        timer.connect_android()
 
         return "Android Restarted"
 
     return "ok,bad network" if timer.process_bad_network() else "ok,unknown error"
+
+
+def try_to_get_expedition(timer: Timer):
+    timer.logger.info("Getting Expedition Rewards....")
+    get, pos = False, timer.wait_image(IMG.game_ui[6], timeout=2)
+    while pos:
+        timer.click(pos[0], pos[1], delay=1)
+        timer.wait_image(IMG.fight_image[3], after_get_delay=0.25)
+        timer.click(900, 500, delay=1)
+        timer.ConfirmOperation(must_confirm=1, delay=0.5, confidence=0.9)
+        pos, get = timer.wait_image(IMG.game_ui[6], timeout=2), True
+    return get

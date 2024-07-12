@@ -1,10 +1,12 @@
 import copy
 import datetime
 import os
+import threading as th
 import time
 from typing import Iterable, Tuple
 
 import cv2
+from airtest.core.android import Android
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.utils.api_image import (
@@ -13,66 +15,52 @@ from autowsgr.utils.api_image import (
     locateCenterOnImage,
     relative_to_absolute,
 )
+from autowsgr.utils.logger import Logger
 from autowsgr.utils.math_functions import CalcDis
-from autowsgr.utils.new_logger import Logger
-
-from .android_controller import AndroidController
-from .windows_controller import WindowsController
 
 
-class Emulator:
-    """模拟器管理单位, 可以用于其它游戏, 对 AndroidController 的进一步封装"""
+class AndroidController:
+    """安卓控制器
 
-    def __init__(self, config, logger: Logger):
-        # 获取设置，初始化windows控制器
+    用于提供底层的控制接口
+    """
+
+    def __init__(self, config, logger: Logger, dev: Android) -> None:
         self.config = config
         self.logger = logger
-        self.Windows = WindowsController(config.emulator, logger)
-
-        # # 获取额外图像数据
-        # self._add_extra_images()
-
-        # 初始化android控制器
-        dev = self.Windows.connect_android()
-        self.Android = AndroidController(config, logger, dev)
+        self.dev = dev
         self.update_screen()
-        self.config.resolution = self.screen.shape[:2]
-        self.config.resolution = self.config.resolution[::-1]  # 转换为 （宽x高）
-        self.logger.info(f"resolution:{str(self.config.resolution)}")
+        self.resolution = self.screen.shape[:2]
+        self.resolution = self.resolution[::-1]
+        self.logger.info(f"resolution:{self.resolution}")
 
-    # ==========初始化函数==========
-
-    # def _add_extra_images(self):
-    #     if "EXTRA_IMAGE_ROOT" in self.config.__dict__ and self.config.EXTRA_IMAGE_ROOT is not None:
-    #         if os.path.isdir(self.config.EXTRA_IMAGE_ROOT):
-    #             self.images = make_dir_templates(self.config.EXTRA_IMAGE_ROOT)
-    #             self.logger.info(f"Extra Images Loaded:{len(self.images)}")
-    #         elif self.config.EXTRA_IMAGE_ROOT is not None:
-    #             self.logger.warning("配置文件参数 EXTRA_IMAGE_ROOT 存在但不是合法的路径")
-
-    # ===========命令函数===========
-
+    # ========= 基础命令 =========
     def shell(self, cmd, *args, **kwargs):
-        """向链接的模拟器发送 adb shell 命令"""
-        return self.Android.ShellCmd(cmd)
+        """向链接的模拟器发送 shell 命令
+        Args:
+            cmd (str):命令字符串
+        """
+        return self.dev.shell(cmd)
 
     def get_frontend_app(self):
         """获取前台应用的包名"""
         return self.shell("dumpsys window | grep mCurrentFocus")
 
+    def start_background_app(self, package_name):
+        self.dev.start_app(package_name)
+        self.shell("input keyevent 3")
+
     def start_app(self, package_name):
-        """启动应用"""
-        self.Android.start_app(package_name)
+        self.dev.start_app(package_name)
 
     def stop_app(self, package_name):
-        """停止应用"""
-        self.Android.stop_app(package_name)
+        self.dev.stop_app(package_name)
 
     def list_apps(self):
         """列出所有正在运行的应用"""
-        return self.shell("ps")
+        return self.dev.shell("ps")
 
-    def is_running(self, app="zhanjian2"):
+    def is_game_running(self, app="zhanjian2"):
         """检查一个应用是否在运行
 
         Args:
@@ -81,43 +69,119 @@ class Emulator:
         Returns:
             bool:
         """
+        return app in self.list_apps()
 
-        return "zhanjian2" in self.list_apps()
-
-    # ===========控制函数============
-
-    def text(self, str):
+    # ========= 输入控制信号 =========
+    def text(self, t):
         """输入文本
 
         需要焦点在输入框时才能输入
         """
-        self.Android.text(str)
+        self.logger.debug(f"Typing:{t}")
+        self.dev.text(t)
 
-    def click(self, x, y):
-        """点击模拟器坐标
+    def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False):
+        """点击模拟器相对坐标 (x,y).
         Args:
-            x (int): 相对横坐标(标准为 960x540 大小的屏幕)
-            y (int): 相对纵坐标
-        Examples:
-            >>> emulator=Emulator(config, logger)
-            >>> emulator.click(432, 221)
+            x,y:相对坐标
+            delay:点击后延时(单位为秒)
+            enable_subprocess:是否启用多线程加速
+            Note:
+                if 'enable_subprocess' is True,arg 'times' must be 1
+        Returns:
+            enable_subprocess == False:None
+            enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
-        self.Android.click(x, y, delay=0.1)
+        if self.config.SHOW_ANDROID_INPUT:
+            self.logger.debug(f"click ({x:.3f} {y:.3f})")
+        x, y = relative_to_absolute((x, y), self.resolution)
 
-    def swipe(self, x0, y0, x1, y1, duration=0.5):
-        """从 (x0, y0) 滑动到 (x1, y1)
+        if times < 1:
+            raise ValueError("invalid arg 'times' " + str(times))
+        if delay < 0:
+            raise ValueError("arg 'delay' should be positive or 0")
+        if enable_subprocess and times != 1:
+            raise ValueError("subprocess enabled but arg 'times' is not 1 but " + str(times))
+        if enable_subprocess:
+            p = th.Thread(target=lambda: self.shell(f"input tap {str(x)} {str(y)}"))
+            p.start()
+            return p
+
+        for _ in range(times):
+            self.shell(f"input tap {str(x)} {str(y)}")
+            time.sleep(delay * self.config.DELAY)
+
+    def click(self, x, y, times=1, delay=0.1, enable_subprocess=False, *args, **kwargs):
+        """点击模拟器相对坐标 (x,y).
         Args:
-            x0: 相对横坐标(标准为 960x540 大小的屏幕)
-
-            duration (float): 滑动时间, 单位为秒
+            x,y:相对横坐标  (相对 960x540 屏幕)
+            delay:点击后延时(单位为秒)
+            enable_subprocess:是否启用多线程加速
+            Note:
+                if 'enable_subprocess' is True,arg 'times' must be 1
+        Returns:
+            enable_subprocess == False:None
+            enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
-        self.Android.swipe(x0, y0, x1, y1, duration=duration, delay=0.1)
+        x, y = absolute_to_relative((x, y), (960, 540))
+        self.relative_click(x, y, times, delay, enable_subprocess)
 
-    # ===========图像函数============
+    def relative_swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
+        """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
+        Args:
+            x1,y1,x2,y2:相对坐标
+            duration:滑动总时间
+            delay:滑动后延时(单位为秒)
+        """
+        if delay < 0:
+            raise ValueError("arg 'delay' should be positive or 0")
+        x1, y1 = relative_to_absolute((x1, y1), self.resolution)
+        x2, y2 = relative_to_absolute((x2, y2), self.resolution)
+        duration = int(duration * 1000)
+        input_str = f"input swipe {str(x1)} {str(y1)} {str(x2)} {str(y2)} {duration}"
+        if self.config.SHOW_ANDROID_INPUT:
+            self.logger.debug(input_str)
+        self.shell(input_str)
+        time.sleep(delay)
 
+    def swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
+        """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
+        Args:
+            x1,y1,x2,y2:相对坐标 (960x540 屏幕)
+            duration:滑动总时间
+            delay:滑动后延时(单位为秒)
+        """
+        x1, y1 = absolute_to_relative((x1, y1), (960, 540))
+        x2, y2 = absolute_to_relative((x2, y2), (960, 540))
+        self.relative_swipe(x1, y1, x2, y2, duration, delay, *args, **kwargs)
+
+    def relative_long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
+        """长按相对坐标 (x,y)
+        Args:
+            x,y: 相对坐标
+            duration (int, optional): 长按时间(秒). Defaults to 1.
+            delay (float, optional): 操作后等待时间(秒). Defaults to 0.5.
+        """
+        if delay < 0:
+            raise ValueError("arg 'delay' should be positive or 0")
+        if duration <= 0.2:
+            raise ValueError("duration time too short,arg 'duration' should greater than 0.2")
+        x, y = relative_to_absolute((x, y), self.resolution)
+        self.swipe(x, y, x, y, duration=duration, delay=delay, *args, **kwargs)
+
+    def long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
+        """长按相对坐标 (x,y)
+        Args:
+            x,y: 相对 (960x540 屏幕) 横坐标
+            duration (int, optional): 长按时间(秒). Defaults to 1.
+            delay (float, optional): 操作后等待时间(秒). Defaults to 0.5.
+        """
+        x, y = absolute_to_relative((x, y), (960, 540))
+        self.relative_long_tap(x, y, duration, delay, *args, **kwargs)
+
+    # ======== 屏幕相关 ========
     def update_screen(self):
-        """记录现在的屏幕信息,以 numpy.array 格式覆盖保存到 self.screen"""
-        self.screen = self.Android.snapshot()
+        self.screen = self.dev.snapshot(quality=99)
 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
         if need_screen_shot:
@@ -185,7 +249,7 @@ class Emulator:
         for image in images:
             res = self.locateCenterOnScreen(image, confidence, this_methods)
             if res is not None:
-                rel_pos = absolute_to_relative(res, self.config.resolution)
+                rel_pos = absolute_to_relative(res, self.resolution)
                 abs_pos = relative_to_absolute(rel_pos, (960, 540))
                 return abs_pos
         return None
@@ -315,7 +379,7 @@ class Emulator:
             else:
                 raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
 
-        self.Android.click(*pos, delay=delay)
+        self.click(*pos, delay=delay)
         return pos
 
     def click_images(self, images, must_click=False, timeout=0, delay=0.5):
