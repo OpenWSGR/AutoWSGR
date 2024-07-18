@@ -44,7 +44,6 @@ daily_automation:
   auto_set_support: False # 自动开启战役支援
   auto_battle: True # 自动打完每日战役次数
   battle_type: "困难潜艇" # 打哪个。可选名称参考"plans/battle/"
-  # change_ship_level_max: False # 是否满级换船，功能未完善，请勿使用
 
   stop_maxship: False # 捞满500船时自动停止出击
   quick_repair_limit: 50 #使用快修的上限，一但达到上限将会停止日常出征，以防止没有更换舰队导致快修被耗尽

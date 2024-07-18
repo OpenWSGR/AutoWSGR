@@ -65,21 +65,6 @@ class Fleet:
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[1]
 
-    def check_level(self, timer: Timer):
-        if timer.config.daily_automation["change_ship_level_max"]:
-            timer.update_screen()
-            for i in range(1, 7):
-                try:
-                    image_crop = crop_image(timer.screen, *POS["result_page"]["ship_level"][i])
-                    timer.ship_level[i] = timer.recognize_number(image_crop, ex_list="Lv.")[1]
-                except:
-                    timer.ship_level[i] = 0  # 识别失败则等级为0
-                    timer.logger.error(f"识别{i}号位置等级失败")
-            timer.logger.debug(f"当前编队舰船等级为：{timer.ship_level}")
-            return timer.ship_level
-        else:
-            pass
-
     def change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name
         self.timer.click(*FLEET_POSITION[position], delay=0)
