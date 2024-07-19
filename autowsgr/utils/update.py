@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import time
 
@@ -41,6 +42,7 @@ def check_for_updates():
             # 选择使用哪个源更新,输出按钮回车选择
             choice = get_user_choice(update_source)
             update_library(choice)
+            # print("更新内容:" + recent_updates)
             print("更新完成，稍后将自动退出，请重新启动脚本")
             time.sleep(5)
             os._exit(0)  # 更新成功后退出脚本
@@ -66,7 +68,14 @@ def get_user_choice(questions):
 def update_library(choice="PyPI"):
     choice_list = {
         "PyPI": ["pip", "install", "--upgrade", "--index-url", "https://pypi.org/simple", "autowsgr"],
-        "北京外国语": ["pip", "install", "--index-url", "https://mirrors.bfsu.edu.cn/pypi/web/simple/", "--upgrade", "autowsgr"],
+        "北京外国语": [
+            "pip",
+            "install",
+            "--index-url",
+            "https://mirrors.bfsu.edu.cn/pypi/web/simple/",
+            "--upgrade",
+            "autowsgr",
+        ],
         "清华源(推荐)": ["pip", "install", "--index-url", "https://pypi.tuna.tsinghua.edu.cn/simple", "--upgrade", "autowsgr"],
     }
     subprocess.run(choice_list[choice])

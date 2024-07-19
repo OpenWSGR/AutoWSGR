@@ -11,11 +11,11 @@
 参与开发、用户交流、闲聊： qq群 568500514
 
 ## 近期更新
-
-- 获取舰船现在会基于图像识别返回 [舰船名，舰船类型] *2024/07/18*
-- 添加自动检查更新的功能，设置文件格式小幅度更新，请重新下载`example`文件夹下`user_settings.yaml`,如果想关闭自动更新请设置`check_update`参数为`False`,请对比自己的文件和默认文件. *2024/04/19*
-- 支持当前活动 "舰队问答-黄金风笛", 详细信息见[文档](/documentation/舰队问答类型活动.md) *2024/04/19*
-- 添加日常出击任务中500船停止出击的功能 *2024/04/11*
+- 删除配置`PLAN_ROOT`和`SHIP_NAME_PATH`,将会默认从example文件夹下加载`PLAN`文件和`SHIP_NAME`文件,请重新从`GitHub`下载`example文件夹`，并注意自己的配置.  **2024/07/19**
+- 获取舰船现在会基于图像识别返回 [舰船名，舰船类型].  **2024/07/18**
+- 添加自动检查更新的功能，设置文件格式小幅度更新，请重新下载`example`文件夹下`user_settings.yaml`,如果想关闭自动更新请设置`check_update`参数为`False`,请对比自己的文件和默认文件.  **2024/04/19**
+- 支持当前活动 "舰队问答-黄金风笛", 详细信息见[文档](/documentation/舰队问答类型活动.md)  **2024/04/19**
+- 添加日常出击任务中500船停止出击的功能  **2024/04/11**
 
 ## 使用本项目
 
@@ -44,4 +44,3 @@ cd Auto-WSGR
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=huan-yp/Auto-WSGR&type=Date)](https://star-history.com/#huan-yp/Auto-WSGR&Date)
-

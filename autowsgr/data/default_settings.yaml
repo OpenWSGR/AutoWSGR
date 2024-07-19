@@ -51,10 +51,8 @@ daily_automation:
   auto_exercise: True #自动打完每日的三次演习
 
   auto_normal_fight: True # 按自定义任务进行常规战
-  normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。plan名参考"plans/normal_fight/"
-    - [8-5AI, 2, 0]
-
-# =========== 数据信息设置 =============
-SHIP_NAME_PATH: ""
-PLAN_ROOT: # 计划根目录, 如果缺省则默认为 [python packages 目录]/autowsgr/data/plans
-EXTRA_IMAGE_ROOT: null # 额外图像根路径, 用于二次开发
+  normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。更多的plan名参考"plans/normal_fight/",如果不想执行某个任务可以使用“#”注释掉
+    - [9-3AD, 2, 10]  # 打9-3AD两点，用第二舰队，出击十次
+    - [9-1BF-only5ss, 2, 0] # 打9-1BF两点，只打5潜艇，用第二舰队，出击零次
+    - [9-1B-only5ss, 3, 10000] # 打9-1B一点，只打5潜艇，用第三舰队，出击10000次
+    - [8-5AI-only1DD, 4, 10000] # 打8-5AI两点，只打单驱逐阵容，用第四舰队，出击10000次

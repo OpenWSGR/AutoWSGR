@@ -1,3 +1,4 @@
+import inspect
 import os
 import threading as th
 import time
@@ -61,21 +62,28 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
         # TODO: 暂时只支持easyocr, 之后加入多后端切换
         EasyocrBackend.__init__(self, config, logger)
 
-        if not self.config.PLAN_ROOT:
-            self.logger.warning(f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used")
-            self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
-        else:
+        # 获取调用栈信息
+        stack = inspect.stack()
+        # 最初启动脚本的路径在调用栈的最后一个元素中
+        Script_running_directory = os.path.abspath(stack[-1].filename)
+        # 从脚本运行目录查找plans和ship_name，如果存在则使用，不存在则使用默认的
+        if os.path.exists(os.path.abspath(os.path.join(Script_running_directory, "..", "plans"))):
+            config.PLAN_ROOT = os.path.abspath(os.path.join(Script_running_directory, "..", "plans"))
             self.logger.info(f"Succeed to load PLAN_ROOT: {self.config.PLAN_ROOT}")
+        else:
+            self.logger.warning(f"从脚本运行目录加载plans失败，将会从默认目录 {os.path.join(DATA_ROOT, 'plans')} 加载plans")
+            config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
 
-        try:
+        if os.path.exists(os.path.abspath(os.path.join(Script_running_directory, "..", "ship_names.yaml"))):
+            config.SHIP_NAME_PATH = os.path.abspath(os.path.join(Script_running_directory, "..", "ship_names.yaml"))
             self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
             self.logger.info(f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}")
-        except:
+        else:
             self.logger.warning(
-                f"Failed to load ship_name file:{config.SHIP_NAME_PATH}\nDefault shipname file {os.path.join(OCR_ROOT,  'ship_name.yaml')} will be used"
+                f"从脚本运行目录加载ship_name失败，将会从默认目录 {os.path.join(OCR_ROOT,  'ship_name.yaml')} 加载ship_name.yaml"
             )
-            ship_name_path = os.path.join(OCR_ROOT, "ship_name.yaml")
-            self.ship_names = unzip_element(list(yaml_to_dict(ship_name_path).values()))
+            config.SHIP_NAME_PATH = os.path.join(OCR_ROOT, "ship_name.yaml")
+            self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
 
         self.init()
 

@@ -1,0 +1,20 @@
+# E10 AD两点夜战，此次活动跟之前的设置不一样
+# 本次活动 E6-E9 设置 map 为 1-4
+# E10的四个入口 阿尔法-德尔塔分别设置 map 为 5-8
+# from_which_entrance也设置为相应的 1-4
+# E3/8 通关, 推荐使用 nga 攻略上的低耗阵容, 请先手动打一遍 D 开路
+
+chapter: E
+map: 4
+from_which_entrance: 1
+selected_nodes: [C, E, M, P, Q]
+repair_mode: 1
+
+node_defaults:
+  formation: 2
+  proceed: True
+
+node_args:
+  Q:
+    formation: 4
+    night: True

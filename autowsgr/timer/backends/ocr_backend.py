@@ -65,7 +65,7 @@ class OCRBackend:
         results = self.read_text(img, allowlist, **kwargs)
         results = [(t[0], post_process_text(t[1]), t[2]) for t in results]
         if self.config.SHOW_OCR_INFO:
-            self.logger.info(f"修正OCR结果：{results}")
+            self.logger.debug(f"修正OCR结果：{results}")
 
         if allow_nan and not results:
             return None
@@ -105,7 +105,7 @@ class OCRBackend:
         results = self.recognize(img, allowlist="0123456789" + extra_chars, multiple=True, **kwargs)
         results = [(t[0], process_number(t[1]), t[2]) for t in results]
         if self.config.SHOW_OCR_INFO:
-            self.logger.info(f"数字解析结果：{results}")
+            self.logger.debug(f"数字解析结果：{results}")
 
         if allow_nan and not results:
             return None
@@ -179,5 +179,5 @@ class EasyocrBackend(OCRBackend):
             raise ValueError(f"Invalid sort method: {sort}")
 
         if self.config.SHOW_OCR_INFO:
-            self.logger.info(f"原始OCR结果: {results}")
+            self.logger.debug(f"原始OCR结果: {results}")
         return results

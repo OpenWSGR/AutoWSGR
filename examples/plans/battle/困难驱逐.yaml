@@ -1,0 +1,9 @@
+# MapLevel
+map: 6 # 简单1-5 困难6-10
+
+# NodeLevel
+node_args:
+  # 阵型选择阶段
+  formation: 2 # 正常情况阵型选择，1-5
+  # 夜战选择阶段
+  night: True # 是否夜战
