@@ -15,7 +15,7 @@ node_defaults:
   enemy_rules:
     - [CVL != 0, retreat]
   # 阵型选择阶段
-c:\Users\25249\Desktop\examples\plans\normal_fight\1-1.yaml  formation: 5 # 正常情况阵型选择，1-5
+  formation: 5 # 正常情况阵型选择，1-5
   # 夜战选择阶段
   night: False # 是否夜战
 
