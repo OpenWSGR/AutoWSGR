@@ -22,12 +22,12 @@ def get_ship(timer: Timer):
         return ship_name, ship_type
 
     timer.got_ship_num += 1
+    ship_name, ship_type = "识别失败", "识别失败"
     while timer.wait_image([IMG.symbol_image[8]] + [IMG.symbol_image[13]], timeout=1):
         try:
             ship_name, ship_type = recognize_get_ship(timer)
         except Exception as e:
             print(e)
-            ship_name, ship_type = "识别失败", "识别失败"
         timer.click(915, 515, delay=0.25, times=1)
         timer.ConfirmOperation()
     timer.logger.info(f"获取舰船: {ship_name} {ship_type}")
