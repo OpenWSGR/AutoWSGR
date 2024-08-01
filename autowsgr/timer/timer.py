@@ -2,6 +2,7 @@ import inspect
 import os
 import threading as th
 import time
+from typing import List
 
 from autowsgr.constants.custom_exceptions import (
     CriticalErr,
@@ -12,13 +13,13 @@ from autowsgr.constants.data_roots import DATA_ROOT, IMG_ROOT, OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES, NO
 from autowsgr.constants.ui import WSGR_UI, Node
-from autowsgr.timer.backends import EasyocrBackend
+from autowsgr.timer.backends import EasyocrBackend, OCRBackend, PaddleOCRBackend
 from autowsgr.timer.controllers import AndroidController, WindowsController
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.operator import unzip_element
 
 
-class Timer(AndroidController, WindowsController, EasyocrBackend):
+class Timer(AndroidController, WindowsController):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
 
     # 战舰少女R专用控制器
@@ -44,9 +45,6 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
     got_ship_num = 0  # 当天已掉落的船
     got_loot_num = 0  # 当天已掉落的胖次
     quick_repaired_cost = 0  # 消耗快修数量
-    got_ship_name = None  # 掉落船的名字
-    ship_type = None  # 掉落船的类型
-    ship_star = None  # 掉落船的星级
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
@@ -59,33 +57,89 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
         dev = self.connect_android()
         AndroidController.__init__(self, config, logger, dev)
 
-        # TODO: 暂时只支持easyocr, 之后加入多后端切换
-        EasyocrBackend.__init__(self, config, logger)
+        if self.config.OCR_BACKEND == "easyocr":
+            self.orc_backend = EasyocrBackend(config, logger)
+        elif self.config.OCR_BACKEND == "paddleocr":
+            self.ocr_backend = PaddleOCRBackend(config, logger)
+        else:
+            raise ValueError(f"Unknown OCR_BACKEND: {self.config.OCR_BACKEND}")
 
         # 获取调用栈信息
         stack = inspect.stack()
         # 最初启动脚本的路径在调用栈的最后一个元素中
         Script_running_directory = os.path.abspath(stack[-1].filename)
         # 从脚本运行目录查找plans和ship_name，如果存在则使用，不存在则使用默认的
-        if os.path.exists(os.path.abspath(os.path.join(Script_running_directory, "..", "plans"))):
-            config.PLAN_ROOT = os.path.abspath(os.path.join(Script_running_directory, "..", "plans"))
+        if os.path.exists(
+            os.path.abspath(os.path.join(Script_running_directory, "..", "plans"))
+        ):
+            config.PLAN_ROOT = os.path.abspath(
+                os.path.join(Script_running_directory, "..", "plans")
+            )
             self.logger.info(f"Succeed to load PLAN_ROOT: {self.config.PLAN_ROOT}")
         else:
-            self.logger.warning(f"从脚本运行目录加载plans失败，将会从默认目录 {os.path.join(DATA_ROOT, 'plans')} 加载plans")
+            self.logger.warning(
+                f"从脚本运行目录加载plans失败，将会从默认目录 {os.path.join(DATA_ROOT, 'plans')} 加载plans"
+            )
             config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
 
-        if os.path.exists(os.path.abspath(os.path.join(Script_running_directory, "..", "ship_names.yaml"))):
-            config.SHIP_NAME_PATH = os.path.abspath(os.path.join(Script_running_directory, "..", "ship_names.yaml"))
-            self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
+        if os.path.exists(
+            os.path.abspath(
+                os.path.join(Script_running_directory, "..", "ship_names.yaml")
+            )
+        ):
+            config.SHIP_NAME_PATH = os.path.abspath(
+                os.path.join(Script_running_directory, "..", "ship_names.yaml")
+            )
+            self.ship_names = unzip_element(
+                list(yaml_to_dict(config.SHIP_NAME_PATH).values())
+            )
             self.logger.info(f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}")
         else:
             self.logger.warning(
                 f"从脚本运行目录加载ship_name失败，将会从默认目录 {os.path.join(OCR_ROOT,  'ship_name.yaml')} 加载ship_name.yaml"
             )
             config.SHIP_NAME_PATH = os.path.join(OCR_ROOT, "ship_name.yaml")
-            self.ship_names = unzip_element(list(yaml_to_dict(config.SHIP_NAME_PATH).values()))
+            self.ship_names = unzip_element(
+                list(yaml_to_dict(config.SHIP_NAME_PATH).values())
+            )
 
         self.init()
+
+    # ========================= OCR 功能穿透 =========================
+    def recognize(
+        self,
+        img,
+        allowlist: List[str] = None,
+        candidates: List[str] = None,
+        multiple=False,
+        allow_nan=False,
+        rgb_select=None,
+        tolerance=30,
+        **kwargs,
+    ):
+        """识别任意字符串"""
+        return self.ocr_backend.recognize(
+            img,
+            allowlist,
+            candidates,
+            multiple,
+            allow_nan,
+            rgb_select,
+            tolerance,
+            **kwargs,
+        )
+
+    def recognize_number(
+        self, img, extra_chars="", multiple=False, allow_nan=False, **kwargs
+    ):
+        """识别数字"""
+        return self.ocr_backend.recognize_number(
+            img, extra_chars, multiple, allow_nan, **kwargs
+        )
+
+    def recognize_ship(self, image, candidates, **kwargs):
+        """传入一张图片,返回舰船信息,包括名字和舰船型号"""
+        return self.ocr_backend.recognize_ship(image, candidates, **kwargs)
 
     # ========================= 初级游戏控制 =========================
     def init(self):
@@ -179,7 +233,9 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
         try:
             if self.everyday_check:
                 self.logger.info("正在尝试关闭新闻, 领取奖励")
-                if self.wait_image(IMG.start_image[6], timeout=2) != False:  # 新闻与公告,设为今日不再显示
+                if (
+                    self.wait_image(IMG.start_image[6], timeout=2) != False
+                ):  # 新闻与公告,设为今日不再显示
                     if not self.check_pixel((70, 485), (201, 129, 54)):
                         self.click(70, 485)
                     self.click(30, 30)
@@ -220,7 +276,10 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
 
     def is_other_device_login(self, timeout=2):
         """检查是否有其他设备登录顶号"""
-        return self.wait_images(IMG.error_image["user_remote_login"], timeout=timeout) != None
+        return (
+            self.wait_images(IMG.error_image["user_remote_login"], timeout=timeout)
+            != None
+        )
 
     def process_other_device_login(self, timeout=2):
         """处理其他设备登录顶号
@@ -233,7 +292,12 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
 
     def is_bad_network(self, timeout=10):
         """检查是否为网络状况问题"""
-        return self.wait_images([IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=timeout) != None
+        return (
+            self.wait_images(
+                [IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=timeout
+            )
+            != None
+        )
 
     def process_bad_network(self, extra_info="", timeout=10):
         """判断并处理网络状况问题
@@ -253,13 +317,17 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
                 raise NetworkErr("can't connect to www.moefantasy.com")
 
             # 处理网络问题
-            while self.wait_images([IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=3):
+            while self.wait_images(
+                [IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=3
+            ):
                 time.sleep(0.5)
 
                 if self.image_exist(IMG.error_image["bad_network"]):
                     self.click_image(IMG.error_image["network_retry"])
 
-                if not self.wait_images([IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=5):
+                if not self.wait_images(
+                    [IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=5
+                ):
                     self.logger.debug("ok network problem solved")
                     return True
 
@@ -280,7 +348,10 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
 
         if (name == "main_page") and (self.identify_page("options_page", 0)):
             return False
-        if (name == "map_page") and (self._integrative_page_identify() != 1 or self.check_pixel((35, 297), (47, 253, 226))):
+        if (name == "map_page") and (
+            self._integrative_page_identify() != 1
+            or self.check_pixel((35, 297), (47, 253, 226))
+        ):
             return False
         if (name == "build_page") and (self._integrative_page_identify() != 1):
             return False
@@ -341,8 +412,12 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
                 dst = self.wait_pages(names=[self.now_page.name, edge.other_dst.name])
                 if dst == 1:
                     continue
-                self.logger.debug(f"Go page: {self.now_page.name}, but arrive: {edge.other_dst.name}")
-                self.now_page = self.ui.get_node_by_name([self.now_page.name, edge.other_dst.name][dst - 1])
+                self.logger.debug(
+                    f"Go page: {self.now_page.name}, but arrive: {edge.other_dst.name}"
+                )
+                self.now_page = self.ui.get_node_by_name(
+                    [self.now_page.name, edge.other_dst.name][dst - 1]
+                )
                 self.logger.debug(f"Now page: {self.now_page.name}")
                 if self.now_page.name == "expedition_page":
                     try_to_get_expedition(self)
@@ -397,13 +472,17 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
             if self.is_other_device_login():
                 self.process_other_device_login()
             if not self.is_bad_network(timeout=2):
-                self.logger.debug("wrong path is operated,anyway we find a way to solve,processing")
+                self.logger.debug(
+                    "wrong path is operated,anyway we find a way to solve,processing"
+                )
                 self.logger.debug("wrong info is:", exception)
                 self.go_main_page()
                 self.walk_to(end, try_times + 1)
             else:
                 while True:
-                    if self.process_bad_network("can't walk to the position because a TimeoutError"):
+                    if self.process_bad_network(
+                        "can't walk to the position because a TimeoutError"
+                    ):
                         try:
                             if not self.wait_pages(names=self.now_page.name, timeout=1):
                                 self.set_page(self.get_now_page())
@@ -452,7 +531,7 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
             if type is None:
                 return
 
-        pos = self.get_image_position(List[type], 0, 0.8)
+        pos = self.get_image_position(List[type], False, 0.8)
         self.click(pos[0], pos[1])
 
         NewList = List[1:] + [List[0]]
@@ -468,7 +547,9 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
         if extra_check:
             self.wait_pages(names=[self.now_page.name])
 
-    def ConfirmOperation(self, must_confirm=False, delay=0.5, confidence=0.9, timeout=0):
+    def ConfirmOperation(
+        self, must_confirm=False, delay=0.5, confidence=0.9, timeout=0
+    ):
         """等待并点击弹出在屏幕中央的各种确认按钮
 
         Args:
@@ -481,13 +562,17 @@ class Timer(AndroidController, WindowsController, EasyocrBackend):
         Returns:
             bool:True 为成功,False 为失败
         """
-        pos = self.wait_images(IMG.confirm_image[1:], confidence=confidence, timeout=timeout)
+        pos = self.wait_images(
+            IMG.confirm_image[1:], confidence=confidence, timeout=timeout
+        )
         if pos is None:
             if must_confirm:
                 raise ImageNotFoundErr("no confirm image found")
             else:
                 return False
-        res = self.get_image_position(IMG.confirm_image[pos + 1], confidence=confidence, need_screen_shot=0)
+        res = self.get_image_position(
+            IMG.confirm_image[pos + 1], confidence=confidence, need_screen_shot=False
+        )
         self.click(res[0], res[1], delay=delay)
         return True
 

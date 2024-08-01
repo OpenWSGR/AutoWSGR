@@ -124,9 +124,9 @@ class NormalFightInfo(FightInfo):
 
     def _update_ship_position(self):
         """在战斗移动界面(有一个黄色小船在地图上跑)更新黄色小船的位置"""
-        pos = self.timer.get_image_position(IMG.fight_image[7], 0, 0.8)
+        pos = self.timer.get_image_position(IMG.fight_image[7], False, 0.8)
         if pos is None:
-            pos = self.timer.get_image_position(IMG.fight_image[8], 0, 0.8)
+            pos = self.timer.get_image_position(IMG.fight_image[8], False, 0.8)
         if pos is None:
             return
         self.ship_position = pos

@@ -329,6 +329,8 @@ class DecisiveBattle:
         try:
             self.stats.score = self.timer.recognize_number(
                 crop_image(screen, *RESOURCE_AREA),
+                # rgb_select=(250, 250, 250),
+                # tolerance = 50,
             )[1]
         except:
             # TODO: 提高OCR对单个数字的识别率
@@ -408,6 +410,8 @@ class DecisiveBattle:
         text = self.timer.recognize(
             crop_image(self.timer.get_screen(), *CHAPTER_AREA),
             allowlist="Ex-0123456789",
+            rgb_select=(247, 221, 82),
+            tolerance=50,
         )[1]
         return int(text[-1])
 
@@ -499,10 +503,22 @@ class DecisiveBattle:
                     crop_image(self.timer.get_screen(), *EXP_AREA),
                     allowlist="Lv.(/)0123456789",
                 )[1]
-                i1 = src.index("(")
+                try:
+                    index1 = src.index("(")
+                except ValueError:
+                    index1 = float("inf")  # 如果没有找到，设置为无穷大
+
+                try:
+                    index2 = src.index("（")
+                except ValueError:
+                    index2 = float("inf")  # 如果没有找到，设置为无穷大
+                i1 = min(index1, index2)
+                if i1 == float("inf"):
+                    raise ValueError("未找到 '(' 或 '（'")
                 i2 = src.index("/")
+                src = src.rstrip(")）")
                 self.stats.exp = int(src[i1 + 1 : i2])
-                self.stats.need = int(src[i2 + 1 : -1])
+                self.stats.need = int(src[i2 + 1 :])
                 self.timer.logger.debug(f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}")
             except:
                 self.timer.logger.error("识别副官升级经验数值失败")

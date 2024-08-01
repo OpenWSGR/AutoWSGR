@@ -3,7 +3,6 @@ import subprocess
 from typing import List, Tuple
 
 import cv2
-import easyocr
 import numpy as np
 from thefuzz import process
 
@@ -17,7 +16,9 @@ class OCRBackend:
         self.config = config
         self.logger = logger
 
-    def read_text(self, img, allowlist: List[str] = None, sort: str = "left-to-right", **kwargs):
+    def read_text(
+        self, img, allowlist: List[str] = None, sort: str = "left-to-right", **kwargs
+    ):
         """识别文字的具体实现，返回字符串格式识别结果"""
         raise NotImplementedError
 
@@ -29,6 +30,7 @@ class OCRBackend:
         multiple=False,
         allow_nan=False,
         rgb_select=None,
+        tolerance=30,
         **kwargs,
     ):
         """识别任意字符串"""
@@ -61,7 +63,7 @@ class OCRBackend:
                 t = process.extractOne(t, candidates)[0]
             return t
 
-        img = pre_process_rgb(img, rgb_select)
+        img = pre_process_rgb(img, rgb_select, tolerance)
         results = self.read_text(img, allowlist, **kwargs)
         results = [(t[0], post_process_text(t[1]), t[2]) for t in results]
         if self.config.SHOW_OCR_INFO:
@@ -73,10 +75,14 @@ class OCRBackend:
         if multiple:
             return results
         else:
-            assert len(results) == 1
+            if not results:
+                print(f"OCR识别失败: {results}")
+                results = ["Unkown"]
             return results[0]
 
-    def recognize_number(self, img, extra_chars="", multiple=False, allow_nan=False, **kwargs):
+    def recognize_number(
+        self, img, extra_chars="", multiple=False, allow_nan=False, **kwargs
+    ):
         """识别数字"""
 
         def process_number(t: str):
@@ -87,7 +93,7 @@ class OCRBackend:
                 return process_number(nums[0]), process_number(nums[1])
 
             # 决战，费用是f"x{cost}"格式
-            t = t.lstrip("x")
+            t = t.lstrip("xX")
             # 战后经验值 f"Lv.{exp}"格式
             t = t.lstrip("Lv.")
             # 建造资源有前导0
@@ -95,14 +101,16 @@ class OCRBackend:
                 t = t.lstrip("0")
 
             # 资源可以是K/M结尾
-            if t.endswith("K"):
+            if t.endswith("K") or t.endswith("k"):
                 return eval(t[:-1]) * 1000
             if t.endswith("M"):
                 return eval(t[:-1]) * 1000000
 
             return eval(t)
 
-        results = self.recognize(img, allowlist="0123456789" + extra_chars, multiple=True, **kwargs)
+        results = self.recognize(
+            img, allowlist="0123456789" + extra_chars, multiple=True, **kwargs
+        )
         results = [(t[0], process_number(t[1]), t[2]) for t in results]
         if self.config.SHOW_OCR_INFO:
             self.logger.debug(f"数字解析结果：{results}")
@@ -113,7 +121,9 @@ class OCRBackend:
         if multiple:
             return results
         else:
-            assert len(results) == 1, f"OCR识别数字失败: {results}"
+            if not len(results) == 1:
+                self.logger.error(f"OCR识别数字失败: {results}")
+                results = []
             return results[0]
 
     def recognize_ship(self, image, candidates, **kwargs):
@@ -142,10 +152,13 @@ class OCRBackend:
 class EasyocrBackend(OCRBackend):
     WORD_REPLACE = {
         "鲍鱼": "鲃鱼",
+        "鲴鱼": "鲃鱼",
     }
 
     def __init__(self, config, logger) -> None:
         super().__init__(config, logger)
+        import easyocr
+
         self.reader = easyocr.Reader(["ch_sim", "en"])
 
     def read_text(
@@ -167,7 +180,12 @@ class EasyocrBackend(OCRBackend):
             return (x1 + x2) / 2, (y1 + y2) / 2
 
         results = self.reader.readtext(
-            img, allowlist=allowlist, min_size=min_size, text_threshold=text_threshold, low_text=low_text, **kwargs
+            img,
+            allowlist=allowlist,
+            min_size=min_size,
+            text_threshold=text_threshold,
+            low_text=low_text,
+            **kwargs,
         )
         results = [(get_center(r[0][0], r[0][2]), r[1], r[2]) for r in results]
 
@@ -178,6 +196,43 @@ class EasyocrBackend(OCRBackend):
         else:
             raise ValueError(f"Invalid sort method: {sort}")
 
+        if self.config.SHOW_OCR_INFO:
+            self.logger.debug(f"原始OCR结果: {results}")
+        return results
+
+
+class PaddleOCRBackend(OCRBackend):
+    WORD_REPLACE = {
+        "鲍鱼": "鲃鱼",
+    }
+
+    def __init__(self, config, logger) -> None:
+        super().__init__(config, logger)
+        # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
+        from paddleocr import PaddleOCR
+
+        self.reader = PaddleOCR(
+            use_angle_cls=True,
+            det_model_dir="https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_det_infer.tar",
+            rec_model_dir="https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_rec_server_infer.tar",
+            show_log=False,
+            lang="ch",
+        )  # need to run only once to download and load model into memory
+
+    def read_text(self, img, allowlist, **kwargs):
+
+        def get_center(pos1, pos2):
+            x1, y1 = pos1
+            x2, y2 = pos2
+            return (x1 + x2) / 2, (y1 + y2) / 2
+
+        results = self.reader.ocr(img, cls=False, **kwargs)
+        self.logger.log_image(img, name=None, ignore_existed_image=True)
+        if results == [None]:
+            results = []
+        else:
+            results = results[0]
+        results = [(get_center(r[0][1], r[0][3]), r[1][0], r[1][1]) for r in results]
         if self.config.SHOW_OCR_INFO:
             self.logger.debug(f"原始OCR结果: {results}")
         return results

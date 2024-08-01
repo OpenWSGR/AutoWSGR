@@ -87,9 +87,11 @@ class BuildManager:
         Returns:
             datetime.timedelta: 剩余时间
         """
-        return min(self.slot_eta[type]) - datetime.datetime.now()
+        valid_times = [eta for eta in self.slot_eta[type] if eta not in (-1, None)]
+        print(valid_times)
+        return min(valid_times) - datetime.datetime.now() if valid_times else datetime.timedelta()
 
-    def get_eta(self, type="ship"):
+    def get_min_eta(self, type="ship"):
         """获取建造队列的最小结束时间
         Args:
             type (str): "ship"/"equipment"
@@ -105,7 +107,8 @@ class BuildManager:
         Returns:
             bool: 是否有空位
         """
-        return -1 in self.slot_eta[type] or datetime.datetime.now() > min(self.slot_eta[type])
+        # 检查是否包含 -1 或当前时间是否大于任何非 None 的时间
+        return -1 in self.slot_eta[type] or any(datetime.datetime.now() > eta for eta in self.slot_eta[type] if eta is not None)
 
     def get_build(self, type="ship", allow_fast_build=False) -> bool:
         """获取已经建造好的舰船或装备
@@ -130,14 +133,24 @@ class BuildManager:
         # 收完成
         while self.timer.image_exist(IMG.build_image[type].complete):
             try:
-                pos = self.timer.click_image(IMG.build_image[type].complete, timeout=3, must_click=False)
-            except:
-                self.timer.logger.error(f"无法获取 {type}, 可能是对应仓库已满")
+                pos = self.timer.click_image(IMG.build_image[type].complete, timeout=3, must_click=True)
+                if self.timer.image_exist(IMG.build_image[type].full_depot):
+                    self.timer.logger.error(f"{type} 仓库已满")
+                    self.timer.go_main_page()
+                    return False
+            except Exception as e:
+                self.timer.logger.error(f"收取 {type} 失败: {e}")
                 return False
 
-            ship_name, ship_type = get_ship(self.timer)
+            try:
+                ship_name, ship_type = get_ship(self.timer)
+                self.timer.logger.info(f"获取 {type}: {ship_name} {ship_type}")
+            except Exception as e:
+                self.timer.logger.error(f"识别获取{type}内容失败: {e}")
+
             slot = match_nearest_index(absolute_to_relative(pos, self.timer.resolution), BUILD_POSITIONS[type])
             self.slot_eta[type][slot] = -1
+        return True
 
     def build(self, type="ship", resources=None, allow_fast_build=False):
         """建造操作
@@ -199,8 +212,9 @@ class BuildManager:
                 return False
 
         # 收完成，检查空队列
-        self.get_build(type, allow_fast_build)
-        if not self.slot_eta[type].count(-1):
+        if not self.get_build(type, allow_fast_build):
+            return False
+        elif not self.slot_eta[type].count(-1):
             self.timer.logger.error(f"{type} 建造队列已满")
             return False
 

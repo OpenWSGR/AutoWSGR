@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime
 
 from autowsgr.utils.io import save_image
 
@@ -54,7 +55,7 @@ class Logger:
     def log_image(
         self,
         image,
-        name,
+        name=None,
         ndarray_mode="BGR",
         ignore_existed_image=False,
         *args,
@@ -65,6 +66,8 @@ class Logger:
             image: 图片,PIL.Image.Image 格式或者 numpy.ndarray 格式
             name (str): 图片文件名
         """
+        if name is None:
+            name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         if "png" not in name and "PNG" not in name:
             name += ".PNG"
         path = os.path.join(self.log_dir, name)

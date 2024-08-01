@@ -229,7 +229,7 @@ class AndroidController:
             this_methods = ["tpl"]
         return locateCenterOnImage(self.screen, query, confidence, this_methods)
 
-    def get_image_position(self, image, need_screen_shot=1, confidence=0.85, this_methods=None):
+    def get_image_position(self, image, need_screen_shot=True, confidence=0.85, this_methods=None):
         """从屏幕中找出和多张模板图像匹配度超过阈值的矩阵区域的中心坐标,如果有多个,返回第一个
             参考 locateCenterOnScreen
         Args:
@@ -244,7 +244,7 @@ class AndroidController:
         images = image
         if not isinstance(images, Iterable):
             images = [images]
-        if need_screen_shot == 1:
+        if need_screen_shot:
             self.update_screen()
         for image in images:
             res = self.locateCenterOnScreen(image, confidence, this_methods)
@@ -254,7 +254,7 @@ class AndroidController:
                 return abs_pos
         return None
 
-    def image_exist(self, images, need_screen_shot=1, confidence=0.85, this_methods=None):
+    def image_exist(self, images, need_screen_shot=True, confidence=0.85, this_methods=None):
         """判断图像是否存在于屏幕中
         Returns:
             bool:如果存在为 True 否则为 False
@@ -265,7 +265,7 @@ class AndroidController:
             images = [images]
         if need_screen_shot:
             self.update_screen()
-        return any(self.get_image_position(image, 0, confidence, this_methods) is not None for image in images)
+        return any(self.get_image_position(image, False, confidence, this_methods) is not None for image in images)
 
     def wait_image(
         self,
@@ -291,7 +291,7 @@ class AndroidController:
             raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
         StartTime = time.time()
         while True:
-            x = self.get_image_position(image, 1, confidence, this_methods)
+            x = self.get_image_position(image, True, confidence, this_methods)
             if x != None:
                 time.sleep(after_get_delay)
                 return x
@@ -353,7 +353,7 @@ class AndroidController:
         rank = self.wait_images(images, confidence, gap, after_get_delay, timeout)
         if rank is None:
             return None
-        return self.get_image_position(images[rank], 0, confidence)
+        return self.get_image_position(images[rank], False, confidence)
 
     def click_image(self, image, must_click=False, timeout=0, delay=0.5):
         """点击一张图片的中心位置
