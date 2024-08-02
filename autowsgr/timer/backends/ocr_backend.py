@@ -227,7 +227,6 @@ class PaddleOCRBackend(OCRBackend):
             return (x1 + x2) / 2, (y1 + y2) / 2
 
         results = self.reader.ocr(img, cls=False, **kwargs)
-        self.logger.log_image(img, name=None, ignore_existed_image=True)
         if results == [None]:
             results = []
         else:

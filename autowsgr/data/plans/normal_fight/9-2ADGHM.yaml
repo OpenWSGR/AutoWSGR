@@ -25,9 +25,4 @@ node_args:
   M:
     enemy_rules:
     - [SAP != 1, detour]
-  formation: 2 # 正常情况阵型选择, 1-5
-  # 夜战选择阶段
-  night: False # 是否夜战
-  SL_when_detour_fails: True # 是否迂回失败后退出
-  # 前进选择阶段
-  proceed: False # 结束后是否继续
+    proceed: False # 结束后是否继续
