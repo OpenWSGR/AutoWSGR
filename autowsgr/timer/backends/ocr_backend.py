@@ -213,9 +213,8 @@ class PaddleOCRBackend(OCRBackend):
 
         self.reader = PaddleOCR(
             use_angle_cls=True,
-            det_model_dir="https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_det_infer.tar",
-            rec_model_dir="https://paddleocr.bj.bcebos.com/PP-OCRv4/chinese/ch_PP-OCRv4_rec_server_infer.tar",
-            show_log=False,
+            use_gpu=True,
+            show_log=True,
             lang="ch",
         )  # need to run only once to download and load model into memory
 

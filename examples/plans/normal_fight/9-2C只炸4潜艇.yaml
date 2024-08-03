@@ -12,6 +12,7 @@ node_args:
   C:
     enemy_rules:
       - [SS != 4, retreat]
+      - [CL == 2, retreat]
     SL_when_spot_enemy_fails: True
     formation: 5
     night: False

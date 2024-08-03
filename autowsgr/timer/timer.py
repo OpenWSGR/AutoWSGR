@@ -58,7 +58,7 @@ class Timer(AndroidController, WindowsController):
         AndroidController.__init__(self, config, logger, dev)
 
         if self.config.OCR_BACKEND == "easyocr":
-            self.orc_backend = EasyocrBackend(config, logger)
+            self.ocr_backend = EasyocrBackend(config, logger)
         elif self.config.OCR_BACKEND == "paddleocr":
             self.ocr_backend = PaddleOCRBackend(config, logger)
         else:

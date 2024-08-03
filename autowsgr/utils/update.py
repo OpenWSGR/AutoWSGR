@@ -43,7 +43,7 @@ def check_for_updates():
             choice = get_user_choice(update_source)
             update_library(choice)
             recent_updates = get_recent_updates_from_tuna(latest_version)
-            print("更新内容:" + recent_updates)
+            print("更新内容:\n" + recent_updates)
 
             print("更新完成，稍后将自动退出，请重新启动脚本")
             time.sleep(5)
@@ -69,7 +69,14 @@ def get_user_choice(questions):
 
 def update_library(choice="PyPI"):
     choice_list = {
-        "PyPI": ["pip", "install", "--upgrade", "--index-url", "https://pypi.org/simple", "autowsgr"],
+        "PyPI": [
+            "pip",
+            "install",
+            "--upgrade",
+            "--index-url",
+            "https://pypi.org/simple",
+            "autowsgr",
+        ],
         "北京外国语": [
             "pip",
             "install",
@@ -78,7 +85,14 @@ def update_library(choice="PyPI"):
             "--upgrade",
             "autowsgr",
         ],
-        "清华源(推荐)": ["pip", "install", "--index-url", "https://pypi.tuna.tsinghua.edu.cn/simple", "--upgrade", "autowsgr"],
+        "清华源(推荐)": [
+            "pip",
+            "install",
+            "--index-url",
+            "https://pypi.tuna.tsinghua.edu.cn/simple",
+            "--upgrade",
+            "autowsgr",
+        ],
     }
     subprocess.run(choice_list[choice])
 
@@ -90,14 +104,18 @@ def get_recent_updates_from_tuna(latest_version):
 
     if response.status_code == 200:
         readme_content = response.text
-        updates_section = re.search(r"<h2>近期更新</h2>(.*?)</ul>", readme_content, re.S)
+        updates_section = re.search(
+            r"<h2>近期更新</h2>(.*?)</ul>", readme_content, re.S
+        )
 
         if updates_section:
             updates = updates_section.group(1).strip()
             # 提取所有 <li> 标签中的内容
             updates_list = re.findall(r"<li>(.*?)</li>", updates, re.S)
             # 合并为一个字符串，每行前面加上一个 ·
-            updates_text = "\n".join([f'· {re.sub(r"<.*?>", "", update).strip()}' for update in updates_list])
+            updates_text = "\n".join(
+                [f'· {re.sub(r"<.*?>", "", update).strip()}' for update in updates_list]
+            )
             return updates_text
         else:
             return "未找到近期更新部分。"
