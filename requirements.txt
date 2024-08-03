@@ -13,3 +13,4 @@ paddlepaddle==2.6.1
 pre-commit
 python-bidi==0.4.2
 thefuzz
+wheel

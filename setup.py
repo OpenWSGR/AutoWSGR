@@ -4,9 +4,6 @@ import subprocess
 import sys
 from datetime import datetime
 
-from setuptools import find_namespace_packages, find_packages, setup
-from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-
 _build_mode = os.getenv("AUTOWSGR_BUILD_MODE", "")
 
 
@@ -38,8 +35,22 @@ def _fetch_version():
     return version
 
 
+def install_wheel():
+    try:
+        import wheel
+    except ImportError:
+        subprocess.run(["pip", "install", "wheel"])
+
+
+install_wheel()
+
+
 def _fetch_package_name():
     return "autowsgr-nightly" if _is_nightly() else "autowsgr"
+
+
+from setuptools import find_namespace_packages, find_packages, setup
+from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 
 # Custom wheel class to modify the wheel name
@@ -76,6 +87,7 @@ setup(
     long_description=_fetch_readme(),
     long_description_content_type="text/markdown",
     install_requires=_fetch_requirements("requirements.txt"),
+    setup_requires=["wheel"],
     dependency_links=[
         "https://www.paddlepaddle.org.cn/packages/stable/cu123/",
         "https://download.pytorch.org/whl/cu123",
@@ -88,7 +100,7 @@ setup(
             "requirements.txt",
             "bin/**",
             "c_src/**",
-        ],  # 包含 version.txt 文件
+        ],  # 希望被打包的文件
     },
     classifiers=[
         "Programming Language :: Python :: 3.9",
