@@ -4,7 +4,7 @@ import subprocess
 import sys
 from datetime import datetime
 
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, find_packages, setup
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 _build_mode = os.getenv("AUTOWSGR_BUILD_MODE", "")
@@ -25,7 +25,9 @@ def _fetch_readme():
 
 
 def _fetch_version():
-    with open("version.txt", "r") as f:
+
+    version_path = os.path.join(os.path.dirname(__file__), "version.txt")
+    with open(version_path, "r") as f:
         version = f.read().strip()
 
     if _is_nightly():
@@ -62,12 +64,14 @@ class bdist_wheel(_bdist_wheel):
 setup(
     name=_fetch_package_name(),
     version=_fetch_version(),
-    packages=find_packages(
+    packages=find_namespace_packages(
+        include=["autowsgr*", "awsg*"],
         exclude=(
             "docs",
             "examples",
-        )
+        ),
     ),
+    include_package_data=True,
     description="Auto Warship Girls Framework.",
     long_description=_fetch_readme(),
     long_description_content_type="text/markdown",
@@ -77,6 +81,15 @@ setup(
         "https://download.pytorch.org/whl/cu123",
     ],
     python_requires=">=3.9",
+    package_data={
+        "": [
+            "version.txt",
+            "data/**",
+            "requirements.txt",
+            "bin/**",
+            "c_src/**",
+        ],  # 包含 version.txt 文件
+    },
     classifiers=[
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
