@@ -8,6 +8,8 @@ emulator:
 game_app: "官服" #官服 小米 应用宝
 check_update: True # 是否在启动脚本时检查更新
 
+OCR_BACKEND: paddleocr # paddleocr, easyocr
+
 LOG_PATH: "log"
 DELAY: 1.5
 
