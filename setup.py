@@ -1,14 +1,8 @@
 import os
 import platform
+import re
 import subprocess
 import sys
-from datetime import datetime
-
-_build_mode = os.getenv("AUTOWSGR_BUILD_MODE", "")
-
-
-def _is_nightly():
-    return _build_mode.lower() == "nightly"
 
 
 def _fetch_requirements(path):
@@ -21,18 +15,18 @@ def _fetch_readme():
         return f.read()
 
 
-def _fetch_version():
+def find_version(filepath: str) -> str:
+    """Extract version information from the given filepath.
 
-    version_path = os.path.join(os.path.dirname(__file__), "version.txt")
-    with open(version_path, "r") as f:
-        version = f.read().strip()
-
-    if _is_nightly():
-        now = datetime.now()
-        date_str = now.strftime("%Y%m%d")
-        version += f".dev{date_str}"
-
-    return version
+    Adapted from https://github.com/ray-project/ray/blob/0b190ee1160eeca9796bc091e07eaebf4c85b511/python/setup.py
+    """
+    with open(filepath) as fp:
+        version_match = re.search(
+            r"^__version__ = ['\"]([^'\"]*)['\"]", fp.read(), re.M
+        )
+        if version_match:
+            return version_match.group(1)
+        raise RuntimeError("Unable to find version string.")
 
 
 def install_wheel():
@@ -46,7 +40,7 @@ install_wheel()
 
 
 def _fetch_package_name():
-    return "autowsgr-nightly" if _is_nightly() else "autowsgr"
+    return "autowsgr"
 
 
 from setuptools import find_namespace_packages, find_packages, setup
@@ -74,7 +68,7 @@ class bdist_wheel(_bdist_wheel):
 # Setup configuration
 setup(
     name=_fetch_package_name(),
-    version=_fetch_version(),
+    version=find_version("autowsgr/__init__.py"),
     packages=find_namespace_packages(
         include=["autowsgr*", "awsg*"],
         exclude=(
