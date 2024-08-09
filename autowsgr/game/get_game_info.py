@@ -292,14 +292,33 @@ def get_exercise_stats(timer: Timer, robot=None):
         up = True
     if up:
         for position in range(1, 5):
-            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
+            result.append(
+                math.sqrt(
+                    CalcDis(
+                        timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE
+                    )
+                )
+                <= 50
+            )
         timer.swipe(800, 400, 800, 200)  # 下滑
         timer.update_screen()
-        result.append(math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
+        result.append(
+            math.sqrt(
+                CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)
+            )
+            <= 50
+        )
         return result
     if down:
         for position in range(1, 5):
-            result.append(math.sqrt(CalcDis(timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50)
+            result.append(
+                math.sqrt(
+                    CalcDis(
+                        timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE
+                    )
+                )
+                <= 50
+            )
         if robot is not None:
             result.insert(1, robot)
         else:
@@ -307,7 +326,10 @@ def get_exercise_stats(timer: Timer, robot=None):
             timer.update_screen()
             result.insert(
                 1,
-                math.sqrt(CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)) <= 50,
+                math.sqrt(
+                    CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)
+                )
+                <= 50,
             )
 
             timer.swipe(800, 400, 800, 200)  # 下滑

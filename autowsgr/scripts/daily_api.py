@@ -26,14 +26,18 @@ class DailyOperation:
             if not self.config.battle_type:
                 raise ValueError("未设置战役类型，请检查配置文件")
             else:
-                self.battle_plan = BattlePlan(self.timer, plan_path=f"battle/{self.config.battle_type}.yaml")
+                self.battle_plan = BattlePlan(
+                    self.timer, plan_path=f"battle/{self.config.battle_type}.yaml"
+                )
         if self.config.auto_exercise:
             self.exercise_plan = NormalExercisePlan(self.timer, "exercise/plan_1.yaml")
 
         if self.config.auto_normal_fight:
             self.fight_plans = []
             self.fight_complete_times = []
-            for plan in self.config.normal_fight_tasks if self.config.normal_fight_tasks else []:
+            for plan in (
+                self.config.normal_fight_tasks if self.config.normal_fight_tasks else []
+            ):
                 self.fight_plans.append(
                     NormalFightPlan(
                         self.timer,
@@ -41,7 +45,9 @@ class DailyOperation:
                         fleet_id=plan[1],
                     )
                 )
-                self.fight_complete_times.append([0, plan[2], plan[0]])  # 二元组， [已完成次数, 目标次数, 任务名称]
+                self.fight_complete_times.append(
+                    [0, plan[2], plan[0]]
+                )  # 二元组， [已完成次数, 目标次数, 任务名称]
 
         self.start_time = self.last_time = time.time()
 
@@ -77,8 +83,12 @@ class DailyOperation:
                     break  # 不解装则结束出征
 
                 if self.config.quick_repair_limit:
-                    if self.timer.quick_repaired_cost >= int(self.config.quick_repair_limit):
-                        self.timer.logger.info(f"快修消耗达到上限:{self.config.quick_repair_limit}，结束出征")
+                    if self.timer.quick_repaired_cost >= int(
+                        self.config.quick_repair_limit
+                    ):
+                        self.timer.logger.info(
+                            f"快修消耗达到上限:{self.config.quick_repair_limit}，结束出征"
+                        )
                         break
 
                 if time.time() - self.last_time >= 5 * 60:

@@ -33,16 +33,25 @@ ETA_AREAS = {
 }
 # 装备页面，右侧整体下移
 EQUIPMENT_DELTA = 0.02
-BUILD_POSITIONS["equipment"] = [(pos[0], pos[1] + EQUIPMENT_DELTA) for pos in BUILD_POSITIONS["ship"]]
+BUILD_POSITIONS["equipment"] = [
+    (pos[0], pos[1] + EQUIPMENT_DELTA) for pos in BUILD_POSITIONS["ship"]
+]
 ETA_AREAS["equipment"] = [
-    ((area[0][0], area[0][1] + EQUIPMENT_DELTA), (area[1][0], area[1][1] + EQUIPMENT_DELTA)) for area in ETA_AREAS["ship"]
+    (
+        (area[0][0], area[0][1] + EQUIPMENT_DELTA),
+        (area[1][0], area[1][1] + EQUIPMENT_DELTA),
+    )
+    for area in ETA_AREAS["ship"]
 ]
 # 四个资源的左下角位置
 RESOURCE_POSITIONS = [(0.2, 0.455), (0.59, 0.455), (0.2, 0.855), (0.59, 0.855)]
 # 四个资源的区域
 RESOURCE_AREAS = [(pos, (pos[0] + 0.16, pos[1] - 0.1)) for pos in RESOURCE_POSITIONS]
 # 操作资源的位置（第一位）
-RESOURCE_OPERATE_POSITIONS = [[(pos[0] + 0.022 + i * 0.057, pos[1] - 0.046) for i in range(3)] for pos in RESOURCE_POSITIONS]
+RESOURCE_OPERATE_POSITIONS = [
+    [(pos[0] + 0.022 + i * 0.057, pos[1] - 0.046) for i in range(3)]
+    for pos in RESOURCE_POSITIONS
+]
 # 滑动的距离
 RESOURCE_OPERATE_DELTA = 0.09
 
@@ -89,7 +98,11 @@ class BuildManager:
         """
         valid_times = [eta for eta in self.slot_eta[type] if eta not in (-1, None)]
         print(valid_times)
-        return min(valid_times) - datetime.datetime.now() if valid_times else datetime.timedelta()
+        return (
+            min(valid_times) - datetime.datetime.now()
+            if valid_times
+            else datetime.timedelta()
+        )
 
     def get_min_eta(self, type="ship"):
         """获取建造队列的最小结束时间
@@ -108,7 +121,11 @@ class BuildManager:
             bool: 是否有空位
         """
         # 检查是否包含 -1 或当前时间是否大于任何非 None 的时间
-        return -1 in self.slot_eta[type] or any(datetime.datetime.now() > eta for eta in self.slot_eta[type] if eta is not None)
+        return -1 in self.slot_eta[type] or any(
+            datetime.datetime.now() > eta
+            for eta in self.slot_eta[type]
+            if eta is not None
+        )
 
     def get_build(self, type="ship", allow_fast_build=False) -> bool:
         """获取已经建造好的舰船或装备
@@ -133,7 +150,9 @@ class BuildManager:
         # 收完成
         while self.timer.image_exist(IMG.build_image[type].complete):
             try:
-                pos = self.timer.click_image(IMG.build_image[type].complete, timeout=3, must_click=True)
+                pos = self.timer.click_image(
+                    IMG.build_image[type].complete, timeout=3, must_click=True
+                )
                 if self.timer.image_exist(IMG.build_image[type].full_depot):
                     self.timer.logger.error(f"{type} 仓库已满")
                     self.timer.go_main_page()
@@ -148,7 +167,9 @@ class BuildManager:
             except Exception as e:
                 self.timer.logger.error(f"识别获取{type}内容失败: {e}")
 
-            slot = match_nearest_index(absolute_to_relative(pos, self.timer.resolution), BUILD_POSITIONS[type])
+            slot = match_nearest_index(
+                absolute_to_relative(pos, self.timer.resolution), BUILD_POSITIONS[type]
+            )
             self.slot_eta[type][slot] = -1
         return True
 
@@ -198,7 +219,8 @@ class BuildManager:
                         self.timer.relative_swipe(
                             *RESOURCE_OPERATE_POSITIONS[resource_id][digit],
                             RESOURCE_OPERATE_POSITIONS[resource_id][digit][0],
-                            RESOURCE_OPERATE_POSITIONS[resource_id][digit][1] + way * RESOURCE_OPERATE_DELTA,
+                            RESOURCE_OPERATE_POSITIONS[resource_id][digit][1]
+                            + way * RESOURCE_OPERATE_DELTA,
                             duration=0.25,
                         )
                         src = detect_build_resources(resource_id)
@@ -208,7 +230,9 @@ class BuildManager:
             minv = 30 if type == "ship" else 10
             maxv = 999
             if min(resources) < minv or max(resources) > maxv:
-                self.timer.logger.error(f"用于 {type} 的资源 {resources} 越界, 已自动取消操作")
+                self.timer.logger.error(
+                    f"用于 {type} 的资源 {resources} 越界, 已自动取消操作"
+                )
                 return False
 
         # 收完成，检查空队列

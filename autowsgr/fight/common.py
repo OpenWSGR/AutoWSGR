@@ -192,7 +192,9 @@ class FightInfo(ABC):
         self.config = timer.config
         self.logger = timer.logger
 
-        self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
+        self.successor_states = (
+            {}
+        )  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
         self.state2image = {}  # 所需用到的图片模板。格式为 [模板，等待时间]
         self.after_match_delay = {}  # 匹配成功后的延时。格式为 {状态名 : 延时时间(s),}
         self.last_state = ""
@@ -221,8 +223,18 @@ class FightInfo(ABC):
             self.logger.debug("waiting:", possible_states, "  ")
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
-        confidence = min([0.8] + [self.state2image[state][2] for state in possible_states if len(self.state2image[state]) >= 3])
-        timeout = [timeout[i] if modified_timeout[i] == -1 else modified_timeout[i] for i in range(len(timeout))]
+        confidence = min(
+            [0.8]
+            + [
+                self.state2image[state][2]
+                for state in possible_states
+                if len(self.state2image[state]) >= 3
+            ]
+        )
+        timeout = [
+            timeout[i] if modified_timeout[i] == -1 else modified_timeout[i]
+            for i in range(len(timeout))
+        ]
         timeout = max(timeout)
         # 等待其中一种出现
         fun_start_time = time.time()
@@ -230,7 +242,10 @@ class FightInfo(ABC):
             self._before_match()
 
             # 尝试匹配
-            ret = [self.timer.image_exist(image, False, confidence=confidence) for image in images]
+            ret = [
+                self.timer.image_exist(image, False, confidence=confidence)
+                for image in images
+            ]
             if any(ret):
                 self.state = possible_states[ret.index(True)]
                 # 查询是否有匹配后延时
@@ -245,7 +260,9 @@ class FightInfo(ABC):
                 return self.state
 
         # 匹配不到时报错
-        self.logger.error(f"匹配状态失败! state: {self.state}  last_action: {self.last_action}")
+        self.logger.error(
+            f"匹配状态失败! state: {self.state}  last_action: {self.last_action}"
+        )
         self.timer.log_screen(True)
         for image in images:
             self.logger.log_image(image, f"match_{str(time.time())}.PNG")
@@ -265,7 +282,13 @@ class FightInfo(ABC):
                 self.ship_stats = result.ship_stats
                 self.fight_history.add_event(
                     "战果结算",
-                    {"position": self.node if "node" in self.__dict__ else f"此类战斗({type(self)})不支持节点信息"},
+                    {
+                        "position": (
+                            self.node
+                            if "node" in self.__dict__
+                            else f"此类战斗({type(self)})不支持节点信息"
+                        )
+                    },
                     result=result,
                 )
             except Exception as e:
@@ -320,7 +343,10 @@ class FightPlan(ABC):
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
                 last_flag = False
-            elif isinstance(self.timer.now_page, Node) and self.timer.now_page.name == "map_page":
+            elif (
+                isinstance(self.timer.now_page, Node)
+                and self.timer.now_page.name == "map_page"
+            ):
                 expedition.run(False)
                 self.timer.goto_game_page("map_page")
 
@@ -395,10 +421,18 @@ class FightPlan(ABC):
                 "dock is full": 因为船坞已满并且不允许解装所以停止
         """
         if not isinstance(result, str) or not isinstance(last_point, str):
-            raise TypeError(f"last_point, result must be str,but is {type(last_point)}, {type(result)}")
+            raise TypeError(
+                f"last_point, result must be str,but is {type(last_point)}, {type(result)}"
+            )
         if result not in ["S", "A", "B", "C", "D", "SS"]:
-            raise ValueError(f"result value {result} is illegal, it should be 'A','B','C','D','S' or 'SS'")
-        if len(last_point) != 1 or ord(last_point) > ord("Z") or ord(last_point) < ord("A"):
+            raise ValueError(
+                f"result value {result} is illegal, it should be 'A','B','C','D','S' or 'SS'"
+            )
+        if (
+            len(last_point) != 1
+            or ord(last_point) > ord("Z")
+            or ord(last_point) < ord("A")
+        ):
             raise ValueError("last_point should be a uppercase within 'A' to 'Z'")
         import time
 
@@ -415,20 +449,30 @@ class FightPlan(ABC):
             # 根据情况截取战果，并在result_list查找索引
             if len(fight_results):
                 if str(fight_results[-1][1])[-2].isalpha():
-                    fight_result_index = result_list.index(str(fight_results[-1][1])[-2:])
+                    fight_result_index = result_list.index(
+                        str(fight_results[-1][1])[-2:]
+                    )
                 else:
-                    fight_result_index = result_list.index(str(fight_results[-1][1])[-1])
+                    fight_result_index = result_list.index(
+                        str(fight_results[-1][1])[-1]
+                    )
 
             finish = (
-                len(fight_results) and fight_results[-1][0] == last_point and fight_result_index <= result_list.index(result)
+                len(fight_results)
+                and fight_results[-1][0] == last_point
+                and fight_result_index <= result_list.index(result)
             )
             if not finish:
-                self.timer.logger.info(f"不满足预设条件, 此次战斗不计入次数, 剩余战斗次数:{times}")
+                self.timer.logger.info(
+                    f"不满足预设条件, 此次战斗不计入次数, 剩余战斗次数:{times}"
+                )
                 if time.time() - start_time > insist_time:
                     return False
             else:
                 start_time, times = time.time(), times - 1
-                self.timer.logger.info(f"完成了一次满足预设条件的战斗, 剩余战斗次数:{times}")
+                self.timer.logger.info(
+                    f"完成了一次满足预设条件的战斗, 剩余战斗次数:{times}"
+                )
         return "OK"
 
     def update_state(self):
@@ -445,7 +489,9 @@ class FightPlan(ABC):
             if self.Info.last_state == "spot_enemy_success":
                 if self.timer.image_exist(IMG.fight_image[2]):
                     self.timer.click(900, 500)
-            if self.Info.last_state in ["proceed", "night"] and self.timer.image_exist(IMG.fight_image[5:7]):
+            if self.Info.last_state in ["proceed", "night"] and self.timer.image_exist(
+                IMG.fight_image[5:7]
+            ):
                 if self.Info.last_action == "yes":
                     self.timer.click(325, 350, times=1)
                 else:
@@ -511,15 +557,25 @@ class DecisionBlock:
             if self.SL_when_enter_fight == True:
                 Info.fight_history.add_event(
                     "进入战斗",
-                    {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
+                    {
+                        "position": (
+                            Info.node
+                            if "node" in Info.__dict__
+                            else f"此类战斗({type(Info)})不包含节点信息"
+                        )
+                    },
                     "SL",
                 )
                 return None, "need SL"
             return None, literals.FIGHT_CONTINUE_FLAG
 
         elif state == "spot_enemy_success":
-            retreat = self.supply_ship_mode == 1 and enemys.get(SAP, 0) == 0  # 功能: 遇到补给舰则战斗，否则撤退
-            can_detour = self.timer.image_exist(IMG.fight_image[13])  # 判断该点是否可以迂回
+            retreat = (
+                self.supply_ship_mode == 1 and enemys.get(SAP, 0) == 0
+            )  # 功能: 遇到补给舰则战斗，否则撤退
+            can_detour = self.timer.image_exist(
+                IMG.fight_image[13]
+            )  # 判断该点是否可以迂回
             detour = can_detour and self.detour  # 由 Node 指定是否要迂回
 
             # 功能, 根据敌方阵容进行选择
@@ -541,7 +597,13 @@ class DecisionBlock:
                 self.timer.click(677, 492, delay=0.2)
                 Info.fight_history.add_event(
                     "索敌成功",
-                    {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
+                    {
+                        "position": (
+                            Info.node
+                            if "node" in Info.__dict__
+                            else f"此类战斗({type(Info)})不包含节点信息"
+                        )
+                    },
                     "撤退",
                 )
                 return "retreat", literals.FIGHT_END_FLAG
@@ -557,14 +619,26 @@ class DecisionBlock:
                 # self.timer.click(540, 500, delay=0.2)
                 Info.fight_history.add_event(
                     "索敌成功",
-                    {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
+                    {
+                        "position": (
+                            Info.node
+                            if "node" in Info.__dict__
+                            else f"此类战斗({type(Info)})不包含节点信息"
+                        )
+                    },
                     "迂回",
                 )
                 return "detour", literals.FIGHT_CONTINUE_FLAG
 
             Info.fight_history.add_event(
                 "索敌成功",
-                {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
+                {
+                    "position": (
+                        Info.node
+                        if "node" in Info.__dict__
+                        else f"此类战斗({type(Info)})不包含节点信息"
+                    )
+                },
                 "战斗",
             )
             if self.long_missile_support == True:
@@ -584,14 +658,24 @@ class DecisionBlock:
                 if self.SL_when_detour_fails and last_action == "detour":
                     Info.fight_history.add_event(
                         "迂回",
-                        {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
+                        {
+                            "position": (
+                                Info.node
+                                if "node" in Info.__dict__
+                                else f"此类战斗({type(Info)})不包含节点信息"
+                            )
+                        },
                         result="失败",
                     )
                     Info.fight_history.add_event(
                         "阵型选择",
                         {
                             "enemys": enemys,
-                            "position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息",
+                            "position": (
+                                Info.node
+                                if "node" in Info.__dict__
+                                else f"此类战斗({type(Info)})不包含节点信息"
+                            ),
                         },
                         action="SL",
                     )
@@ -607,7 +691,11 @@ class DecisionBlock:
                         "阵型选择",
                         {
                             "enemys": "索敌失败",
-                            "position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息",
+                            "position": (
+                                Info.node
+                                if "node" in Info.__dict__
+                                else f"此类战斗({type(Info)})不包含节点信息"
+                            ),
                         },
                         action="SL",
                     )
@@ -617,8 +705,14 @@ class DecisionBlock:
             Info.fight_history.add_event(
                 "阵型选择",
                 {
-                    "enemys": enemys if last_state == "spot_enemy_success" else "索敌失败",
-                    "position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息",
+                    "enemys": (
+                        enemys if last_state == "spot_enemy_success" else "索敌失败"
+                    ),
+                    "position": (
+                        Info.node
+                        if "node" in Info.__dict__
+                        else f"此类战斗({type(Info)})不包含节点信息"
+                    ),
                 },
                 action=value,
             )
@@ -628,7 +722,13 @@ class DecisionBlock:
             is_night = self.night
             Info.fight_history.add_event(
                 "是否夜战",
-                {"position": Info.node if "node" in Info.__dict__ else f"此类战斗({type(Info)})不包含节点信息"},
+                {
+                    "position": (
+                        Info.node
+                        if "node" in Info.__dict__
+                        else f"此类战斗({type(Info)})不包含节点信息"
+                    )
+                },
                 action="追击" if is_night else "撤退",
             )
 
@@ -732,7 +832,9 @@ class IndependentFightInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["proceed"]:
-            p = self.timer.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
+            p = self.timer.click(
+                380, 520, delay=0, enable_subprocess=True, not_show=True
+            )
         self.timer.update_screen()
 
     def _after_match(self):

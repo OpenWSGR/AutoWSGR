@@ -10,8 +10,12 @@ timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_setting
 plan = EventFightPlan20240419(
     timer, "event/20240419/E11CD.yaml", fleet_id=4
 )  # 修改E11CD.yaml为相对于的plan，详细的plan名可在data/plans/event/20240419查看，fleet_id为出击编队
-plan.run_for_times(500)  # 第一个参数是战斗次数,还有个可选参数为检查远征时间，默认为1800S
+plan.run_for_times(
+    500
+)  # 第一个参数是战斗次数,还有个可选参数为检查远征时间，默认为1800S
 
 
-operation = DailyOperation(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml")
+operation = DailyOperation(
+    f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml"
+)
 operation.run()

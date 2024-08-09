@@ -120,6 +120,8 @@ class BattlePlan(FightPlan):
             return literals.FIGHT_END_FLAG
 
         # 进行通用 NodeLevel 决策
-        action, fight_stage = self.node.make_decision(self.Info.state, self.Info.last_state, self.Info.last_action, self.Info)
+        action, fight_stage = self.node.make_decision(
+            self.Info.state, self.Info.last_state, self.Info.last_action, self.Info
+        )
         self.Info.last_action = action
         return fight_stage

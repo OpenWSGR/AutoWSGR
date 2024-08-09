@@ -25,7 +25,9 @@ class Event:
         self.common_image = make_dir_templates_without_number(common_dir)
         self.enemy_image = make_dir_templates_without_number(enemy_dir)
 
-        self.common_image["monster"] = self.common_image["little_monster"] + self.common_image["big_monster"]
+        self.common_image["monster"] = (
+            self.common_image["little_monster"] + self.common_image["big_monster"]
+        )
 
     def _go_map_page(self):
         self.timer.go_main_page()
@@ -38,11 +40,15 @@ class Event:
         这里同时有检查 _go_map_page 是否成功的功能
         如果未能检测到难度图标，但是检测到进入活动地图，默认没有通过简单难度，返回简单 0.
         """
-        res = self.timer.wait_images(self.common_image["hard"] + self.common_image["easy"])
+        res = self.timer.wait_images(
+            self.common_image["hard"] + self.common_image["easy"]
+        )
         if res is None:
             self.logger.error("ImageNotFoundErr: difficulty image not found")
             if self.timer.wait_image(self.event_image[2]):
-                self.logger.info("成功进入活动页面，未检测到切换难度图标，请检查是否通关简单难度")
+                self.logger.info(
+                    "成功进入活动页面，未检测到切换难度图标，请检查是否通关简单难度"
+                )
                 return 0
             self.timer.log_screen()
             raise ImageNotFoundErr()
@@ -100,11 +106,16 @@ class PatrollingEvent(Event):
             self.timer.swipe(600, 300, 100, 300, duration=0.4, delay=0.15)
             self.timer.swipe(600, 300, 100, 300, duration=0.4, delay=0.15)
         self.timer.click(*self.MAP_POSITIONS[map], delay=0.25)
-        assert self.timer.wait_image(self.event_image[2]) is not False  # 是否成功进入地图
+        assert (
+            self.timer.wait_image(self.event_image[2]) is not False
+        )  # 是否成功进入地图
 
     def go_fight_prepare_page(self):
         self.timer.click(789, 455)
-        assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) is not False
+        assert (
+            self.timer.wait_image(IMG.identify_images["fight_prepare_page"])
+            is not False
+        )
 
     def random_walk(self):
         "随机游走,寻找敌人"
@@ -123,8 +134,13 @@ class PatrollingEvent(Event):
 
     def get_close(self, images):
         while True:
-            ret = self.timer.wait_images_position(images, confidence=0.8, gap=0.03, timeout=1)
-            if CalcDis([ret[0]], [480]) ** 0.5 < 320 and CalcDis([ret[1]], [270]) ** 0.5 < 180:
+            ret = self.timer.wait_images_position(
+                images, confidence=0.8, gap=0.03, timeout=1
+            )
+            if (
+                CalcDis([ret[0]], [480]) ** 0.5 < 320
+                and CalcDis([ret[1]], [270]) ** 0.5 < 180
+            ):
                 return ret
             if ret[0] > 480:
                 ret = (ret[0] - 130, ret[1])
@@ -134,7 +150,9 @@ class PatrollingEvent(Event):
 
     def find(self, images, max_times=20):
         for _ in range(max_times):
-            ret = self.timer.wait_images_position(images, confidence=0.75, gap=0.03, timeout=1)
+            ret = self.timer.wait_images_position(
+                images, confidence=0.75, gap=0.03, timeout=1
+            )
             if ret is not None:
                 return ret
             else:

@@ -16,7 +16,11 @@ script_end = 0
 
 
 def initialize_logger_and_config(settings_path):
-    config = yaml_to_dict(os.path.join(os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"))
+    config = yaml_to_dict(
+        os.path.join(
+            os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"
+        )
+    )
     if settings_path is not None:
         user_settings = yaml_to_dict(settings_path)
         config = recursive_dict_update(config, user_settings)
@@ -38,7 +42,9 @@ def initialize_logger_and_config(settings_path):
         print("=========End===========")
 
     # set logger
-    config["log_dir"] = os.path.join(config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    config["log_dir"] = os.path.join(
+        config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    )
     os.makedirs(config["log_dir"], exist_ok=True)
     logger = Logger(config)
     config = SimpleNamespace(**config)
@@ -69,7 +75,9 @@ def start_script(settings_path=None):
 def get_emulator_path(emulator_type):
     try:
         if emulator_type == "雷电":
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\leidian\ldplayer9")
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\leidian\ldplayer9"
+            )
             try:
                 path, _ = winreg.QueryValueEx(key, "InstallDir")
                 return os.path.join(path, "dnplayer.exe")
@@ -79,7 +87,9 @@ def get_emulator_path(emulator_type):
                 winreg.CloseKey(key)
 
         elif emulator_type == "蓝叠 Hyper-V":
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt_cn")
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt_cn"
+            )
             try:
                 path, _ = winreg.QueryValueEx(key, "InstallDir")
                 return os.path.join(path, "HD-Player.exe")

@@ -193,7 +193,9 @@ def create_namespace(directory, template):
     root = Path(directory)
     namespace = MyNamespace()
 
-    for path in sorted(root.rglob("*.png"), key=cmp_to_key(compare_length_and_alphabet)):
+    for path in sorted(
+        root.rglob("*.png"), key=cmp_to_key(compare_length_and_alphabet)
+    ):
         *parts, folder, filename = path.parts
         current = namespace
         for part in parts[len(root.parts) :]:

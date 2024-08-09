@@ -112,7 +112,9 @@ def make_map(image_path, dict_dir):
         dict_value, relative_value = SetPoints(name, cv2.imread(file))
         dict_to_yaml(dict_value, os.path.join(dict_dir, "E-" + name[1:] + ".yaml"))
         dict_to_yaml(dict_value, os.path.join(dict_dir, "H-" + name[1:] + ".yaml"))
-        dict_to_yaml(relative_value, os.path.join(dict_dir, "E-" + name[1:] + "_relative.yaml"))
+        dict_to_yaml(
+            relative_value, os.path.join(dict_dir, "E-" + name[1:] + "_relative.yaml")
+        )
 
 
 if __name__ == "__main__":

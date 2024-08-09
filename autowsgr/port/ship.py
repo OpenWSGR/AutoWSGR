@@ -51,7 +51,9 @@ class Fleet:
                 return False
             ships = other.ships
         for i in range(1, 7):
-            if have_ship(ships[i]) != have_ship(self.ships[i]) or (have_ship(ships[i]) and ships[i] != self.ships[i]):
+            if have_ship(ships[i]) != have_ship(self.ships[i]) or (
+                have_ship(ships[i]) and ships[i] != self.ships[i]
+            ):
                 return False
         return True
 
@@ -60,7 +62,9 @@ class Fleet:
         assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) != False
         if self.fleet_id is not None:
             MoveTeam(self.timer, self.fleet_id)
-        ships = self.timer.recognize_ship(self.timer.get_screen()[433:459], self.timer.ship_names)
+        ships = self.timer.recognize_ship(
+            self.timer.get_screen()[433:459], self.timer.ship_names
+        )
         self.ships = [None] * 7
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[1]
@@ -83,11 +87,15 @@ class Fleet:
                 self.timer.relative_click(0.875, 0.246)
             if search_method == "word":
                 self.timer.relative_click(0.729, 0.056, delay=0)
-                self.timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=0.1)
+                self.timer.wait_image(
+                    IMG.choose_ship_image[3], gap=0, after_get_delay=0.1
+                )
                 self.timer.text(ship_name)
                 self.timer.click(1219 * 0.75, 667 * 0.75, delay=1)
 
-            ships = self.timer.recognize_ship(self.timer.get_screen()[:, :1048], self.timer.ship_names)
+            ships = self.timer.recognize_ship(
+                self.timer.get_screen()[:, :1048], self.timer.ship_names
+            )
             print("页面中舰船：", ships)
             for ship in ships:
                 if ship[1] == ship_name:
@@ -130,9 +138,19 @@ class Fleet:
 
     def circular_move(self, p1, p2):
         if p1 > p2:
-            self.ships = self.ships[:p2] + self.ships[p1 : p1 + 1] + self.ships[p2:p1] + self.ships[p1 + 1 :]
+            self.ships = (
+                self.ships[:p2]
+                + self.ships[p1 : p1 + 1]
+                + self.ships[p2:p1]
+                + self.ships[p1 + 1 :]
+            )
         else:
-            self.ships = self.ships[:p1] + self.ships[p1 + 1 : p2 + 1] + self.ships[p1 : p1 + 1] + self.ships[p2 + 1 :]
+            self.ships = (
+                self.ships[:p1]
+                + self.ships[p1 + 1 : p2 + 1]
+                + self.ships[p1 : p1 + 1]
+                + self.ships[p2 + 1 :]
+            )
         assert len(self.ships) == 7
         p1 = FLEET_POSITION[p1]
         p2 = FLEET_POSITION[p2]

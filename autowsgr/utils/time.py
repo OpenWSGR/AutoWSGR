@@ -6,7 +6,9 @@ def str2time(time_str: str, format="%H:%M:%S"):
 
 
 def time2timedelta(time_obj: time):
-    return timedelta(hours=time_obj.hour, minutes=time_obj.minute, seconds=time_obj.second)
+    return timedelta(
+        hours=time_obj.hour, minutes=time_obj.minute, seconds=time_obj.second
+    )
 
 
 def get_eta(time_obj: time):

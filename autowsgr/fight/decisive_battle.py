@@ -60,7 +60,11 @@ class DecisiveStats:
                 ]
             ]
         ]  # [chapter][map][node(str)] (lst["", enemies])
-        self.__dict__.update(yaml_to_dict(os.path.join(MAP_ROOT, "decisive_battle", f"{str(version)}.yaml")))
+        self.__dict__.update(
+            yaml_to_dict(
+                os.path.join(MAP_ROOT, "decisive_battle", f"{str(version)}.yaml")
+            )
+        )
         self.score = 10
         self.level = 1  # 副官等级
         self.exp = 0
@@ -123,7 +127,9 @@ class Logic:
             choose = [element for element in self.level2 if is_ship(element)]
         else:
             lim = score
-            choose = self.level1 + [element for element in self.level2 if not is_ship(element)]
+            choose = self.level1 + [
+                element for element in self.level2 if not is_ship(element)
+            ]
         result = []
         for target in choose:
             if target in self.stats.selections.keys():
@@ -242,7 +248,9 @@ class DecisiveBattle:
         assert chapter <= 6 and chapter >= 1
         self.stats = DecisiveStats(timer, chapter, map, node, version)
         if logic is None:
-            self.logic = Logic(self.timer, self.stats, level1, level2, flagship_priority)
+            self.logic = Logic(
+                self.timer, self.stats, level1, level2, flagship_priority
+            )
         self.__dict__.update(kwargs)
 
     def buy_ticket(self, use="steel", times=3):
@@ -265,11 +273,14 @@ class DecisiveBattle:
         """
         if type == "enter_map":
             _res = ["challenging", "refreshed", "refresh"]
-            res = self.timer.wait_images(IMG.decisive_battle_image[3:6], after_get_delay=0.2)
+            res = self.timer.wait_images(
+                IMG.decisive_battle_image[3:6], after_get_delay=0.2
+            )
         if type == "running":
             _res = ["map", "fight_prepare"]
             res = self.timer.wait_images(
-                [IMG.decisive_battle_image[1]] + IMG.identify_images["fight_prepare_page"],
+                [IMG.decisive_battle_image[1]]
+                + IMG.identify_images["fight_prepare_page"],
                 gap=0.03,
                 after_get_delay=0.2,
             )
@@ -295,7 +306,9 @@ class DecisiveBattle:
 
     def repair(self):
         self.go_fleet_page()
-        quick_repair(self.timer, self.repair_strategy)  # TODO：我的中破比很高，先改成只修大破控制一下用桶
+        quick_repair(
+            self.timer, self.repair_strategy
+        )  # TODO：我的中破比很高，先改成只修大破控制一下用桶
         # quick_repair(self.timer, 2)
 
     def next(self):
@@ -353,20 +366,28 @@ class DecisiveBattle:
                 continue
             ships.append(
                 self.timer.recognize(
-                    crop_image(screen, (SHIP_X[i][0], SHIP_Y[0]), (SHIP_X[i][1], SHIP_Y[1])), candidates=self.timer.ship_names
+                    crop_image(
+                        screen, (SHIP_X[i][0], SHIP_Y[0]), (SHIP_X[i][1], SHIP_Y[1])
+                    ),
+                    candidates=self.timer.ship_names,
                 )[1]
             )
             _costs.append(cost)
             real_position.append(i)
         # print("Scan result:", costs)
         costs = _costs
-        selections = {ships[i]: (costs[i], (CHOOSE_X[real_position[i]], CHOOSE_Y)) for i in range(len(costs))}
+        selections = {
+            ships[i]: (costs[i], (CHOOSE_X[real_position[i]], CHOOSE_Y))
+            for i in range(len(costs))
+        }
         if rec_only:
             return
         # ==================做出决策===================
         self.stats.selections = selections
         self.timer.logger.debug("选择舰船：", selections)
-        choose = self.logic._choose_ship(must=(self.stats.map == 1 and self.stats.node == "A" and refreshed == True))
+        choose = self.logic._choose_ship(
+            must=(self.stats.map == 1 and self.stats.node == "A" and refreshed == True)
+        )
         if len(choose) == 0 and refreshed == False:
             self.timer.click(380, 500)  # 刷新备选舰船
             return self.choose(True)
@@ -443,7 +464,9 @@ class DecisiveBattle:
                     return "full_destroy_success"
                 self.timer.click(500, 500, delay=0.25)
                 for i in range(5):
-                    self.timer.click_image(IMG.decisive_battle_image[7], timeout=12, must_click=True)
+                    self.timer.click_image(
+                        IMG.decisive_battle_image[7], timeout=12, must_click=True
+                    )
                     self.timer.click(873, 500)
                     if (
                         self.timer.wait_images(
@@ -481,7 +504,10 @@ class DecisiveBattle:
         """
         检查船舱是否满，船舱满了自动解装
         """
-        if self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None and self.full_destroy:
+        if (
+            self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None
+            and self.full_destroy
+        ):
             self.timer.relative_click(0.38, 0.565)
             DestroyShip(self.timer)
             self.enter_map()
@@ -519,7 +545,9 @@ class DecisiveBattle:
                 src = src.rstrip(")）")
                 self.stats.exp = int(src[i1 + 1 : i2])
                 self.stats.need = int(src[i2 + 1 :])
-                self.timer.logger.debug(f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}")
+                self.timer.logger.debug(
+                    f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}"
+                )
             except:
                 self.timer.logger.error("识别副官升级经验数值失败")
         except:
@@ -536,7 +564,9 @@ class DecisiveBattle:
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False:
             self.timer.click(300, 225)  # 选上中下路
             self.timer.ConfirmOperation(must_confirm=1)
-        if self.timer.wait_image([IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=5):
+        if self.timer.wait_image(
+            [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=5
+        ):
             self.choose()  # 获取战备舰队
         self._get_exp()
         while self.logic._up_level():
@@ -571,7 +601,9 @@ class DecisiveBattle:
 
     def _during_fight(self):
         formation = get_formation(self.stats.fleet, self.stats.enemy_now)
-        night = self.stats.node in self.stats.key_points[self.stats.chapter][self.stats.map]
+        night = (
+            self.stats.node in self.stats.key_points[self.stats.chapter][self.stats.map]
+        )
         plan = DecisiveBattlePlan(
             self.timer,
             formation=formation,
@@ -579,7 +611,9 @@ class DecisiveBattle:
             ship_stats=self.stats.ship_stats,
         )
         plan.run()
-        self.stats.ship_stats = plan.Info.fight_history.get_fight_results()[-1].ship_stats
+        self.stats.ship_stats = plan.Info.fight_history.get_fight_results()[
+            -1
+        ].ship_stats
 
     def _change_fleet(self, fleet):
         self.go_fleet_page()

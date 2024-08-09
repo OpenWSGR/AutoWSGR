@@ -113,7 +113,9 @@ class NormalExerciseInfo(FightInfo):
     def _before_match(self):
         # 点击加速
         if self.state in ["fight_prepare_page"]:
-            p = self.timer.click(380, 520, delay=0, enable_subprocess=True, not_show=True)
+            p = self.timer.click(
+                380, 520, delay=0, enable_subprocess=True, not_show=True
+            )
 
         self.timer.update_screen()
 
@@ -144,7 +146,9 @@ class NormalExercisePlan(FightPlan):
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)
             if node_name in plan_args["node_args"]:
-                node_args = recursive_dict_update(node_args, plan_args["node_args"][node_name])
+                node_args = recursive_dict_update(
+                    node_args, plan_args["node_args"][node_name]
+                )
             self.nodes[node_name] = ExerciseDecisionBlock(timer, node_args)
 
         # 构建信息存储结构

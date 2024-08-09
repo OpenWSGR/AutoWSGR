@@ -49,6 +49,10 @@ class EventFightInfo20231215(Event, NormalFightInfo):
     def __init__(self, timer: Timer, chapter_id, map_id, event="20231215") -> None:
         NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         Event.__init__(self, timer, event)
-        self.map_image = self.common_image["easy"] + self.common_image["hard"] + [self.event_image[1]]
+        self.map_image = (
+            self.common_image["easy"]
+            + self.common_image["hard"]
+            + [self.event_image[1]]
+        )
         self.end_page = "unknown_page"
         self.state2image["map_page"] = [self.map_image, 5]

@@ -14,7 +14,9 @@ def get_ship(timer: Timer):
     def recognize_get_ship(timer: Timer):
         """识别获取 舰船/装备 页面斜着的文字，对原始图片进行旋转裁切"""
         NAME_POSITION = [(0.754, 0.268), (0.983, 0.009), 25]
-        ship_name = timer.recognize(crop_image(timer.screen, *NAME_POSITION), candidates=timer.ship_names)[1]
+        ship_name = timer.recognize(
+            crop_image(timer.screen, *NAME_POSITION), candidates=timer.ship_names
+        )[1]
 
         TYPE_POSITION = [(0.804, 0.27), (0.881, 0.167), 25]
         ship_type = timer.recognize(crop_image(timer.screen, *TYPE_POSITION))[1]
@@ -268,7 +270,9 @@ def Supply(timer: Timer, ship_ids=[1, 2, 3, 4, 5, 6], try_times=0):
         Supply(timer, ship_ids, try_times + 1)
 
 
-def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_stats=None):
+def ChangeShip(
+    timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_stats=None
+):
     """切换舰船(不支持第一舰队)"""
     if fleet_id is not None:
         timer.goto_game_page("fight_prepare_page")
@@ -284,7 +288,9 @@ def ChangeShip(timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_s
     if name is None and ship_stats[ship_id] == -1:
         return
     timer.click(110 * ship_id, 250, delay=0)
-    res = timer.wait_images([IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=0.4, gap=0)
+    res = timer.wait_images(
+        [IMG.choose_ship_image[1], IMG.choose_ship_image[2]], after_get_delay=0.4, gap=0
+    )
     if res == 1:
         timer.click(839, 113)
 
@@ -389,5 +395,7 @@ def cook(timer: Timer, position: int, force_click=False):
         return True
 
     except:
-        timer.logger.error(f"不支持的菜谱编号:{position}, 请检查该菜谱是否有效, 或者检查今日用餐次数是否已经用尽")
+        timer.logger.error(
+            f"不支持的菜谱编号:{position}, 请检查该菜谱是否有效, 或者检查今日用餐次数是否已经用尽"
+        )
         return False

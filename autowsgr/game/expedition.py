@@ -11,7 +11,9 @@ class Expedition:
 
     def update(self, force=False):
         self.timer.update_screen()
-        if (isinstance(self.timer.now_page, str) and "unknow" in self.timer.now_page) or self.timer.now_page.name not in [
+        if (
+            isinstance(self.timer.now_page, str) and "unknow" in self.timer.now_page
+        ) or self.timer.now_page.name not in [
             "expedition_page",
             "map_page",
             "battle_page",
@@ -21,7 +23,9 @@ class Expedition:
             if force or time.time() - self.last_check > 1800:
                 self.timer.goto_game_page("main_page")
             if self.timer.now_page.name == "main_page":
-                self.is_ready = self.timer.check_pixel((933, 454), bgr_color=(45, 89, 255))
+                self.is_ready = self.timer.check_pixel(
+                    (933, 454), bgr_color=(45, 89, 255)
+                )
         else:
             self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
 

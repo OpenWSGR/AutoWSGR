@@ -101,7 +101,9 @@ class AndroidController:
         if delay < 0:
             raise ValueError("arg 'delay' should be positive or 0")
         if enable_subprocess and times != 1:
-            raise ValueError("subprocess enabled but arg 'times' is not 1 but " + str(times))
+            raise ValueError(
+                "subprocess enabled but arg 'times' is not 1 but " + str(times)
+            )
         if enable_subprocess:
             p = th.Thread(target=lambda: self.shell(f"input tap {str(x)} {str(y)}"))
             p.start()
@@ -165,7 +167,9 @@ class AndroidController:
         if delay < 0:
             raise ValueError("arg 'delay' should be positive or 0")
         if duration <= 0.2:
-            raise ValueError("duration time too short,arg 'duration' should greater than 0.2")
+            raise ValueError(
+                "duration time too short,arg 'duration' should greater than 0.2"
+            )
         x, y = relative_to_absolute((x, y), self.resolution)
         self.swipe(x, y, x, y, duration=duration, delay=delay, *args, **kwargs)
 
@@ -217,7 +221,9 @@ class AndroidController:
         color.reverse()
         return CalcDis(color, bgr_color) < distance**2
 
-    def locateCenterOnScreen(self, query: MyTemplate, confidence=0.85, this_methods=None):
+    def locateCenterOnScreen(
+        self, query: MyTemplate, confidence=0.85, this_methods=None
+    ):
         """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
             参考 locateCenterOnImage
         Returns:
@@ -229,7 +235,9 @@ class AndroidController:
             this_methods = ["tpl"]
         return locateCenterOnImage(self.screen, query, confidence, this_methods)
 
-    def get_image_position(self, image, need_screen_shot=True, confidence=0.85, this_methods=None):
+    def get_image_position(
+        self, image, need_screen_shot=True, confidence=0.85, this_methods=None
+    ):
         """从屏幕中找出和多张模板图像匹配度超过阈值的矩阵区域的中心坐标,如果有多个,返回第一个
             参考 locateCenterOnScreen
         Args:
@@ -254,7 +262,9 @@ class AndroidController:
                 return abs_pos
         return None
 
-    def image_exist(self, images, need_screen_shot=True, confidence=0.85, this_methods=None):
+    def image_exist(
+        self, images, need_screen_shot=True, confidence=0.85, this_methods=None
+    ):
         """判断图像是否存在于屏幕中
         Returns:
             bool:如果存在为 True 否则为 False
@@ -265,7 +275,10 @@ class AndroidController:
             images = [images]
         if need_screen_shot:
             self.update_screen()
-        return any(self.get_image_position(image, False, confidence, this_methods) is not None for image in images)
+        return any(
+            self.get_image_position(image, False, confidence, this_methods) is not None
+            for image in images
+        )
 
     def wait_image(
         self,
@@ -300,7 +313,9 @@ class AndroidController:
                 return False
             time.sleep(gap)
 
-    def wait_images(self, images=None, confidence=0.85, gap=0.15, after_get_delay=0, timeout=10):
+    def wait_images(
+        self, images=None, confidence=0.85, gap=0.15, after_get_delay=0, timeout=10
+    ):
         """等待一系列图片中的一个在屏幕中出现
 
         Args:
@@ -341,7 +356,9 @@ class AndroidController:
             if time.time() - StartTime > timeout:
                 return None
 
-    def wait_images_position(self, images=None, confidence=0.85, gap=0.15, after_get_delay=0, timeout=10):
+    def wait_images_position(
+        self, images=None, confidence=0.85, gap=0.15, after_get_delay=0, timeout=10
+    ):
         """等待一些图片,并返回第一个匹配结果的位置
 
         参考 wait_images
@@ -389,7 +406,13 @@ class AndroidController:
         """
         return self.click_image(images, must_click, timeout)
 
-    def log_screen(self, need_screen_shot=False, resolution=(960, 540), ignore_existed_image=True, name=None):
+    def log_screen(
+        self,
+        need_screen_shot=False,
+        resolution=(960, 540),
+        ignore_existed_image=True,
+        name=None,
+    ):
         """向默认数据记录路径记录当前屏幕数据,带时间戳保存,960x540大小
         Args:
             need_screen_shot (bool, optional): 是否新截取一张图片. Defaults to False.
@@ -405,4 +428,6 @@ class AndroidController:
                 name=datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             )
         else:
-            self.logger.log_image(image=screen, ignore_existed_image=ignore_existed_image, name=name)
+            self.logger.log_image(
+                image=screen, ignore_existed_image=ignore_existed_image, name=name
+            )

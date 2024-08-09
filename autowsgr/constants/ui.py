@@ -191,14 +191,20 @@ class UI:
             self._construct_clicks_method([(900, 480, 1, 0)]),
             expedition_page,
         )
-        self._add_edge(main_page, mission_page, self._construct_clicks_method([(656, 480, 1, 0)]))
-        self._add_edge(main_page, backyard_page, self._construct_clicks_method([(45, 80, 1, 0)]))
+        self._add_edge(
+            main_page, mission_page, self._construct_clicks_method([(656, 480, 1, 0)])
+        )
+        self._add_edge(
+            main_page, backyard_page, self._construct_clicks_method([(45, 80, 1, 0)])
+        )
         self._add_edge(
             main_page,
             support_set_page,
             self._construct_clicks_method([(50, 135, 1, 1), (200, 300, 1, 1)]),
         )
-        self._add_edge(main_page, options_page, self._construct_clicks_method([(42, 484, 1, 0)]))
+        self._add_edge(
+            main_page, options_page, self._construct_clicks_method([(42, 484, 1, 0)])
+        )
 
         self._add_edge(
             map_page,
@@ -228,18 +234,28 @@ class UI:
             remake_page,
             self._construct_clicks_method([(150, 270, 1, 1.25), (360, 270, 1, 0)]),
         )
-        self._add_edge(options_page, friend_page, self._construct_clicks_method([(150, 410, 1, 0)]))
-        self._add_edge(options_page, main_page, self._construct_clicks_method([(36, 500, 1, 0)]))
+        self._add_edge(
+            options_page, friend_page, self._construct_clicks_method([(150, 410, 1, 0)])
+        )
+        self._add_edge(
+            options_page, main_page, self._construct_clicks_method([(36, 500, 1, 0)])
+        )
 
         self._add_edge(
             backyard_page,
             canteen_page,
             self._construct_clicks_method([(700, 400, 1, 0)]),
         )
-        self._add_edge(backyard_page, bath_page, self._construct_clicks_method([(300, 200, 1, 0)]))
-        self._add_edge(backyard_page, main_page, self._construct_clicks_method([(50, 30, 1, 0)]))
+        self._add_edge(
+            backyard_page, bath_page, self._construct_clicks_method([(300, 200, 1, 0)])
+        )
+        self._add_edge(
+            backyard_page, main_page, self._construct_clicks_method([(50, 30, 1, 0)])
+        )
 
-        self._add_edge(bath_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)]))
+        self._add_edge(
+            bath_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)])
+        )
         self._add_edge(
             bath_page,
             choose_repair_page,
@@ -252,10 +268,16 @@ class UI:
             self._construct_clicks_method([(916, 45, 1, 0)]),
         )
 
-        self._add_edge(canteen_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)]))
-        self._add_edge(canteen_page, backyard_page, self._construct_clicks_method([(50, 30, 1, 0)]))
+        self._add_edge(
+            canteen_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)])
+        )
+        self._add_edge(
+            canteen_page, backyard_page, self._construct_clicks_method([(50, 30, 1, 0)])
+        )
 
-        self._add_edge(mission_page, main_page, self._construct_clicks_method([(30, 30, 1, 0)]))
+        self._add_edge(
+            mission_page, main_page, self._construct_clicks_method([(30, 30, 1, 0)])
+        )
 
         self._add_edge(
             support_set_page,
@@ -263,7 +285,9 @@ class UI:
             self._construct_clicks_method([(30, 30, 1, 0.5), (50, 30, 1, 0.5)]),
         )
 
-        self._add_edge(friend_page, options_page, self._construct_clicks_method([(30, 30, 1, 0)]))
+        self._add_edge(
+            friend_page, options_page, self._construct_clicks_method([(30, 30, 1, 0)])
+        )
 
         self._dfs(main_page)
 
@@ -309,7 +333,9 @@ class UI:
         edge = Edge(method, u, v, other_dst=other_dst)
         u.add_edge(edge)
 
-    def _construct_integrative_pages(self, father, click_positions=[], names=[], common_edges=[]):
+    def _construct_integrative_pages(
+        self, father, click_positions=[], names=[], common_edges=[]
+    ):
         assert len(click_positions) == len(names)
         first_node = self._construct_node(names[0], father)
         nodes = [first_node]
@@ -319,7 +345,9 @@ class UI:
             for j, click_position in enumerate(click_positions):
                 if i == j:
                     continue
-                self._add_edge(node, nodes[j], self._construct_clicks_method([click_position]))
+                self._add_edge(
+                    node, nodes[j], self._construct_clicks_method([click_position])
+                )
 
             for edge in common_edges:
                 dst = edge.get("dst")

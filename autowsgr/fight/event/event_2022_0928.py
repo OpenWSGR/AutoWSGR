@@ -32,8 +32,13 @@ class EventFightPlan20220928(PatrollingEvent, NormalFightPlan):
 
     def _change_fight_map(self, chapter_id, map_id):
         self.enter_map(chapter_id, map_id)
-        while self.timer.image_exist(self.common_image["little_monster"]) == False:  # 找到小怪物图标,点击下方进入主力决战
-            while self.timer.wait_images_position(self.common_image["monster"], timeout=1) is None:
+        while (
+            self.timer.image_exist(self.common_image["little_monster"]) == False
+        ):  # 找到小怪物图标,点击下方进入主力决战
+            while (
+                self.timer.wait_images_position(self.common_image["monster"], timeout=1)
+                is None
+            ):
                 self.random_walk()
             if self.timer.image_exist(self.common_image["little_monster"]):
                 break

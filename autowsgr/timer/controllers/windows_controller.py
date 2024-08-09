@@ -28,7 +28,9 @@ class WindowsController:
 
         self.exe_name = os.path.basename(self.start_cmd)  # 自动获得模拟器的进程名
         if self.emulator == "雷电":
-            self.emulator_index = (int(re.search(r"\d+", self.emulator_name).group()) - 5554) / 2
+            self.emulator_index = (
+                int(re.search(r"\d+", self.emulator_name).group()) - 5554
+            ) / 2
 
     # ======================== 网络 ========================
     def check_network(self):
@@ -69,16 +71,28 @@ class WindowsController:
         console_dir = os.path.join(os.path.dirname(self.start_cmd), "ldconsole.exe")
 
         if not global_command:
-            cmd = [console_dir, command, "--index", str(self.emulator_index), command_arg]
+            cmd = [
+                console_dir,
+                command,
+                "--index",
+                str(self.emulator_index),
+                command_arg,
+            ]
         else:
             cmd = [console_dir, command_arg]
 
         # 使用subprocess.Popen来执行命令
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+        )
         output, error = process.communicate()
 
         # 获取命令执行的输出
-        result = output.decode("utf-8", errors="replace") if output else error.decode("utf-8", errors="replace")
+        result = (
+            output.decode("utf-8", errors="replace")
+            if output
+            else error.decode("utf-8", errors="replace")
+        )
 
         return result
 
@@ -128,7 +142,9 @@ class WindowsController:
             self.logger.debug("Emulator status: " + raw_res)
             return raw_res == "running"
         else:
-            raw_res = check_output(f'tasklist /fi "ImageName eq {self.exe_name}').decode(
+            raw_res = check_output(
+                f'tasklist /fi "ImageName eq {self.exe_name}'
+            ).decode(
                 "gbk"
             )  # TODO: 检查是否所有windows版本返回都是中文
             return "PID" in raw_res

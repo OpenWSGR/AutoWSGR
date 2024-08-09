@@ -23,7 +23,9 @@ NODE_POSITION = (
 
 
 class EventFightPlan20230613(Event, NormalFightPlan):
-    def __init__(self, timer: Timer, plan_path, from_alpha=True, fleet_id=None, event="20230613"):
+    def __init__(
+        self, timer: Timer, plan_path, from_alpha=True, fleet_id=None, event="20230613"
+    ):
         """
         Args:
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
@@ -70,6 +72,10 @@ class EventFightInfo20230613(Event, NormalFightInfo):
     def __init__(self, timer: Timer, chapter_id, map_id, event="20230613") -> None:
         NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         Event.__init__(self, timer, event)
-        self.map_image = self.common_image["easy"] + self.common_image["hard"] + [self.event_image[1]]
+        self.map_image = (
+            self.common_image["easy"]
+            + self.common_image["hard"]
+            + [self.event_image[1]]
+        )
         self.end_page = "unknown_page"
         self.state2image["map_page"] = [self.map_image, 5]
