@@ -13,7 +13,7 @@
 参与开发、用户交流、闲聊： qq群 568500514
 
 ## 近期更新
-- 请重新下载`example`文件夹,OCR识别增加新的后端，如果感觉paddleocr速度较慢，可在`user_settings`中设置`OCR_BACKEND`为`easyocr`,增加2-1捞破除的plan. **2024/08/02**
+- 请重新下载`example`文件夹,OCR识别增加新的后端，如果感觉paddleocr速度较慢，可在`user_settings`中设置`OCR_BACKEND`为`easyocr`,增加2-1捞胖次的plan. **2024/08/02**
 - 添加自动检查更新的功能，设置文件格式小幅度更新，请重新下载`example`文件夹下`user_settings.yaml`,如果想关闭自动更新请设置`check_update`参数为`False`,请对比自己的文件和默认文件.  **2024/04/19**
 - 支持当前活动 "舰队问答-黄金风笛", 详细信息见[文档](/documentation/舰队问答类型活动.md)  **2024/04/19**
 - 添加日常出击任务中500船停止出击的功能  **2024/04/11**

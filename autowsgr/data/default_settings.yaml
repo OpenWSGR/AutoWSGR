@@ -6,9 +6,9 @@ emulator:
   emulator_name: emulator-5554 # 雷电模拟器使用多开器请填写该项, 不多开默认为 "emulator-5554"
 
 game_app: "官服" #官服 小米 应用宝
-check_update: True # 是否在启动脚本时检查更新
+check_update: False # 是否在启动脚本时检查更新
 
-OCR_BACKEND: paddleocr # paddleocr, easyocr
+OCR_BACKEND: paddleocr # 文字识别后端，有两种可选 "paddleocr", "easyocr"
 
 LOG_PATH: "log"
 DELAY: 1.5
@@ -27,12 +27,9 @@ SHOW_MATCH_FIGHT_STAGE: True # 是否显示当前阶段信息。
 SHOW_DECISIVE_BATTLE_INFO: True # 是否显示决战信息。
 SHOW_OCR_INFO: True    # 是否显示 OCR 识别信息。
 log_level: DEBUG # 调试模式 log_level 应该设置为 DEBUGlog
-
-
 # ========== 调试设置 ==============
 
-CHECK_PAGE: True
-
+CHECK_PAGE: True # 是否在启动时检查游戏页面，建议为True
 
 # ========== 解装设置 ===========
 
@@ -48,12 +45,12 @@ daily_automation:
   battle_type: "困难潜艇" # 打哪个。可选名称参考"plans/battle/"
 
   stop_maxship: False # 捞满500船时自动停止出击
-  quick_repair_limit: 50 # 使用快修的上限，一但达到上限将会停止日常出征，以防止没有更换舰队导致快修被耗尽
+  quick_repair_limit: 50 #使用快修的上限，一但达到上限将会停止日常出征，以防止没有更换舰队导致快修被耗尽
 
   auto_exercise: True #自动打完每日的三次演习
 
   auto_normal_fight: True # 按自定义任务进行常规战
-  normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。更多的plan名参考"plans/normal_fight/",如果不想执行某个任务可以使用“#”注释掉
+  normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。更多的plan名参考"plans/normal_fight/"，如果不想执行某个任务可以使用“#”注释掉
     - [9-3AD, 2, 10]  # 打9-3AD两点，用第二舰队，出击十次
     - [9-1BF-only5ss, 2, 0] # 打9-1BF两点，只打5潜艇，用第二舰队，出击零次
     - [9-1B-only5ss, 3, 10000] # 打9-1B一点，只打5潜艇，用第三舰队，出击10000次
