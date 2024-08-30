@@ -272,10 +272,11 @@ class DecisiveBattle:
             str: ['fight_prepare', 'map']
         """
         if type == "enter_map":
-            _res = ["challenging", "refreshed", "refresh"]
+            _res = ["cant_fight", "challenging", "refreshed", "refresh"]
             res = self.timer.wait_images(
                 IMG.decisive_battle_image[3:6], after_get_delay=0.2
             )
+            print(res)
         if type == "running":
             _res = ["map", "fight_prepare"]
             res = self.timer.wait_images(
@@ -453,8 +454,8 @@ class DecisiveBattle:
     def enter_map(self, check_map=True):
         if check_map:
             self.enter_decisive_battle()
-            stats = self.detect()
             self._move_chapter()
+            stats = self.detect()
             if stats == "refresh":
                 self.reset_chapter()
                 stats = "refreshed"
@@ -463,6 +464,9 @@ class DecisiveBattle:
                 if self.check_dock_full():
                     return "full_destroy_success"
                 self.timer.click(500, 500, delay=0.25)
+                stats = self.detect()
+                if stats == "cant_fight":
+                    raise SystemError("其他关卡正在进行挑战")
                 for i in range(5):
                     self.timer.click_image(
                         IMG.decisive_battle_image[7], timeout=12, must_click=True
@@ -472,7 +476,7 @@ class DecisiveBattle:
                         self.timer.wait_images(
                             [
                                 IMG.decisive_battle_image[1],
-                                IMG.decisive_battle_image[6],
+                                IMG.decisive_battle_image[3],
                             ],
                             timeout=10,
                             gap=0.03,
@@ -492,7 +496,7 @@ class DecisiveBattle:
             return "full_destroy_success"
 
         res = self.timer.wait_images(
-            [IMG.decisive_battle_image[1], IMG.decisive_battle_image[6]],
+            [IMG.decisive_battle_image[1], IMG.decisive_battle_image[3]],
             timeout=10,
             gap=0.03,
         )
