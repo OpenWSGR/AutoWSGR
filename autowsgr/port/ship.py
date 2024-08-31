@@ -96,7 +96,7 @@ class Fleet:
             ships = self.timer.recognize_ship(
                 self.timer.get_screen()[:, :1048], self.timer.ship_names
             )
-            print("页面中舰船：", ships)
+            self.timer.logger.info("当前页面中舰船：", ships)
             for ship in ships:
                 if ship[1] == ship_name:
                     rel_center = absolute_to_relative(ship[0], (1280, 720))

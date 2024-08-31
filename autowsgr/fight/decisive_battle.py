@@ -274,9 +274,8 @@ class DecisiveBattle:
         if type == "enter_map":
             _res = ["cant_fight", "challenging", "refreshed", "refresh"]
             res = self.timer.wait_images(
-                IMG.decisive_battle_image[3:6], after_get_delay=0.2
+                IMG.decisive_battle_image[3:7], after_get_delay=0.2
             )
-            print(res)
         if type == "running":
             _res = ["map", "fight_prepare"]
             res = self.timer.wait_images(

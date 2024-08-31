@@ -214,7 +214,7 @@ class PaddleOCRBackend(OCRBackend):
         self.reader = PaddleOCR(
             use_angle_cls=True,
             use_gpu=True,
-            show_log=True,
+            show_log=False,
             lang="ch",
         )  # need to run only once to download and load model into memory
 

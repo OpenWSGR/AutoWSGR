@@ -1,8 +1,10 @@
+import datetime
 import json
 import logging
 import os
 import sys
-from datetime import datetime
+
+import colorlog
 
 from autowsgr.utils.io import save_image
 
@@ -71,7 +73,8 @@ class Logger:
             name (str): 图片文件名
         """
         if name is None:
-            name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
         if "png" not in name and "PNG" not in name:
             name += ".PNG"
         path = os.path.join(self.log_dir, name)
@@ -90,18 +93,27 @@ class Logger:
         logger.handlers = []
         logger.setLevel(log_level)
 
-        # Stream
-        ch_formatter = logging.Formatter(
-            "[%(levelname)s %(asctime)s %(name)s] %(message)s", "%H:%M:%S"
+        formatter = colorlog.ColoredFormatter(
+            "%(log_color)s%(levelname)-7s | %(reset)s %(asctime)s %(name)s %(message)s",
+            "%H:%M:%S",
+            log_colors={
+                "DEBUG": "cyan",
+                "INFO": "green",
+                "WARNING": "yellow",
+                "ERROR": "red",
+                "CRITICAL": "red",
+            },
+            reset=True,
+            style="%",
         )
+
         ch = logging.StreamHandler(sys.stderr)
-        ch.setFormatter(ch_formatter)
+        ch.setFormatter(formatter)
         logger.addHandler(ch)
 
-        # File
         self.log_file_path = os.path.join(self.log_dir, "console.log")
         ch = logging.FileHandler(self.log_file_path, encoding="utf-8")
-        ch.setFormatter(ch_formatter)
+        ch.setFormatter(formatter)
         logger.addHandler(ch)
 
         return logger
