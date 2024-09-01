@@ -14,4 +14,4 @@ pre-commit
 python-bidi==0.4.2
 thefuzz
 wheel
-colorlog
+loguru

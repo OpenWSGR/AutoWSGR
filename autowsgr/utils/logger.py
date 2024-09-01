@@ -1,14 +1,11 @@
-import datetime
 import json
-import logging
 import os
 import sys
+from datetime import datetime
 
-import colorlog
+from loguru import logger
 
 from autowsgr.utils.io import save_image
-
-# import streamlit as st
 
 
 class Logger:
@@ -20,7 +17,53 @@ class Logger:
         else:
             log_level = "INFO"
         self.log_level = log_level
-        self.console_logger = self._get_logger(log_level)
+
+    def _configure_logger(self, log_level):
+
+        # 自定义格式化器
+        def custom_format(record):
+            level = record["level"].name
+            message = record["message"]
+
+            # 绿色：32，红色：31，黄色：33，蓝色：34，淡蓝色：36，清除：0
+            if level == "INFO":
+                return "\x1b[32m{time:HH:mm:ss} \x1b[36mautowsgr \x1b[32m{level:^7}\x1b[0m| {message}\n"
+            elif level == "ERROR":
+                return "\x1b[32m{time:HH:mm:ss} \x1b[36mautowsgr \x1b[31m{level:^7}\x1b[0m| {message}\n"
+            elif level == "DEBUG":
+                return "\x1b[32m{time:HH:mm:ss} \x1b[36mautowsgr \x1b[0m{level:^7}| {message}\n"
+            elif level == "WARNING":
+                return "\x1b[32m{time:HH:mm:ss} \x1b[36mautowsgr \x1b[33m{level:^7}\x1b[0m| {message}\n"
+            else:
+                return "\x1b[32m{time:HH:mm:ss} \x1b[36mautowsgr \x1b[31m{level:^7}| {message}\n"
+
+        # 添加文件日志记录器
+        logger.add(
+            os.path.join(self.log_dir, "log_{time}.log"),
+            level=log_level,
+            colorize=True,
+            format="{time:HH:mm:ss} autowsgr {level:^7}| {message}",
+            catch=True,
+            retention="1 week",
+        )
+
+        # 添加控制台日志记录器
+        # logger.add(
+        #    sys.stdout,
+        #    level=log_level,
+        #    colorize=True,
+        #    format="<green>{time:HH:mm:ss}</green> <level>{level}</level> <cyan>autowsgr:</cyan> <level>{message}</level>",
+        #    catch=True,
+        # )
+
+        # 添加控制台日志记录器
+        logger.add(
+            lambda msg: print(msg, end=""),
+            level=log_level,
+            colorize=True,
+            format=custom_format,
+            catch=True,
+        )
 
     def save_config(self, config):
         # write config file
@@ -34,29 +77,26 @@ class Logger:
         return config_str
 
     def reset_level(self):
-        self.console_logger.setLevel(self.log_level)
+        logger.remove()
+        self._configure_logger(self.log_level)
 
     def debug(self, *args):
-        self.console_logger.debug(str(args))
+        logger.debug(str(args))
 
     def info(self, string):
-        self.console_logger.info(string)
+        logger.info(string)
         # st.write(string)
 
     def warning(self, string):
-        self.console_logger.warning("===================WARNING===================")
-        self.console_logger.warning(string)
-        self.console_logger.warning("====================END====================")
+        logger.warning("===================WARNING===================")
+        logger.warning(string)
+        logger.warning("====================END====================")
         # st.write(string)
 
     def error(self, string):
-        self.console_logger.error("===================ERROR===================")
-        self.console_logger.error(string)
-        self.console_logger.error("====================END====================")
-        # st.write(string)
-
-    def log_stat(self, key, value, t, tag="train"):
-        self.info(f"{tag} {key}: {value:.4f}")
+        logger.error("===================ERROR===================")
+        logger.error(string)
+        logger.error("====================END====================")
 
     def log_image(
         self,
@@ -86,34 +126,4 @@ class Logger:
             *args,
             **kwargs,
         )
-
-    def _get_logger(self, log_level="INFO") -> logging.Logger:
-        logger = logging.getLogger("autowsgr")
-        logger.propagate = False
-        logger.handlers = []
-        logger.setLevel(log_level)
-
-        formatter = colorlog.ColoredFormatter(
-            "%(log_color)s%(levelname)-7s | %(reset)s %(asctime)s %(name)s %(message)s",
-            "%H:%M:%S",
-            log_colors={
-                "DEBUG": "cyan",
-                "INFO": "green",
-                "WARNING": "yellow",
-                "ERROR": "red",
-                "CRITICAL": "red",
-            },
-            reset=True,
-            style="%",
-        )
-
-        ch = logging.StreamHandler(sys.stderr)
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-
-        self.log_file_path = os.path.join(self.log_dir, "console.log")
-        ch = logging.FileHandler(self.log_file_path, encoding="utf-8")
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-
-        return logger
+        self.info(f"图片已保存至{path}")
