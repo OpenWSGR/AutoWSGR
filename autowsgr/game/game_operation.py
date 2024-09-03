@@ -166,6 +166,7 @@ def quick_repair(timer: Timer, repair_mode=2, ship_stats=None, *args, **kwargs):
             ship_stats = detect_ship_stats(timer)
         if not any(x in ship_stats for x in [0, 1, 2]):
             timer.logger.warning("执行修理操作时没有成功检测到舰船")
+            raise ValueError("没有成功检测到舰船，请检查是否正确编队")
 
         assert type(repair_mode) in [int, list, tuple]
         if type(repair_mode) == int:  # 指定所有统一修理方案

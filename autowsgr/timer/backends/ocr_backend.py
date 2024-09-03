@@ -76,7 +76,6 @@ class OCRBackend:
             return results
         else:
             if not results:
-                print(f"OCR识别失败: {results}")
                 results = ["Unkown"]
             return results[0]
 
