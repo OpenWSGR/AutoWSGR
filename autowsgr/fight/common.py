@@ -310,7 +310,7 @@ class FightPlan(ABC):
                 expedition.run(False)
                 self.timer.goto_game_page("map_page")
 
-            fight_flag = self.run(last_flag)
+            fight_flag = self.run()
             last_flag = fight_flag != "SL"
 
             if fight_flag not in ["SL", "success"]:

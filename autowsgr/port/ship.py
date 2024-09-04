@@ -59,7 +59,7 @@ class Fleet:
                 return False
         return True
 
-    def detect(self):
+    def detect(self, check_level=False):
         """在对应的战斗准备页面检查舰船"""
         assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) != False
         if self.fleet_id is not None:
@@ -69,7 +69,12 @@ class Fleet:
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[0]
         print(self.ships)
-        self.check_level()
+        try:
+            self.check_level()
+        except IndexError as e:
+            self.timer.logger.info("检查等级失败")
+            if check_level:
+                raise e
 
     def check_level(self):
         LEFT_TOPS = [(0.069, 0.566), (0.186, 0.566), (0.303, 0.566), (0.420, 0.566), (0.537, 0.566), (0.653, 0.566)]

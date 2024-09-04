@@ -52,13 +52,14 @@ def get_ship(timer: Timer, max_times=1):
     """获取掉落舰船"""
     # TODO: 返回舰船名称
     timer.got_ship_num += 1
+    if timer.port.ship_factory.capacity is not None:
+        timer.logger.info(f"当前船坞容量 {timer.port.ship_factory.occupation}/{timer.port.ship_factory.capacity}")
+        timer.port.ship_factory.occupation += 1
     while timer.wait_image([IMG.symbol_image[8]] + [IMG.symbol_image[13]], timeout=1):
         try:
             ship_name, ship_type = recognize_get_ship(timer.screen, timer.ship_names)
         except:
             ship_name, ship_type = "识别失败", "识别失败"
-        if timer.port.ship_factory.capacity is not None:
-            timer.port.ship_factory.occupation += 1
         timer.Android.click(915, 515, delay=0.25, times=1)
         timer.ConfirmOperation()
     timer.logger.info(f"获取舰船: {ship_name} {ship_type}")
@@ -108,7 +109,7 @@ def DestroyShip(timer: Timer, ship_types=None):
     timer.Android.click(90, 206, delay=1.5)  # 点添加
     occupation, capacity = recognize_number_with_slash(crop_rectangle_relative(timer.get_screen(), 0.873, 0.035, 0.102, 0.038))
     timer.port.ship_factory.update_capacity(capacity, occupation)
-    timer.logger.info(f"舰船容量: {capacity}/{occupation}")
+    timer.logger.info(f"舰船容量: {occupation}/{capacity}")
     timer.go_main_page
 
 
