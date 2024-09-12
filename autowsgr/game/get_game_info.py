@@ -105,7 +105,7 @@ def get_resources(timer: Timer):
             ret[key] = timer.recognize_number(image_crop, "KM.")[1]
         except:
             # 容错处理，如果监测出来不是数字则出错了
-            timer.logger.error(f"读取{key}资源失败")
+            timer.logger.warning(f"读取{key}资源失败")
     timer.logger.info(ret)
     return ret
 
@@ -131,11 +131,11 @@ def get_loot_and_ship(timer: Timer):
                     ret[key] = result[1][0:-4]
                     ret[key + "_max"] = 500
         else:
-            timer.logger.error(f"读取{key}数量失败")
+            timer.logger.warning(f"读取{key}数量失败")
     try:
         timer.got_ship_num = ret.get("ship")
     except:
-        timer.logger.error("赋值给got_ship_num失败")
+        timer.logger.warning("赋值给got_ship_num失败")
         timer.got_ship_num = 0
 
     try:
@@ -143,7 +143,7 @@ def get_loot_and_ship(timer: Timer):
         if timer.got_loot_num == None:
             timer.got_loot_num = 0
     except:
-        timer.logger.error("赋值给got_loot_num失败")
+        timer.logger.warning("赋值给got_loot_num失败")
         timer.got_loot_num = 0
     timer.logger.info(f"已掉落胖次:{timer.got_loot_num}")
     timer.logger.info(f"已掉落舰船:{timer.got_ship_num}")

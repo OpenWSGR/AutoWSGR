@@ -309,7 +309,7 @@ class Timer(AndroidController, WindowsController):
         start_time = time.time()
         while self.is_bad_network(timeout):
             self.log_screen(need_screen_shot=True, name="bad_network.PNG")
-            self.logger.error(f"bad network: {extra_info}")
+            self.logger.warning(f"bad network: {extra_info}")
 
             # 等待网络恢复
 

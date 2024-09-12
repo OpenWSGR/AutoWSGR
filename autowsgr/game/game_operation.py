@@ -315,7 +315,7 @@ def ChangeShip(
     found_ship = next((ship for ship in ship_info if ship[1] == name), None)
     # 点击舰船
     if found_ship is None:
-        timer.logger.error(f"Can't find ship {name},ocr result:{ship_info}")
+        timer.logger.warning(f"Can't find ship {name},ocr result:{ship_info}")
         # raise ValueError(f"Can't find ship {name}")
         timer.logger.debug("Try to click the first ship")
         if ship_stats[ship_id] == -1:

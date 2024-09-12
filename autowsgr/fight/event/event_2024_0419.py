@@ -95,7 +95,7 @@ class EventFightPlan20240419(Event, NormalFightPlan):
             self.timer.click(*entrance_position[int(self.from_alpha)])
 
         if not self.timer.click_image(self.event_image[1], timeout=10):
-            self.timer.logger.error("进入战斗准备页面失败,重新尝试进入战斗准备页面")
+            self.timer.logger.warning("进入战斗准备页面失败,重新尝试进入战斗准备页面")
             self.timer.click(*NODE_POSITION[self.map])
             self.timer.click_image(self.event_image[1], timeout=10)
 

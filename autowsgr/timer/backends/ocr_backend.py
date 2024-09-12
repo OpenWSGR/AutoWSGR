@@ -92,7 +92,7 @@ class OCRBackend:
                 return process_number(nums[0]), process_number(nums[1])
 
             # 决战，费用是f"x{cost}"格式
-            t = t.lstrip("xX")
+            t = t.lstrip("xXKk")
             # 战后经验值 f"Lv.{exp}"格式
             t = t.lstrip("Lv.")
             # 建造资源有前导0
@@ -121,7 +121,7 @@ class OCRBackend:
             return results
         else:
             if not len(results) == 1:
-                self.logger.error(f"OCR识别数字失败: {results}")
+                self.logger.warning(f"OCR识别数字失败: {results}")
                 results = []
             return results[0]
 

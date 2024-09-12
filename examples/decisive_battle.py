@@ -16,7 +16,6 @@ decisive_battle = DecisiveBattle(
     level1=[
         "鲃鱼",
         "U-1206",
-        "U-47",
         "射水鱼",
         "U-96",
         "U-1405",
