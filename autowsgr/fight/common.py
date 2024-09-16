@@ -69,7 +69,7 @@ class FightResultInfo:
             self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
         except Exception as e:
             timer.log_screen(name="mvp_image")
-            timer.logger.error(f"can't identify mvp, error: {e}")
+            timer.logger.warning(f"can't identify mvp, error: {e}")
         self.ship_stats = detect_ship_stats(timer, "sumup", ship_stats)
 
         self.result = timer.wait_images(IMG.fight_result, timeout=5)
@@ -762,7 +762,7 @@ class DecisionBlock:
             get_ship(self.timer)
             return None, literals.FIGHT_CONTINUE_FLAG
         else:
-            self.logger.error("===========Unknown State==============")
+            self.logger.error("Unknown State")
             raise BaseException()
 
 

@@ -50,6 +50,7 @@ class Fleet:
             if other.fleet_id != self.fleet_id:
                 return False
             ships = other.ships
+
         for i in range(1, 7):
             if have_ship(ships[i]) != have_ship(self.ships[i]) or (
                 have_ship(ships[i]) and ships[i] != self.ships[i]
@@ -96,7 +97,7 @@ class Fleet:
             ships = self.timer.recognize_ship(
                 self.timer.get_screen()[:, :1048], self.timer.ship_names
             )
-            self.timer.logger.info(f"当前页面中舰船：{[item[1] for item in ships]}")
+            self.timer.logger.info(f"更改编队可用舰船：{[item[1] for item in ships]}")
             for ship in ships:
                 if ship[1] == ship_name:
                     print(ship[0])
@@ -107,6 +108,13 @@ class Fleet:
         self.timer.wait_pages("fight_prepare_page", gap=0)
 
     def _set_ships(self, ships, search_method="word"):
+        """
+        将当前舰队设置为指定的舰船，ships是要设置的舰队，self.ships是当前舰队
+        Args:
+            ships (list(str)): 要设置的舰船 [0号位留空, 1号位, 2号位, ...]
+            search_method (str): "word" or "image"
+
+        """
         ok = [None] + [False] * 6
         if self.ships is None:
             self.detect()
@@ -120,13 +128,16 @@ class Fleet:
             if ship in self.ships or not have_ship(ship):
                 continue
             position = ok.index(False)
+            self.timer.logger.debug(f"更改{position}号位舰船为 {ship}")
             self.change_ship(position, ship, search_method=search_method)
             ok[position] = True
 
+        # 删除多余舰船，如果在设置中某个位置为更改舰船，而且self.ships中有舰船，则去除舰船后删除
         for i in range(1, 7):
             if ok[7 - i] == False and self.ships[7 - i] != None:
                 self.change_ship(7 - i, None)
                 self.ships[7 - i :] = self.ships[8 - i :]
+                self.ships.append(None)
 
     def reorder(self, ships):
         assert unorder_equal(ships, self.ships, skip=[None, ""])
@@ -159,8 +170,9 @@ class Fleet:
 
     def legal(self, ships):
         ok = False
-        if len(ships) <= 7:
-            ships += [None] * 7
+        # 如果舰队长度小于等于7，加上7个None
+        while len(ships) < 7:
+            ships.append("")
         for i in range(1, 7):
             if ships[i] is None:
                 ok = True
@@ -177,6 +189,7 @@ class Fleet:
         """
         assert self.legal(ships)
         assert flag_ship is None or flag_ship in ships
+        self.timer.logger.debug(f"编队更改为：{ships}")
         self.detect()
         self._set_ships(ships, search_method=search_method)
         if order:

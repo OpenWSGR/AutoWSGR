@@ -347,7 +347,7 @@ class DecisiveBattle:
             )[1]
         except:
             # TODO: 提高OCR对单个数字的识别率
-            self.timer.logger.error("读取资源数值失败")
+            self.timer.logger.warning("读取当前可用费用失败")
             self.stats.score = 0
         self.timer.logger.debug(f"当前可用费用为：{self.stats.score}")
         results = self.timer.recognize_number(
@@ -362,7 +362,7 @@ class DecisiveBattle:
                 if cost > self.stats.score:
                     continue
             except Exception as e:
-                self.timer.logger.error(f"读取购买费用出错，错误如下:\n {e}")
+                self.timer.logger.warning(f"读取购买费用出错，错误如下:\n {e}")
                 continue
             ships.append(
                 self.timer.recognize(
@@ -384,7 +384,7 @@ class DecisiveBattle:
             return
         # ==================做出决策===================
         self.stats.selections = selections
-        self.timer.logger.debug("选择舰船：", selections)
+        self.timer.logger.debug("可购买舰船：", selections)
         choose = self.logic._choose_ship(
             must=(self.stats.map == 1 and self.stats.node == "A" and refreshed == True)
         )
@@ -557,10 +557,10 @@ class DecisiveBattle:
                     f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}"
                 )
             except:
-                self.timer.logger.error("识别副官升级经验数值失败")
+                self.timer.logger.warning("识别副官升级经验数值失败")
         except:
             if retry > 3:
-                self.timer.logger.error("重新读取 exp 失败, 退出逻辑")
+                self.timer.logger.warning("重新读取 exp 失败, 退出逻辑")
                 raise BaseException()  # ToDo: 定义对应的 Exception
 
             self.timer.logger.warning("读取exp失败，五秒后重试")
