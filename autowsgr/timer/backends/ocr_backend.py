@@ -9,6 +9,36 @@ from thefuzz import process
 from autowsgr.constants.data_roots import TUNNEL_ROOT
 
 
+def edit_distance(word1, word2) -> int:
+    """
+    解题思路，动态规划
+        步骤1：将word1与word2前拼接上空格，方便为空时的操作
+        步骤2：初始化dp第一个元素，接着初始化dp的第一行与第一列
+        步骤3：可通过画表(如: excel里)找到状态转移的规律，填充剩下的dp格子即可
+    :return: dp[-1][-1], 返回最后操作的结果
+    """
+    m, n = len(word1), len(word2)
+    if m == 0 and n == 0:
+        return 0
+    word1, word2 = (
+        " " + word1,
+        " " + word2,
+    )  # 非常必要的操作，不添加空格话，在Word为空时会比较麻烦
+    dp = [[0 for _ in range(n + 1)] for _ in range(m + 1)]
+    dp[0][0] = 0  # 初始化dp[0][0] = 0，因为空格对空格不需要任何操作，即0步
+    for i in range(1, n + 1):  # 第一行初始化
+        dp[0][i] = i
+    for i in range(1, m + 1):  # 第一列初始化
+        dp[i][0] = i
+    for i in range(1, m + 1):  # 逐个填充剩余的dp格子
+        for j in range(1, n + 1):
+            if word1[i] == word2[j]:
+                dp[i][j] = dp[i - 1][j - 1]
+            else:
+                dp[i][j] = min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]) + 1
+    return dp[-1][-1]
+
+
 class OCRBackend:
     WORD_REPLACE = None  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
 
@@ -21,6 +51,30 @@ class OCRBackend:
     ):
         """识别文字的具体实现，返回字符串格式识别结果"""
         raise NotImplementedError
+
+    def resize_image_proportionally(self, image, scale_factor):
+        """
+        等比例扩大图片。
+
+        参数:
+        image -- NumPy数组格式的图片
+        scale_factor -- 扩大的倍数，例如2表示扩大到原来的两倍
+
+        返回:
+        resized_image -- 扩大后的图片
+        """
+        # 获取原始图片的尺寸
+        original_height, original_width = image.shape[:2]
+
+        # 计算新的尺寸
+        new_width = int(original_width * scale_factor)
+        new_height = int(original_height * scale_factor)
+
+        # 使用cv2.resize函数等比例扩大图片
+        resized_image = cv2.resize(
+            image, (new_width, new_height), interpolation=cv2.INTER_LINEAR
+        )
+        return resized_image
 
     def recognize(
         self,
@@ -59,13 +113,26 @@ class OCRBackend:
         def post_process_text(t):
             for k, v in self.WORD_REPLACE.items():
                 t = t.replace(k, v)
-            if candidates:
-                t = process.extractOne(t, candidates)[0]
-            return t
+            res, lcs, name = "dsjfagiahsdifhaoisd", "", t
+            if candidates is None:
+                return name
+            for _name in candidates:
+                if any([(_name.find(char) != -1) for char in name]):
+                    dis1 = edit_distance(_name, name)
+                    dis2 = edit_distance(res, name)
+                    if dis1 < dis2:
+                        res = _name
+            return res
 
         img = pre_process_rgb(img, rgb_select, tolerance)
+        if type(img) == type("1234"):
+            img = cv2.imread(img)
+        img = self.resize_image_proportionally(img, 2)
         results = self.read_text(img, allowlist, **kwargs)
+        results = [x for x in results if x[1] != ""]  # 去除空匹配
         results = [(t[0], post_process_text(t[1]), t[2]) for t in results]
+        for i, result in enumerate(results):
+            results[i] = ([data // 2 for data in result[0]], result[1], result[2])
         if self.config.SHOW_OCR_INFO:
             self.logger.debug(f"修正OCR结果：{results}")
 
@@ -107,6 +174,7 @@ class OCRBackend:
 
             return eval(t)
 
+        img = self.resize_image_proportionally(img, 2)
         results = self.recognize(
             img, allowlist="0123456789" + extra_chars, multiple=True, **kwargs
         )

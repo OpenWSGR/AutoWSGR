@@ -1,11 +1,14 @@
 import datetime
 import os
+import subprocess
 import winreg
 from types import SimpleNamespace
 
 import keyboard as kd
+from airtest.core.error import AdbError
 
 import autowsgr
+from autowsgr.constants.data_roots import TUNNEL_ROOT
 from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.logger import Logger
@@ -67,8 +70,14 @@ def start_script(settings_path=None):
         Timer: 该模拟器的记录器
     """
     # set logger
-    config, logger = initialize_logger_and_config(settings_path)
-    timer = Timer(config, logger)
+    try:
+        config, logger = initialize_logger_and_config(settings_path)
+        timer = Timer(config, logger)
+    except AdbError:
+        adb_exe = os.path.join(os.path.dirname(TUNNEL_ROOT), "adb", "adb.exe")
+        subprocess.run([adb_exe, "devices", "-l"])
+        logger.warning("Adb 连接模拟器失败, 正在清除原有连接并重试")
+        timer = Timer(config, logger)
     return timer
 
 

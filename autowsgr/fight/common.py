@@ -475,7 +475,7 @@ class FightPlan(ABC):
                 )
         return "OK"
 
-    def update_state(self):
+    def update_state(self, *args, **kwargs):
         try:
             self.Info.update_state()
             state = self.Info.state
@@ -486,18 +486,26 @@ class FightPlan(ABC):
                 self.timer.process_other_device_login()  # TODO: 处理其他设备登录
             if self.timer.is_bad_network(timeout=5):
                 self.timer.process_bad_network(extra_info="update_state", timeout=5)
-            if self.Info.last_state == "spot_enemy_success":
-                if self.timer.image_exist(IMG.fight_image[2]):
-                    self.timer.click(900, 500)
-            if self.Info.last_state in ["proceed", "night"] and self.timer.image_exist(
-                IMG.fight_image[5:7]
-            ):
-                if self.Info.last_action == "yes":
-                    self.timer.click(325, 350, times=1)
+            self._make_decision(skip_update=True)
+            # if self.Info.last_state == "spot_enemy_success":
+            #     if self.timer.image_exist(IMG.fight_image[2]):
+            #         self.timer.click(900, 500)
+            # if self.Info.last_state in ["proceed", "night"] and self.timer.image_exist(
+            #     IMG.fight_image[5:7]
+            # ):
+            #     if self.Info.last_action == "yes":
+            #         self.timer.click(325, 350, times=1)
+            #     else:
+            #         self.timer.click(615, 350, times=1)
+
+            if "try_times" not in kwargs.keys():
+                return self.update_state(1)
+            else:
+                if kwargs["try_times"] > 3:
+                    raise _
                 else:
-                    self.timer.click(615, 350, times=1)
-            self.Info.update_state()
-            state = self.Info.state
+                    time.sleep(10 * 2.5 ** kwargs["try_times"])
+                    return self.update_state(try_times=kwargs["try_times"] + 1)
         return state
 
     @abstractmethod
@@ -505,7 +513,7 @@ class FightPlan(ABC):
         pass
 
     @abstractmethod
-    def _make_decision(self) -> str:
+    def _make_decision(self, *args, **kwargs) -> str:
         pass
 
     # =============== 战斗中通用的操作 ===============
@@ -716,6 +724,11 @@ class DecisionBlock:
                 },
                 action=value,
             )
+            # import random
+            # if random.random() > 0.5:
+            #     print("这次没点起")
+            # else:
+            #     self.timer.click(573, value * 100 - 20, delay=2)
             self.timer.click(573, value * 100 - 20, delay=2)
             return value, literals.FIGHT_CONTINUE_FLAG
         elif state == "night":
@@ -778,8 +791,9 @@ class IndependentFightPlan(FightPlan):
     def run(self):
         super().fight()
 
-    def _make_decision(self):
-        self.Info.update_state()
+    def _make_decision(self, *args, **kwargs):
+        if "skip_update" not in kwargs.keys():
+            state = self.update_state()
         if self.Info.state == "battle_page":
             return literals.FIGHT_END_FLAG
 

@@ -29,6 +29,6 @@ decisive_battle = DecisiveBattle(
     level2=["U-81", "大青花鱼"],  # 打决战要第二优先选择的舰船，可以设置多个
     flagship_priority=["U-1405", "U-47", "U-1206"],  # 旗舰优先选择的舰船，可以设置多个
     repair_level=1,  # 维修策略，1为中破修，2为大破修
-    full_destroy=False,  # 是否船舱满了解装舰船（仅限决战）
+    full_destroy=True,  # 是否船舱满了解装舰船（仅限决战）
 )
 decisive_battle.run_for_times(1)  # 数字为决战出击的次数

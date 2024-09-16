@@ -279,8 +279,13 @@ class NormalFightPlan(FightPlan):
 
         return start_march(self.timer)
 
-    def _make_decision(self):  # sourcery skip: extract-duplicate-method
-        state = self.update_state()
+    def _make_decision(
+        self, *args, **kwargs
+    ):  # sourcery skip: extract-duplicate-method
+        if "skip_update" not in kwargs.keys():
+            state = self.update_state()
+        else:
+            state = self.Info.state
         # 进行 MapLevel 的决策
         if state == "map_page":
             self.Info.fight_history.add_event(

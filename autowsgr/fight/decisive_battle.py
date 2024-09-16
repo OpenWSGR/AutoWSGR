@@ -456,7 +456,9 @@ class DecisiveBattle:
             self._move_chapter()
             stats = self.detect()
             if stats == "refresh":
-                self.reset_chapter()
+                entered = self.reset_chapter()
+                if entered:
+                    return
                 stats = "refreshed"
             if stats == "refreshed":
                 # 选用上一次的舰船并进入
@@ -487,6 +489,8 @@ class DecisiveBattle:
                     raise TimeoutError("选择决战舰船失败")
             else:
                 self.timer.click(500, 500, delay=0)
+                if self.check_dock_full():
+                    return "full_destroy_success"
         else:
             self.detect()
             self.timer.click(500, 500, delay=0)
@@ -507,14 +511,15 @@ class DecisiveBattle:
         """
         检查船舱是否满，船舱满了自动解装
         """
-        if (
-            self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None
-            and self.full_destroy
-        ):
-            self.timer.relative_click(0.38, 0.565)
-            DestroyShip(self.timer)
-            self.enter_map()
-            return True
+        if self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None:
+            if self.full_destroy:
+                self.timer.relative_click(0.38, 0.565)
+                DestroyShip(self.timer)
+                self.enter_map()
+                return True
+            else:
+                self.timer.logger.warning("船舱已满, 但不允许解装")
+                return False
         return False
 
     def retreat(self):
@@ -658,7 +663,10 @@ class DecisiveBattle:
         self._reset()
         self._move_chapter()
         self.timer.relative_click(0.5, 0.925)
-        self.timer.ConfirmOperation(must_confirm=True)
+        if self.check_dock_full():
+            return True
+        else:
+            self.timer.ConfirmOperation(must_confirm=True)
 
     def _reset(self):
         self.stats.reset()

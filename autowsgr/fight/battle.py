@@ -114,8 +114,11 @@ class BattlePlan(FightPlan):
         quick_repair(self.timer, self.repair_mode, ship_stats=self.Info.ship_stats)
         return start_march(self.timer)
 
-    def _make_decision(self) -> str:
-        self.update_state()
+    def _make_decision(self, *args, **kwargs) -> str:
+        if "skip_update" not in kwargs.keys():
+            state = self.update_state()
+        else:
+            state = self.Info.state
         if self.Info.state == "battle_page":
             return literals.FIGHT_END_FLAG
 

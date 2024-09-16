@@ -167,9 +167,11 @@ class NormalExercisePlan(FightPlan):
         self.exercise_stats = [None, None]
         return literals.OPERATION_SUCCESS_FLAG
 
-    def _make_decision(self):
-        self.Info.update_state()
-        state = self.Info.state
+    def _make_decision(self, *args, **kwargs):
+        if "skip_update" not in kwargs.keys():
+            state = self.update_state()
+        else:
+            state = self.Info.state
         # 进行MapLevel的决策
         if state == "exercise_page":
             self.exercise_stats = get_exercise_stats(self.timer, self.exercise_stats[1])

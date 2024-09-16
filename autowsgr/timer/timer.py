@@ -82,6 +82,19 @@ class Timer(AndroidController, WindowsController):
             )
             config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
 
+        if hasattr(config, "SHIP_NAME_PATH"):
+            path = config.SHIP_NAME_PATH
+            if os.path.exists(path):
+                self.ship_names = unzip_element(list(yaml_to_dict(path).values()))
+                self.logger.info(
+                    f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}"
+                )
+                self.init()
+                return
+            else:
+                self.logger.warning(
+                    f"从用户指定位置加载ship_name失败, 自动找寻其它可用参数"
+                )
         if os.path.exists(
             os.path.abspath(
                 os.path.join(Script_running_directory, "..", "ship_names.yaml")
