@@ -1,15 +1,14 @@
 """舰队问答类活动抄这个
 """
 
-
 import os
 
 from autowsgr.constants.data_roots import MAP_ROOT
-from autowsgr.controller.run_timer import Timer
 from autowsgr.fight.common import start_march
 from autowsgr.fight.event.event import Event
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from autowsgr.game.game_operation import MoveTeam, quick_repair
+from autowsgr.timer import Timer
 from autowsgr.utils.math_functions import CalcDis
 
 NODE_POSITION = (
@@ -24,7 +23,9 @@ NODE_POSITION = (
 
 
 class EventFightPlan20230613(Event, NormalFightPlan):
-    def __init__(self, timer: Timer, plan_path, from_alpha=True, fleet_id=None, event="20230613"):
+    def __init__(
+        self, timer: Timer, plan_path, from_alpha=True, fleet_id=None, event="20230613"
+    ):
         """
         Args:
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
@@ -55,15 +56,15 @@ class EventFightPlan20230613(Event, NormalFightPlan):
 
     def _go_fight_prepare_page(self) -> None:
         if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
-            self.timer.Android.click(*NODE_POSITION[self.map])
+            self.timer.click(*NODE_POSITION[self.map])
 
         # 选择入口
         if self._is_alpha() != self.from_alpha:
             entrance_position = [(820, 377), (820, 321)]
-            self.timer.Android.click(*entrance_position[int(self.from_alpha)])
+            self.timer.click(*entrance_position[int(self.from_alpha)])
 
         self.timer.wait_image(self.event_image[1])
-        self.timer.Android.click(850, 490)
+        self.timer.click(850, 490)
         self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
 
 
@@ -71,6 +72,10 @@ class EventFightInfo20230613(Event, NormalFightInfo):
     def __init__(self, timer: Timer, chapter_id, map_id, event="20230613") -> None:
         NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         Event.__init__(self, timer, event)
-        self.map_image = self.common_image["easy"] + self.common_image["hard"] + [self.event_image[1]]
+        self.map_image = (
+            self.common_image["easy"]
+            + self.common_image["hard"]
+            + [self.event_image[1]]
+        )
         self.end_page = "unknown_page"
         self.state2image["map_page"] = [self.map_image, 5]

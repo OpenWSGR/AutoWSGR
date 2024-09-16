@@ -1,0 +1,17 @@
+airtest
+black
+easyocr>=1.7.1
+inquirer>=3.2.4
+isort
+keyboard
+matplotlib
+opencv-contrib-python==4.5.4.60
+opencv-python-headless==4.5.4.60
+opencv-python==4.5.4.60
+paddleocr==2.8.1
+paddlepaddle==2.6.1
+pre-commit
+python-bidi==0.4.2
+thefuzz
+wheel
+loguru

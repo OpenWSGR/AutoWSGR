@@ -1,0 +1,14 @@
+# 功能：9-4练6SS
+# 带路条件：战列小于2，重巡小于2
+
+# MapLevel
+chapter: 9
+map: 4
+selected_nodes: [B]
+repair_mode: 1   #1中破修，2大破修
+# NodeLevel
+
+node_args:
+  B:
+    formation: 4
+    proceed: False

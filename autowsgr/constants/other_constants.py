@@ -156,7 +156,7 @@ PORT_FACILITIES = {"ship_limit", "ship_amount", "equipment_limit", "equipment_am
 
 # 维修船坞, 建造位, 开发位
 
-CHAPTER_NODE_COUNT = [0, 5, 6, 4, 4, 5, 4, 5, 5, 3]
+CHAPTER_NODE_COUNT = [0, 5, 6, 4, 4, 5, 4, 5, 5, 4]
 # 常规图节点数
 
 _SHIP_TYPE_CLICK = {
@@ -184,5 +184,7 @@ _SHIP_TYPE_CLICK = {
     "导战": (184.0, 299.0),
     "其他": (303.0, 299.0),
 }
-SHIP_TYPE_CLICK = {key: (value[0] + 645, value[1] + 109) for key, value in _SHIP_TYPE_CLICK.items()}
+SHIP_TYPE_CLICK = {
+    key: (value[0] + 645, value[1] + 109) for key, value in _SHIP_TYPE_CLICK.items()
+}
 # 舰船类型筛选点击位置 1280x720 标准

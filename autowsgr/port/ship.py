@@ -7,11 +7,12 @@ import cv2
 from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
-from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import MoveTeam
 from autowsgr.ocr.ship_name import recognize_number, recognize_ship
+from autowsgr.timer import Timer
 from autowsgr.utils.api_image import (
     absolute_to_relative,
+    crop_image,
     crop_rectangle_relative,
     cv_show_image,
 )
@@ -54,8 +55,11 @@ class Fleet:
             if other.fleet_id != self.fleet_id:
                 return False
             ships = other.ships
+
         for i in range(1, 7):
-            if have_ship(ships[i]) != have_ship(self.ships[i]) or (have_ship(ships[i]) and ships[i] != self.ships[i]):
+            if have_ship(ships[i]) != have_ship(self.ships[i]) or (
+                have_ship(ships[i]) and ships[i] != self.ships[i]
+            ):
                 return False
         return True
 
@@ -64,7 +68,9 @@ class Fleet:
         assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) != False
         if self.fleet_id is not None:
             MoveTeam(self.timer, self.fleet_id)
-        ships = recognize_ship(self.timer.get_screen()[433:459], self.timer.ship_names)
+        ships = self.timer.recognize_ship(
+            self.timer.get_screen()[433:459], self.timer.ship_names
+        )
         self.ships = [None] * 7
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[0]
@@ -77,12 +83,21 @@ class Fleet:
                 raise e
 
     def check_level(self):
-        LEFT_TOPS = [(0.069, 0.566), (0.186, 0.566), (0.303, 0.566), (0.420, 0.566), (0.537, 0.566), (0.653, 0.566)]
+        LEFT_TOPS = [
+            (0.069, 0.566),
+            (0.186, 0.566),
+            (0.303, 0.566),
+            (0.420, 0.566),
+            (0.537, 0.566),
+            (0.653, 0.566),
+        ]
         SIZE = (0.023, 0.024)
         screen = self.timer.get_screen()
         self.levels = [None] * 7
         for i in range(1, count_ship(self.ships) + 1):
-            img = crop_rectangle_relative(screen, LEFT_TOPS[i - 1][0], LEFT_TOPS[i - 1][1], SIZE[0], SIZE[1])
+            img = crop_rectangle_relative(
+                screen, LEFT_TOPS[i - 1][0], LEFT_TOPS[i - 1][1], SIZE[0], SIZE[1]
+            )
             img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
             self.levels[i] = int(recognize_number(img, min_size=3)[0][1])
@@ -90,7 +105,7 @@ class Fleet:
 
     def change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name
-        self.timer.Android.click(*FLEET_POSITION[position], delay=0)
+        self.timer.click(*FLEET_POSITION[position], delay=0)
         res = self.timer.wait_images(
             IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]],
             after_get_delay=0.4,
@@ -100,27 +115,39 @@ class Fleet:
         if res == None:
             raise TimeoutError("选择舰船时点击超时")
         if ship_name is None:
-            self.timer.Android.click(83, 167, delay=0)
+            self.timer.click(83, 167, delay=0)
         else:
             if res == 1:
-                self.timer.Android.click(839, 113)
+                self.timer.relative_click(0.875, 0.246)
             if search_method == "word":
-                self.timer.Android.click(700, 30, delay=0)
-                self.timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=0.1)
-                self.timer.Android.text(ship_name)
-                self.timer.Android.click(1219 * 0.75, 667 * 0.75, delay=1)
+                self.timer.relative_click(0.729, 0.056, delay=0)
+                self.timer.wait_image(
+                    IMG.choose_ship_image[3], gap=0, after_get_delay=0.1
+                )
+                self.timer.text(ship_name)
+                self.timer.click(1219 * 0.75, 667 * 0.75, delay=1)
 
-            ships = recognize_ship(self.timer.get_screen()[:, :1048], self.timer.ship_names)
+            ships = self.timer.recognize_ship(
+                self.timer.get_screen()[:, :1048], self.timer.ship_names
+            )
+            self.timer.logger.info(f"更改编队可用舰船：{[item[1] for item in ships]}")
             for ship in ships:
-                if ship[0] == ship_name:
-                    center = (ship[1][1][0] + 20, ship[1][1][1])
-                    rel_center = absolute_to_relative(center, self.timer.Android.resolution)
-                    self.timer.Android.relative_click(*rel_center)
+                if ship[1] == ship_name:
+                    print(ship[0])
+                    rel_center = absolute_to_relative(ship[0], (1280, 720))
+                    self.timer.relative_click(*rel_center)
                     break
 
         self.timer.wait_pages("fight_prepare_page", gap=0)
 
     def _set_ships(self, ships, search_method="word"):
+        """
+        将当前舰队设置为指定的舰船，ships是要设置的舰队，self.ships是当前舰队
+        Args:
+            ships (list(str)): 要设置的舰船 [0号位留空, 1号位, 2号位, ...]
+            search_method (str): "word" or "image"
+
+        """
         ok = [None] + [False] * 6
         if self.ships is None:
             self.detect()
@@ -134,13 +161,16 @@ class Fleet:
             if ship in self.ships or not have_ship(ship):
                 continue
             position = ok.index(False)
+            self.timer.logger.debug(f"更改{position}号位舰船为 {ship}")
             self.change_ship(position, ship, search_method=search_method)
             ok[position] = True
 
+        # 删除多余舰船，如果在设置中某个位置为更改舰船，而且self.ships中有舰船，则去除舰船后删除
         for i in range(1, 7):
             if ok[7 - i] == False and self.ships[7 - i] != None:
                 self.change_ship(7 - i, None)
                 self.ships[7 - i :] = self.ships[8 - i :]
+                self.ships.append(None)
 
     def reorder(self, ships):
         assert unorder_equal(ships, self.ships, skip=[None, ""])
@@ -153,18 +183,29 @@ class Fleet:
 
     def circular_move(self, p1, p2):
         if p1 > p2:
-            self.ships = self.ships[:p2] + self.ships[p1 : p1 + 1] + self.ships[p2:p1] + self.ships[p1 + 1 :]
+            self.ships = (
+                self.ships[:p2]
+                + self.ships[p1 : p1 + 1]
+                + self.ships[p2:p1]
+                + self.ships[p1 + 1 :]
+            )
         else:
-            self.ships = self.ships[:p1] + self.ships[p1 + 1 : p2 + 1] + self.ships[p1 : p1 + 1] + self.ships[p2 + 1 :]
+            self.ships = (
+                self.ships[:p1]
+                + self.ships[p1 + 1 : p2 + 1]
+                + self.ships[p1 : p1 + 1]
+                + self.ships[p2 + 1 :]
+            )
         assert len(self.ships) == 7
         p1 = FLEET_POSITION[p1]
         p2 = FLEET_POSITION[p2]
-        self.timer.Android.swipe(*p1, *p2)
+        self.timer.swipe(*p1, *p2)
 
     def legal(self, ships):
         ok = False
-        if len(ships) <= 7:
-            ships += [None] * 7
+        # 如果舰队长度小于等于7，加上7个None
+        while len(ships) < 7:
+            ships.append("")
         for i in range(1, 7):
             if ships[i] is None:
                 ok = True
@@ -181,6 +222,7 @@ class Fleet:
         """
         assert self.legal(ships)
         assert flag_ship is None or flag_ship in ships
+        self.timer.logger.debug(f"编队更改为：{ships}")
         self.detect()
         self._set_ships(ships, search_method=search_method)
         if order:

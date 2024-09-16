@@ -1,15 +1,14 @@
 import datetime
 
 from autowsgr.constants.image_templates import IMG
-from autowsgr.controller.run_timer import Timer
 from autowsgr.game.game_operation import get_ship
-from autowsgr.ocr.ship_name import recognize, recognize_single_number
+from autowsgr.timer import Timer
 from autowsgr.utils.api_image import (
     absolute_to_relative,
     crop_image,
     match_nearest_index,
 )
-from autowsgr.utils.time import get_eta
+from autowsgr.utils.time import get_eta, str2time
 
 # 开始建造，建造完成，快速建造 三个按钮的中心位置
 BUILD_POSITIONS = {
@@ -34,18 +33,27 @@ ETA_AREAS = {
 }
 # 装备页面，右侧整体下移
 EQUIPMENT_DELTA = 0.02
-BUILD_POSITIONS["equipment"] = [(pos[0], pos[1] + EQUIPMENT_DELTA) for pos in BUILD_POSITIONS["ship"]]
+BUILD_POSITIONS["equipment"] = [
+    (pos[0], pos[1] + EQUIPMENT_DELTA) for pos in BUILD_POSITIONS["ship"]
+]
 ETA_AREAS["equipment"] = [
-    ((area[0][0], area[0][1] + EQUIPMENT_DELTA), (area[1][0], area[1][1] + EQUIPMENT_DELTA)) for area in ETA_AREAS["ship"]
+    (
+        (area[0][0], area[0][1] + EQUIPMENT_DELTA),
+        (area[1][0], area[1][1] + EQUIPMENT_DELTA),
+    )
+    for area in ETA_AREAS["ship"]
 ]
 # 四个资源的左下角位置
 RESOURCE_POSITIONS = [(0.2, 0.455), (0.59, 0.455), (0.2, 0.855), (0.59, 0.855)]
 # 四个资源的区域
 RESOURCE_AREAS = [(pos, (pos[0] + 0.16, pos[1] - 0.1)) for pos in RESOURCE_POSITIONS]
 # 操作资源的位置（第一位）
-RESOURCE_OPERATE_POSITIONS = [[(pos[0] + 0.022 + i * 0.057, pos[1] - 0.046) for i in range(3)] for pos in RESOURCE_POSITIONS]
+RESOURCE_OPERATE_POSITIONS = [
+    [(pos[0] + 0.022 + i * 0.057, pos[1] - 0.046) for i in range(3)]
+    for pos in RESOURCE_POSITIONS
+]
 # 滑动的距离
-RESOURCE_OPERATE_DELTA = 0.06
+RESOURCE_OPERATE_DELTA = 0.09
 
 
 class BuildManager:
@@ -68,20 +76,18 @@ class BuildManager:
         if type == "ship":
             self.timer.goto_game_page("build_page")
         # 截图检测
-        screen = self.timer.get_screen(self.timer.Android.resolution, need_screen_shot=True)
+        screen = self.timer.get_screen(self.timer.resolution, need_screen_shot=True)
         for build_slot in range(4):
-            ocr_result = recognize(
-                crop_image(
-                    screen,
-                    *ETA_AREAS[type][build_slot],
-                ),
+            ocr_result = self.timer.recognize(
+                crop_image(screen, *ETA_AREAS[type][build_slot]),
+                allow_nan=True,
             )
-            if not ocr_result or ocr_result[0][2] <= 0.5:
+            if not ocr_result:
                 self.slot_eta[type][build_slot] = None
-            elif "完成" in ocr_result[0][1] or "开始" in ocr_result[0][1]:
+            elif "完成" in ocr_result[1] or "开始" in ocr_result[1]:
                 self.slot_eta[type][build_slot] = -1
-            else:
-                self.slot_eta[type][build_slot] = get_eta(ocr_result[0][1])
+            elif ":" in ocr_result[1]:
+                self.slot_eta[type][build_slot] = get_eta(str2time(ocr_result[1]))
 
     def get_timedelta(self, type="ship"):
         """获取建造队列的最小剩余时间
@@ -90,9 +96,15 @@ class BuildManager:
         Returns:
             datetime.timedelta: 剩余时间
         """
-        return min(self.slot_eta[type]) - datetime.datetime.now()
+        valid_times = [eta for eta in self.slot_eta[type] if eta not in (-1, None)]
+        print(valid_times)
+        return (
+            min(valid_times) - datetime.datetime.now()
+            if valid_times
+            else datetime.timedelta()
+        )
 
-    def get_eta(self, type="ship"):
+    def get_min_eta(self, type="ship"):
         """获取建造队列的最小结束时间
         Args:
             type (str): "ship"/"equipment"
@@ -108,7 +120,12 @@ class BuildManager:
         Returns:
             bool: 是否有空位
         """
-        return -1 in self.slot_eta[type] or datetime.datetime.now() > min(self.slot_eta[type])
+        # 检查是否包含 -1 或当前时间是否大于任何非 None 的时间
+        return -1 in self.slot_eta[type] or any(
+            datetime.datetime.now() > eta
+            for eta in self.slot_eta[type]
+            if eta is not None
+        )
 
     def get_build(self, type="ship", allow_fast_build=False) -> bool:
         """获取已经建造好的舰船或装备
@@ -133,16 +150,28 @@ class BuildManager:
         # 收完成
         while self.timer.image_exist(IMG.build_image[type].complete):
             try:
-                pos = self.timer.click_image(IMG.build_image[type].complete, timeout=3, must_click=False)
-            except:
-                self.timer.logger.error(f"无法获取 {type}, 可能是对应仓库已满")
+                pos = self.timer.click_image(
+                    IMG.build_image[type].complete, timeout=3, must_click=True
+                )
+                if self.timer.image_exist(IMG.build_image[type].full_depot):
+                    self.timer.logger.error(f"{type} 仓库已满")
+                    self.timer.go_main_page()
+                    return False
+            except Exception as e:
+                self.timer.logger.error(f"收取 {type} 失败: {e}")
                 return False
 
-            ship_name, ship_type = get_ship(self.timer)
-            slot = match_nearest_index(absolute_to_relative(pos, self.timer.Android.resolution), BUILD_POSITIONS[type])
-            self.slot_eta[type][slot] = -1
+            try:
+                ship_name, ship_type = get_ship(self.timer)
+                self.timer.logger.info(f"获取 {type}: {ship_name} {ship_type}")
+            except Exception as e:
+                self.timer.logger.error(f"识别获取{type}内容失败: {e}")
 
-        return ship_name
+            slot = match_nearest_index(
+                absolute_to_relative(pos, self.timer.resolution), BUILD_POSITIONS[type]
+            )
+            self.slot_eta[type][slot] = -1
+        return True
 
     def build(self, type="ship", resources=None, allow_fast_build=False):
         """建造操作
@@ -173,13 +202,11 @@ class BuildManager:
                 Returns:
                     list: 拆分为3位数的资源
                 """
-                screen = self.timer.get_screen(self.timer.Android.resolution, need_screen_shot=True)
-                value = recognize_single_number(
-                    crop_image(
-                        screen,
-                        *RESOURCE_AREAS[resource_id],
-                    )
-                )
+                screen = self.timer.get_screen()
+                value = self.timer.recognize_number(
+                    crop_image(screen, *RESOURCE_AREAS[resource_id]),
+                    rgb_select=(255, 155, 81),
+                )[1]
                 return value_to_digits(value)
 
             resource_digits = [value_to_digits(res) for res in resources]
@@ -189,10 +216,11 @@ class BuildManager:
                     while src[digit] != dst[digit]:
                         print(f"资源 {resource_id} 目前 {src} 目标 {dst}")
                         way = -1 if src[digit] < dst[digit] else 1
-                        self.timer.Android.relative_swipe(
+                        self.timer.relative_swipe(
                             *RESOURCE_OPERATE_POSITIONS[resource_id][digit],
                             RESOURCE_OPERATE_POSITIONS[resource_id][digit][0],
-                            RESOURCE_OPERATE_POSITIONS[resource_id][digit][1] + way * RESOURCE_OPERATE_DELTA,
+                            RESOURCE_OPERATE_POSITIONS[resource_id][digit][1]
+                            + way * RESOURCE_OPERATE_DELTA,
                             duration=0.25,
                         )
                         src = detect_build_resources(resource_id)
@@ -202,12 +230,15 @@ class BuildManager:
             minv = 30 if type == "ship" else 10
             maxv = 999
             if min(resources) < minv or max(resources) > maxv:
-                self.timer.logger.error(f"用于 {type} 的资源 {resources} 越界, 已自动取消操作")
+                self.timer.logger.error(
+                    f"用于 {type} 的资源 {resources} 越界, 已自动取消操作"
+                )
                 return False
 
         # 收完成，检查空队列
-        self.get_build(type, allow_fast_build)
-        if not self.slot_eta[type].count(-1):
+        if not self.get_build(type, allow_fast_build):
+            return False
+        elif not self.slot_eta[type].count(-1):
             self.timer.logger.error(f"{type} 建造队列已满")
             return False
 
@@ -216,7 +247,7 @@ class BuildManager:
         # 选择资源，开始建造
         self.timer.wait_image(IMG.build_image.resource)
         choose_build_resources()
-        self.timer.Android.relative_click(0.89, 0.89)
+        self.timer.relative_click(0.89, 0.89)
         # 更新建造时间
         self.update_slot_eta(type)
 

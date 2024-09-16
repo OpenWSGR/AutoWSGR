@@ -59,10 +59,14 @@ class MyTemplate(Template):
                     scale_step=self.scale_step,
                 )
             else:
-                ret = self._try_match(func, image, screen, threshold=self.threshold, rgb=self.rgb)
+                ret = self._try_match(
+                    func, image, screen, threshold=self.threshold, rgb=self.rgb
+                )
             if ret:
                 break
         return ret
 
 
-IMG = create_namespace(IMG_ROOT, partial(MyTemplate, threshold=0.9, resolution=(960, 540)))
+IMG = create_namespace(
+    IMG_ROOT, partial(MyTemplate, threshold=0.9, resolution=(960, 540))
+)

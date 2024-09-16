@@ -1,14 +1,17 @@
 import datetime
 import os
+import subprocess
 import winreg
 from types import SimpleNamespace
 
 import keyboard as kd
+from airtest.core.error import AdbError
 
 import autowsgr
-from autowsgr.controller.run_timer import Emulator, Timer
+from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
-from autowsgr.utils.new_logger import Logger
+from autowsgr.utils.logger import Logger
 from autowsgr.utils.update import check_for_updates
 
 event_pressed = set()
@@ -16,7 +19,11 @@ script_end = 0
 
 
 def initialize_logger_and_config(settings_path):
-    config = yaml_to_dict(os.path.join(os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"))
+    config = yaml_to_dict(
+        os.path.join(
+            os.path.dirname(autowsgr.__file__), "data", "default_settings.yaml"
+        )
+    )
     if settings_path is not None:
         user_settings = yaml_to_dict(settings_path)
         config = recursive_dict_update(config, user_settings)
@@ -38,7 +45,9 @@ def initialize_logger_and_config(settings_path):
         print("=========End===========")
 
     # set logger
-    config["log_dir"] = os.path.join(config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    config["log_dir"] = os.path.join(
+        config["LOG_PATH"], datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    )
     os.makedirs(config["log_dir"], exist_ok=True)
     logger = Logger(config)
     config = SimpleNamespace(**config)
@@ -61,25 +70,23 @@ def start_script(settings_path=None):
         Timer: 该模拟器的记录器
     """
     # set logger
-    config, logger = initialize_logger_and_config(settings_path)
-    timer = Timer(config, logger)
+    try:
+        config, logger = initialize_logger_and_config(settings_path)
+        timer = Timer(config, logger)
+    except AdbError:
+        adb_exe = os.path.join(os.path.dirname(TUNNEL_ROOT), "adb", "adb.exe")
+        subprocess.run([adb_exe, "devices", "-l"])
+        logger.warning("Adb 连接模拟器失败, 正在清除原有连接并重试")
+        timer = Timer(config, logger)
     return timer
-
-
-def start_script_emulator(settings_path=None):
-    """启动脚本, 返回一个 Emulator 记录器, 用于操作模拟器
-    Returns:
-        Emulator: 该模拟器的记录器
-    """
-    config, logger = initialize_logger_and_config(settings_path)
-    emulator = Emulator(config, logger)
-    return emulator
 
 
 def get_emulator_path(emulator_type):
     try:
         if emulator_type == "雷电":
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\leidian\ldplayer9")
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\leidian\ldplayer9"
+            )
             try:
                 path, _ = winreg.QueryValueEx(key, "InstallDir")
                 return os.path.join(path, "dnplayer.exe")
@@ -89,7 +96,9 @@ def get_emulator_path(emulator_type):
                 winreg.CloseKey(key)
 
         elif emulator_type == "蓝叠 Hyper-V":
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt_cn")
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt_cn"
+            )
             try:
                 path, _ = winreg.QueryValueEx(key, "InstallDir")
                 return os.path.join(path, "HD-Player.exe")

@@ -22,10 +22,6 @@ def unzip_element(o: object):
 
 
 def unorder_equal(o1: Iterable, o2: Iterable, skip=[None]):
-    for obj in o1:
-        if obj not in o2 and obj not in skip:
-            return False
-    for obj in o2:
-        if obj not in o1 and obj not in skip:
-            return False
-    return True
+    if skip is None:
+        skip = []
+    return (set(o1) - set(skip)) == (set(o2) - set(skip))

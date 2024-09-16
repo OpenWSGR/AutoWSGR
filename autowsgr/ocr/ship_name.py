@@ -34,7 +34,10 @@ def edit_distance(word1, word2) -> int:
     m, n = len(word1), len(word2)
     if m == 0 and n == 0:
         return 0
-    word1, word2 = " " + word1, " " + word2  # 非常必要的操作，不添加空格话，在Word为空时会比较麻烦
+    word1, word2 = (
+        " " + word1,
+        " " + word2,
+    )  # 非常必要的操作，不添加空格话，在Word为空时会比较麻烦
     dp = [[0 for _ in range(n + 1)] for _ in range(m + 1)]
     dp[0][0] = 0  # 初始化dp[0][0] = 0，因为空格对空格不需要任何操作，即0步
     for i in range(1, n + 1):  # 第一行初始化
@@ -135,7 +138,9 @@ def recognize(image, char_list=None, min_size=7, text_threshold=0.55, low_text=0
     return result
 
 
-def recognize_single_number(image, ex_list="", min_size=7, text_threshold=0.55, low_text=0.3):
+def recognize_single_number(
+    image, ex_list="", min_size=7, text_threshold=0.55, low_text=0.3
+):
     """识别单个数字
     Returns:
         int: 结果
@@ -189,7 +194,9 @@ def filte_ship_name(result, names):
     return results
 
 
-def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3):
+def _recognize_ship(
+    image, names, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3
+):
     """识别没有预处理过的图片中的舰船, 返回识别结果列表,
     Returns:
         list(result): 一个 result 为 [ship_name, left_top]
@@ -208,7 +215,9 @@ def _recognize_ship(image, names, char_list=None, min_size=7, text_threshold=0.5
     return filte_ship_name(result, names)
 
 
-def recognize_ship(image, names, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3):
+def recognize_ship(
+    image, names, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3
+):
     """传入一张图片,返回舰船信息,包括名字和舰船型号
 
     Args:

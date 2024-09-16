@@ -13,7 +13,7 @@ repos:
       - id: detect-private-key
       - id: debug-statements
   - repo: https://github.com/psf/black
-    rev: 24.4.2
+    rev: 24.8.0
     hooks:
       - id: black
       - id: black-jupyter

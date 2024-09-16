@@ -1,0 +1,17 @@
+# 功能：9-3航空点二连炸
+# 带路：带一艘航速低于27节的船
+# 配队：推荐赤城+大凤或者大凤+祥凤，0铝阵容，四个练级位，打之前先压制
+
+# MapLevel
+chapter: 9
+map: 3
+selected_nodes: [A, D]
+
+# NodeLevel
+node_args:
+  A:
+    formation: 4
+    proceed: True
+  D:
+    formation: 4
+    proceed: False

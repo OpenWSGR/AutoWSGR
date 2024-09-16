@@ -30,7 +30,9 @@ def absolute_to_relative(absolute_pos, resolution=(960, 540)):
     """将绝对坐标转换为相对坐标"""
     abs_x, abs_y = absolute_pos
     _w, _h = resolution
-    assert 0 <= abs_x <= _w and 0 <= abs_y <= _h, "abs_x and abs_y should be in [0, resolution]"
+    assert (
+        0 <= abs_x <= _w and 0 <= abs_y <= _h
+    ), "abs_x and abs_y should be in [0, resolution]"
     rel_x = abs_x / _w
     rel_y = abs_y / _h
     return rel_x, rel_y
@@ -181,7 +183,10 @@ def crop_rectangle(image, rect):
     rect_height = rect[1][1]
 
     return image[
-        rect_center_y - rect_height // 2 : rect_center_y + rect_height - rect_height // 2,
+        rect_center_y
+        - rect_height // 2 : rect_center_y
+        + rect_height
+        - rect_height // 2,
         rect_center_x - rect_width // 2 : rect_center_x + rect_width - rect_width // 2,
     ]
 
@@ -201,16 +206,25 @@ def crop_rotated_rectangle(image, rect):
     rect_bbx_upright = rect_bbx(rect=rect)
     rect_bbx_upright_image = crop_rectangle(image=image, rect=rect_bbx_upright)
 
-    rotated_rect_bbx_upright_image = image_rotate_without_crop(mat=rect_bbx_upright_image, angle=rotated_angle)
+    rotated_rect_bbx_upright_image = image_rotate_without_crop(
+        mat=rect_bbx_upright_image, angle=rotated_angle
+    )
 
     rect_width = rect[1][0]
     rect_height = rect[1][1]
 
-    crop_center = (rotated_rect_bbx_upright_image.shape[1] // 2, rotated_rect_bbx_upright_image.shape[0] // 2)
+    crop_center = (
+        rotated_rect_bbx_upright_image.shape[1] // 2,
+        rotated_rect_bbx_upright_image.shape[0] // 2,
+    )
 
     return rotated_rect_bbx_upright_image[
-        crop_center[1] - rect_height // 2 : crop_center[1] + (rect_height - rect_height // 2),
-        crop_center[0] - rect_width // 2 : crop_center[0] + (rect_width - rect_width // 2),
+        crop_center[1]
+        - rect_height // 2 : crop_center[1]
+        + (rect_height - rect_height // 2),
+        crop_center[0]
+        - rect_width // 2 : crop_center[0]
+        + (rect_width - rect_width // 2),
     ]
 
 
@@ -248,7 +262,9 @@ def crop_image(image, pos1, pos2, rotation=0, debug=False):
     return ret
 
 
-def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, this_methods=None):
+def locateCenterOnImage(
+    image: np.ndarray, query: MyTemplate, confidence=0.85, this_methods=None
+):
     """从原图像中尝试找出一个置信度相对于模板图像最高的矩阵区域的中心坐标
 
     Args:
@@ -269,7 +285,9 @@ def locateCenterOnImage(image: np.ndarray, query: MyTemplate, confidence=0.85, t
     return match_pos or None
 
 
-def match_nearest_index(pos: Tuple[int, int], positions: List[Tuple[int, int]], metric: str = "l2"):
+def match_nearest_index(
+    pos: Tuple[int, int], positions: List[Tuple[int, int]], metric: str = "l2"
+):
     """找出离目标点最近的点的索引
 
     Args:

@@ -1,14 +1,16 @@
-import datetime
+from datetime import datetime, time, timedelta
 
 
-def get_eta(time_str):
-    # time_str: 时间字符串 "10:30:00" 格式
+def str2time(time_str: str, format="%H:%M:%S"):
+    return datetime.strptime(time_str, format).time()
 
-    # 将时间字符串转换为datetime对象
-    time_obj = datetime.datetime.strptime(time_str, "%H:%M:%S")
 
-    # 获取当前时间
-    now = datetime.datetime.now()
+def time2timedelta(time_obj: time):
+    return timedelta(
+        hours=time_obj.hour, minutes=time_obj.minute, seconds=time_obj.second
+    )
 
-    # 计算当前时间加上time_obj表示的时间
-    return now + datetime.timedelta(hours=time_obj.hour, minutes=time_obj.minute, seconds=time_obj.second)
+
+def get_eta(time_obj: time):
+    now = datetime.now()
+    return now + time2timedelta(time_obj)
