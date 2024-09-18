@@ -49,16 +49,14 @@ class Timer(AndroidController, WindowsController):
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
-        super().__init__(config, logger)
         self.port = Port(logger)
-
+        self.config = config
+        self.logger = logger
         if not self.config.PLAN_ROOT:
             self.logger.warning(
                 f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used"
             )
             self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
-        self.config = config
-        self.logger = logger
 
         # 初始化android控制器
         WindowsController.__init__(self, config.emulator, logger)

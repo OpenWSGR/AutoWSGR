@@ -53,38 +53,6 @@ def edit_distance(word1, word2) -> int:
     return dp[-1][-1]
 
 
-def find_lcseque(s1, s2):
-    """求两个字符串的LCS"""
-    m = [[0 for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
-    d = [[None for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
-    for p1 in range(len(s1)):
-        for p2 in range(len(s2)):
-            if s1[p1] == s2[p2]:
-                m[p1 + 1][p2 + 1] = m[p1][p2] + 1
-                d[p1 + 1][p2 + 1] = "ok"
-            elif m[p1 + 1][p2] > m[p1][p2 + 1]:
-                m[p1 + 1][p2 + 1] = m[p1 + 1][p2]
-                d[p1 + 1][p2 + 1] = "left"
-            else:
-                m[p1 + 1][p2 + 1] = m[p1][p2 + 1]
-                d[p1 + 1][p2 + 1] = "up"
-
-    (p1, p2) = (len(s1), len(s2))
-    s = []
-    while m[p1][p2]:  # 不为None时
-        c = d[p1][p2]
-        if c == "ok":  # 匹配成功，插入该字符，并向左上角找下一个
-            s.append(s1[p1 - 1])
-            p1 -= 1
-            p2 -= 1
-        if c == "left":  # 根据标记，向左找下一个
-            p2 -= 1
-        if c == "up":  # 根据标记，向上找下一个
-            p1 -= 1
-    s.reverse()
-    return "".join(s)
-
-
 def get_allow(names):
     char_set = set()
     for name in unzip_element(names):
@@ -170,7 +138,7 @@ def recognize_number(image, ex_list="", min_size=7, text_threshold=0.55, low_tex
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    print(f"recognize_number的识别结果为：{result}")
+    # print(f"recognize_number的识别结果为：{result}")
     return result
 
 

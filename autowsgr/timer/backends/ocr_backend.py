@@ -85,9 +85,16 @@ class OCRBackend:
         allow_nan=False,
         rgb_select=None,
         tolerance=30,
+        scale_factor=2,
         **kwargs,
     ):
-        """识别任意字符串"""
+        """识别任意字符串, 该函数为最底层封装
+
+        Args:
+            scale_factor (int, optional): 图标缩放倍率. Defaults to 2.
+        Returns:
+            list((int, int), str, float): 中心位置, 字串识别结果, 置信度
+        """
 
         def pre_process_rgb(img, rgb_select=None, tolerance=30):
             # 如果没有提供rgb_select，直接返回原始图像
@@ -127,12 +134,16 @@ class OCRBackend:
         img = pre_process_rgb(img, rgb_select, tolerance)
         if type(img) == type("1234"):
             img = cv2.imread(img)
-        img = self.resize_image_proportionally(img, 2)
+        img = self.resize_image_proportionally(img, scale_factor)
         results = self.read_text(img, allowlist, **kwargs)
         results = [x for x in results if x[1] != ""]  # 去除空匹配
         results = [(t[0], post_process_text(t[1]), t[2]) for t in results]
         for i, result in enumerate(results):
-            results[i] = ([data // 2 for data in result[0]], result[1], result[2])
+            results[i] = (
+                [data // scale_factor for data in result[0]],
+                result[1],
+                result[2],
+            )
         if self.config.SHOW_OCR_INFO:
             self.logger.debug(f"修正OCR结果：{results}")
 
@@ -174,7 +185,6 @@ class OCRBackend:
 
             return eval(t)
 
-        img = self.resize_image_proportionally(img, 2)
         results = self.recognize(
             img, allowlist="0123456789" + extra_chars, multiple=True, **kwargs
         )

@@ -236,7 +236,7 @@ def quick_repair(
                         delay=1.5,
                     )
             if switch_back:
-                timer.Android.click(200, 420, times=2, delay=1.5)  # 返回正常切换页面
+                timer.click(200, 420, times=2, delay=1.5)  # 返回正常切换页面
     except AssertionError:
         raise ValueError(f"修理舰船的参数不合法, 请检查你的参数:{arg}")
 
@@ -247,8 +247,8 @@ def get_rewards(timer: Timer):
     if not timer.check_pixel((694, 457), bgr_color=(45, 89, 255)):
         return "no"
     timer.goto_game_page("mission_page")
-    timer.goto_game_page("mission_page")
     if timer.click_image(IMG.game_ui[15]):
+        timer.relative_click(0.5, 0.5)
         timer.ConfirmOperation(must_confirm=1, timeout=5)
         return "ok"
     elif timer.click_image(IMG.game_ui[12]):

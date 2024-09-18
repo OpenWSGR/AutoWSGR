@@ -65,8 +65,12 @@ class BuildManager:
             "ship": [None] * 4,
             "equipment": [None] * 4,
         }
+        self.initialized = False
+
+    def init(self):
         self.update_slot_eta("ship")
         self.update_slot_eta("equipment")
+        self.initialized = True
 
     def update_slot_eta(self, type="ship"):
         """更新建造队列的剩余时间"""
@@ -120,6 +124,8 @@ class BuildManager:
         Returns:
             bool: 是否有空位
         """
+        if not self.initialized:
+            self.init()
         # 检查是否包含 -1 或当前时间是否大于任何非 None 的时间
         return -1 in self.slot_eta[type] or any(
             datetime.datetime.now() > eta

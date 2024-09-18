@@ -1,6 +1,6 @@
 import time
 
-from autowsgr.utils.new_logger import Logger
+from autowsgr.utils.logger import Logger
 
 
 class Ship:
@@ -129,7 +129,6 @@ class Port:
         self.quick_build = 0
         self.bathroom = BathRoom()
         self.ship_factory = Factory()
-        self.equipment_factory = Factory()
         self.ships = []
         self.fleet = [[]] * 5
         self.map = 0

@@ -9,6 +9,7 @@ from airtest.core.error import AdbError
 
 import autowsgr
 from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.game.build import BuildManager
 from autowsgr.timer import Timer
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.logger import Logger
@@ -73,6 +74,7 @@ def start_script(settings_path=None):
     try:
         config, logger = initialize_logger_and_config(settings_path)
         timer = Timer(config, logger)
+        timer.port.factory = BuildManager(timer)
     except AdbError:
         adb_exe = os.path.join(os.path.dirname(TUNNEL_ROOT), "adb", "adb.exe")
         subprocess.run([adb_exe, "devices", "-l"])

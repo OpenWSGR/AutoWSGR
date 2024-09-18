@@ -8,9 +8,10 @@ from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
 from autowsgr.game.game_operation import DestroyShip, get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
+from autowsgr.ocr.ship_name import recognize
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer import Timer
-from autowsgr.utils.api_image import crop_image
+from autowsgr.utils.api_image import crop_image, crop_rectangle_relative, cv_show_image
 from autowsgr.utils.io import count, yaml_to_dict
 
 """决战结构:
@@ -29,6 +30,13 @@ def get_formation(fleet: Fleet, enemy: list):
     elif anti_sub <= 0:
         return 4
     return 2
+
+
+def recognize_map(img):
+    cropped_image = crop_rectangle_relative(img, 0.5 - 0.025, 0, 0.05, 1)
+    result = recognize(cropped_image, "123ABCDEFGHIJK")
+    cv_show_image(cropped_image)
+    print(result)
 
 
 class DB:
@@ -582,6 +590,7 @@ class DecisiveBattle:
             self._get_exp()
         if self.logic._use_skill():
             self.use_skill(self.logic._use_skill())
+
         if self.stats.fleet.empty() and not self.stats.is_begin():
             self._check_fleet()
         _fleet = self.logic.get_best_fleet()

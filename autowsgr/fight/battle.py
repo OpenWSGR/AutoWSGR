@@ -107,7 +107,7 @@ class BattlePlan(FightPlan):
 
     def _enter_fight(self) -> str:
         self._go_fight_prepare_page()
-        self.timer.Android.click(180 * ((self.map - 1) % 5 + 1), 200)
+        self.timer.click(180 * ((self.map - 1) % 5 + 1), 200)
         self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
         self.Info.ship_stats = detect_ship_stats(self.timer)
         quick_repair(self.timer, self.repair_mode, ship_stats=self.Info.ship_stats)

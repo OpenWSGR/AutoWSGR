@@ -73,8 +73,8 @@ class Fleet:
         )
         self.ships = [None] * 7
         for rk, ship in enumerate(ships):
-            self.ships[rk + 1] = ship[0]
-        print(self.ships)
+            self.ships[rk + 1] = ship[1]
+        self.timer.logger.info(f"舰船识别结果为: {self.ships}")
         try:
             self.check_level()
         except IndexError as e:
@@ -102,8 +102,9 @@ class Fleet:
             # cv_show_image(img)
             self.levels[i] = int(recognize_number(img, min_size=3)[0][1])
             # print(levels)
+        self.timer.logger.info(f"等级识别结果: {self.levels}")
 
-    def change_ship(self, position, ship_name, search_method="word"):
+    def _change_ship(self, position, ship_name, search_method="word"):
         self.ships[position] = ship_name
         self.timer.click(*FLEET_POSITION[position], delay=0)
         res = self.timer.wait_images(
@@ -162,13 +163,13 @@ class Fleet:
                 continue
             position = ok.index(False)
             self.timer.logger.debug(f"更改{position}号位舰船为 {ship}")
-            self.change_ship(position, ship, search_method=search_method)
+            self._change_ship(position, ship, search_method=search_method)
             ok[position] = True
 
         # 删除多余舰船，如果在设置中某个位置为更改舰船，而且self.ships中有舰船，则去除舰船后删除
         for i in range(1, 7):
             if ok[7 - i] == False and self.ships[7 - i] != None:
-                self.change_ship(7 - i, None)
+                self._change_ship(7 - i, None)
                 self.ships[7 - i :] = self.ships[8 - i :]
                 self.ships.append(None)
 
@@ -219,6 +220,7 @@ class Fleet:
             ships (list(str)): 代表舰船 [0号位留空, 1号位, 2号位, ...]
             flag_ship: 如果不为 None, 则代表旗舰名称
             order (bool): 是否按照 ships 给定的顺序 (优先级高于旗舰指定)
+            search_method: 检索方式 "word"/None 表示输入舰船名检索与不进行额外检索直接 OCR 切换
         """
         assert self.legal(ships)
         assert flag_ship is None or flag_ship in ships

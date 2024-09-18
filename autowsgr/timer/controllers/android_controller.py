@@ -9,11 +9,11 @@ import cv2
 from airtest.core.android import Android
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
-from autowsgr.ocr.ocr import crop_rectangle_relative
 from autowsgr.ocr.ship_name import recognize
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
+    crop_rectangle_relative,
     locateCenterOnImage,
     relative_to_absolute,
 )
