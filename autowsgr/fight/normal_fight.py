@@ -268,8 +268,7 @@ class NormalFightPlan(FightPlan):
             self._change_fight_map(self.chapter, self.map)
             self.timer.port.chapter = self.chapter
             self.timer.port.map = self.map
-        # try:
-        assert self.timer.wait_images(self.Info.map_image) != None
+        self.timer.wait_images(self.Info.map_image) != None
         self._go_fight_prepare_page()
         MoveTeam(self.timer, self.fleet_id)
         if (
