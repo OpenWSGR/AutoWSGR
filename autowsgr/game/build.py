@@ -160,18 +160,18 @@ class BuildManager:
                     IMG.build_image[type].complete, timeout=3, must_click=True
                 )
                 if self.timer.image_exist(IMG.build_image[type].full_depot):
-                    self.timer.logger.error(f"{type} 仓库已满")
+                    self.timer.logger.warning(f"{type} 仓库已满")
                     self.timer.go_main_page()
                     return False
             except Exception as e:
-                self.timer.logger.error(f"收取 {type} 失败: {e}")
+                self.timer.logger.warning(f"收取 {type} 失败: {e}")
                 return False
 
             try:
                 ship_name, ship_type = get_ship(self.timer)
                 self.timer.logger.info(f"获取 {type}: {ship_name} {ship_type}")
             except Exception as e:
-                self.timer.logger.error(f"识别获取{type}内容失败: {e}")
+                self.timer.logger.warning(f"识别获取{type}内容失败: {e}")
 
             slot = match_nearest_index(
                 absolute_to_relative(pos, self.timer.resolution), BUILD_POSITIONS[type]
@@ -236,7 +236,7 @@ class BuildManager:
             minv = 30 if type == "ship" else 10
             maxv = 999
             if min(resources) < minv or max(resources) > maxv:
-                self.timer.logger.error(
+                self.timer.logger.warning(
                     f"用于 {type} 的资源 {resources} 越界, 已自动取消操作"
                 )
                 return False
@@ -245,7 +245,7 @@ class BuildManager:
         if not self.get_build(type, allow_fast_build):
             return False
         elif not self.slot_eta[type].count(-1):
-            self.timer.logger.error(f"{type} 建造队列已满")
+            self.timer.logger.warning(f"{type} 建造队列已满")
             return False
 
         # 点击建造

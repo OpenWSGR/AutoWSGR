@@ -432,7 +432,7 @@ def cook(timer: Timer, position: int, force_click=False):
         return True
 
     except:
-        timer.logger.error(
+        timer.logger.warning(
             f"不支持的菜谱编号:{position}, 请检查该菜谱是否有效, 或者检查今日用餐次数是否已经用尽"
         )
         return False

@@ -1,3 +1,5 @@
+import os
+
 from autowsgr.game.game_operation import cook
 from autowsgr.scripts.main import start_script
 

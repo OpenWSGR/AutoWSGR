@@ -244,7 +244,7 @@ class FightInfo(ABC):
                 return self.state
 
         # 匹配不到时报错
-        self.logger.error(
+        self.logger.warning(
             f"匹配状态失败! state: {self.state}  last_action: {self.last_action}"
         )
         self.timer.log_screen(True)
@@ -276,7 +276,7 @@ class FightInfo(ABC):
                     result=result,
                 )
             except Exception as e:
-                self.logger.error(f"战果结算记录失败：{e}")
+                self.logger.warning(f"战果结算记录失败：{e}")
 
     @abstractmethod
     def reset(self):
@@ -463,7 +463,7 @@ class FightPlan(ABC):
             state = self.Info.state
         except ImageNotFoundErr as _:
             # 处理点击延迟或者网络波动导致的匹配失败
-            self.logger.error("Image Match Failed, Processing")
+            self.logger.warning("Image Match Failed, Trying to Process")
             if self.timer.is_other_device_login():
                 self.timer.process_other_device_login()  # TODO: 处理其他设备登录
             if self.timer.is_bad_network(timeout=5):
@@ -500,6 +500,10 @@ class FightPlan(ABC):
 
     # =============== 战斗中通用的操作 ===============
     def _SL(self):
+        # 重置地图节点信息
+        self.timer.port.chapter = None
+        self.timer.port.map = None
+
         self.timer.restart()
         self.timer.go_main_page()
         self.timer.set_page("main_page")

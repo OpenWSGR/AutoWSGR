@@ -28,35 +28,23 @@ class Timer(AndroidController, WindowsController):
     ui = WSGR_UI
     ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
     enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
-    ship_level = {
-        1: 0,
-        2: 0,
-        3: 0,
-        4: 0,
-        5: 0,
-        6: 0,
-    }  # 我方舰船等级
     now_page = None  # 当前所在 UI 名
     resources = None  # 当前四项资源量
+    got_ship_num = 0  # 当天已掉落的船
+    got_loot_num = 0  # 当天已掉落的胖次
+    quick_repaired_cost = 0  # 消耗快修数量
     """
     以上时能用到的
     以下是暂时用不到的
     """
     last_mission_completed = 0
-    got_ship_num = 0  # 当天已掉落的船
-    got_loot_num = 0  # 当天已掉落的胖次
-    quick_repaired_cost = 0  # 消耗快修数量
+
     last_expedition_check_time = time.time()
 
     def __init__(self, config, logger):
         self.port = Port(logger)
         self.config = config
         self.logger = logger
-        if not self.config.PLAN_ROOT:
-            self.logger.warning(
-                f"No PLAN_ROOT specified, default value {os.path.join(DATA_ROOT, 'plans')} will be used"
-            )
-            self.config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
 
         # 初始化android控制器
         WindowsController.__init__(self, config.emulator, logger)
@@ -76,6 +64,8 @@ class Timer(AndroidController, WindowsController):
         # 最初启动脚本的路径在调用栈的最后一个元素中
         Script_running_directory = os.path.abspath(stack[-1].filename)
         # 从脚本运行目录查找plans和ship_name，如果存在则使用，不存在则使用默认的
+        # 加载plans文件夹
+        self.logger.info(f"尝试从脚本运行目录加载plans")
         if os.path.exists(
             os.path.abspath(os.path.join(Script_running_directory, "..", "plans"))
         ):
@@ -88,20 +78,8 @@ class Timer(AndroidController, WindowsController):
                 f"从脚本运行目录加载plans失败，将会从默认目录 {os.path.join(DATA_ROOT, 'plans')} 加载plans"
             )
             config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
-
-        if hasattr(config, "SHIP_NAME_PATH"):
-            path = config.SHIP_NAME_PATH
-            if os.path.exists(path):
-                self.ship_names = unzip_element(list(yaml_to_dict(path).values()))
-                self.logger.info(
-                    f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}"
-                )
-                self.init()
-                return
-            else:
-                self.logger.warning(
-                    f"从用户指定位置加载ship_name失败, 自动找寻其它可用参数"
-                )
+        # 加载舰船名文件
+        self.logger.info(f"尝试从脚本运行目录加载ship_names.yaml")
         if os.path.exists(
             os.path.abspath(
                 os.path.join(Script_running_directory, "..", "ship_names.yaml")
@@ -116,7 +94,7 @@ class Timer(AndroidController, WindowsController):
             self.logger.info(f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}")
         else:
             self.logger.warning(
-                f"从脚本运行目录加载ship_name失败，将会从默认目录 {os.path.join(OCR_ROOT,  'ship_name.yaml')} 加载ship_name.yaml"
+                f"从脚本运行目录加载ship_name失败，尝试从默认目录 {os.path.join(OCR_ROOT,  'ship_name.yaml')} 加载ship_name.yaml"
             )
             config.SHIP_NAME_PATH = os.path.join(OCR_ROOT, "ship_name.yaml")
             self.ship_names = unzip_element(
