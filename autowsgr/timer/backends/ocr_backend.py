@@ -39,6 +39,37 @@ def edit_distance(word1, word2) -> int:
     return dp[-1][-1]
 
 
+def find_lcseque(s1, s2):
+    """求两个字符串的LCS"""
+    m = [[0 for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
+    d = [[None for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
+    for p1 in range(len(s1)):
+        for p2 in range(len(s2)):
+            if s1[p1] == s2[p2]:
+                m[p1 + 1][p2 + 1] = m[p1][p2] + 1
+                d[p1 + 1][p2 + 1] = "ok"
+            elif m[p1 + 1][p2] > m[p1][p2 + 1]:
+                m[p1 + 1][p2 + 1] = m[p1 + 1][p2]
+                d[p1 + 1][p2 + 1] = "left"
+            else:
+                m[p1 + 1][p2 + 1] = m[p1][p2 + 1]
+                d[p1 + 1][p2 + 1] = "up"
+    (p1, p2) = (len(s1), len(s2))
+    s = []
+    while m[p1][p2]:  # 不为None时
+        c = d[p1][p2]
+        if c == "ok":  # 匹配成功，插入该字符，并向左上角找下一个
+            s.append(s1[p1 - 1])
+            p1 -= 1
+            p2 -= 1
+        if c == "left":  # 根据标记，向左找下一个
+            p2 -= 1
+        if c == "up":  # 根据标记，向上找下一个
+            p1 -= 1
+    s.reverse()
+    return "".join(s)
+
+
 class OCRBackend:
     WORD_REPLACE = None  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
 
@@ -117,6 +148,28 @@ class OCRBackend:
 
             return result_img_bgr
 
+        def split_image(img: np.ndarray):
+            def is_key_line(line: np.ndarray):
+                return line.min() != 255
+                # for i in range(1, line.shape[0], 8):
+                #     if any(val != 255 for val in line[i]):
+                #         return True
+                # return False
+
+            bias = []
+            imgs = []
+            last_array = np.ndarray([0, img.shape[1], 3], dtype=np.uint8)
+            for i in range(img.shape[0]):
+                if (not is_key_line(img[i])) or i == img.shape[0] - 1:
+                    if last_array.shape[0] > 8:
+                        imgs.append(last_array)
+                        bias.append(i - last_array.shape[0])
+                    last_array = np.ndarray([0, img.shape[1], 3], dtype=np.uint8)
+                    # else:
+                else:
+                    last_array = np.append(last_array, [img[i]], 0)
+            return imgs, bias
+
         def post_process_text(t):
             for k, v in self.WORD_REPLACE.items():
                 t = t.replace(k, v)
@@ -125,8 +178,10 @@ class OCRBackend:
                 return name
             for _name in candidates:
                 if any([(_name.find(char) != -1) for char in name]):
-                    dis1 = edit_distance(_name, name)
-                    dis2 = edit_distance(res, name)
+                    dis1 = edit_distance(_name, name) / (
+                        len(find_lcseque(_name, name)) + 1
+                    )
+                    dis2 = edit_distance(res, name) / (len(find_lcseque(res, name)) + 1)
                     if dis1 < dis2:
                         res = _name
             return res
@@ -135,15 +190,23 @@ class OCRBackend:
         if type(img) == type("1234"):
             img = cv2.imread(img)
         img = self.resize_image_proportionally(img, scale_factor)
-        results = self.read_text(img, allowlist, **kwargs)
-        results = [x for x in results if x[1] != ""]  # 去除空匹配
-        results = [(t[0], post_process_text(t[1]), t[2]) for t in results]
-        for i, result in enumerate(results):
-            results[i] = (
-                [data // scale_factor for data in result[0]],
-                result[1],
-                result[2],
-            )
+        imgs, bias = split_image(img)
+        results = []
+        for img, bia in zip(imgs, bias):
+            _results = self.read_text(img, allowlist, **kwargs)
+            _results = [x for x in _results if x[1] != ""]  # 去除空匹配
+            _results = [(t[0], post_process_text(t[1]), t[2]) for t in _results]
+            for i, result in enumerate(_results):
+                results.append(
+                    (
+                        [
+                            (result[0][0]) // scale_factor,
+                            (result[0][1] + bia) // scale_factor,
+                        ],
+                        result[1],
+                        result[2],
+                    )
+                )
         if self.config.SHOW_OCR_INFO:
             self.logger.debug(f"修正OCR结果：{results}")
 

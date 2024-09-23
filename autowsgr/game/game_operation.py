@@ -337,9 +337,17 @@ def ChangeShip(
         return
 
     timer.click(700, 30, delay=0)
-    timer.wait_image(IMG.choose_ship_image[3], gap=0, after_get_delay=0.1)
-
+    # 等待输入框出现
+    start_time = time.time()
+    while not timer.check_pixel((955, 500), (255, 255, 255), screen_shot=True):
+        time.sleep(0.2)
+        if time.time() - start_time > 10:
+            timer.log_screen(True)
+            raise TimeoutError("等待输入框出现时超时")
+    timer.logger.debug("输入框已经出现")
+    # 输入名字检索
     timer.text(name)
+    # 输入后随便点击获得检索结果
     timer.click(50, 50, delay=0.5)
     time.sleep(0.5)
     # OCR识别舰船

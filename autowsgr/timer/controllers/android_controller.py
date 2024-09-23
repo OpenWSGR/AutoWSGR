@@ -76,10 +76,15 @@ class AndroidController:
     # ========= 输入控制信号 =========
     def text(self, t):
         """输入文本
-
         需要焦点在输入框时才能输入
         """
-        self.logger.debug(f"Typing:{t}")
+        if hasattr(self, "first_type") and self.first_type:
+            self.logger.debug("第一次尝试输入, 测试中...")
+            self.dev.text("T")
+            time.sleep(0.5)
+            self.dev.shell("input keyevent 67")
+            self.first_type = False
+        self.logger.debug(f"正在输入: {t}")
         self.dev.text(t)
 
     def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False):

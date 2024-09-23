@@ -59,6 +59,8 @@ class FightTask(Task):
             quick_repair: 无轮换时是否使用快修
 
             destroy_ship_types: 解装舰船
+
+            all_ships: 所有参与轮换的舰船
         """
         super().__init__(timer)
         self.quick_repair = False
@@ -72,11 +74,17 @@ class FightTask(Task):
         self.fleet_id = 2
         self.times = 1
         self.plan_path = ""
+        self.all_ships = []
         if file_path != "":
             self.__dict__.update(yaml_to_dict(file_path))
         self.__dict__.update(kwargs)
         if any([not self.port.have_ship(ship) for ship in self.all_ships]):
             self.timer.logger.info("含有未注册的舰船, 正在注册中...")
+
+            # 添加到舰船名字列表中
+            for ship in self.all_ships:
+                if ship not in self.timer.ship_names:
+                    self.timer.ship_names.append(ship)
 
             # 检查当前舰队中是否含有未初始化的舰船并将其初始化
             self.timer.goto_game_page("fight_prepare_page")

@@ -1,8 +1,9 @@
 import os
+import subprocess
 import time
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
-from autowsgr.constants.data_roots import MAP_ROOT
+from autowsgr.constants.data_roots import MAP_ROOT, TUNNEL_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
@@ -11,7 +12,12 @@ from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.ocr.ship_name import recognize
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer import Timer
-from autowsgr.utils.api_image import crop_image, crop_rectangle_relative, cv_show_image
+from autowsgr.utils.api_image import (
+    crop_image,
+    crop_rectangle_relative,
+    cv2,
+    cv_show_image,
+)
 from autowsgr.utils.io import count, yaml_to_dict
 
 """决战结构:
@@ -32,13 +38,6 @@ def get_formation(fleet: Fleet, enemy: list):
     return 2
 
 
-def recognize_map(img):
-    cropped_image = crop_rectangle_relative(img, 0.5 - 0.025, 0, 0.05, 1)
-    result = recognize(cropped_image, "123ABCDEFGHIJK")
-    cv_show_image(cropped_image)
-    print(result)
-
-
 class DB:
     def __init__(self, *args, **kwargs):
         self.__dict__.update(kwargs)
@@ -50,7 +49,7 @@ class DB:
 
 
 class DecisiveStats:
-    def __init__(self, timer: Timer, chapter=6, map=1, node="A", version=3) -> None:
+    def __init__(self, timer: Timer, node="A", chapter=6) -> None:
         # 选择战备舰队的点击位置
         self.timer = timer
         self.key_points = [
@@ -69,17 +68,13 @@ class DecisiveStats:
             ]
         ]  # [chapter][map][node(str)] (lst["", enemies])
         self.__dict__.update(
-            yaml_to_dict(
-                os.path.join(MAP_ROOT, "decisive_battle", f"{str(version)}.yaml")
-            )
+            yaml_to_dict(os.path.join(MAP_ROOT, "decisive_battle", f"3.yaml"))
         )
         self.score = 10
         self.level = 1  # 副官等级
         self.exp = 0
         self.need = 0  # 副官升级所需经验
         self.chapter = chapter  # 大关
-        self.map = map  # 小关
-        self.node = node
         self.fleet = Fleet(self.timer)
         self.ships = set()
         self.ship_stats = [-1] * 7
@@ -217,9 +212,6 @@ class DecisiveBattle:
         self,
         timer: Timer,
         chapter=6,
-        map=1,
-        node="A",
-        version=3,
         level1=["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"],
         level2=["U-81", "大青花鱼"],
         flagship_priority=["U-1405", "U-47", "U-96", "U-1206"],
@@ -236,9 +228,6 @@ class DecisiveBattle:
         Args:
             timer (Timer): 记录器
             chapter (int, optional): 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
-            map (int, optional): 当前小关. Defaults to 1.
-            node (str, optional): 当前节点. Defaults to 'A'.
-            version (int, optional): 决战版本. Defaults to 3.
             level1: 第一优先舰队, Defaults Recommend
             level2: 第二优先舰船, Defaults Recommend
             flagship_priority: 旗舰优先级, Defaults Recommend
@@ -254,7 +243,7 @@ class DecisiveBattle:
         self.repair_strategy = repair_level
         self.full_destroy = full_destroy
         assert chapter <= 6 and chapter >= 1
-        self.stats = DecisiveStats(timer, chapter, map, node, version)
+        self.stats = DecisiveStats(timer, chapter)
         if logic is None:
             self.logic = Logic(
                 self.timer, self.stats, level1, level2, flagship_priority
@@ -267,6 +256,42 @@ class DecisiveBattle:
         self.timer.click(458 * 0.75, 665 * 0.75, delay=1.5)
         self.timer.click(638, position[use], delay=1, times=times)
         self.timer.click(488, 405)
+
+    def recognize_map(self):
+        CHECK_POINT = {
+            4: [(0.381, 0.436), (0.596, 0.636), (0.778, 0.521)],
+            5: [(0.418, 0.378), (0.760, 0.477), (0.550, 0.750)],
+            6: [(0.606, 0.375), (0.532, 0.703), (0.862, 0.644)],
+        }
+        check_point = CHECK_POINT[self.stats.chapter]
+        for i, point in enumerate(check_point):
+            if not self.timer.check_pixel(
+                (int(point[0] * 960), int(point[1] * 540)), (250, 244, 253), 30, True
+            ):
+                self.timer.logger.info(f"识别决战地图参数, 第 {i} 小节正在进行")
+                return i
+        self.timer.logger.info(f"识别决战地图参数, 第 3 小节正在进行")
+        return 3
+
+    def recognize_node(self):
+        position = self.timer.wait_images_position(
+            IMG.fight_image[18:20], confidence=0.7
+        )
+        self.timer.logger.debug(f"Ship_ICON position: {position}")
+        cropped_image = crop_rectangle_relative(
+            self.timer.get_screen(), position[0] / 960 - 0.03, 0, 0.042, 1
+        )
+        image_path = os.path.join(TUNNEL_ROOT, "1.PNG")
+        cv2.imwrite(image_path, cropped_image)
+        processor = os.path.join(TUNNEL_ROOT, "process_recognize_map.exe")
+        subprocess.run([processor, image_path])
+        cropped_image = cv2.imread(image_path)
+        with open(os.path.join(TUNNEL_ROOT, "1.out"), mode="r") as f:
+            result = f.read()
+            self.timer.logger.info(f"识别决战地图参数, 第 {result[0]} 节点正在进行")
+            return result[0]
+        # result = recognize(cropped_image, "ABCDEFGHIJK")
+        # return result[0][1]
 
     def detect(self, type="enter_map"):
         """检查当前关卡状态
@@ -459,10 +484,12 @@ class DecisiveBattle:
         self.detect()
 
     def enter_map(self, check_map=True):
+        self.stats.node = "A"
         if check_map:
             self.enter_decisive_battle()
             self._move_chapter()
             stats = self.detect()
+            self.stats.map = self.recognize_map()
             if stats == "refresh":
                 entered = self.reset_chapter()
                 if entered:
@@ -473,6 +500,7 @@ class DecisiveBattle:
                 if self.check_dock_full():
                     return "full_destroy_success"
                 self.timer.click(500, 500, delay=0.25)
+                self.stats.map = 1
                 stats = self.detect()
                 if stats == "cant_fight":
                     raise SystemError("其他关卡正在进行挑战")
@@ -497,10 +525,9 @@ class DecisiveBattle:
                     raise TimeoutError("选择决战舰船失败")
             else:
                 self.timer.click(500, 500, delay=0)
-                if self.check_dock_full():
-                    return "full_destroy_success"
         else:
             self.detect()
+            self.stats.map = self.recognize_map()
             self.timer.click(500, 500, delay=0)
 
         if self.check_dock_full():
@@ -519,7 +546,7 @@ class DecisiveBattle:
         """
         检查船舱是否满，船舱满了自动解装
         """
-        if self.timer.wait_images(IMG.symbol_image[12], timeout=3) is not None:
+        if self.timer.wait_images(IMG.symbol_image[12], timeout=2) is not None:
             if self.full_destroy:
                 self.timer.relative_click(0.38, 0.565)
                 DestroyShip(self.timer)
@@ -567,27 +594,30 @@ class DecisiveBattle:
             except:
                 self.timer.logger.warning("识别副官升级经验数值失败")
         except:
-            if retry > 3:
+            if retry > 1:
                 self.timer.logger.warning("重新读取 exp 失败, 退出逻辑")
                 raise BaseException()  # ToDo: 定义对应的 Exception
 
             self.timer.logger.warning("读取exp失败，五秒后重试")
             self.timer.click(580, 500)
-            time.sleep(5)
+            time.sleep(1)
             self._get_exp(retry + 1)
 
     def _before_fight(self):
+        self.timer.logger.info("Test")
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False:
             self.timer.click(300, 225)  # 选上中下路
             self.timer.ConfirmOperation(must_confirm=1)
         if self.timer.wait_image(
-            [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=5
+            [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=2
         ):
             self.choose()  # 获取战备舰队
         self._get_exp()
-        while self.logic._up_level():
-            self.up_level_assistant()
-            self._get_exp()
+        self.stats.node = self.recognize_node()
+        # 升级副官, 现在这功能坏掉了
+        # while self.logic._up_level():
+        #     self.up_level_assistant()
+        #     self._get_exp()
         if self.logic._use_skill():
             self.use_skill(self.logic._use_skill())
 
@@ -610,11 +640,33 @@ class DecisiveBattle:
         self.timer.logger.info(self.stats.ship_stats)
 
     def _check_fleet(self):
+        self.stats.ships.clear()
         self.go_fleet_page()
         self.stats.fleet.detect()
-        for ship in self.stats.fleet.ships:
+        for ship in self.stats.fleet.ships[1:]:
             self.stats.ships.add(ship)
         self.stats.ship_stats = detect_ship_stats(self.timer)
+        self.timer.relative_click(0.1, 0.5)
+        res = self.timer.wait_images(
+            IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]],
+            after_get_delay=0.4,
+            gap=0,
+            timeout=16,
+        )
+        if res == None:
+            raise TimeoutError("选择舰船时点击超时")
+        ships = self.timer.recognize_ship(
+            self.timer.get_screen()[:, :1048], self.timer.ship_names
+        )
+        self.timer.logger.info(f"其它可用舰船：{[item[1] for item in ships]}")
+        for ship in ships:
+            self.stats.ships.add(ship[1])
+        self.timer.relative_click(0.05, 0.05)
+        res = self.timer.wait_images(
+            IMG.identify_images["fight_prepare_page"],
+            gap=0.03,
+            after_get_delay=0.2,
+        )
 
     def _during_fight(self):
         formation = get_formation(self.stats.fleet, self.stats.enemy_now)
