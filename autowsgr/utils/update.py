@@ -42,7 +42,7 @@ def check_for_updates():
             # 选择使用哪个源更新,输出按钮回车选择
             choice = get_user_choice(update_source)
             update_library(choice)
-            recent_updates = get_recent_updates_from_tuna(latest_version)
+            recent_updates = get_recent_updates_from_pypi(latest_version)
             print("更新内容:\n" + recent_updates)
 
             print("更新完成，稍后将自动退出，请重新启动脚本")
@@ -97,7 +97,7 @@ def update_library(choice="PyPI"):
     subprocess.run(choice_list[choice])
 
 
-def get_recent_updates_from_tuna(latest_version):
+def get_recent_updates_from_pypi(latest_version):
 
     url = f"https://pypi.org/project/autowsgr/{latest_version}/#description"
     response = requests.get(url)

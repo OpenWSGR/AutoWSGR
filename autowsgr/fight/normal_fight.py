@@ -268,8 +268,7 @@ class NormalFightPlan(FightPlan):
             self._change_fight_map(self.chapter, self.map)
             self.timer.port.chapter = self.chapter
             self.timer.port.map = self.map
-        # try:
-        # assert self.timer.wait_images(self.Info.map_image) != None
+        self.timer.wait_images(self.Info.map_image) != None
         self._go_fight_prepare_page()
         MoveTeam(self.timer, self.fleet_id)
         if (
@@ -281,11 +280,6 @@ class NormalFightPlan(FightPlan):
 
         self.Info.ship_stats = detect_ship_stats(self.timer)
         quick_repair(self.timer, self.repair_mode, self.Info.ship_stats)
-        # 满级更换舰船
-        # if self.config.daily_automation["change_ship_level_max"]:
-        # for i in range(1, 7):
-        # if self.timer.ship_level[i] >= 110:
-        # ChangeShip(self.timer, ship_id=i, name="U-47", fleet_id=None)  # name 为舰船名字,后续可以改为配置文件
 
         # TODO: 这里应该只catch network error，太宽的catch会导致其他错误被隐藏
         # except AssertionError:
@@ -460,7 +454,8 @@ class NormalFightPlan(FightPlan):
             time.sleep(0.15)
             self._move_chapter(target_chapter, now_chapter)
         except:
-            self.logger.error(
+
+            self.logger.warning(
                 f"切换章节失败 target_chapter: {target_chapter}   now: {now_chapter}"
             )
             if self.timer.process_bad_network("move_chapter"):
