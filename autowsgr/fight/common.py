@@ -335,7 +335,7 @@ class FightPlan(ABC):
                 self.timer.goto_game_page("map_page")
 
             fight_flag = self.run()
-            last_flag = fight_flag != "SL"
+            fight_flag != "SL"
 
             if fight_flag not in ["SL", "success"]:
                 if fight_flag == "dock is full":
@@ -368,7 +368,7 @@ class FightPlan(ABC):
             if self.config.dock_full_destroy:
                 self.timer.relative_click(0.38, 0.565)
                 DestroyShip(self.timer)
-                return self.run(False)
+                return self.run()
             else:
                 return ret
         elif ret == literals.FIGHT_END_FLAG:

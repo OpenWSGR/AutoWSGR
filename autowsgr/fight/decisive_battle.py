@@ -49,7 +49,7 @@ class DB:
 
 
 class DecisiveStats:
-    def __init__(self, timer: Timer, node="A", chapter=6) -> None:
+    def __init__(self, timer: Timer, chapter=6) -> None:
         # 选择战备舰队的点击位置
         self.timer = timer
         self.key_points = [

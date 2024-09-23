@@ -11,8 +11,6 @@ timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_setting
 decisive_battle = DecisiveBattle(
     timer,
     chapter=5,  # 设置为5则代表打E5，设置为6则代表打E6
-    map=1,  # 要打的第几个小章节，一共有三个
-    node="A",  # 起始点，A则为从A点开始打，如果达到了E点则设置为E
     level1=[
         "鲃鱼",
         "U-1206",

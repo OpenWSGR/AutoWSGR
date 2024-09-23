@@ -2,6 +2,7 @@ import datetime
 import time
 
 from autowsgr.constants import literals
+from autowsgr.constants.custom_exceptions import ShipNotFoundErr
 from autowsgr.fight.normal_fight import NormalFightPlan
 from autowsgr.game.build import BuildManager
 from autowsgr.game.game_operation import (
@@ -107,8 +108,11 @@ class FightTask(Task):
                     try:
                         ChangeShip(self.timer, self.fleet_id, 1, ship)
                         quick_repair(timer, 3, switch_back=True)
-                    except:
-                        raise BaseException(f"未找到 {ship} 舰船")
+                    except ShipNotFoundErr as e:
+                        self.timer.relative_click(0.05, 0.05)
+                        self.timer.logger.warning(f"舰船 {ship} 注册失败, 放弃注册")
+                        continue
+                        # raise BaseException(f"未找到 {ship} 舰船")
                     tmp = self.port.register_ship(ship)
                     tmp.statu = detect_ship_stats(self.timer)[1]
                     fleet.detect()
@@ -122,6 +126,7 @@ class FightTask(Task):
             fleet = [
                 None,
             ]
+            ships = [ship for ship in ships if self.port.have_ship(ship)]
             ships = set(ships)
             for i in range(1, self.ship_count + 1):
                 fleet.append(None)
@@ -232,12 +237,15 @@ class FightTask(Task):
             ]
         self.times -= 1
         # 更新舰船状态
+        self.timer.wait_pages("map_page")
         self.timer.goto_game_page("fight_prepare_page")
         MoveTeam(self.timer, self.fleet_id)
         fleet = Fleet(self.timer)
         fleet.detect()
         ship_stats = detect_ship_stats(self.timer)
         for i, name in enumerate(fleet.ships):
+            if name == None:
+                continue
             ship = self.port.get_ship_by_name(name)
             if ship is not None:
                 ship.level = fleet.levels[i]

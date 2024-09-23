@@ -1,6 +1,6 @@
 import time
 
-from autowsgr.constants.custom_exceptions import ImageNotFoundErr
+from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import SHIP_TYPE_CLICK
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
@@ -359,13 +359,16 @@ def ChangeShip(
     found_ship = next((ship for ship in ship_info if ship[1] == name), None)
     # 点击舰船
     if found_ship is None:
-        timer.logger.warning(f"Can't find ship {name},ocr result:{ship_info}")
-        # raise ValueError(f"Can't find ship {name}")
-        timer.logger.debug("Try to click the first ship")
-        if ship_stats[ship_id] == -1:
-            timer.click(83, 167, delay=0)
+        timer.logger.error(f"Can't find ship {name}, ocr result:{ship_info}")
+        if len(ship_info) == 0:
+            timer.logger.warning("无法查找到任何舰船, 请检查舰船名是否有错误")
+            raise ShipNotFoundErr()
         else:
-            timer.click(183, 167, delay=0)
+            timer.logger.debug("Try to click the first ship")
+            if ship_stats[ship_id] == -1:
+                timer.click(83, 167, delay=0)
+            else:
+                timer.click(183, 167, delay=0)
     else:
         center = found_ship[0]
         rel_center = absolute_to_relative(center, timer.resolution)
