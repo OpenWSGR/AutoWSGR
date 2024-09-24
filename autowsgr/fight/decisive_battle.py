@@ -273,7 +273,7 @@ class DecisiveBattle:
         self.timer.logger.info(f"识别决战地图参数, 第 3 小节正在进行")
         return 3
 
-    def recognize_node(self):
+    def recognize_node(self, retry=0):
         position = self.timer.wait_images_position(
             IMG.fight_image[18:20], confidence=0.7
         )
@@ -288,8 +288,18 @@ class DecisiveBattle:
         cropped_image = cv2.imread(image_path)
         with open(os.path.join(TUNNEL_ROOT, "1.out"), mode="r") as f:
             result = f.read()
-            self.timer.logger.info(f"识别决战地图参数, 第 {result[0]} 节点正在进行")
-            return result[0]
+            if result != "":
+                self.timer.logger.info(f"识别决战地图参数, 第 {result[0]} 节点正在进行")
+                return result[0]
+            else:
+                if retry > 3:
+                    self.timer.logger.warning("识别决战地图参数失败, 退出逻辑")
+                    raise BaseException()
+                else:
+                    self.timer.logger.warning(
+                        f"识别决战地图参数失败, 正在重试第 {retry + 1} 次"
+                    )
+                    return self.recognize_node(retry + 1)
         # result = recognize(cropped_image, "ABCDEFGHIJK")
         # return result[0][1]
 
@@ -423,6 +433,9 @@ class DecisiveBattle:
         )
         if len(choose) == 0 and refreshed == False:
             self.timer.click(380, 500)  # 刷新备选舰船
+            self.timer.wait_image(
+                [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=2
+            )
             return self.choose(True)
 
         for target in choose:
