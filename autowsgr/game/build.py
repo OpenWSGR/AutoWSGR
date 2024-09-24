@@ -101,7 +101,7 @@ class BuildManager:
             datetime.timedelta: 剩余时间
         """
         valid_times = [eta for eta in self.slot_eta[type] if eta not in (-1, None)]
-        print(valid_times)
+        self.timer.logger.debug(valid_times)
         return (
             min(valid_times) - datetime.datetime.now()
             if valid_times

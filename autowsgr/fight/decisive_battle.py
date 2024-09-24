@@ -436,6 +436,7 @@ class DecisiveBattle:
             self.timer.wait_image(
                 [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]], timeout=2
             )
+            self.timer.logger.info("刷新备选舰船")
             return self.choose(True)
 
         for target in choose:
@@ -473,11 +474,11 @@ class DecisiveBattle:
         self.timer.click(360, 300)
 
     def _get_chapter(self):
-        CHAPTER_AREA = ((0.818, 0.867), (0.871, 0.826))
+        CHAPTER_AREA = ((0.818, 0.867), (0.875, 0.81))
         text = self.timer.recognize(
             crop_image(self.timer.get_screen(), *CHAPTER_AREA),
             allowlist="Ex-0123456789",
-            rgb_select=(247, 221, 82),
+            # rgb_select=(247, 221, 82),
             tolerance=50,
         )[1]
         return int(text[-1])
@@ -548,7 +549,7 @@ class DecisiveBattle:
 
         res = self.timer.wait_images(
             [IMG.decisive_battle_image[1], IMG.decisive_battle_image[3]],
-            timeout=10,
+            timeout=5,
             gap=0.03,
         )
         if res is None:
@@ -580,44 +581,32 @@ class DecisiveBattle:
         try:
             self.stats.exp = 0
             self.stats.need = 20
+            src = self.timer.recognize(
+                crop_image(self.timer.get_screen(), *EXP_AREA),
+                allowlist="Lv.(/)0123456789",
+            )[1]
             try:
-                src = self.timer.recognize(
-                    crop_image(self.timer.get_screen(), *EXP_AREA),
-                    allowlist="Lv.(/)0123456789",
-                )[1]
-                try:
-                    index1 = src.index("(")
-                except ValueError:
-                    index1 = float("inf")  # 如果没有找到，设置为无穷大
-
-                try:
-                    index2 = src.index("（")
-                except ValueError:
-                    index2 = float("inf")  # 如果没有找到，设置为无穷大
-                i1 = min(index1, index2)
-                if i1 == float("inf"):
-                    raise ValueError("未找到 '(' 或 '（'")
-                i2 = src.index("/")
-                src = src.rstrip(")）")
-                self.stats.exp = int(src[i1 + 1 : i2])
-                self.stats.need = int(src[i2 + 1 :])
-                self.timer.logger.debug(
-                    f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}"
-                )
-            except:
-                self.timer.logger.warning("识别副官升级经验数值失败")
+                index1 = src.index("(")
+            except ValueError:
+                index1 = float("inf")  # 如果没有找到，设置为无穷大
+            try:
+                index2 = src.index("（")
+            except ValueError:
+                index2 = float("inf")  # 如果没有找到，设置为无穷大
+            i1 = min(index1, index2)
+            if i1 == float("inf"):
+                raise ValueError("未找到 '(' 或 '（'")
+            i2 = src.index("/")
+            src = src.rstrip(")）")
+            self.stats.exp = int(src[i1 + 1 : i2])
+            self.stats.need = int(src[i2 + 1 :])
+            self.timer.logger.debug(
+                f"当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}"
+            )
         except:
-            if retry > 1:
-                self.timer.logger.warning("重新读取 exp 失败, 退出逻辑")
-                raise BaseException()  # ToDo: 定义对应的 Exception
-
-            self.timer.logger.warning("读取exp失败，五秒后重试")
-            self.timer.click(580, 500)
-            time.sleep(1)
-            self._get_exp(retry + 1)
+            self.timer.logger.warning("识别副官升级经验数值失败")
 
     def _before_fight(self):
-        self.timer.logger.info("Test")
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1) != False:
             self.timer.click(300, 225)  # 选上中下路
             self.timer.ConfirmOperation(must_confirm=1)
@@ -626,6 +615,7 @@ class DecisiveBattle:
         ):
             self.choose()  # 获取战备舰队
         self._get_exp()
+        self.timer.wait_image(IMG.decisive_battle_image[9])
         self.stats.node = self.recognize_node()
         # 升级副官, 现在这功能坏掉了
         # while self.logic._up_level():

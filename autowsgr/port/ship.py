@@ -134,7 +134,6 @@ class Fleet:
             self.timer.logger.info(f"更改编队可用舰船：{[item[1] for item in ships]}")
             for ship in ships:
                 if ship[1] == ship_name:
-                    print(ship[0])
                     rel_center = absolute_to_relative(ship[0], (1280, 720))
                     self.timer.relative_click(*rel_center)
                     break
