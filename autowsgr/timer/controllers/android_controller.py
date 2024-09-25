@@ -120,7 +120,7 @@ class AndroidController:
             self.shell(f"input tap {str(x)} {str(y)}")
             time.sleep(delay * self.config.DELAY)
 
-    def click(self, x, y, times=1, delay=0.1, enable_subprocess=False, *args, **kwargs):
+    def click(self, x, y, times=1, delay=0.3, enable_subprocess=False, *args, **kwargs):
         """点击模拟器相对坐标 (x,y).
         Args:
             x,y:相对横坐标  (相对 960x540 屏幕)
@@ -423,7 +423,7 @@ class AndroidController:
         Returns:
             bool:如果找到图片返回匹配位置，未找到则返回None
         """
-        return self.click_image(images, must_click, timeout)
+        return self.click_image(images, must_click, timeout, delay)
 
     def log_screen(
         self,

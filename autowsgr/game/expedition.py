@@ -38,6 +38,7 @@ class Expedition:
             bool: 是否进行了远征操作
         """
         self.update(force=force)
+        self.timer.logger.debug("尚未有已完成的远征任务")
         if self.is_ready:
             self.timer.goto_game_page("expedition_page")
             flag = try_to_get_expedition(self.timer)

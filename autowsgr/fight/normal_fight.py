@@ -270,8 +270,9 @@ class NormalFightPlan(FightPlan):
             self.timer.port.map = self.map
         # if not hasattr(self, "level_checked"):
         self.timer.wait_images(
-            [self.Info.map_image] + [IMG.identify_images["fight_prepare_page"]]
-        ) != None
+            [self.Info.map_image] + [IMG.identify_images["fight_prepare_page"]],
+            timeout=3,
+        )
         self._go_fight_prepare_page()
         MoveTeam(self.timer, self.fleet_id)
         if (

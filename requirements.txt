@@ -11,7 +11,6 @@ opencv-python==4.5.4.60
 paddleocr==2.8.1
 paddlepaddle==2.6.1
 pre-commit
-python-bidi==0.4.2
 thefuzz
 wheel
 loguru

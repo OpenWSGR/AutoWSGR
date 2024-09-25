@@ -243,7 +243,7 @@ def quick_repair(
 
 def get_rewards(timer: Timer):
     """检查任务情况,如果可以领取奖励则领取"""
-    timer.goto_game_page("main_page")
+    timer.go_main_page()
     if not timer.check_pixel((694, 457), bgr_color=(45, 89, 255)):
         return "no"
     timer.goto_game_page("mission_page")
