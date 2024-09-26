@@ -77,7 +77,7 @@ class DailyOperation:
                 plan = self.fight_plans[task_id]
                 ret = plan.run()
 
-                if ret == literals.OPERATION_SUCCESS_FLAG:
+                if ret == literals.OPERATION_SUCCESS_FLAG or ret == "SL":
                     self.fight_complete_times[task_id][0] += 1
                 elif ret == literals.DOCK_FULL_FLAG:
                     break  # 不解装则结束出征
