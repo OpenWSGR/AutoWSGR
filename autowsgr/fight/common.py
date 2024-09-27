@@ -502,15 +502,11 @@ class FightPlan(ABC):
     def _SL(self):
         self.timer.logger.debug("正在执行SL操作")
         # 重置地图节点信息
-        self.reset_chapter_map()
+        self.timer.reset_chapter_map()
 
         self.timer.restart()
         self.timer.go_main_page()
         self.timer.set_page("main_page")
-
-    def reset_chapter_map(self):
-        self.timer.port.chapter = None
-        self.timer.port.map = None
 
 
 class DecisionBlock:

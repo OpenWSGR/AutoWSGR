@@ -48,7 +48,7 @@ class Resources:
         timer = self.timer
         if name is not None:
             if name in ("normal", "oil", "ammo", "steel", "aluminum"):
-                self.timer.goto_game_page("main_page")
+                self.timer.go_main_page()
                 self.detect_resources()
             if name == "quick_repair":
                 self.timer.goto_game_page("choose_repair_page")
@@ -95,7 +95,7 @@ def get_resources(timer: Timer):
     """根据 timer 所处界面获取对应资源数据
     部分 case 会没掉,请重写
     """
-    timer.goto_game_page("main_page")
+    timer.go_main_page()
     timer.update_screen()
     image = timer.screen
     ret = {}

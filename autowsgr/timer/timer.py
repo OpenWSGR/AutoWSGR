@@ -297,6 +297,10 @@ class Timer(AndroidController, WindowsController):
             != None
         )
 
+    def reset_chapter_map(self):
+        self.port.chapter = None
+        self.port.map = None
+
     def process_bad_network(self, extra_info="", timeout=10):
         """判断并处理网络状况问题
         Returns:
@@ -327,6 +331,7 @@ class Timer(AndroidController, WindowsController):
                     [IMG.symbol_image[10]] + IMG.error_image["bad_network"], timeout=5
                 ):
                     self.logger.debug("ok network problem solved")
+                    self.reset_chapter_map()
                     return True
 
                 if time.time() - start_time > 1800:
@@ -514,7 +519,7 @@ class Timer(AndroidController, WindowsController):
             else:
                 self.logger.error("Unknown error,can't go main page")
                 raise ValueError("Error,Couldn't go main page")
-
+        self.reset_chapter_map()
         self.now_page = self.ui.get_node_by_name("main_page")
         if len(List) == 0:
             List = IMG.back_buttons[1:] + ExList

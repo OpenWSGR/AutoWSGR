@@ -21,7 +21,7 @@ class Expedition:
             "decisive_battle_entrance",
         ]:
             if force or time.time() - self.last_check > 1800:
-                self.timer.goto_game_page("main_page")
+                self.timer.go_main_page()
             if self.timer.now_page.name == "main_page":
                 self.is_ready = self.timer.check_pixel(
                     (933, 454), bgr_color=(45, 89, 255)
