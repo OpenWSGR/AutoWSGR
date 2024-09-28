@@ -113,7 +113,7 @@ class Logger:
             name (str): 图片文件名
         """
         if name is None:
-            name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         if "png" not in name and "PNG" not in name:
             name += ".PNG"

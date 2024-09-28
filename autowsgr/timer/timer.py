@@ -17,6 +17,7 @@ from autowsgr.port.common import Port
 from autowsgr.timer.backends import EasyocrBackend, OCRBackend, PaddleOCRBackend
 from autowsgr.timer.controllers import AndroidController, WindowsController
 from autowsgr.utils.io import yaml_to_dict
+from autowsgr.utils.logger import Logger
 from autowsgr.utils.operator import unzip_element
 
 
@@ -41,7 +42,7 @@ class Timer(AndroidController, WindowsController):
 
     last_expedition_check_time = time.time()
 
-    def __init__(self, config, logger):
+    def __init__(self, config, logger: Logger):
         self.port = Port(logger)
         self.config = config
         self.logger = logger
