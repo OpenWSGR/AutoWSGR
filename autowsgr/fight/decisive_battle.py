@@ -515,9 +515,6 @@ class DecisiveBattle:
                     return "full_destroy_success"
                 self.timer.click(500, 500, delay=0.25)
                 self.stats.map = 1
-                stats = self.detect()
-                if stats == "cant_fight":
-                    raise SystemError("其他关卡正在进行挑战")
                 for i in range(5):
                     self.timer.click_image(
                         IMG.decisive_battle_image[7], timeout=12, must_click=True
