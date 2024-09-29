@@ -125,10 +125,10 @@ def get_loot_and_ship(timer: Timer):
             else:
                 # 如果ocr把"/"识别为"1",则使用下列方法
                 if key == "loot":
-                    ret[key] = result[1][0:-3]
+                    ret[key] = int(str(result[1])[:-3])
                     ret[key + "_max"] = 50
                 if key == "ship":
-                    ret[key] = result[1][0:-4]
+                    ret[key] = int(str(result[1])[:-4])
                     ret[key + "_max"] = 500
         else:
             timer.logger.warning(f"读取{key}数量失败")
