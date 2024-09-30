@@ -354,11 +354,13 @@ class AndroidController:
             raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
         if images is None:
             return None
-
         if isinstance(images, MyTemplate):
             images = [(0, images)]
         elif isinstance(images, (list, Tuple)) and isinstance(images[0], MyTemplate):
-            images = list(enumerate(images))
+            images = list(enumerate(images))  # 把列表转化为元组
+        # TODO: 后续优化此内容，当图片结尾有数字的时候会生成一个列表，也就是列表里面嵌套列表，先前不支持此类型
+        elif isinstance(images, (list, Tuple)) and isinstance(images[0], (list, Tuple)):
+            images = [(i, image) for i, image in enumerate(images)]
         elif isinstance(images, dict):
             images = images.items()
         else:

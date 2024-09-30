@@ -3,31 +3,24 @@ import time
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import IMG_ROOT
-from autowsgr.constants.image_templates import (
-    IMG,
-    make_dir_templates,
-    make_dir_templates_without_number,
-)
+from autowsgr.constants.image_templates import IMG
 from autowsgr.timer import Timer
 from autowsgr.utils.math_functions import CalcDis
 
 
 class Event:
     def __init__(self, timer: Timer, event_name):
-        image_dir = os.path.join(IMG_ROOT, "event")
-        common_dir = os.path.join(IMG_ROOT, "event", "common")
-        enemy_dir = os.path.join(IMG_ROOT, "event", "enemy")
-        event_dir = os.path.join(image_dir, event_name)
         self.timer = timer
         self.logger = timer.logger
 
-        self.event_image = make_dir_templates(event_dir)
-        self.common_image = make_dir_templates_without_number(common_dir)
-        self.enemy_image = make_dir_templates_without_number(enemy_dir)
+        self.event_image = IMG.event[event_name]
+        self.common_image = IMG.event["common"]
+        self.enemy_image = IMG.event["enemy"]
 
-        self.common_image["monster"] = (
-            self.common_image["little_monster"] + self.common_image["big_monster"]
-        )
+        self.common_image["monster"] = [
+            self.common_image.little_monster,
+            self.common_image.big_monster,
+        ]
 
     def _go_map_page(self):
         self.timer.go_main_page()
@@ -40,9 +33,7 @@ class Event:
         这里同时有检查 _go_map_page 是否成功的功能
         如果未能检测到难度图标，但是检测到进入活动地图，默认没有通过简单难度，返回简单 0.
         """
-        res = self.timer.wait_images(
-            self.common_image["hard"] + self.common_image["easy"]
-        )
+        res = self.timer.wait_images(self.common_image.hard + self.common_image.easy)
         if res is None:
             self.logger.error("ImageNotFoundErr: difficulty image not found")
             if self.timer.wait_image(self.event_image[2]):
@@ -53,7 +44,7 @@ class Event:
             self.timer.log_screen()
             raise ImageNotFoundErr()
 
-        if self.timer.image_exist(self.common_image["hard"], need_screen_shot=False):
+        if self.timer.image_exist(self.common_image.hard, need_screen_shot=False):
             return 0
         else:
             return 1
@@ -65,11 +56,11 @@ class Event:
         if r_difficulty != difficulty:
             time.sleep(0.2)
             if int(chapter in "Hh"):
-                if not self.timer.click_image(self.common_image["hard"]):
+                if not self.timer.click_image(self.common_image.hard):
                     self.logger.error("请检查是否通关简单难度")
                     raise ImageNotFoundErr("Can't change difficulty")
             else:
-                self.timer.click_image(self.common_image["easy"])
+                self.timer.click_image(self.common_image.easy)
 
             if self.get_difficulty() != r_difficulty:
                 if retry:
