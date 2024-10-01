@@ -1,9 +1,9 @@
 # ========== 游戏设置 ==========
 emulator:
-  type: "雷电" # 模拟器类型
+  type: "雷电" # 模拟器类型,"蓝叠 Hyper-V","雷电","MuMu","云手机","其他" , mumu模拟器现在截图效率较低，后续会进行优化
   start_cmd: "" # 模拟器的地址，如果留空则自动从注册表中查询 示例: "C:/leidian/LDPlayer9/dnplayer.exe"
-  config_file: ""
-  emulator_name: emulator-5554 # 雷电模拟器使用多开器请填写该项, 不多开默认为 "emulator-5554"
+  config_file: "" # 蓝叠模拟器才需要填写，其他模拟器留空
+  emulator_name: emulator-5554 # 模拟器链接地址,雷电模拟器默认为 "emulator-5554"，mumu模拟器默认为 "127.0.0.1:16384"
 
 game_app: "官服" #官服 小米 应用宝
 check_update: False # 是否在启动脚本时检查更新
@@ -50,8 +50,11 @@ daily_automation:
   auto_exercise: True #自动打完每日的三次演习
 
   auto_normal_fight: True # 按自定义任务进行常规战
-  normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。plan名参考"plans/normal_fight/"
-    - [8-5AI, 2, 0]
+  normal_fight_tasks: # 自动出征任务用列表 [plan名，舰队号，目标成功次数] 表示，按顺序从上往下执行。更多的plan名参考"plans/normal_fight/"，如果不想执行某个任务可以使用“#”注释掉
+    - [9-3AD, 2, 10]  # 打9-3AD两点，用第二舰队，出击十次
+    - [9-1BF-only5ss, 2, 0] # 打9-1BF两点，只打5潜艇，用第二舰队，出击零次
+    - [9-1B-only5ss, 3, 10000] # 打9-1B一点，只打5潜艇，用第三舰队，出击10000次
+    - [8-5AI-only1DD, 4, 10000] # 打8-5AI两点，只打单驱逐阵容，用第四舰队，出击10000次
 
 # =========== 浴室信息配置 ===========
 bath:

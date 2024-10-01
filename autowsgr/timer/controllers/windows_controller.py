@@ -115,6 +115,12 @@ class WindowsController:
                 if line.startswith("bst.instance.Pie64.status.adb_port="):
                     port = line.split("=")[-1].strip()[1:-1]
                     dev_name = f"ANDROID:///127.0.0.1:{port}"
+        elif self.emulator == "MuMu":
+            dev_name = f"Android:///{self.emulator_name}"
+        elif self.emulator == "云手机":
+            dev_name = f"Android:///{self.emulator_name}"
+        else:
+            dev_name = f"Android:///{self.emulator_name}"
 
         from logging import ERROR, getLogger
 
@@ -123,6 +129,7 @@ class WindowsController:
         start_time = time.time()
         while time.time() - start_time <= 30:
             try:
+                print(dev_name)
                 dev = connect_device(dev_name)
                 self.logger.info("Android Connected!")
                 return dev
@@ -141,6 +148,8 @@ class WindowsController:
             raw_res = self.ldconsole("isrunning")
             self.logger.debug("Emulator status: " + raw_res)
             return raw_res == "running"
+        elif self.emulator == "云手机":
+            return True
         else:
             raw_res = check_output(
                 f'tasklist /fi "ImageName eq {self.exe_name}'
@@ -155,8 +164,14 @@ class WindowsController:
                 self.ldconsole("quit")
             elif self.emulator == "蓝叠 Hyper-V":
                 subprocess.run(["taskkill", "-f", "-im", self.exe_name])
+            elif self.emulator == "MuMu":
+                subprocess.run(["taskkill", "-f", "-im", self.exe_name])
+            elif self.emulator == "云手机":
+                self.logger.info("云手机无需关闭")
+            elif self.emulator == "其他":
+                subprocess.run(["taskkill", "-f", "-im", self.exe_name])
         except:
-            pass
+            self.logger.warning("Failed to kill emulator!")
 
     def start_android(self):
         try:
@@ -164,6 +179,12 @@ class WindowsController:
                 self.ldconsole("launch")
                 self.logger.info("Emulator launched")
             elif self.emulator == "蓝叠 Hyper-V":
+                os.popen(self.start_cmd)
+            elif self.emulator == "MuMu":
+                os.popen(self.start_cmd)
+            elif self.emulator == "云手机":
+                self.logger.info("云手机无需启动")
+            elif self.emulator == "其他":
                 os.popen(self.start_cmd)
             start_time = time.time()
             while not self.is_android_online():
