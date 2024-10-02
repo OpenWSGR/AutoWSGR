@@ -22,9 +22,6 @@ class WindowsController:
         self.emulator = config["type"]  # 模拟器类型
         self.emulator_name = config["emulator_name"]
         self.start_cmd = config["start_cmd"]  # 模拟器启动命令
-        if self.emulator == "蓝叠 Hyper-V":
-            assert config["config_file"], "Bluestacks 需要提供配置文件"
-            self.emulator_config_file = config["config_file"]
 
         self.exe_name = os.path.basename(self.start_cmd)  # 自动获得模拟器的进程名
         if self.emulator == "雷电":
@@ -109,12 +106,7 @@ class WindowsController:
         if self.emulator == "雷电":
             dev_name = f"ANDROID:///{self.emulator_name}"
         elif self.emulator == "蓝叠 Hyper-V":
-            with open(self.emulator_config_file, "r") as f:
-                lines = f.readlines()
-            for line in lines:
-                if line.startswith("bst.instance.Pie64.status.adb_port="):
-                    port = line.split("=")[-1].strip()[1:-1]
-                    dev_name = f"ANDROID:///127.0.0.1:{port}"
+            dev_name = f"ANDROID:///{self.emulator_name}"
         elif self.emulator == "MuMu":
             dev_name = f"Android:///{self.emulator_name}"
         elif self.emulator == "云手机":

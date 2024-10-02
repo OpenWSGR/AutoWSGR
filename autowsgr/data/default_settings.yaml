@@ -2,7 +2,6 @@
 emulator:
   type: "雷电" # 模拟器类型,"蓝叠 Hyper-V","雷电","MuMu","云手机","其他" , mumu模拟器现在截图效率较低，后续会进行优化
   start_cmd: "" # 模拟器的地址，如果留空则自动从注册表中查询 示例: "C:/leidian/LDPlayer9/dnplayer.exe"
-  config_file: "" # 蓝叠模拟器才需要填写，其他模拟器留空
   emulator_name: emulator-5554 # 模拟器链接地址,雷电模拟器默认为 "emulator-5554"，mumu模拟器默认为 "127.0.0.1:16384"
 
 game_app: "官服" #官服 小米 应用宝

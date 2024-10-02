@@ -1,3 +1,4 @@
+# 任务调度功能，设置好后可以轮换练船，理论上可以无限轮换，直到手动停止
 import os
 
 from autowsgr.port.task_runner import FightTask, TaskRunner
