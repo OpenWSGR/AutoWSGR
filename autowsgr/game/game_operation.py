@@ -311,7 +311,7 @@ def ChangeShip(
     timer: Timer, fleet_id, ship_id=None, name=None, pre=None, ship_stats=None
 ):
     """切换舰船(不支持第一舰队)"""
-    if fleet_id is not None:
+    if fleet_id is not None and not timer.identify_page("fight_prepare_page"):
         timer.goto_game_page("fight_prepare_page")
         MoveTeam(timer, fleet_id)
         if fleet_id >= 5:
@@ -390,7 +390,7 @@ def ChangeShips(timer: Timer, fleet_id, ship_names):
 
     """
     timer.logger.info(f"Change Fleet {fleet_id} to {ship_names}")
-    if fleet_id is not None:
+    if fleet_id is not None and not timer.identify_page("fight_prepare_page"):
         timer.goto_game_page("fight_prepare_page")
         MoveTeam(timer, fleet_id)
     if fleet_id == 1:

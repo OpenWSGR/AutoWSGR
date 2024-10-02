@@ -461,8 +461,18 @@ class FightPlan(ABC):
         try:
             self.Info.update_state()
             state = self.Info.state
+            self.timer.keep_try_update_fight = 0
         except ImageNotFoundErr as _:
             # 处理点击延迟或者网络波动导致的匹配失败
+            if (
+                hasattr(self.timer, "keep_try_update_fight")
+                and self.timer.keep_try_update_fight > 3
+            ):
+                raise _
+            elif hasattr(self.timer, "keep_try_update_fight"):
+                self.timer.keep_try_update_fight += 1
+            else:
+                self.timer.keep_try_update_fight = 1
             self.logger.warning("Image Match Failed, Trying to Process")
             if self.timer.is_other_device_login():
                 self.timer.process_other_device_login()  # TODO: 处理其他设备登录

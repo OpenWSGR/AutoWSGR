@@ -34,9 +34,11 @@ class Task:
 
 
 class FightTask(Task):
-    def __init__(self, timer: Timer, file_path="", *args, **kwargs) -> None:
+    def __init__(self, timer: Timer, file_path="", plan=None, *args, **kwargs) -> None:
         """
         Args:
+            plan(FightPlan): 使用哪个战斗方案模板, 默认为 None, 根据 plan_path 注册为 NormalFightPlan, 活动需要提供 plan 实例
+
             banned_ship (list(list(str))): 1-index 的列表, banned_ship[i] 表示第 i 号位不允许的舰船
 
             default_level_limit: 默认等级限制(2-111 之间的整数)
@@ -64,6 +66,7 @@ class FightTask(Task):
             all_ships: 所有参与轮换的舰船
         """
         super().__init__(timer)
+        self.plan = plan
         self.quick_repair = False
         self.destroy_ship_types = None
         self.default_level_limit = 2
@@ -212,8 +215,13 @@ class FightTask(Task):
                 )
             ]
             return False, tasks
-
-        plan = NormalFightPlan(self.timer, self.plan_path, self.fleet_id, fleet=fleet)
+        if self.plan == None:
+            plan = NormalFightPlan(
+                self.timer, self.plan_path, self.fleet_id, fleet=fleet
+            )
+        else:
+            plan = self.plan
+        plan.fleet = fleet
         plan.repair_mode = [3] * 6
         # 设置战时快修
         if statu == 2:
@@ -237,7 +245,11 @@ class FightTask(Task):
             ]
         self.times -= 1
         # 更新舰船状态
-        self.timer.wait_pages("map_page")
+        if self.plan == None:
+            self.timer.wait_pages("map_page")
+        else:
+            pass
+        plan._go_fight_prepare_page()
         self.timer.goto_game_page("fight_prepare_page")
         MoveTeam(self.timer, self.fleet_id)
         fleet = Fleet(self.timer)
