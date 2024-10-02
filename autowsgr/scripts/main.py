@@ -108,6 +108,28 @@ def get_emulator_path(emulator_type):
                 print("Path not found")
             finally:
                 winreg.CloseKey(key)
+        elif emulator_type == "MuMu":
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0",
+            )
+            try:
+                path, _ = winreg.QueryValueEx(key, "UninstallString")
+                paths = os.path.join(os.path.dirname(os.path.join(path)), "shell")
+                paths = os.path.join(paths, "MuMuPlayer.exe")
+                return paths
+            except FileNotFoundError as e:
+                print(f"Path not found:{e}")
+            finally:
+                winreg.CloseKey(key)
+        elif emulator_type == "云手机":
+            return ""
+        elif emulator_type == "其他":
+            print("请手动输入模拟器路径")
+            raise ValueError("请手动输入模拟器路径")
+        else:
+            print("Emulator not found")
+            return ""
 
     except FileNotFoundError:
         print("Emulator not found")
