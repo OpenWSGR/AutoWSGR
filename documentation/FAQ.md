@@ -21,3 +21,26 @@ OSError:[WinError 127]找不到指定的程序。Error loading "C:\Users25249\De
 OMP: Hint This means that multiple copies of the OpenMp runtime have been linked into the program. That is dangerous, since it can degrade performance or cause incorrect results. The best thing to do is to ensure that only a single 0penMp runtime is linked into the process, e.g. by avoiding static linking of the 0penMp runtime in any library. As anunsafe, unsupported, undocumented workaround you can set the environment variableKMP_DUPLICATE_LIB_OK=TRUE to allow the programto continue to execute, but thatmay cause crashes or silently produce incorrect results, For more information, please see http://www.intel.com/software/products/support/.
 ```
 该问题是torch和paddle重复加载libiomp5md.dll的问题，在Python的依赖中找到重复的libiomp5md.dll选择删除一个可以解决该问题
+
+### 4. 使用example中的活动预设文件报错
+
+报错如下：
+```
+ModuleNotFoundError: No module named autowsgr.fight.event.event_2024_0930
+```
+报错后面的日期可能不一样，但是都是因为相同的原因导致的。
+请检查是否更新依赖，如果没有更新可以使用以下方法更新
+```
+pip install -U autowsgr
+```
+或者使用清华源的代理进行更新
+```
+pip install -U autowsgr -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 5. 使用pip更新的时候报错
+
+配置代理或者使用清华源代理进行更新
+```
+pip install -U autowsgr -i https://pypi.tuna.tsinghua.edu.cn/simple
+```

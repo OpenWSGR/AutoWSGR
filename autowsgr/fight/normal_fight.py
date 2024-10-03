@@ -302,6 +302,9 @@ class NormalFightPlan(FightPlan):
             state = self.update_state()
         else:
             state = self.Info.state
+        if state == "need SL":
+            return "need SL"
+
         # 进行 MapLevel 的决策
         if state == "map_page":
             self.Info.fight_history.add_event(

@@ -167,6 +167,9 @@ class NormalExercisePlan(FightPlan):
             state = self.update_state()
         else:
             state = self.Info.state
+        if state == "need SL":
+            return "need SL"
+
         # 进行MapLevel的决策
         if state == "exercise_page":
             self.exercise_stats = get_exercise_stats(self.timer, self.exercise_stats[1])
