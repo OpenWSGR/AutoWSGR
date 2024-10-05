@@ -7,7 +7,7 @@ emulator:
 game_app: "官服" #官服 小米 应用宝
 check_update: False # 是否在启动脚本时检查更新
 
-OCR_BACKEND: paddleocr # 文字识别后端，有两种可选 "paddleocr", "easyocr"
+OCR_BACKEND: easyocr # 文字识别后端，有两种可选 "paddleocr", "easyocr"
 
 LOG_PATH: "log"
 DELAY: 1.5

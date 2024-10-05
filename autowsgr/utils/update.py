@@ -23,7 +23,7 @@ def check_for_updates():
     local_version = get_local_version()
 
     # 发送 GET 请求获取库的元数据信息
-    response = requests.get("https://pypi.tuna.tsinghua.edu.cn/pypi/autowsgr/json")
+    response = requests.get("https://mirrors.pku.edu.cn/pypi/web/json/autowsgr")
     data = response.json()
 
     # 提取最新版本号
