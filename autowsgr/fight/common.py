@@ -324,6 +324,7 @@ class FightPlan(ABC):
         expedition = Expedition(self.timer)
         last_flag = self.run() != "SL"
         for _ in range(1, times):
+            self.timer.logger.info(f"已出击次数:{_}，目标次数{times}")
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
                 last_flag = False
@@ -422,9 +423,10 @@ class FightPlan(ABC):
         start_time, run = time.time(), False
         while times:
             ret = self.run()
-            run = ret != "SL"
-            if run == "dock is full":
-                return run
+            last_flag = ret != "SL"
+            if ret == "dock is full":
+                self.timer.logger.error("船坞已满, 无法继续")
+                return ret
 
             self.logger.info("战斗信息:\n" + str(self.Info.fight_history))
             fight_results = sorted(self.Info.fight_history.get_fight_results().items())
@@ -468,7 +470,7 @@ class FightPlan(ABC):
                 hasattr(self.timer, "keep_try_update_fight")
                 and self.timer.keep_try_update_fight > 3
             ):
-                raise _
+                return "need_SL"
             elif hasattr(self.timer, "keep_try_update_fight"):
                 self.timer.keep_try_update_fight += 1
             else:
@@ -491,13 +493,10 @@ class FightPlan(ABC):
             #         self.timer.click(615, 350, times=1)
 
             if "try_times" not in kwargs.keys():
-                return self.update_state(1)
+                return self.update_state(try_times=1)
             else:
-                if kwargs["try_times"] > 3:
-                    raise _
-                else:
-                    time.sleep(10 * 2.5 ** kwargs["try_times"])
-                    return self.update_state(try_times=kwargs["try_times"] + 1)
+                time.sleep(10 * 2.5 ** kwargs["try_times"])
+                return self.update_state(try_times=kwargs["try_times"] + 1)
         return state
 
     @abstractmethod
@@ -792,6 +791,8 @@ class IndependentFightPlan(FightPlan):
             state = self.update_state()
         if self.Info.state == "battle_page":
             return literals.FIGHT_END_FLAG
+        if state == "need SL":
+            return "need SL"
 
         # 进行通用NodeLevel决策
         action, fight_stage = self.decision_block.make_decision(

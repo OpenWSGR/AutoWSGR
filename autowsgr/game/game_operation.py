@@ -273,6 +273,11 @@ def RepairByBath(timer: Timer):
 
 
 def SetAutoSupply(timer: Timer, type=1):
+    """设置自动补给
+    Args:
+        timer (Timer): _description_
+        type (int, optional): 1: 自动补给, 0: 不自动补给. Defaults to 1.
+    """
     timer.update_screen()
     NowType = int(timer.check_pixel((48, 508), (224, 135, 35)))
     if NowType != type:

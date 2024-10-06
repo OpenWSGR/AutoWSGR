@@ -235,6 +235,8 @@ class AndroidController:
             distance (int, optional): 最大相差欧氏距离. Defaults to 30.
 
             screen_shot (bool, optional): 是否重新截图. Defaults to False.
+        return:
+            bool:是否满足要求
         """
         color = self.get_pixel(*position, screen_shot)
         color.reverse()

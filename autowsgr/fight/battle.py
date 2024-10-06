@@ -118,6 +118,8 @@ class BattlePlan(FightPlan):
             state = self.update_state()
         else:
             state = self.Info.state
+        if state == "need SL":
+            return "need SL"
         if self.Info.state == "battle_page":
             return literals.FIGHT_END_FLAG
 
