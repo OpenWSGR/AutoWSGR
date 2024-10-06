@@ -83,7 +83,6 @@ setup(
     install_requires=_fetch_requirements("requirements.txt"),
     setup_requires=["wheel"],
     dependency_links=[
-        "https://www.paddlepaddle.org.cn/packages/stable/cu123/",
         "https://download.pytorch.org/whl/cu123",
     ],
     python_requires=">=3.9",
