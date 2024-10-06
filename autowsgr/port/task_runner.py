@@ -37,7 +37,7 @@ class FightTask(Task):
     def __init__(self, timer: Timer, file_path="", plan=None, *args, **kwargs) -> None:
         """
         Args:
-            plan(FightPlan): 使用哪个战斗方案模板, 默认为 None, 根据 plan_path 注册为 NormalFightPlan, 活动需要提供 plan 实例
+            plan(FightPlan): 使用哪个战斗方案模板, 默认为 None.
 
             banned_ship (list(list(str))): 1-index 的列表, banned_ship[i] 表示第 i 号位不允许的舰船
 
@@ -52,8 +52,6 @@ class FightTask(Task):
             ship_count: 舰队舰船数量
 
             fleet_id: 使用的舰队编号, 忽视 fight_plan 中的对应参数, 不支持第一舰队
-
-            plan_path: 战斗策略文件位置, 参考 NormalFightPlan 的规范
 
             times: 任务重复次数
 
@@ -77,7 +75,6 @@ class FightTask(Task):
         self.banned_ship = [[]] * 7
         self.fleet_id = 2
         self.times = 1
-        self.plan_path = ""
         self.all_ships = []
         if file_path != "":
             self.__dict__.update(yaml_to_dict(file_path))
@@ -216,9 +213,7 @@ class FightTask(Task):
             ]
             return False, tasks
         if self.plan == None:
-            plan = NormalFightPlan(
-                self.timer, self.plan_path, self.fleet_id, fleet=fleet
-            )
+            raise ValueError("没有指定战斗策略")
         else:
             plan = self.plan
         plan.fleet = fleet

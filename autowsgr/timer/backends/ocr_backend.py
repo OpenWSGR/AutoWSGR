@@ -349,7 +349,57 @@ class PaddleOCRBackend(OCRBackend):
     def __init__(self, config, logger) -> None:
         super().__init__(config, logger)
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
-        from paddleocr import PaddleOCR
+        try:
+            from paddleocr import PaddleOCR
+        except ModuleNotFoundError as e:
+            import subprocess
+            import sys
+
+            # 定义阿里云镜像地址
+            ALIYUN_PYPI_URL = "https://mirrors.aliyun.com/pypi/simple/"
+            self.logger.warning("paddleocr module not found, installing...")
+            self.logger.warning(
+                "如果开启了 代理/VPN/梯子/加速器, 请关闭它们后重新运行脚本。"
+            )
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "paddleocr==2.8.1",
+                    "-i",
+                    ALIYUN_PYPI_URL,
+                ]
+            )
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "paddlepaddle==2.6.1",
+                    "-i",
+                    ALIYUN_PYPI_URL,
+                ]
+            )
+            try:
+                from paddleocr import PaddleOCR
+
+                print("paddleocr module installed and imported successfully.")
+            except ModuleNotFoundError:
+                print("Failed to install paddleocr module.")
+                exit(1)  # Exit with an error code if the installation fails
+
+            print("paddlepaddle module not found, installing...")
+
+            try:
+                import paddle
+
+                print("paddlepaddle module installed and imported successfully.")
+            except ModuleNotFoundError:
+                print("Failed to install paddlepaddle module.")
+                exit(1)  # Exit with an error code if the installation fails
 
         self.reader = PaddleOCR(
             use_angle_cls=True,

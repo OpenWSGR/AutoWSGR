@@ -8,9 +8,9 @@
 
 用 python 与 c++ 实现的 战舰少女R 的自动化流水线 & 数据统计一体化脚本, 提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口.
 
-安装使用与详细功能：[notion文档](https://sincere-theater-0e6.notion.site/56a26bfe32da4931a6a1ece332173211?v=428430662def42a2a7ea6dac48238d50)
+**如何使用：**[notion文档](https://sincere-theater-0e6.notion.site/56a26bfe32da4931a6a1ece332173211?v=428430662def42a2a7ea6dac48238d50)
 
-参与开发、用户交流、闲聊： qq群 568500514
+参与开发、用户交流、闲聊：qq群 568500514
 
 ## 近期更新
 - 蓝叠模拟器的连接方法改为手动填写adb地址， **2024/10/02**

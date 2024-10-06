@@ -144,11 +144,11 @@ class AndroidController:
         )
 
     def relative_swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
-        """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
+        """匀速滑动模拟器相对坐标 (x1, y1) 到 (x2, y2).
         Args:
-            x1,y1,x2,y2:相对坐标
-            duration:滑动总时间
-            delay:滑动后延时(单位为秒)
+            x1, y1, x2, y2: 相对坐标
+            duration: 滑动总时间
+            delay: 滑动后延时(单位为秒)
         """
         if delay < 0:
             raise ValueError("arg 'delay' should be positive or 0")
@@ -164,18 +164,18 @@ class AndroidController:
     def swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
         """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
         Args:
-            x1,y1,x2,y2:相对坐标 (960x540 屏幕)
-            duration:滑动总时间
-            delay:滑动后延时(单位为秒)
+            x1, y1, x2, y2:相对坐标 (960x540 屏幕)
+            duration: 滑动总时间
+            delay: 滑动后延时(单位为秒)
         """
         x1, y1 = absolute_to_relative((x1, y1), (960, 540))
         x2, y2 = absolute_to_relative((x2, y2), (960, 540))
         self.relative_swipe(x1, y1, x2, y2, duration, delay, *args, **kwargs)
 
     def relative_long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
-        """长按相对坐标 (x,y)
+        """长按相对坐标 (x, y)
         Args:
-            x,y: 相对坐标
+            x, y: 相对坐标
             duration (int, optional): 长按时间(秒). Defaults to 1.
             delay (float, optional): 操作后等待时间(秒). Defaults to 0.5.
         """

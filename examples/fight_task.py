@@ -1,11 +1,12 @@
 # 任务调度功能，设置好后可以轮换练船，理论上可以无限轮换，直到手动停止
 import os
 
+from autowsgr.fight.normal_fight import NormalFightPlan
 from autowsgr.port.task_runner import FightTask, TaskRunner
 from autowsgr.scripts.main import start_script
 
 timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml")
-
+plan = NormalFightPlan(timer, "normal_fight/9-3AD.yaml")
 runner = TaskRunner()  # 注册 TaskRunner
 runner.tasks.append(
     FightTask(
