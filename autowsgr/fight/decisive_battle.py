@@ -116,9 +116,11 @@ class Logic:
         self.config = timer.config
         self.logger = timer.logger
 
-        self.level1 = level1
-        self.level2 = ["长跑训练", "肌肉记忆"] + self.level1 + level2 + ["黑科技"]
-        self.flag_ships = flagship_priority
+        self.level1 = list(set(level1))
+        self.level2 = list(
+            set(["长跑训练", "肌肉记忆"] + self.level1 + level2 + ["黑科技"])
+        )
+        self.flag_ships = list(set(flagship_priority))
         self.stats = stats
 
     def _choose_ship(self, must=False):
@@ -282,10 +284,10 @@ class DecisiveBattle:
             self.timer.get_screen(), position[0] / 960 - 0.03, 0, 0.042, 1
         )
         image_path = os.path.join(TUNNEL_ROOT, "1.PNG")
-        cv2.imwrite(image_path, cropped_image)
+        cv2.imencode(".PNG", cropped_image)[1].tofile(image_path)
         processor = os.path.join(TUNNEL_ROOT, "process_recognize_map.exe")
         subprocess.run([processor, image_path])
-        cropped_image = cv2.imread(image_path)
+        # cropped_image = cv2.imread(image_path)
         with open(os.path.join(TUNNEL_ROOT, "1.out"), mode="r") as f:
             result = f.read()
             if result != "":

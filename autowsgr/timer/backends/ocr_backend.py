@@ -7,6 +7,7 @@ import numpy as np
 from thefuzz import process
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.utils.io import cv_imread
 
 
 def edit_distance(word1, word2) -> int:
@@ -188,7 +189,9 @@ class OCRBackend:
 
         img = pre_process_rgb(img, rgb_select, tolerance)
         if type(img) == type("1234"):
-            img = cv2.imread(img)
+            img = cv2.imdecode(
+                np.frombuffer(cv_imread(img), np.uint8), cv2.IMREAD_COLOR
+            )
         img = self.resize_image_proportionally(img, scale_factor)
         imgs, bias = split_image(img)
         results = []
@@ -272,7 +275,7 @@ class OCRBackend:
             image_path = os.path.abspath(image)
         else:
             image_path = os.path.join(TUNNEL_ROOT, "OCR.PNG")
-            cv2.imwrite(image_path, image)
+            cv2.imencode(".PNG", image)[1].tofile(image_path)
         with open(os.path.join(TUNNEL_ROOT, "locator.in"), "w+") as f:
             f.write(image_path)
         locator_exe = os.path.join(TUNNEL_ROOT, "locator.exe")

@@ -30,7 +30,6 @@ repair_mode: # 指定修理方式
  85工程: 1 # 85工程中破修
 ship_count: 6 # 舰队舰船数量
 fleet_id: 3 # 该任务占用的舰队编号, 不能用第1舰队
-plan_path: C:\Users\huany\Desktop\Projects\Auto-WSGR-dev\Auto-WSGR\tests\plans\normal_fight\9-3AD.yaml # 执行的 fight_plan 的绝对路径
 times: 200 # 任务次数
 max_repair_time: 86400 # 最大修理时间(秒), 超出该时间则使用快速修复, 这里是 1 天也就是相当于不允许使用快修.
 quick_repair: False # 不存在能够参与轮换的舰队时是否使用快修.
