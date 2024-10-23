@@ -121,7 +121,6 @@ class WindowsController:
         start_time = time.time()
         while time.time() - start_time <= 30:
             try:
-                print(dev_name)
                 dev = connect_device(dev_name)
                 self.logger.info("Android Connected!")
                 return dev

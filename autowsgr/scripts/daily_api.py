@@ -27,10 +27,10 @@ class DailyOperation:
                 raise ValueError("未设置战役类型，请检查配置文件")
             else:
                 self.battle_plan = BattlePlan(
-                    self.timer, plan_path=f"battle/{self.config.battle_type}.yaml"
+                    self.timer, plan_path=self.config.battle_type
                 )
         if self.config.auto_exercise:
-            self.exercise_plan = NormalExercisePlan(self.timer, "exercise/plan_1.yaml")
+            self.exercise_plan = NormalExercisePlan(self.timer, "plan_1")
 
         if self.config.auto_normal_fight:
             self.fight_plans = []
@@ -41,7 +41,7 @@ class DailyOperation:
                 self.fight_plans.append(
                     NormalFightPlan(
                         self.timer,
-                        plan_path=f"normal_fight/{plan[0]}.yaml",
+                        plan_path=plan[0],
                         fleet_id=plan[1],
                     )
                 )

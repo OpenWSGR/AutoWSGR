@@ -767,7 +767,6 @@ class IndependentFightPlan(FightPlan):
         timer: Timer,
         end_image,
         plan_path=None,
-        default_path="plans/default.yaml",
         *args,
         **kwargs,
     ):
@@ -776,7 +775,7 @@ class IndependentFightPlan(FightPlan):
             end_image (MyTemplate): 整个战斗流程结束后的图片
         """
         super().__init__(timer)
-        default_args = yaml_to_dict(default_path)
+        default_args = yaml_to_dict(self.timer.plan_root_list["default"])
         node_defaults = default_args["node_defaults"]
         node_args = yaml_to_dict(plan_path) if (plan_path is not None) else kwargs
         node_args = recursive_dict_update(node_defaults, node_args)

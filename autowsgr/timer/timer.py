@@ -27,6 +27,7 @@ class Timer(AndroidController, WindowsController):
     # 战舰少女R专用控制器
     everyday_check = True
     ui = WSGR_UI
+    plan_root_list = {}
     ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
     enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
     now_page = None  # 当前所在 UI 名
@@ -79,7 +80,15 @@ class Timer(AndroidController, WindowsController):
                 f"从脚本运行目录加载plans失败，将会从默认目录 {os.path.join(DATA_ROOT, 'plans')} 加载plans"
             )
             config.PLAN_ROOT = os.path.join(DATA_ROOT, "plans")
+
+        self.create_nested_dict(config.PLAN_ROOT)
+        self.plan_root_list = self.update_nested_dict(
+            self.create_nested_dict(os.path.join(DATA_ROOT, "plans")),
+            self.create_nested_dict(config.PLAN_ROOT),
+        )
+
         # 加载舰船名文件
+        defult_ship_names = yaml_to_dict(os.path.join(OCR_ROOT, "ship_name.yaml"))
         self.logger.info(f"尝试从脚本运行目录加载ship_names.yaml")
         if os.path.exists(
             os.path.abspath(
@@ -89,22 +98,58 @@ class Timer(AndroidController, WindowsController):
             config.SHIP_NAME_PATH = os.path.abspath(
                 os.path.join(Script_running_directory, "..", "ship_names.yaml")
             )
-            self.ship_names = unzip_element(
-                list(yaml_to_dict(config.SHIP_NAME_PATH).values())
-            )
+            self.ship_names = yaml_to_dict(config.SHIP_NAME_PATH)
             self.logger.info(f"Succeed to load ship_name file:{config.SHIP_NAME_PATH}")
+            self.ship_names = self.update_nested_dict(
+                defult_ship_names, self.ship_names
+            )
         else:
-            self.logger.warning(
-                f"从脚本运行目录加载ship_name失败，尝试从默认目录 {os.path.join(OCR_ROOT,  'ship_name.yaml')} 加载ship_name.yaml"
-            )
-            config.SHIP_NAME_PATH = os.path.join(OCR_ROOT, "ship_name.yaml")
-            self.ship_names = unzip_element(
-                list(yaml_to_dict(config.SHIP_NAME_PATH).values())
-            )
+            self.ship_names = defult_ship_names
+        self.ship_names = unzip_element(list(self.ship_names.values()))
 
         self.init()
 
     # ========================= OCR 功能穿透 =========================
+    def create_nested_dict(self, directory):
+        """
+        创建一个嵌套字典，表示目录及其子目录中的文件
+        Args:
+            directory (str): 目录路径
+        Returns:
+            dict: 嵌套字典，表示目录结构
+        """
+        for root, dirs, files in os.walk(directory):
+            # 获取相对于根目录的路径
+            rel_path = os.path.relpath(root, directory)
+            # 获取当前层级的字典
+            current_dict = self.plan_root_list
+            if rel_path != ".":
+                for part in rel_path.split(os.sep):
+                    current_dict = current_dict.setdefault(part, {})
+            # 将文件添加到当前层级的字典中
+            for file in files:
+                file_key = file[:-5] if file.endswith(".yaml") else file
+                # 赋予其绝对路径
+                current_dict[file_key] = os.path.abspath(os.path.join(root, file))
+        return self.plan_root_list
+
+    def update_nested_dict(self, d1, d2):
+        """
+        递归地更新嵌套字典 d1，使其包含 d2 中的所有键值对。
+        如果键在两个字典中都存在且对应的值也是字典，则递归更新。
+        Args:
+            d1 (dict): 要更新的字典
+            d2 (dict): 用于更新的字典
+        Returns:
+            dict: 更新后的字典 d1
+        """
+        for k, v in d2.items():
+            if k in d1 and isinstance(d1[k], dict) and isinstance(v, dict):
+                self.update_nested_dict(d1[k], v)
+            else:
+                d1[k] = v
+        return d1
+
     def recognize(
         self,
         img,

@@ -35,6 +35,10 @@ class EventFightPlan20240930(Event, NormalFightPlan):
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
 
         """
+        if os.path.isabs(plan_path):
+            plan_path = plan_path
+        else:
+            plan_path = timer.plan_root_list["event"][event][plan_path]
         self.event_name = event
         NormalFightPlan.__init__(self, timer, plan_path, fleet_id=fleet_id)
         Event.__init__(self, timer, event)

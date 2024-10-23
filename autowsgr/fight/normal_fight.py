@@ -199,11 +199,13 @@ class NormalFightPlan(FightPlan):
         super().__init__(timer)
 
         # 从配置文件加载计划
-        default_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, "default.yaml"))
+        default_args = yaml_to_dict(self.timer.plan_root_list["default"])
         if os.path.isabs(plan_path):
             plan_args = yaml_to_dict(plan_path)
         else:
-            plan_args = yaml_to_dict(os.path.join(self.config.PLAN_ROOT, plan_path))
+            plan_args = yaml_to_dict(
+                self.timer.plan_root_list["normal_fight"][plan_path]
+            )
 
         # 从参数加载计划
         if fleet_id is not None:

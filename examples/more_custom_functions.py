@@ -18,7 +18,9 @@ def week(start=1, start_times=0, fleet_id=4, change=True):
     if change:
         changes[start] = -1
     for i in range(start, 10):
-        plan = nf.NormalFightPlan(timer, f"week/{i}.yaml", fleet_id, changes[i])
+        plan = nf.NormalFightPlan(
+            timer, timer.plan_root_list["week"][i], fleet_id, changes[i]
+        )
         if i == start:
             plan.run_for_times_condition(5 - start_times, last_point[i], result[i])
         else:
