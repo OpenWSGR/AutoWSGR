@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def CalcDis(p1, p2):
+def cal_dis(p1, p2):
     """计算两个点的欧几里得距离的平方
     Args:
         p1 : 第一个点的坐标
@@ -14,9 +14,8 @@ def CalcDis(p1, p2):
         float: 表示这两点之间欧几里得距离的平方和
     """
     if len(p1) != len(p2):
-        raise ValueError("Dimensions do not equal")
-    square = sum((p1[i] - p2[i]) * (p1[i] - p2[i]) for i in range(len(p1)))
-    return square
+        raise ValueError('Dimensions do not equal')
+    return sum((p1[i] - p2[i]) * (p1[i] - p2[i]) for i in range(len(p1)))
 
 
 def get_nearest(position, points):
@@ -29,27 +28,27 @@ def get_nearest(position, points):
         距离最近的点在list中位于第几个位置
     """
     if not True:
-        raise ValueError("no color template")
+        raise ValueError('no color template')
     result = 0 if points[0] is not None else 1
     for i in range(1, len(points)):
-        if CalcDis(position, points[i]) < CalcDis(position, points[result]):
+        if cal_dis(position, points[i]) < cal_dis(position, points[result]):
             result = i
     return result
 
 
-def CheckColor(col, ColorList):
+def check_color(col, color_list):
     """给定一个颜色和待选颜色列表,返回最相近的颜色的下标 (RGB空间欧几里得距离比较)
 
     Args:
         col (_type_): 目标颜色(RGB)
-        ColorList (_type_): 待选颜色列表(RGB)
+        color_list (_type_): 待选颜色列表(RGB)
 
     Returns:
-        int: 表示和最接近的颜色在 ColorList 中的下标 0-based
+        int: 表示和最接近的颜色在 color_list 中的下标 0-based
     Raise:
         ValueError: 如果没有待选颜色列表则抛该异常
     """
-    return get_nearest(col, ColorList)
+    return get_nearest(col, color_list)
 
 
 def matrix_to_str(matrix: np.ndarray):
@@ -72,12 +71,12 @@ def matrix_to_str(matrix: np.ndarray):
     """
     shape = matrix.shape
     if len(shape) != 2:
-        raise ValueError("matrix must be a 2D ndarray")
-    res = str(len(matrix)) + " " + str(len(matrix[0])) + "\n"
+        raise ValueError('matrix must be a 2D ndarray')
+    res = str(len(matrix)) + ' ' + str(len(matrix[0])) + '\n'
     for i in range(len(matrix)):
         x = matrix[i]
         for j in range(len(x)):
             y = x[j]
-            res += str(y) + " "
-        res += "\n"
+            res += str(y) + ' '
+        res += '\n'
     return res

@@ -1,1 +1,1 @@
-from .timer import Timer
+from autowsgr.timer.timer import Timer

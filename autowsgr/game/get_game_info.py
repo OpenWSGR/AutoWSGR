@@ -3,7 +3,7 @@ import os
 import subprocess
 
 import numpy as np
-from PIL import Image as PIM
+from PIL import Image
 
 from autowsgr.constants.colors import COLORS
 from autowsgr.constants.data_roots import OCR_ROOT, TUNNEL_ROOT
@@ -36,31 +36,31 @@ from autowsgr.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from autowsgr.timer import Timer
 from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import delete_file, read_file, yaml_to_dict
-from autowsgr.utils.math_functions import CalcDis, CheckColor, matrix_to_str
+from autowsgr.utils.math_functions import cal_dis, check_color, matrix_to_str
 
 
 class Resources:
-    def __init__(self, timer: Timer):
+    def __init__(self, timer: Timer) -> None:
         self.timer = timer
         self.resources = {}
 
     def detect_resources(self, name=None):
         timer = self.timer
         if name is not None:
-            if name in ("normal", "oil", "ammo", "steel", "aluminum"):
+            if name in ('normal', 'oil', 'ammo', 'steel', 'aluminum'):
                 self.timer.go_main_page()
                 self.detect_resources()
-            if name == "quick_repair":
-                self.timer.goto_game_page("choose_repair_page")
+            if name == 'quick_repair':
+                self.timer.goto_game_page('choose_repair_page')
                 self.detect_resources()
-            if name == "quick_build":
-                self.timer.goto_game_page("build_page")
+            if name == 'quick_build':
+                self.timer.goto_game_page('build_page')
                 self.detect_resources()
-            if name == "ship_blueprint":
-                self.timer.goto_game_page("build_page")
+            if name == 'ship_blueprint':
+                self.timer.goto_game_page('build_page')
                 self.detect_resources()
-            if name == "equipment_blueprint":
-                self.timer.goto_game_page("develop_page")
+            if name == 'equipment_blueprint':
+                self.timer.goto_game_page('develop_page')
                 self.detect_resources()
         else:
             result = get_resources(timer)
@@ -81,14 +81,14 @@ class Resources:
             int: 资源量
         """
         if name not in RESOURCE_NAME:
-            raise ValueError("Unsupported resource name")
-        if detect or name not in self.resources.keys():
+            raise ValueError('Unsupported resource name')
+        if detect or name not in self.resources:
             self.detect_resources(name)
 
         return self.resources.get(name)
 
 
-POS = yaml_to_dict(os.path.join(OCR_ROOT, "relative_location.yaml"))
+POS = yaml_to_dict(os.path.join(OCR_ROOT, 'relative_location.yaml'))
 
 
 def get_resources(timer: Timer):
@@ -99,58 +99,58 @@ def get_resources(timer: Timer):
     timer.update_screen()
     image = timer.screen
     ret = {}
-    for key in POS["main_page"]["resources"]:
-        image_crop = crop_image(image, *POS["main_page"]["resources"][key])
+    for key in POS['main_page']['resources']:
+        image_crop = crop_image(image, *POS['main_page']['resources'][key])
         try:
-            ret[key] = timer.recognize_number(image_crop, "KM.")[1]
+            ret[key] = timer.recognize_number(image_crop, 'KM.')[1]
         except:
             # 容错处理，如果监测出来不是数字则出错了
-            timer.logger.warning(f"读取{key}资源失败")
+            timer.logger.warning(f'读取{key}资源失败')
     timer.logger.info(ret)
     return ret
 
 
 def get_loot_and_ship(timer: Timer):
     """获取掉落数据"""
-    timer.goto_game_page("map_page")
+    timer.goto_game_page('map_page')
     timer.update_screen()
     image = timer.screen
     ret = {}
-    for key in POS["map_page"]:
-        image_crop = crop_image(image, *POS["map_page"][key])
-        result = timer.recognize_number(image_crop, extra_chars="/", allow_nan=True)
+    for key in POS['map_page']:
+        image_crop = crop_image(image, *POS['map_page'][key])
+        result = timer.recognize_number(image_crop, extra_chars='/', allow_nan=True)
         if result:
             if isinstance(result[1], tuple):
-                ret[key], ret[key + "_max"] = result[1]
+                ret[key], ret[key + '_max'] = result[1]
             else:
                 # 如果ocr把"/"识别为"1",则使用下列方法
-                if key == "loot":
+                if key == 'loot':
                     ret[key] = int(str(result[1])[:-3])
-                    ret[key + "_max"] = 50
-                if key == "ship":
+                    ret[key + '_max'] = 50
+                if key == 'ship':
                     ret[key] = int(str(result[1])[:-4])
-                    ret[key + "_max"] = 500
+                    ret[key + '_max'] = 500
         else:
-            timer.logger.warning(f"读取{key}数量失败")
+            timer.logger.warning(f'读取{key}数量失败')
     try:
-        timer.got_ship_num = ret.get("ship")
+        timer.got_ship_num = ret.get('ship')
     except:
-        timer.logger.warning("赋值给got_ship_num失败")
+        timer.logger.warning('赋值给got_ship_num失败')
         timer.got_ship_num = 0
 
     try:
-        timer.got_loot_num = ret.get("loot")
-        if timer.got_loot_num == None:
+        timer.got_loot_num = ret.get('loot')
+        if timer.got_loot_num is None:
             timer.got_loot_num = 0
     except:
-        timer.logger.warning("赋值给got_loot_num失败")
+        timer.logger.warning('赋值给got_loot_num失败')
         timer.got_loot_num = 0
-    timer.logger.info(f"已掉落胖次:{timer.got_loot_num}")
-    timer.logger.info(f"已掉落舰船:{timer.got_ship_num}")
+    timer.logger.info(f'已掉落胖次:{timer.got_loot_num}')
+    timer.logger.info(f'已掉落舰船:{timer.got_ship_num}')
     return ret
 
 
-def get_enemy_condition(timer: Timer, type="exercise", *args, **kwargs):
+def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     """获取敌方舰船类型数据并返回一个字典, 具体图像识别为黑箱, 采用 C++ 实现
 
     Args:
@@ -159,7 +159,7 @@ def get_enemy_condition(timer: Timer, type="exercise", *args, **kwargs):
 
             'fight': 索敌成功后的两列三行
 
-    Returs:
+    Returns:
         dict: {[SHIP_TYPE]:[SHIP_AMOUNT]}
 
         example return: {"CV":1, "BB":3, "DD": 2}
@@ -179,7 +179,7 @@ def get_enemy_condition(timer: Timer, type="exercise", *args, **kwargs):
         CLT: 0,
         CVL: 0,
         NO: 0,
-        "all": 0,
+        'all': 0,
         CAV: 0,
         AV: 0,
         BM: 0,
@@ -188,12 +188,12 @@ def get_enemy_condition(timer: Timer, type="exercise", *args, **kwargs):
         CBG: 0,
         SC: 0,
         BBV: 0,
-        "AP": 0,
+        'AP': 0,
     }
 
-    if type == "exercise":
+    if type == 'exercise':
         type = 0
-    if type == "fight":
+    if type == 'fight':
         type = 1
 
     if timer.image_exist(IMG.fight_image[12]):
@@ -201,37 +201,34 @@ def get_enemy_condition(timer: Timer, type="exercise", *args, **kwargs):
         enemy_type_count[SAP] = 1
 
     # 处理图像并将参数传递给识别图像的程序
-    img = PIM.fromarray(timer.screen).convert("L")
+    img = Image.fromarray(timer.screen).convert('L')
     img = img.resize((960, 540))
-    input_path = os.path.join(TUNNEL_ROOT, "args.in")
-    output_path = os.path.join(TUNNEL_ROOT, "res.out")
+    input_path = os.path.join(TUNNEL_ROOT, 'args.in')
+    output_path = os.path.join(TUNNEL_ROOT, 'res.out')
     delete_file(output_path)
-    args = "recognize\n6\n"
-    for i, area in enumerate(TYPE_SCAN_AREA[type]):
+    args = 'recognize\n6\n'
+    for area in TYPE_SCAN_AREA[type]:
         arr = np.array(img.crop(area))
         args += matrix_to_str(arr)
-    with open(input_path, "w") as f:
+    with open(input_path, 'w') as f:
         f.write(args)
-    recognize_enemy_exe = os.path.join(TUNNEL_ROOT, "recognize_enemy.exe")
+    recognize_enemy_exe = os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe')
     subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
 
     # 获取并解析结果
-    res = read_file(os.path.join(TUNNEL_ROOT, "res.out")).split()
-    enemy_type_count["ALL"] = 0
-    for i, x in enumerate(res):
+    res = read_file(os.path.join(TUNNEL_ROOT, 'res.out')).split()
+    enemy_type_count['ALL'] = 0
+    for x in res:
         enemy_type_count[x] += 1
         if x != NO:
-            enemy_type_count["ALL"] += 1
-    enemy_type_count[NAP] = enemy_type_count["AP"] - enemy_type_count[SAP]
-    count = {}
-    for key, value in enemy_type_count.items():
-        if value:
-            count[key] = value
-    timer.logger.debug("enemys:" + str(count))
+            enemy_type_count['ALL'] += 1
+    enemy_type_count[NAP] = enemy_type_count['AP'] - enemy_type_count[SAP]
+    count = {k: v for k, v in enemy_type_count.items() if v}
+    timer.logger.debug('enemys:' + str(count))
     return count
 
 
-def detect_ship_stats(timer: Timer, type="prepare", previous=None):
+def detect_ship_stats(timer: Timer, type='prepare', previous=None):
     """检查我方舰船的血量状况(精确到红血黄血绿血)并返回
 
     Args:
@@ -250,9 +247,9 @@ def detect_ship_stats(timer: Timer, type="prepare", previous=None):
     timer.update_screen()
     result = [-1, 0, 0, 0, 0, 0, 0]
     for i in range(1, 7):
-        if type == "prepare":
+        if type == 'prepare':
             pixel = timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
-            result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[0])
+            result[i] = check_color(pixel, COLORS.BLOOD_COLORS[0])
             if result[i] in [3, 2]:
                 result[i] = 2
             elif result[i] == 0:
@@ -261,12 +258,12 @@ def detect_ship_stats(timer: Timer, type="prepare", previous=None):
                 result[i] = -1
             else:
                 result[i] = 1
-        elif type == "sumup":
+        elif type == 'sumup':
             if previous and previous[i] == -1:
                 result[i] = -1
                 continue
             pixel = timer.get_pixel(*BLOOD_BAR_POSITION[1][i])
-            result[i] = CheckColor(pixel, COLORS.BLOOD_COLORS[1])
+            result[i] = check_color(pixel, COLORS.BLOOD_COLORS[1])
             if result[i] == 4:
                 result[i] = -1
     return result
@@ -278,7 +275,7 @@ def detect_ship_type(timer: Timer):
     """
 
 
-def get_exercise_stats(timer: Timer, robot=None):
+def get_exercise_stats(timer: Timer, robot=None) -> list[None] | None:
     """检查演习界面, 第 position 个位置,是否为可挑战状态, 强制要求屏幕中只有四个目标
 
     Args:
@@ -290,43 +287,45 @@ def get_exercise_stats(timer: Timer, robot=None):
     timer.update_screen()
     up = timer.check_pixel((933, 59), (177, 171, 176), distance=60)
     down = timer.check_pixel((933, 489), (177, 171, 176), distance=60)
-    assert (up and down) == False
+    assert not (up and down)
 
     result = [
         None,
     ]
-    if up == False and down == False:
+    if not up and not down:
         timer.swipe(800, 200, 800, 400)  # 上滑
         timer.update_screen()
         up = True
     if up:
         for position in range(1, 5):
-            result.append(
+            result.append(  # noqa: PERF401
                 math.sqrt(
-                    CalcDis(
-                        timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE
-                    )
+                    cal_dis(
+                        timer.get_pixel(770, position * 110 - 10),
+                        COLORS.CHALLENGE_BLUE,
+                    ),
                 )
-                <= 50
+                <= 50,
             )
         timer.swipe(800, 400, 800, 200)  # 下滑
         timer.update_screen()
         result.append(
             math.sqrt(
-                CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)
+                cal_dis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE),
             )
-            <= 50
+            <= 50,
         )
         return result
     if down:
         for position in range(1, 5):
-            result.append(
+            result.append(  # noqa: PERF401
                 math.sqrt(
-                    CalcDis(
-                        timer.get_pixel(770, position * 110 - 10), COLORS.CHALLENGE_BLUE
-                    )
+                    cal_dis(
+                        timer.get_pixel(770, position * 110 - 10),
+                        COLORS.CHALLENGE_BLUE,
+                    ),
                 )
-                <= 50
+                <= 50,
             )
         if robot is not None:
             result.insert(1, robot)
@@ -336,7 +335,7 @@ def get_exercise_stats(timer: Timer, robot=None):
             result.insert(
                 1,
                 math.sqrt(
-                    CalcDis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE)
+                    cal_dis(timer.get_pixel(770, 4 * 110 - 10), COLORS.CHALLENGE_BLUE),
                 )
                 <= 50,
             )
@@ -344,6 +343,7 @@ def get_exercise_stats(timer: Timer, robot=None):
             timer.swipe(800, 400, 800, 200)  # 下滑
 
         return result
+    return None
 
 
 def check_support_stats(timer: Timer):
@@ -354,11 +354,10 @@ def check_support_stats(timer: Timer):
     """
     timer.update_screen()
     pixel = timer.get_pixel(623, 75)
-    d1 = CalcDis(pixel, COLORS.SUPPORT_ENABLE)  # 支援启用的黄色
-    d2 = CalcDis(pixel, COLORS.SUPPORT_DISABLE)  # 支援禁用的蓝色
-    d3 = CalcDis(pixel, COLORS.SUPPORT_ENLESS)  # 支援次数用尽的灰色
+    d1 = cal_dis(pixel, COLORS.SUPPORT_ENABLE)  # 支援启用的黄色
+    d2 = cal_dis(pixel, COLORS.SUPPORT_DISABLE)  # 支援禁用的蓝色
+    d3 = cal_dis(pixel, COLORS.SUPPORT_ENLESS)  # 支援次数用尽的灰色
     if d1 > d3 and d2 > d3:
-        timer.logger.info("战役支援次数已用尽")
+        timer.logger.info('战役支援次数已用尽')
         return True
-    else:
-        return d1 < d2
+    return d1 < d2

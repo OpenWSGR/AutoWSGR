@@ -1,10 +1,10 @@
 class ImageNotFoundErr(BaseException):
-    def __init__(self, *args: object):
+    def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
 
 class NetworkErr(BaseException):
-    def __init__(self, *args: object):
+    def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
 
@@ -20,10 +20,10 @@ class CriticalErr(BaseException):
         BaseException (_type_): _description_
     """
 
-    def __init__(self, *args: object):
+    def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
 
 class LogitException(BaseException):
-    def __init__(self, *args: object):
+    def __init__(self, *args: object) -> None:
         super().__init__()(*args)

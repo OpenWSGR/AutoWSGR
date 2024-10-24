@@ -4,12 +4,10 @@
 import os
 
 from autowsgr.constants.data_roots import MAP_ROOT
-from autowsgr.fight.common import start_march
 from autowsgr.fight.event.event import Event
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
-from autowsgr.game.game_operation import MoveTeam, quick_repair
 from autowsgr.timer import Timer
-from autowsgr.utils.math_functions import CalcDis
+
 
 NODE_POSITION = (
     None,
@@ -24,8 +22,13 @@ NODE_POSITION = (
 
 class EventFightPlan20230613(Event, NormalFightPlan):
     def __init__(
-        self, timer: Timer, plan_path, from_alpha=True, fleet_id=None, event="20230613"
-    ):
+        self,
+        timer: Timer,
+        plan_path,
+        from_alpha=True,
+        fleet_id=None,
+        event='20230613',
+    ) -> None:
         """
         Args:
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
@@ -40,12 +43,12 @@ class EventFightPlan20230613(Event, NormalFightPlan):
             self.from_alpha = from_alpha
 
         # 如果未指定入口则默认从 alpha 进入
-        if "from_alpha" not in self.__dict__:
+        if 'from_alpha' not in self.__dict__:
             self.from_alpha = True
 
     def _load_fight_info(self):
-        self.Info = EventFightInfo20230613(self.timer, self.chapter, self.map)
-        self.Info.load_point_positions(os.path.join(MAP_ROOT, "event", self.event_name))
+        self.info = EventFightInfo20230613(self.timer, self.chapter, self.map)
+        self.info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
 
     def _change_fight_map(self, chapter_id, map_id):
         """选择并进入战斗地图(chapter-map)"""
@@ -55,7 +58,7 @@ class EventFightPlan20230613(Event, NormalFightPlan):
         return self.timer.check_pixel((795, 321), (254, 148, 36), screen_shot=True)
 
     def _go_fight_prepare_page(self) -> None:
-        if not self.timer.image_exist(self.Info.event_image[1], need_screen_shot=0):
+        if not self.timer.image_exist(self.info.event_image[1], need_screen_shot=0):
             self.timer.click(*NODE_POSITION[self.map])
 
         # 选择入口
@@ -65,17 +68,15 @@ class EventFightPlan20230613(Event, NormalFightPlan):
 
         self.timer.wait_image(self.event_image[1])
         self.timer.click(850, 490)
-        self.timer.wait_pages("fight_prepare_page", after_wait=0.15)
+        self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
 
 
 class EventFightInfo20230613(Event, NormalFightInfo):
-    def __init__(self, timer: Timer, chapter_id, map_id, event="20230613") -> None:
+    def __init__(self, timer: Timer, chapter_id, map_id, event='20230613') -> None:
         NormalFightInfo.__init__(self, timer, chapter_id, map_id)
         Event.__init__(self, timer, event)
         self.map_image = (
-            self.common_image["easy"]
-            + self.common_image["hard"]
-            + [self.event_image[1]]
+            self.common_image['easy'] + self.common_image['hard'] + [self.event_image[1]]
         )
-        self.end_page = "unknown_page"
-        self.state2image["map_page"] = [self.map_image, 5]
+        self.end_page = 'unknown_page'
+        self.state2image['map_page'] = [self.map_image, 5]

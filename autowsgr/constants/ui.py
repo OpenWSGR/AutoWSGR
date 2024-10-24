@@ -3,16 +3,15 @@
 
 
 class SwitchMethod:
-    def __init__(self, fun_list):
+    def __init__(self, fun_list) -> None:
         self.operates = fun_list
 
     def operate(self):
-        res = list(self.operates)
-        return res
+        return list(self.operates)
 
     def print(self):
         for operation in self.operates:
-            print(operation, end=" ")
+            print(operation, end=' ')
 
 
 class Node:
@@ -20,7 +19,7 @@ class Node:
     保存 UI 树的节点
     """
 
-    def __init__(self, name, id):
+    def __init__(self, name, id) -> None:
         self.id = id
         self.name = name
         self.father_edge = None
@@ -45,13 +44,13 @@ class Node:
         return choice(edges) if len(edges) != 0 else None
 
     def print(self):
-        print("节点名:", self.name, "节点编号:", self.id)
-        print("父节点:", self.father)
-        print("节点连边:")
+        print('节点名:', self.name, '节点编号:', self.id)
+        print('父节点:', self.father)
+        print('节点连边:')
         for edge in self.edges:
             edge.print()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -67,7 +66,7 @@ class Edge:
         v: Node,
         other_dst=None,
         extra_op: SwitchMethod = None,
-    ):
+    ) -> None:
         self.operate_fun = operate_fun
         self.u = u
         self.v = v
@@ -80,13 +79,13 @@ class Edge:
     def print(
         self,
     ):
-        print("起点:", self.u.name, "终点:", self.v.name)
+        print('起点:', self.u.name, '终点:', self.v.name)
 
 
 class UI:
     """UI树(拓扑学概念)"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes = {}
         self.page_count = 0
         self.is_normal_fight_prepare = False
@@ -109,16 +108,16 @@ class UI:
             path2.append(end)
             end = end.father
         path2.reverse()
-        path = path1 + [lca] + path2
+        path = [*path1, lca, *path2]
         result, i = [], 0
         while i < len(path):
             node = path[i]
             result.append(node)
-            if node.find_edge(path[-1]) != None:
-                return result + [path[-1]]
+            if node.find_edge(path[-1]) is not None:
+                return [*result, path[-1]]
             for j in range(i + 2, len(path)):
                 dst = path[j]
-                if node.find_edge(dst) != None:
+                if node.find_edge(dst) is not None:
                     i = j - 1
             i += 1
         return result
@@ -128,7 +127,7 @@ class UI:
             node.print()
 
     def _build_ui_tree(self):
-        main_page = self._construct_node("main_page", None)
+        main_page = self._construct_node('main_page', None)
         (
             map_page,
             exercise_page,
@@ -138,17 +137,17 @@ class UI:
         ) = self._construct_integrative_pages(
             main_page,
             names=[
-                "map_page",
-                "exercise_page",
-                "expedition_page",
-                "battle_page",
-                "decisive_battle_entrance",
+                'map_page',
+                'exercise_page',
+                'expedition_page',
+                'battle_page',
+                'decisive_battle_entrance',
             ],
             click_positions=[(163, 25), (287, 25), (417, 25), (544, 25), (661, 25)],
-            common_edges=[{"pos": (30, 30), "dst": main_page}],
+            common_edges=[{'pos': (30, 30), 'dst': main_page}],
         )
 
-        options_page = self._construct_node("options_page", main_page)
+        options_page = self._construct_node('options_page', main_page)
         (
             build_page,
             destroy_page,
@@ -157,33 +156,33 @@ class UI:
         ) = self._construct_integrative_pages(
             options_page,
             names=[
-                "build_page",
-                "destroy_page",
-                "develop_page",
-                "discard_page",
+                'build_page',
+                'destroy_page',
+                'develop_page',
+                'discard_page',
             ],
             click_positions=[(163, 25), (287, 25), (417, 25), (544, 25)],
-            common_edges=[{"pos": (30, 30), "dst": options_page}],
+            common_edges=[{'pos': (30, 30), 'dst': options_page}],
         )
         intensify_page, remake_page, skill_page = self._construct_integrative_pages(
             options_page,
             names=[
-                "intensify_page",
-                "remake_page",
-                "skill_page",
+                'intensify_page',
+                'remake_page',
+                'skill_page',
             ],
             click_positions=[(163, 25), (287, 25), (417, 25)],
-            common_edges=[{"pos": (30, 30), "dst": options_page}],
+            common_edges=[{'pos': (30, 30), 'dst': options_page}],
         )
 
-        fight_prepare_page = self._construct_node("fight_prepare_page", map_page)
-        backyard_page = self._construct_node("backyard_page", main_page)
-        bath_page = self._construct_node("bath_page", backyard_page)
-        choose_repair_page = self._construct_node("choose_repair_page", bath_page)
-        canteen_page = self._construct_node("canteen_page", backyard_page)
-        mission_page = self._construct_node("mission_page", main_page)
-        support_set_page = self._construct_node("support_set_page", main_page)
-        friend_page = self._construct_node("friend_page", options_page)
+        fight_prepare_page = self._construct_node('fight_prepare_page', map_page)
+        backyard_page = self._construct_node('backyard_page', main_page)
+        bath_page = self._construct_node('bath_page', backyard_page)
+        choose_repair_page = self._construct_node('choose_repair_page', bath_page)
+        canteen_page = self._construct_node('canteen_page', backyard_page)
+        mission_page = self._construct_node('mission_page', main_page)
+        support_set_page = self._construct_node('support_set_page', main_page)
+        friend_page = self._construct_node('friend_page', options_page)
 
         self._add_edge(
             main_page,
@@ -192,10 +191,14 @@ class UI:
             expedition_page,
         )
         self._add_edge(
-            main_page, mission_page, self._construct_clicks_method([(656, 480, 1, 0)])
+            main_page,
+            mission_page,
+            self._construct_clicks_method([(656, 480, 1, 0)]),
         )
         self._add_edge(
-            main_page, backyard_page, self._construct_clicks_method([(45, 80, 1, 0)])
+            main_page,
+            backyard_page,
+            self._construct_clicks_method([(45, 80, 1, 0)]),
         )
         self._add_edge(
             main_page,
@@ -203,7 +206,9 @@ class UI:
             self._construct_clicks_method([(50, 135, 1, 1), (200, 300, 1, 1)]),
         )
         self._add_edge(
-            main_page, options_page, self._construct_clicks_method([(42, 484, 1, 0)])
+            main_page,
+            options_page,
+            self._construct_clicks_method([(42, 484, 1, 0)]),
         )
 
         self._add_edge(
@@ -235,10 +240,14 @@ class UI:
             self._construct_clicks_method([(150, 270, 1, 1.25), (360, 270, 1, 0)]),
         )
         self._add_edge(
-            options_page, friend_page, self._construct_clicks_method([(150, 410, 1, 0)])
+            options_page,
+            friend_page,
+            self._construct_clicks_method([(150, 410, 1, 0)]),
         )
         self._add_edge(
-            options_page, main_page, self._construct_clicks_method([(36, 500, 1, 0)])
+            options_page,
+            main_page,
+            self._construct_clicks_method([(36, 500, 1, 0)]),
         )
 
         self._add_edge(
@@ -247,14 +256,20 @@ class UI:
             self._construct_clicks_method([(700, 400, 1, 0)]),
         )
         self._add_edge(
-            backyard_page, bath_page, self._construct_clicks_method([(300, 200, 1, 0)])
+            backyard_page,
+            bath_page,
+            self._construct_clicks_method([(300, 200, 1, 0)]),
         )
         self._add_edge(
-            backyard_page, main_page, self._construct_clicks_method([(50, 30, 1, 0)])
+            backyard_page,
+            main_page,
+            self._construct_clicks_method([(50, 30, 1, 0)]),
         )
 
         self._add_edge(
-            bath_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)])
+            bath_page,
+            main_page,
+            self._construct_clicks_method([(120, 30, 1, 0)]),
         )
         self._add_edge(
             bath_page,
@@ -269,14 +284,20 @@ class UI:
         )
 
         self._add_edge(
-            canteen_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)])
+            canteen_page,
+            main_page,
+            self._construct_clicks_method([(120, 30, 1, 0)]),
         )
         self._add_edge(
-            canteen_page, backyard_page, self._construct_clicks_method([(50, 30, 1, 0)])
+            canteen_page,
+            backyard_page,
+            self._construct_clicks_method([(50, 30, 1, 0)]),
         )
 
         self._add_edge(
-            mission_page, main_page, self._construct_clicks_method([(30, 30, 1, 0)])
+            mission_page,
+            main_page,
+            self._construct_clicks_method([(30, 30, 1, 0)]),
         )
 
         self._add_edge(
@@ -286,7 +307,9 @@ class UI:
         )
 
         self._add_edge(
-            friend_page, options_page, self._construct_clicks_method([(30, 30, 1, 0)])
+            friend_page,
+            options_page,
+            self._construct_clicks_method([(30, 30, 1, 0)]),
         )
 
         self._dfs(main_page)
@@ -315,7 +338,7 @@ class UI:
     def _list_walk_path(self, start: Node, end: Node):
         path = self.find_path(start, end)
         for node in path:
-            print(node, end="->")
+            print(node, end='->')
 
     def _construct_node(self, name: str, father):
         self.page_count += 1
@@ -325,7 +348,7 @@ class UI:
         return node
 
     def _construct_clicks_method(self, click_position_args):
-        operations = [["click", operation] for operation in click_position_args]
+        operations = [['click', operation] for operation in click_position_args]
 
         return SwitchMethod(operations)
 
@@ -334,24 +357,35 @@ class UI:
         u.add_edge(edge)
 
     def _construct_integrative_pages(
-        self, father, click_positions=[], names=[], common_edges=[]
-    ):
+        self,
+        father,
+        click_positions=None,
+        names=None,
+        common_edges=None,
+    ) -> list[Node]:
+        if click_positions is None:
+            click_positions = []
+        if names is None:
+            names = []
+        if common_edges is None:
+            common_edges = []
+
         assert len(click_positions) == len(names)
         first_node = self._construct_node(names[0], father)
-        nodes = [first_node]
-        for name in names[1:]:
-            nodes.append(self._construct_node(name, first_node))
+        nodes = [first_node] + [self._construct_node(name, first_node) for name in names[1:]]
         for i, node in enumerate(nodes):
             for j, click_position in enumerate(click_positions):
                 if i == j:
                     continue
                 self._add_edge(
-                    node, nodes[j], self._construct_clicks_method([click_position])
+                    node,
+                    nodes[j],
+                    self._construct_clicks_method([click_position]),
                 )
 
             for edge in common_edges:
-                dst = edge.get("dst")
-                x, y = edge.get("pos")
+                dst = edge.get('dst')
+                x, y = edge.get('pos')
                 self._add_edge(node, dst, self._construct_clicks_method([(x, y)]))
         return nodes
 

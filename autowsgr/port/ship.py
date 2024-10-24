@@ -1,38 +1,32 @@
 import os
-import time
-from typing import Iterable
+from collections.abc import Iterable
 
 import cv2
 
 from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
-from autowsgr.game.game_operation import MoveTeam
-from autowsgr.ocr.ship_name import recognize_number, recognize_ship
+from autowsgr.game.game_operation import move_team
+from autowsgr.ocr.ship_name import recognize_number
 from autowsgr.timer import Timer
-from autowsgr.utils.api_image import (
-    absolute_to_relative,
-    crop_image,
-    crop_rectangle_relative,
-    cv_show_image,
-)
-from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
+from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
+from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.operator import unorder_equal
 
-POS = yaml_to_dict(os.path.join(OCR_ROOT, "relative_location.yaml"))
+
+POS = yaml_to_dict(os.path.join(OCR_ROOT, 'relative_location.yaml'))
 
 
 def count_ship(fleet):
-    res = sum(have_ship(fleet[i]) for i in range(1, min(len(fleet), 7)))
-    return res
+    return sum(have_ship(fleet[i]) for i in range(1, min(len(fleet), 7)))
 
 
 def have_ship(ship):
-    return ship is not None and ship != ""
+    return ship is not None and ship != ''
 
 
 class Fleet:
-    def __init__(self, timer: Timer, fleet_id=None):
+    def __init__(self, timer: Timer, fleet_id=None) -> None:
         self.timer = timer
         self.fleet_id = fleet_id
         self.flag_ship = None
@@ -47,9 +41,9 @@ class Fleet:
     def count(self):
         return 0 if self.ships is None else count_ship(self.ships)
 
-    def __eq__(self, other: object):
-        if not isinstance(other, (Iterable, Fleet)):
-            raise ValueError()
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Iterable | Fleet):
+            raise TypeError
         ships = other
         if isinstance(other, Fleet):
             if other.fleet_id != self.fleet_id:
@@ -65,20 +59,21 @@ class Fleet:
 
     def detect(self, check_level=False):
         """在对应的战斗准备页面检查舰船"""
-        assert self.timer.wait_image(IMG.identify_images["fight_prepare_page"]) != False
+        assert self.timer.wait_image(IMG.identify_images['fight_prepare_page'])
         if self.fleet_id is not None:
-            MoveTeam(self.timer, self.fleet_id)
+            move_team(self.timer, self.fleet_id)
         ships = self.timer.recognize_ship(
-            self.timer.get_screen()[433:459], self.timer.ship_names
+            self.timer.get_screen()[433:459],
+            self.timer.ship_names,
         )
         self.ships = [None] * 7
         for rk, ship in enumerate(ships):
             self.ships[rk + 1] = ship[1]
-        self.timer.logger.info(f"舰船识别结果为: {self.ships}")
+        self.timer.logger.info(f'舰船识别结果为: {self.ships}')
         try:
             self.check_level()
         except IndexError as e:
-            self.timer.logger.info("检查等级失败")
+            self.timer.logger.info('检查等级失败')
             if check_level:
                 raise e
 
@@ -96,15 +91,19 @@ class Fleet:
         self.levels = [None] * 7
         for i in range(1, count_ship(self.ships) + 1):
             img = crop_rectangle_relative(
-                screen, LEFT_TOPS[i - 1][0], LEFT_TOPS[i - 1][1], SIZE[0], SIZE[1]
+                screen,
+                LEFT_TOPS[i - 1][0],
+                LEFT_TOPS[i - 1][1],
+                SIZE[0],
+                SIZE[1],
             )
             img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
             self.levels[i] = int(recognize_number(img, min_size=3)[0][1])
             # print(levels)
-        self.timer.logger.info(f"等级识别结果: {self.levels}")
+        self.timer.logger.info(f'等级识别结果: {self.levels}')
 
-    def _change_ship(self, position, ship_name, search_method="word"):
+    def _change_ship(self, position, ship_name, search_method='word'):
         self.ships[position] = ship_name
         self.timer.click(*FLEET_POSITION[position], delay=0)
         res = self.timer.wait_images(
@@ -113,34 +112,37 @@ class Fleet:
             gap=0,
             timeout=16,
         )
-        if res == None:
-            raise TimeoutError("选择舰船时点击超时")
+        if res is None:
+            raise TimeoutError('选择舰船时点击超时')
         if ship_name is None:
             self.timer.click(83, 167, delay=0)
         else:
             if res == 1:
                 self.timer.relative_click(0.875, 0.246)
-            if search_method == "word":
+            if search_method == 'word':
                 self.timer.relative_click(0.729, 0.056, delay=0)
                 self.timer.wait_image(
-                    IMG.choose_ship_image[3], gap=0, after_get_delay=0.1
+                    IMG.choose_ship_image[3],
+                    gap=0,
+                    after_get_delay=0.1,
                 )
                 self.timer.text(ship_name)
                 self.timer.click(1219 * 0.75, 667 * 0.75, delay=1)
 
             ships = self.timer.recognize_ship(
-                self.timer.get_screen()[:, :1048], self.timer.ship_names
+                self.timer.get_screen()[:, :1048],
+                self.timer.ship_names,
             )
-            self.timer.logger.info(f"更改编队可用舰船：{[item[1] for item in ships]}")
+            self.timer.logger.info(f'更改编队可用舰船：{[item[1] for item in ships]}')
             for ship in ships:
                 if ship[1] == ship_name:
                     rel_center = absolute_to_relative(ship[0], (1280, 720))
                     self.timer.relative_click(*rel_center)
                     break
 
-        self.timer.wait_pages("fight_prepare_page", gap=0)
+        self.timer.wait_pages('fight_prepare_page', gap=0)
 
-    def _set_ships(self, ships, search_method="word"):
+    def _set_ships(self, ships, search_method='word'):
         """
         将当前舰队设置为指定的舰船，ships是要设置的舰队，self.ships是当前舰队
         Args:
@@ -161,19 +163,19 @@ class Fleet:
             if ship in self.ships or not have_ship(ship):
                 continue
             position = ok.index(False)
-            self.timer.logger.debug(f"更改{position}号位舰船为 {ship}")
+            self.timer.logger.debug(f'更改{position}号位舰船为 {ship}')
             self._change_ship(position, ship, search_method=search_method)
             ok[position] = True
 
         # 删除多余舰船，如果在设置中某个位置为更改舰船，而且self.ships中有舰船，则去除舰船后删除
         for i in range(1, 7):
-            if ok[7 - i] == False and self.ships[7 - i] != None:
+            if not ok[7 - i] and self.ships[7 - i] is not None:
                 self._change_ship(7 - i, None)
                 self.ships[7 - i :] = self.ships[8 - i :]
                 self.ships.append(None)
 
     def reorder(self, ships):
-        assert unorder_equal(ships, self.ships, skip=[None, ""])
+        assert unorder_equal(ships, self.ships, skip=[None, ''])
         for i in range(1, 7):
             ship = ships[i]
             if not have_ship(ship):
@@ -184,10 +186,7 @@ class Fleet:
     def circular_move(self, p1, p2):
         if p1 > p2:
             self.ships = (
-                self.ships[:p2]
-                + self.ships[p1 : p1 + 1]
-                + self.ships[p2:p1]
-                + self.ships[p1 + 1 :]
+                self.ships[:p2] + self.ships[p1 : p1 + 1] + self.ships[p2:p1] + self.ships[p1 + 1 :]
             )
         else:
             self.ships = (
@@ -205,7 +204,7 @@ class Fleet:
         ok = False
         # 如果舰队长度小于等于7，加上7个None
         while len(ships) < 7:
-            ships.append("")
+            ships.append('')
         for i in range(1, 7):
             if ships[i] is None:
                 ok = True
@@ -213,7 +212,7 @@ class Fleet:
                 return False
         return True
 
-    def set_ship(self, ships, flag_ship=None, order=False, search_method="word"):
+    def set_ship(self, ships, flag_ship=None, order=False, search_method='word'):
         """设置指定位置的舰队, 1-index
         Args:
             ships (list(str)): 代表舰船 [0号位留空, 1号位, 2号位, ...]
@@ -223,7 +222,7 @@ class Fleet:
         """
         assert self.legal(ships)
         assert flag_ship is None or flag_ship in ships
-        self.timer.logger.debug(f"编队更改为：{ships}")
+        self.timer.logger.debug(f'编队更改为：{ships}')
         self.detect()
         self._set_ships(ships, search_method=search_method)
         if order:

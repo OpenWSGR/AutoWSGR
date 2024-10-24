@@ -8,26 +8,24 @@ import airtest.core.android
 from airtest.core.api import connect_device
 
 from autowsgr.constants.custom_exceptions import CriticalErr
-from autowsgr.constants.data_roots import ADB_ROOT
-from autowsgr.utils.function_wrapper import try_for_times
+from autowsgr.utils.logger import Logger
+
 
 # Win 和 Android 的通信
 # Win 向系统写入数据
 
 
 class WindowsController:
-    def __init__(self, config, logger) -> None:
+    def __init__(self, config, logger: Logger) -> None:
         self.logger = logger
 
-        self.emulator = config["type"]  # 模拟器类型
-        self.emulator_name = config["emulator_name"]
-        self.start_cmd = config["start_cmd"]  # 模拟器启动命令
+        self.emulator = config['type']  # 模拟器类型
+        self.emulator_name = config['emulator_name']
+        self.start_cmd = config['start_cmd']  # 模拟器启动命令
 
         self.exe_name = os.path.basename(self.start_cmd)  # 自动获得模拟器的进程名
-        if self.emulator == "雷电":
-            self.emulator_index = (
-                int(re.search(r"\d+", self.emulator_name).group()) - 5554
-            ) / 2
+        if self.emulator == '雷电':
+            self.emulator_index = (int(re.search(r'\d+', self.emulator_name).group()) - 5554) / 2
 
     # ======================== 网络 ========================
     def check_network(self):
@@ -36,7 +34,7 @@ class WindowsController:
         Returns:
             bool:网络正常返回 True,否则返回 False
         """
-        return os.system("ping www.moefantasy.com") == 0
+        return os.system('ping www.moefantasy.com') == 0
 
     def wait_network(self, timeout=1000):
         """等待到网络恢复"""
@@ -49,7 +47,7 @@ class WindowsController:
         return False
 
     # ======================== 模拟器 ========================
-    def ldconsole(self, command, command_arg="", global_command=False):
+    def ldconsole(self, command, command_arg='', global_command=False):
         """
         使用雷电命令行控制模拟器。
 
@@ -65,13 +63,13 @@ class WindowsController:
         :return: 雷电命令行执行的输出。
         :rtype: str
         """
-        console_dir = os.path.join(os.path.dirname(self.start_cmd), "ldconsole.exe")
+        console_dir = os.path.join(os.path.dirname(self.start_cmd), 'ldconsole.exe')
 
         if not global_command:
             cmd = [
                 console_dir,
                 command,
-                "--index",
+                '--index',
                 str(self.emulator_index),
                 command_arg,
             ]
@@ -80,20 +78,20 @@ class WindowsController:
 
         # 使用subprocess.Popen来执行命令
         process = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
         )
         output, error = process.communicate()
 
         # 获取命令执行的输出
-        result = (
-            output.decode("utf-8", errors="replace")
+        return (
+            output.decode('utf-8', errors='replace')
             if output
-            else error.decode("utf-8", errors="replace")
+            else error.decode('utf-8', errors='replace')
         )
 
-        return result
-
-    # @try_for_times()
     def connect_android(self) -> airtest.core.android.Android:
         """连接指定安卓设备
         Returns:
@@ -103,88 +101,78 @@ class WindowsController:
             self.restart_android()
             time.sleep(15)
 
-        if self.emulator == "雷电":
-            dev_name = f"ANDROID:///{self.emulator_name}"
-        elif self.emulator == "蓝叠 Hyper-V":
-            dev_name = f"ANDROID:///{self.emulator_name}"
-        elif self.emulator == "MuMu":
-            dev_name = f"Android:///{self.emulator_name}"
-        elif self.emulator == "云手机":
-            dev_name = f"Android:///{self.emulator_name}"
+        if self.emulator == '雷电' or self.emulator == '蓝叠 Hyper-V':
+            dev_name = f'ANDROID:///{self.emulator_name}'
+        elif self.emulator == 'MuMu' or self.emulator == '云手机':
+            dev_name = f'Android:///{self.emulator_name}'
         else:
-            dev_name = f"Android:///{self.emulator_name}"
+            dev_name = f'Android:///{self.emulator_name}'
 
         from logging import ERROR, getLogger
 
-        getLogger("airtest").setLevel(ERROR)
+        getLogger('airtest').setLevel(ERROR)
 
         start_time = time.time()
         while time.time() - start_time <= 30:
             try:
                 dev = connect_device(dev_name)
-                self.logger.info("Android Connected!")
+                self.logger.info('Android Connected!')
                 return dev
             except:
-                pass
+                self.logger.error('连接模拟器失败！')
 
-        self.logger.error("连接模拟器失败！")
-        raise CriticalErr("连接模拟器失败！")
+        self.logger.error('连接模拟器失败！')
+        raise CriticalErr('连接模拟器失败！')
 
     def is_android_online(self):
         """判断 timer 给定的设备是否在线
         Returns:
             bool: 在线返回 True, 否则返回 False
         """
-        if self.emulator == "雷电":
-            raw_res = self.ldconsole("isrunning")
-            self.logger.debug("Emulator status: " + raw_res)
-            return raw_res == "running"
-        elif self.emulator == "云手机":
+        if self.emulator == '雷电':
+            raw_res = self.ldconsole('isrunning')
+            self.logger.debug('Emulator status: ' + raw_res)
+            return raw_res == 'running'
+        if self.emulator == '云手机':
             return True
-        else:
-            raw_res = check_output(
-                f'tasklist /fi "ImageName eq {self.exe_name}'
-            ).decode(
-                "gbk"
-            )  # TODO: 检查是否所有windows版本返回都是中文
-            return "PID" in raw_res
+        raw_res = check_output(
+            f'tasklist /fi "ImageName eq {self.exe_name}',
+        ).decode(
+            'gbk',
+        )  # TODO: 检查是否所有windows版本返回都是中文
+        return 'PID' in raw_res
 
     def kill_android(self):
         try:
-            if self.emulator == "雷电":
-                self.ldconsole("quit")
-            elif self.emulator == "蓝叠 Hyper-V":
-                subprocess.run(["taskkill", "-f", "-im", self.exe_name])
-            elif self.emulator == "MuMu":
-                subprocess.run(["taskkill", "-f", "-im", self.exe_name])
-            elif self.emulator == "云手机":
-                self.logger.info("云手机无需关闭")
-            elif self.emulator == "其他":
-                subprocess.run(["taskkill", "-f", "-im", self.exe_name])
+            if self.emulator == '雷电':
+                self.ldconsole('quit')
+            elif self.emulator == '蓝叠 Hyper-V' or self.emulator == 'MuMu':
+                subprocess.run(['taskkill', '-f', '-im', self.exe_name])
+            elif self.emulator == '云手机':
+                self.logger.info('云手机无需关闭')
+            elif self.emulator == '其他':
+                subprocess.run(['taskkill', '-f', '-im', self.exe_name])
         except:
-            self.logger.warning("Failed to kill emulator!")
+            self.logger.warning('Failed to kill emulator!')
 
     def start_android(self):
         try:
-            if self.emulator == "雷电":
-                self.ldconsole("launch")
-                self.logger.info("Emulator launched")
-            elif self.emulator == "蓝叠 Hyper-V":
+            if self.emulator == '雷电':
+                self.ldconsole('launch')
+                self.logger.info('Emulator launched')
+            elif self.emulator == '蓝叠 Hyper-V' or self.emulator == 'MuMu':
                 os.popen(self.start_cmd)
-            elif self.emulator == "MuMu":
-                os.popen(self.start_cmd)
-            elif self.emulator == "云手机":
-                self.logger.info("云手机无需启动")
-            elif self.emulator == "其他":
+            elif self.emulator == '云手机':
+                self.logger.info('云手机无需启动')
+            elif self.emulator == '其他':
                 os.popen(self.start_cmd)
             start_time = time.time()
             while not self.is_android_online():
                 time.sleep(1)
                 if time.time() - start_time > 120:
-                    raise TimeoutError("模拟器启动超时！")
+                    raise TimeoutError('模拟器启动超时！')
         except Exception as e:
-            self.logger.error(f"{e} 请检查模拟器路径!")
-            raise CriticalErr("on Restart Android")
+            raise CriticalErr(f'on Restart Android {e} 请检查模拟器路径!')
 
     def restart_android(self):
         self.kill_android()

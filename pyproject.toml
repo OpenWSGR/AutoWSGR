@@ -1,0 +1,156 @@
+[tool.black]
+line-length = 100
+skip-string-normalization = true
+target-version = ["py310"]
+
+[tool.isort]
+atomic = true
+profile = "black"
+src_paths = ["autowsgr", "examples"]
+known_first_party = ["autowsgr"]
+extra_standard_library = ["typing_extensions"]
+indent = 4
+line_length = 100
+lines_after_imports = 2
+multi_line_output = 3
+
+[tool.codespell]
+ignore-words = "docs/spelling_wordlist.txt"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+output-format = "full"
+src = ["autowsgr", "examples"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "N",       # pep8-naming
+    "UP",      # pyupgrade
+    "ANN",     # flake8-annotations
+    "S",       # flake8-bandit
+    "BLE",     # flake8-blind-except
+    "B",       # flake8-bugbear
+    "COM",     # flake8-commas
+    "C4",      # flake8-comprehensions
+    "EXE",     # flake8-executable
+    "FA",      # flake8-future-annotations
+    "LOG",     # flake8-logging
+    "ISC",     # flake8-implicit-str-concat
+    "INP",     # flake8-no-pep420
+    "PIE",     # flake8-pie
+    "PYI",     # flake8-pyi
+    "Q",       # flake8-quotes
+    "RSE",     # flake8-raise
+    "RET",     # flake8-return
+    "SIM",     # flake8-simplify
+    "TID",     # flake8-tidy-imports
+    "TCH",     # flake8-type-checking
+    "PERF",    # perflint
+    "FURB",    # refurb
+    "TRY",     # tryceratops
+    "RUF",     # ruff
+]
+ignore = [
+    # E501: line too long
+    # W505: doc line too long
+    # too long docstring due to long example blocks
+    "E501",
+    "W505",
+    # ANN002 Missing type annotation for `*args`
+    # ANN003 Missing type annotation for `**kwargs`
+    # ANN101: missing type annotation for `self` in method
+    # ANN102: missing type annotation for `cls` in classmethod
+    "ANN002",
+    "ANN003",
+    "ANN101",
+    "ANN102",
+    # ANN401: dynamically typed expressions (typing.Any) are disallowed
+    "ANN401",
+    # S101: use of `assert` detected
+    # internal use and may never raise at runtime
+    "S101",
+    # S311: random number generator not cryptographically secure
+    # not a security-sensitive application
+    "S311",
+    # SIM105: use `contextlib.suppress(...)` instead of try-except-pass
+    # reduce unnecessary function call
+    "SIM105",
+    # TRY003: avoid specifying long messages outside the exception class
+    # long messages are necessary for clarity
+    "TRY003",
+    # RUF001 String contains ambiguous `：` (FULLWIDTH COLON)
+    # RUF002 Docstring contains ambiguous `，` (FULLWIDTH COMMA)
+    # RUF003 Comment contains ambiguous `，` (FULLWIDTH COMMA)
+    # allow Chinese characters in docstrings
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # S307 Use of possibly insecure function; consider using `ast.literal_eval`
+    # S602 `subprocess` call with `shell=True` identified, security issue
+    # S603 `subprocess` call: check for execution of untrusted input
+    # S605 Starting a process with a shell, possible injection detected
+    # S607 Starting a process with a partial executable path
+    # allow some unsafe cases
+    "S307",
+    "S602",
+    "S603",
+    "S605",
+    "S607",
+    # N801 Class name `EventFightInfo20230117_2` should use CapWords convention
+    # N806 Variable `SIZE` in function should be lowercase
+    # allow some abuse of naming conventions
+    "N801",
+    "N806",
+    # ANN001 Missing type annotation for function argument
+    # ANN201 Missing return type annotation for public function
+    # ANN202 Missing return type annotation for private function
+    # TODO: temporarily ignore until all annotations are added
+    "ANN001",
+    "ANN201",
+    "ANN202",
+    # E722 Do not use bare `except`
+    # BLE001 Do not catch blind exception
+    # B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
+    # TRY002 Create your own exception
+    # TRY201 Use `raise` without specifying exception name
+    # TRY300 Consider moving this statement to an `else` block
+    # TRY301 Abstract `raise` to an inner function
+    # TRY400 Use `logging.exception` instead of `logging.error`
+    # PERF203 `try`-`except` within a loop incurs performance overhead
+    # TODO: temporarily ignore until all exceptions are handled
+    "E722",
+    "BLE001",
+    "B904",
+    "TRY002",
+    "TRY201",
+    "TRY300",
+    "TRY301",
+    "TRY400",
+    "PERF203",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "F401",    # unused-import
+]
+"examples/**/*.py" = [
+    "ANN",     # flake8-annotations
+    "TID252",  # relative-imports
+]
+"docs/conf.py" = [
+    "INP001",  # flake8-no-pep420
+]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+multiline-quotes = "double"
+inline-quotes = "single"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"

@@ -1,13 +1,13 @@
 import os
 from functools import cmp_to_key
 from pathlib import Path
-from pprint import pprint
 from types import SimpleNamespace
+from typing import Any
 
 import cv2
 import numpy as np
 import yaml
-from PIL import Image as PIM
+from PIL.Image import Image
 
 
 def listdir(path):
@@ -28,19 +28,21 @@ def all_in(elements, set):
 def yaml_to_dict(yaml_file):
     """将yaml文件转换为字典"""
     # 处理yaml文件中的转义字符\
-    with open(yaml_file, "r", encoding="utf-8") as f:
+    with open(yaml_file, encoding='utf-8') as f:
         content = f.read()
-    content = content.replace("\\", "\\\\")
-    return yaml.load(content, Loader=yaml.FullLoader)
+    content = content.replace('\\', '\\\\')
+    return yaml.load(content, Loader=yaml.FullLoader)  # noqa: S506
 
 
 def dict_to_yaml(dict_data, yaml_file):
     """将字典转换为yaml文件"""
-    with open(yaml_file, "w") as f:
+    with open(yaml_file, 'w') as f:
         yaml.dump(dict_data, f)
 
 
-def recursive_dict_update(d, u, skip=[]):
+def recursive_dict_update(d, u, skip=None):
+    if skip is None:
+        skip = []
     for k, v in u.items():
         if k in skip:
             continue
@@ -68,8 +70,8 @@ def get_file_suffix_name(path):
     Returns:
         str: 表示后缀名
     """
-    if os.path.exists(path) == False:
-        raise FileNotFoundError("file " + os.path.abspath(path) + " not found")
+    if not os.path.exists(path):
+        raise FileNotFoundError('file ' + os.path.abspath(path) + ' not found')
     if os.path.isdir(path):
         raise ValueError("arg 'path' is not a file but a dir")
     file = os.path.basename(path)
@@ -89,9 +91,9 @@ def read_file(path):
     Returns:
         _type_: _description_
     """
-    if os.path.exists(path) == False:
-        raise FileNotFoundError("file " + os.path.abspath(path) + " not found")
-    with open(path, mode="r") as f:
+    if not os.path.exists(path):
+        raise FileNotFoundError('file ' + os.path.abspath(path) + ' not found')
+    with open(path) as f:
         return f.read()
 
 
@@ -101,11 +103,11 @@ def create_file_with_path(path):
         path (str):需要创建的文件路径
     """
     dirname = os.path.dirname(path)
-    if dirname != "":
+    if dirname != '':
         os.makedirs(dirname, exist_ok=True)
-    if os.path.exists(path) == False:
-        file = open(path, "w")
-        file.close()
+    if not os.path.exists(path):
+        with open(path, 'w') as _f:
+            pass
 
 
 def delete_file(path):
@@ -115,7 +117,7 @@ def delete_file(path):
 
 def cv_imread(file_path):
     """读取含中文路径的图片, 返回一个字节流对象"""
-    with open(file_path, "rb") as file:
+    with open(file_path, 'rb') as file:
         return file.read()  # 读取整个文件的字节流
 
 
@@ -130,32 +132,27 @@ def save_image(path, image, ignore_existed_image=False, *args, **kwargs):
     Raises:
         FileExistsError: 如果未忽略已存在图片并且图片已存在
     """
-    if ignore_existed_image == False and os.path.exists(path):
-        raise FileExistsError("该图片已存在")
-    if isinstance(image, PIM.Image):
+    if not ignore_existed_image and os.path.exists(path):
+        raise FileExistsError('该图片已存在')
+    if isinstance(image, Image):
         image.save(os.path.abspath(path))
     if isinstance(image, np.ndarray):
-        cv2.imencode(".png", image)[1].tofile(path)
+        cv2.imencode('.png', image)[1].tofile(path)
 
 
 def get_all_files(dir):
-    res = []
-    for r, d, f in os.walk(dir):
-        for file in f:
-            res.append(os.path.join(r, file))
-    return res
+    return [os.path.join(r, file) for r, _d, f in os.walk(dir) for file in f]
 
 
 def count(keys, iter):
-    res = sum(1 for it in iter if (it in keys))
-    return res
+    return sum(1 for it in iter if (it in keys))
 
 
 class MyNamespace(SimpleNamespace):
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Any:
         return getattr(self, key)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         setattr(self, key, value)
 
 
@@ -185,16 +182,16 @@ def create_namespace(directory, template):
         """
         if len(a.stem) == len(b.stem):
             return 0 if a.stem == b.stem else (-1 if a.stem < b.stem else 1)
-        elif len(a.stem) < len(b.stem):
+        if len(a.stem) < len(b.stem):
             return -1
-        else:
-            return 1
+        return 1
 
     root = Path(directory)
     namespace = MyNamespace()
 
     for path in sorted(
-        root.rglob("*.png"), key=cmp_to_key(compare_length_and_alphabet)
+        root.rglob('*.png'),
+        key=cmp_to_key(compare_length_and_alphabet),
     ):
         *parts, folder, filename = path.parts
         current = namespace
@@ -213,9 +210,9 @@ def create_namespace(directory, template):
             if not hasattr(current, folder):
                 setattr(current, folder, MyNamespace())
             current = getattr(current, folder)
-            if filename != filename.rstrip(r"0123456789"):
+            if filename != filename.rstrip(r'0123456789'):
                 # 2. 以数字后缀结尾的文件名情况，代表多个等价图片
-                filename = filename.rstrip(r"0123456789")
+                filename = filename.rstrip(r'0123456789')
                 if not hasattr(current, filename):
                     setattr(current, filename, [])
                 getattr(current, filename).append(template(path))

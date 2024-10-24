@@ -7,19 +7,23 @@ from autowsgr.game.build import BuildManager
 from autowsgr.game.game_operation import cook
 from autowsgr.scripts.main import start_script
 
-timer = start_script(f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml")
+
+timer = start_script(f'{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml')
 
 
 def week(start=1, start_times=0, fleet_id=4, change=True):
     # 完成周常任务(针对作者的船舱)
     changes = [None, -1, -1, -1, -1, None, None, None, None, -1]
-    last_point = [None, "B", "F", "G", "L", "I", "J", "M", "L", "O"]
-    result = [None] + ["S"] * 8
+    last_point = [None, 'B', 'F', 'G', 'L', 'I', 'J', 'M', 'L', 'O']
+    result = [None] + ['S'] * 8
     if change:
         changes[start] = -1
     for i in range(start, 10):
         plan = nf.NormalFightPlan(
-            timer, timer.plan_root_list["week"][i], fleet_id, changes[i]
+            timer,
+            timer.plan_root_list['week'][i],
+            fleet_id,
+            changes[i],
         )
         if i == start:
             plan.run_for_times_condition(5 - start_times, last_point[i], result[i])
@@ -37,11 +41,11 @@ def day():
     build_manager.build(resources=resources)
     print(build_manager.slot_eta)
 
-    for i in range(3):
-        build_manager.build(type="equipment", resources=equipment_resources)
+    for _ in range(3):
+        build_manager.build(type='equipment', resources=equipment_resources)
         print(build_manager.slot_eta)
-        print(build_manager.get_timedelta(type="equipment").total_seconds())
-        time.sleep(build_manager.get_timedelta(type="equipment").total_seconds())
+        print(build_manager.get_timedelta(type='equipment').total_seconds())
+        time.sleep(build_manager.get_timedelta(type='equipment').total_seconds())
 
 
 week()
@@ -49,6 +53,6 @@ week()
 # day()  # 日常做菜
 
 operation = da.DailyOperation(
-    f"{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml"
+    f'{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml',
 )
 operation.run()

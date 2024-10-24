@@ -12,19 +12,20 @@ class Expedition:
     def update(self, force=False):
         self.timer.update_screen()
         if (
-            isinstance(self.timer.now_page, str) and "unknow" in self.timer.now_page
+            isinstance(self.timer.now_page, str) and 'unknown' in self.timer.now_page
         ) or self.timer.now_page.name not in [
-            "expedition_page",
-            "map_page",
-            "battle_page",
-            "exercise_page",
-            "decisive_battle_entrance",
+            'expedition_page',
+            'map_page',
+            'battle_page',
+            'exercise_page',
+            'decisive_battle_entrance',
         ]:
             if force or time.time() - self.last_check > 1800:
                 self.timer.go_main_page()
-            if self.timer.now_page.name == "main_page":
+            if self.timer.now_page.name == 'main_page':
                 self.is_ready = self.timer.check_pixel(
-                    (933, 454), bgr_color=(45, 89, 255)
+                    (933, 454),
+                    bgr_color=(45, 89, 255),
                 )
         else:
             self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
@@ -38,8 +39,8 @@ class Expedition:
             bool: 是否进行了远征操作
         """
         self.update(force=force)
-        self.timer.logger.debug("尚未有已完成的远征任务")
+        self.timer.logger.debug('尚未有已完成的远征任务')
         if self.is_ready:
-            self.timer.goto_game_page("expedition_page")
-            flag = try_to_get_expedition(self.timer)
+            self.timer.goto_game_page('expedition_page')
+            try_to_get_expedition(self.timer)
             self.timer.last_expedition_check_time = time.time()

@@ -7,7 +7,7 @@ class Ship:
     def __init__(self, name) -> None:
         self.level = 1
         self.name = name  # 舰船名: 舰船的唯一标识
-        self.type = "DD"  # 舰船类型, 暂时没啥用
+        self.type = 'DD'  # 舰船类型, 暂时没啥用
         self._statu = 0  # 数字: 0 绿血, 1 黄血, 2 红血, 3 修理中.
         self.repair_end_time = 0
         self.repair_start_time = 0
@@ -15,8 +15,8 @@ class Ship:
         self.equipments = None  # 装备状态, 暂时不用
 
     def __str__(self) -> str:
-        table = ["绿血", "中破", "大破", "修理中"]
-        return f"舰船名:{self.name}\n舰船状态:{table[self.statu]}\n舰船等级:{self.level}\n\n"
+        table = ['绿血', '中破', '大破', '修理中']
+        return f'舰船名:{self.name}\n舰船状态:{table[self.statu]}\n舰船等级:{self.level}\n\n'
 
     @property
     def statu(self):
@@ -47,7 +47,7 @@ class WorkShop:
         self.available_time = None
 
     def _time_to_seconds(self, time_str):
-        parts = time_str.split(":")
+        parts = time_str.split(':')
         return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
 
     def update_available_time(self, available_time):
@@ -55,15 +55,14 @@ class WorkShop:
 
     def get_waiting_time(self):
         # 如果不确定, 返回 None
-        if self.available_time == None:
+        if self.available_time is None:
             return None
 
         waiting_time = 86400
         for bath in self.available_time:
             if time.time() > bath:
                 return 0
-            else:
-                waiting_time = min(waiting_time, bath - time.time() + 0.1)
+            waiting_time = min(waiting_time, bath - time.time() + 0.1)
         return waiting_time
 
     def is_available(self):
@@ -85,8 +84,7 @@ class WorkShop:
                     end_time = time.time() + self._time_to_seconds(time_cost)
                     self.available_time[id] = end_time
                     return (True, end_time)
-        else:
-            return (False, 0)
+        return (False, 0)
 
 
 class BathRoom(WorkShop):
@@ -135,13 +133,13 @@ class Port:
         self.chapter = 0
 
     def have_ship(self, name):
-        return any([name == ship.name for ship in self.ships])
+        return any(name == ship.name for ship in self.ships)
 
     def register_ship(self, name):
         if not self.have_ship(name):
             ship = Ship(name)
             self.ships.append(ship)
-            self.logger.info(f"舰船 {name} 已注册")
+            self.logger.info(f'舰船 {name} 已注册')
             return ship
         return None
 
@@ -151,10 +149,10 @@ class Port:
                 if ship.name == name:
                     return ship
         self.show_fleet()
-        self.logger.info(f"需要查找的舰船 {name} 未找到")
+        self.logger.info(f'需要查找的舰船 {name} 未找到')
         return None
 
     def show_fleet(self):
-        self.logger.info("当前已经注册的舰船如下:")
+        self.logger.info('当前已经注册的舰船如下:')
         for ship in self.ships:
             print(ship)

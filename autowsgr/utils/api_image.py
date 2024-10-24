@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import cv2
 import numpy as np
 
@@ -10,7 +8,7 @@ def relative_to_absolute(record_pos, resolution=(960, 540)):
     """将相对坐标转换为绝对坐标"""
     rel_x, rel_y = record_pos
     _w, _h = resolution
-    assert 0 <= rel_x <= 1 and 0 <= rel_y <= 1, "rel_x and rel_y should be in [0, 1]"
+    assert 0 <= rel_x <= 1 and 0 <= rel_y <= 1, 'rel_x and rel_y should be in [0, 1]'
     abs_x = _w * rel_x
     abs_y = _h * rel_y
     return abs_x, abs_y
@@ -21,7 +19,7 @@ def cv_show_image(img):
 
     img: numpy.ndarray 格式的图片
     """
-    cv2.imshow("Image", img)
+    cv2.imshow('Image', img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -30,9 +28,7 @@ def absolute_to_relative(absolute_pos, resolution=(960, 540)):
     """将绝对坐标转换为相对坐标"""
     abs_x, abs_y = absolute_pos
     _w, _h = resolution
-    assert (
-        0 <= abs_x <= _w and 0 <= abs_y <= _h
-    ), "abs_x and abs_y should be in [0, resolution]"
+    assert 0 <= abs_x <= _w and 0 <= abs_y <= _h, f'{abs_x, abs_y} should be in {resolution}'
     rel_x = abs_x / _w
     rel_y = abs_y / _h
     return rel_x, rel_y
@@ -48,16 +44,12 @@ def inside_rect(rect, num_cols, num_rows):
     # size    Width and height of the rectangle.
     # angle   The rotation angle in a clockwise direction. When the angle is 0, 90, 180, 270 etc., the rectangle becomes an up-right rectangle.
     # Return:
-    # True: if the rotated sub rectangle is side the up-right rectange
+    # True: if the rotated sub rectangle is side the up-right rectangle
     # False: else
 
     rect_center = rect[0]
     rect_center_x = rect_center[0]
     rect_center_y = rect_center[1]
-
-    rect_width, rect_height = rect[1]
-
-    rect_angle = rect[2]
 
     if (rect_center_x < 0) or (rect_center_x > num_cols):
         return False
@@ -72,10 +64,7 @@ def inside_rect(rect, num_cols, num_rows):
     y_max = int(np.max(box[:, 1]))
     y_min = int(np.min(box[:, 1]))
 
-    if (x_max <= num_cols) and (x_min >= 0) and (y_max <= num_rows) and (y_min >= 0):
-        return True
-    else:
-        return False
+    return (x_max <= num_cols) and (x_min >= 0) and (y_max <= num_rows) and (y_min >= 0)
 
 
 def rect_bbx(rect):
@@ -132,9 +121,7 @@ def image_rotate_without_crop(mat, angle):
     rotation_mat[0, 2] += bound_w / 2 - image_center[0]
     rotation_mat[1, 2] += bound_h / 2 - image_center[1]
 
-    rotated_mat = cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
-
-    return rotated_mat
+    return cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
 
 
 def crop_rectangle_relative(image, x_ratio, y_ratio, width_ratio, height_ratio):
@@ -161,9 +148,7 @@ def crop_rectangle_relative(image, x_ratio, y_ratio, width_ratio, height_ratio):
     end_y = start_y + int(height * height_ratio)
 
     # 裁剪图像
-    cropped_image = image[start_y:end_y, start_x:end_x]
-
-    return cropped_image
+    return image[start_y:end_y, start_x:end_x]
 
 
 def crop_rectangle(image, rect):
@@ -173,7 +158,7 @@ def crop_rectangle(image, rect):
     num_cols = image.shape[1]
 
     if not inside_rect(rect=rect, num_cols=num_cols, num_rows=num_rows):
-        print("Proposed rectangle is not fully in the image.")
+        print('Proposed rectangle is not fully in the image.')
         return None
 
     rect_center = rect[0]
@@ -183,10 +168,7 @@ def crop_rectangle(image, rect):
     rect_height = rect[1][1]
 
     return image[
-        rect_center_y
-        - rect_height // 2 : rect_center_y
-        + rect_height
-        - rect_height // 2,
+        rect_center_y - rect_height // 2 : rect_center_y + rect_height - rect_height // 2,
         rect_center_x - rect_width // 2 : rect_center_x + rect_width - rect_width // 2,
     ]
 
@@ -198,7 +180,7 @@ def crop_rotated_rectangle(image, rect):
     num_cols = image.shape[1]
 
     if not inside_rect(rect=rect, num_cols=num_cols, num_rows=num_rows):
-        print("Proposed rectangle is not fully in the image.")
+        print('Proposed rectangle is not fully in the image.')
         return None
 
     rotated_angle = rect[2]
@@ -207,7 +189,8 @@ def crop_rotated_rectangle(image, rect):
     rect_bbx_upright_image = crop_rectangle(image=image, rect=rect_bbx_upright)
 
     rotated_rect_bbx_upright_image = image_rotate_without_crop(
-        mat=rect_bbx_upright_image, angle=rotated_angle
+        mat=rect_bbx_upright_image,
+        angle=rotated_angle,
     )
 
     rect_width = rect[1][0]
@@ -219,12 +202,8 @@ def crop_rotated_rectangle(image, rect):
     )
 
     return rotated_rect_bbx_upright_image[
-        crop_center[1]
-        - rect_height // 2 : crop_center[1]
-        + (rect_height - rect_height // 2),
-        crop_center[0]
-        - rect_width // 2 : crop_center[0]
-        + (rect_width - rect_width // 2),
+        crop_center[1] - rect_height // 2 : crop_center[1] + (rect_height - rect_height // 2),
+        crop_center[0] - rect_width // 2 : crop_center[0] + (rect_width - rect_width // 2),
     ]
 
 
@@ -257,13 +236,16 @@ def crop_image(image, pos1, pos2, rotation=0, debug=False):
         ret = crop_rotated_rectangle(image, rect)
 
     if debug:
-        cv2.imwrite("crop_image.png", ret)
+        cv2.imwrite('crop_image.png', ret)
 
     return ret
 
 
-def locateCenterOnImage(
-    image: np.ndarray, query: MyTemplate, confidence=0.85, this_methods=None
+def locate_image_center(
+    image: np.ndarray,
+    query: MyTemplate,
+    confidence=0.85,
+    this_methods=None,
 ):
     """从原图像中尝试找出一个置信度相对于模板图像最高的矩阵区域的中心坐标
 
@@ -279,14 +261,16 @@ def locateCenterOnImage(
         否则返回 None
     """
     if this_methods is None:
-        this_methods = ["tpl"]
+        this_methods = ['tpl']
     query.threshold = confidence
     match_pos = query.match_in(image, this_methods=this_methods)
     return match_pos or None
 
 
 def match_nearest_index(
-    pos: Tuple[int, int], positions: List[Tuple[int, int]], metric: str = "l2"
+    pos: tuple[int, int],
+    positions: list[tuple[int, int]],
+    metric: str = 'l2',
 ):
     """找出离目标点最近的点的索引
 
@@ -297,15 +281,15 @@ def match_nearest_index(
     Returns:
         int: 最近点的索引
     """
-    min_distance = float("inf")
+    min_distance = float('inf')
     min_index = -1
     for i, p in enumerate(positions):
-        if metric == "l2":
+        if metric == 'l2':
             distance = (p[0] - pos[0]) ** 2 + (p[1] - pos[1]) ** 2
-        elif metric == "l1":
+        elif metric == 'l1':
             distance = abs(p[0] - pos[0]) + abs(p[1] - pos[1])
         else:
-            raise ValueError("unsupported metric " + str(metric))
+            raise ValueError('unsupported metric ' + str(metric))
         if distance < min_distance:
             min_distance = distance
             min_index = i

@@ -1,9 +1,8 @@
 import copy
 import datetime
-import os
 import threading as th
 import time
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 
 import cv2
 from airtest.core.android import Android
@@ -14,11 +13,11 @@ from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
     crop_rectangle_relative,
-    locateCenterOnImage,
+    locate_image_center,
     relative_to_absolute,
 )
 from autowsgr.utils.logger import Logger
-from autowsgr.utils.math_functions import CalcDis
+from autowsgr.utils.math_functions import cal_dis
 
 
 class AndroidController:
@@ -34,10 +33,10 @@ class AndroidController:
         self.update_screen()
         self.resolution = self.screen.shape[:2]
         self.resolution = self.resolution[::-1]
-        self.logger.info(f"resolution:{self.resolution}")
+        self.logger.info(f'resolution:{self.resolution}')
 
     # ========= 基础命令 =========
-    def shell(self, cmd, *args, **kwargs):
+    def shell(self, cmd):
         """向链接的模拟器发送 shell 命令
         Args:
             cmd (str):命令字符串
@@ -46,11 +45,11 @@ class AndroidController:
 
     def get_frontend_app(self):
         """获取前台应用的包名"""
-        return self.shell("dumpsys window | grep mCurrentFocus")
+        return self.shell('dumpsys window | grep mCurrentFocus')
 
     def start_background_app(self, package_name):
         self.dev.start_app(package_name)
-        self.shell("input keyevent 3")
+        self.shell('input keyevent 3')
 
     def start_app(self, package_name):
         self.dev.start_app(package_name)
@@ -60,9 +59,9 @@ class AndroidController:
 
     def list_apps(self):
         """列出所有正在运行的应用"""
-        return self.dev.shell("ps")
+        return self.dev.shell('ps')
 
-    def is_game_running(self, app="zhanjian2"):
+    def is_game_running(self, app='zhanjian2'):
         """检查一个应用是否在运行
 
         Args:
@@ -78,16 +77,16 @@ class AndroidController:
         """输入文本
         需要焦点在输入框时才能输入
         """
-        if hasattr(self, "first_type") and self.first_type:
-            self.logger.debug("第一次尝试输入, 测试中...")
-            self.dev.text("T")
+        if hasattr(self, 'first_type') and self.first_type:
+            self.logger.debug('第一次尝试输入, 测试中...')
+            self.dev.text('T')
             time.sleep(0.5)
-            self.dev.shell("input keyevent 67")
+            self.dev.shell('input keyevent 67')
             self.first_type = False
-        self.logger.debug(f"正在输入: {t}")
+        self.logger.debug(f'正在输入: {t}')
         self.dev.text(t)
 
-    def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False):
+    def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False) -> th.Thread | None:
         """点击模拟器相对坐标 (x,y).
         Args:
             x,y:相对坐标
@@ -100,7 +99,7 @@ class AndroidController:
             enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
         if self.config.SHOW_ANDROID_INPUT:
-            self.logger.debug(f"click ({x:.3f} {y:.3f})")
+            self.logger.debug(f'click ({x:.3f} {y:.3f})')
         x, y = relative_to_absolute((x, y), self.resolution)
 
         if times < 1:
@@ -109,18 +108,19 @@ class AndroidController:
             raise ValueError("arg 'delay' should be positive or 0")
         if enable_subprocess and times != 1:
             raise ValueError(
-                "subprocess enabled but arg 'times' is not 1 but " + str(times)
+                "subprocess enabled but arg 'times' is not 1 but " + str(times),
             )
         if enable_subprocess:
-            p = th.Thread(target=lambda: self.shell(f"input tap {str(x)} {str(y)}"))
+            p = th.Thread(target=lambda: self.shell(f'input tap {x!s} {y!s}'))
             p.start()
             return p
 
         for _ in range(times):
-            self.shell(f"input tap {str(x)} {str(y)}")
+            self.shell(f'input tap {x!s} {y!s}')
             time.sleep(delay * self.config.DELAY)
+        return None
 
-    def click(self, x, y, times=1, delay=0.3, enable_subprocess=False, *args, **kwargs):
+    def click(self, x, y, times=1, delay=0.3, enable_subprocess=False):
         """点击模拟器相对坐标 (x,y).
         Args:
             x,y:相对横坐标  (相对 960x540 屏幕)
@@ -136,14 +136,14 @@ class AndroidController:
         self.relative_click(x, y, times, delay, enable_subprocess)
 
     # ===========图像函数============
-    def recognize_screen_relative(self, left, top, right, buttom, update=False):
+    def recognize_screen_relative(self, left, top, right, bottom, update=False):
         if update:
             self.update_screen()
         return recognize(
-            crop_rectangle_relative(self.screen, left, top, right - left, buttom - top)
+            crop_rectangle_relative(self.screen, left, top, right - left, bottom - top),
         )
 
-    def relative_swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
+    def relative_swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5):
         """匀速滑动模拟器相对坐标 (x1, y1) 到 (x2, y2).
         Args:
             x1, y1, x2, y2: 相对坐标
@@ -155,13 +155,13 @@ class AndroidController:
         x1, y1 = relative_to_absolute((x1, y1), self.resolution)
         x2, y2 = relative_to_absolute((x2, y2), self.resolution)
         duration = int(duration * 1000)
-        input_str = f"input swipe {str(x1)} {str(y1)} {str(x2)} {str(y2)} {duration}"
+        input_str = f'input swipe {x1!s} {y1!s} {x2!s} {y2!s} {duration}'
         if self.config.SHOW_ANDROID_INPUT:
             self.logger.debug(input_str)
         self.shell(input_str)
         time.sleep(delay)
 
-    def swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5, *args, **kwargs):
+    def swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5):
         """匀速滑动模拟器相对坐标 (x1,y1) 到 (x2,y2).
         Args:
             x1, y1, x2, y2:相对坐标 (960x540 屏幕)
@@ -170,9 +170,9 @@ class AndroidController:
         """
         x1, y1 = absolute_to_relative((x1, y1), (960, 540))
         x2, y2 = absolute_to_relative((x2, y2), (960, 540))
-        self.relative_swipe(x1, y1, x2, y2, duration, delay, *args, **kwargs)
+        self.relative_swipe(x1, y1, x2, y2, duration, delay)
 
-    def relative_long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
+    def relative_long_tap(self, x, y, duration=1, delay=0.5):
         """长按相对坐标 (x, y)
         Args:
             x, y: 相对坐标
@@ -183,12 +183,12 @@ class AndroidController:
             raise ValueError("arg 'delay' should be positive or 0")
         if duration <= 0.2:
             raise ValueError(
-                "duration time too short,arg 'duration' should greater than 0.2"
+                "duration time too short,arg 'duration' should greater than 0.2",
             )
         x, y = relative_to_absolute((x, y), self.resolution)
-        self.swipe(x, y, x, y, duration=duration, delay=delay, *args, **kwargs)
+        self.swipe(x, y, x, y, duration=duration, delay=delay)
 
-    def long_tap(self, x, y, duration=1, delay=0.5, *args, **kwargs):
+    def long_tap(self, x, y, duration=1, delay=0.5):
         """长按相对坐标 (x,y)
         Args:
             x,y: 相对 (960x540 屏幕) 横坐标
@@ -196,7 +196,7 @@ class AndroidController:
             delay (float, optional): 操作后等待时间(秒). Defaults to 0.5.
         """
         x, y = absolute_to_relative((x, y), (960, 540))
-        self.relative_long_tap(x, y, duration, delay, *args, **kwargs)
+        self.relative_long_tap(x, y, duration, delay)
 
     # ======== 屏幕相关 ========
     def update_screen(self):
@@ -226,7 +226,7 @@ class AndroidController:
         return [self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0]]
 
     def check_pixel(self, position, bgr_color, distance=30, screen_shot=False) -> bool:
-        """检查像素点是否满足要求
+        r"""检查像素点是否满足要求
         Args:
             position (_type_): (x, y) 坐标, x 是长, 相对 960x540 的值, x \in [0, 960)
 
@@ -240,27 +240,34 @@ class AndroidController:
         """
         color = self.get_pixel(*position, screen_shot)
         color.reverse()
-        return CalcDis(color, bgr_color) < distance**2
+        return cal_dis(color, bgr_color) < distance**2
 
-    def locateCenterOnScreen(
-        self, query: MyTemplate, confidence=0.85, this_methods=None
+    def locate_center_on_screen(
+        self,
+        query: MyTemplate,
+        confidence=0.85,
+        this_methods=None,
     ):
         """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
-            参考 locateCenterOnImage
+            参考 locate_image_center
         Returns:
             如果找到返回一个二元组表示绝对坐标
 
             否则返回 None
         """
         if this_methods is None:
-            this_methods = ["tpl"]
-        return locateCenterOnImage(self.screen, query, confidence, this_methods)
+            this_methods = ['tpl']
+        return locate_image_center(self.screen, query, confidence, this_methods)
 
     def get_image_position(
-        self, image, need_screen_shot=True, confidence=0.85, this_methods=None
+        self,
+        image,
+        need_screen_shot=True,
+        confidence=0.85,
+        this_methods=None,
     ):
         """从屏幕中找出和多张模板图像匹配度超过阈值的矩阵区域的中心坐标,如果有多个,返回第一个
-            参考 locateCenterOnScreen
+            参考 locate_center_on_screen
         Args:
             need_screen_shot (int, optional): 是否重新截取屏幕. Defaults to 1.
         Returns:
@@ -269,29 +276,32 @@ class AndroidController:
             否则返回 None
         """
         if this_methods is None:
-            this_methods = ["tpl"]
+            this_methods = ['tpl']
         images = image
         if not isinstance(images, Iterable):
             images = [images]
         if need_screen_shot:
             self.update_screen()
         for image in images:
-            res = self.locateCenterOnScreen(image, confidence, this_methods)
+            res = self.locate_center_on_screen(image, confidence, this_methods)
             if res is not None:
                 rel_pos = absolute_to_relative(res, self.resolution)
-                abs_pos = relative_to_absolute(rel_pos, (960, 540))
-                return abs_pos
+                return relative_to_absolute(rel_pos, (960, 540))
         return None
 
     def image_exist(
-        self, images, need_screen_shot=True, confidence=0.85, this_methods=None
+        self,
+        images,
+        need_screen_shot=True,
+        confidence=0.85,
+        this_methods=None,
     ):
         """判断图像是否存在于屏幕中
         Returns:
             bool:如果存在为 True 否则为 False
         """
         if this_methods is None:
-            this_methods = ["tpl"]
+            this_methods = ['tpl']
         if not isinstance(images, list):
             images = [images]
         if need_screen_shot:
@@ -320,22 +330,27 @@ class AndroidController:
             否则返回 False
         """
         if this_methods is None:
-            this_methods = ["tpl"]
+            this_methods = ['tpl']
         if timeout < 0:
             raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
-        StartTime = time.time()
+        start_time = time.time()
         while True:
             x = self.get_image_position(image, True, confidence, this_methods)
-            if x != None:
+            if x is not None:
                 time.sleep(after_get_delay)
                 return x
-            if time.time() - StartTime > timeout:
+            if time.time() - start_time > timeout:
                 time.sleep(gap)
                 return False
             time.sleep(gap)
 
     def wait_images(
-        self, images=None, confidence=0.85, gap=0.15, after_get_delay=0, timeout=10
+        self,
+        images=None,
+        confidence=0.85,
+        gap=0.15,
+        after_get_delay=0,
+        timeout=10,
     ):
         """等待一系列图片中的一个在屏幕中出现
 
@@ -358,17 +373,17 @@ class AndroidController:
             return None
         if isinstance(images, MyTemplate):
             images = [(0, images)]
-        elif isinstance(images, (list, Tuple)) and isinstance(images[0], MyTemplate):
+        elif isinstance(images, list | tuple) and isinstance(images[0], MyTemplate):
             images = list(enumerate(images))  # 把列表转化为元组
         # TODO: 后续优化此内容，当图片结尾有数字的时候会生成一个列表，也就是列表里面嵌套列表，先前不支持此类型
-        elif isinstance(images, (list, Tuple)) and isinstance(images[0], (list, Tuple)):
-            images = [(i, image) for i, image in enumerate(images)]
+        elif isinstance(images, list | tuple) and isinstance(images[0], list | tuple):
+            images = list(enumerate(images))
         elif isinstance(images, dict):
             images = images.items()
         else:
             images = images.__dict__.items()
 
-        StartTime = time.time()
+        start_time = time.time()
         while True:
             self.update_screen()
             for res, image in images:
@@ -376,11 +391,16 @@ class AndroidController:
                     time.sleep(after_get_delay)
                     return res
             time.sleep(gap)
-            if time.time() - StartTime > timeout:
+            if time.time() - start_time > timeout:
                 return None
 
     def wait_images_position(
-        self, images=None, confidence=0.85, gap=0.15, after_get_delay=0, timeout=10
+        self,
+        images=None,
+        confidence=0.85,
+        gap=0.15,
+        after_get_delay=0,
+        timeout=10,
     ):
         """等待一些图片,并返回第一个匹配结果的位置
 
@@ -416,8 +436,7 @@ class AndroidController:
         if pos is None:
             if not must_click:
                 return False
-            else:
-                raise ImageNotFoundErr(f"Target image not found:{str(image.filepath)}")
+            raise ImageNotFoundErr(f'Target image not found:{image.filepath!s}')
 
         self.click(*pos, delay=delay)
         return pos
@@ -447,10 +466,12 @@ class AndroidController:
         if name is None:
             self.logger.log_image(
                 image=screen,
+                name=datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
                 ignore_existed_image=ignore_existed_image,
-                name=datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             )
         else:
             self.logger.log_image(
-                image=screen, ignore_existed_image=ignore_existed_image, name=name
+                image=screen,
+                name=name,
+                ignore_existed_image=ignore_existed_image,
             )

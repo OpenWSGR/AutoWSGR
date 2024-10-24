@@ -1,37 +1,27 @@
 from functools import partial
 
-from airtest.core.cv import (
-    MATCHING_METHODS,
-    ST,
-    InvalidMatchingMethodError,
-    TargetPos,
-    Template,
-)
-from airtest.core.settings import Settings as ST
+from airtest.core.cv import MATCHING_METHODS, ST, InvalidMatchingMethodError, TargetPos, Template
 
 from autowsgr.constants.data_roots import IMG_ROOT
 from autowsgr.utils.io import create_namespace
 
 
 class MyTemplate(Template):
-    def __radd__(self, other):
+    def __radd__(self, other) -> list:
         if isinstance(other, list):
-            return other + [self]  # 添加到列表开头
-        else:
-            return NotImplemented
+            return [*other, self]  # 添加到列表开头
+        return NotImplemented
 
-    def __add__(self, other):
+    def __add__(self, other) -> list:
         if isinstance(other, list):
-            return [self] + other  # 添加到列表末尾
-        else:
-            return NotImplemented
+            return [self, *other]  # 添加到列表末尾
+        return NotImplemented
 
     def match_in(self, screen, this_methods=None):
         match_result = self._cv_match(screen, this_methods)
         if not match_result:
             return None
-        focus_pos = TargetPos().getXY(match_result, self.target_pos)
-        return focus_pos
+        return TargetPos().getXY(match_result, self.target_pos)
 
     def _cv_match(self, screen, this_methods=None):
         ori_image = self._imread()
@@ -44,9 +34,9 @@ class MyTemplate(Template):
             func = MATCHING_METHODS.get(method, None)
             if func is None:
                 raise InvalidMatchingMethodError(
-                    f"Undefined method in CVSTRATEGY: '{method}', try 'kaze'/'brisk'/'akaze'/'orb'/'surf'/'sift'/'brief' instead."
+                    f"Undefined method in CVSTRATEGY: '{method}', try 'kaze'/'brisk'/'akaze'/'orb'/'surf'/'sift'/'brief' instead.",
                 )
-            if method in ["mstpl", "gmstpl"]:
+            if method in ['mstpl', 'gmstpl']:
                 ret = self._try_match(
                     func,
                     ori_image,
@@ -60,7 +50,11 @@ class MyTemplate(Template):
                 )
             else:
                 ret = self._try_match(
-                    func, image, screen, threshold=self.threshold, rgb=self.rgb
+                    func,
+                    image,
+                    screen,
+                    threshold=self.threshold,
+                    rgb=self.rgb,
                 )
             if ret:
                 break
@@ -68,5 +62,6 @@ class MyTemplate(Template):
 
 
 IMG = create_namespace(
-    IMG_ROOT, partial(MyTemplate, threshold=0.9, resolution=(960, 540))
+    IMG_ROOT,
+    partial(MyTemplate, threshold=0.9, resolution=(960, 540)),
 )

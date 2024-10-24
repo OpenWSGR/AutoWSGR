@@ -14,7 +14,8 @@
 
 ## 近期更新
 
-- 计划弃用 `paddleocr` 后端, 请及时修改自己的 `user_settings.yaml` 中对应参数, 兼容性还将保持一段时间. **2024/10/06**
+- 已弃用 Python 3.9，请升级 Python>=3.10. 2024/10/24
+- 计划弃用 `paddleocr` 后端, 请及时修改自己的 `user_settings.yaml` 中`OCR_BACKEND`为`easyocr`. **2024/10/06**
 - 任务调度支持决战、战役、演习和活动. **2024/10/03**
 - 蓝叠模拟器的连接方法改为手动填写adb地址. **2024/10/02**
 - 支持当前活动 "征程启航",请重新下载example文件夹中的plans和event.py文件.活动先关的使用方法可以参考[这里](https://sincere-theater-0e6.notion.site/fb9bbe5a4b0a426db59ac7892645ee1b)**2024/09/30**

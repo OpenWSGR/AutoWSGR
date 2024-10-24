@@ -9,18 +9,19 @@ from autowsgr.constants.data_roots import TUNNEL_ROOT
 from autowsgr.utils.io import cv_imread
 from autowsgr.utils.operator import unzip_element
 
+
 en_reader = None
 ch_reader = None
 
 
 def load_en_reader():
     global en_reader
-    en_reader = easyocr.Reader(["en"], gpu=True)
+    en_reader = easyocr.Reader(['en'], gpu=True)
 
 
 def load_ch_reader():
     global ch_reader
-    ch_reader = easyocr.Reader(["ch_sim"], gpu=True)
+    ch_reader = easyocr.Reader(['ch_sim'], gpu=True)
 
 
 def edit_distance(word1, word2) -> int:
@@ -35,8 +36,8 @@ def edit_distance(word1, word2) -> int:
     if m == 0 and n == 0:
         return 0
     word1, word2 = (
-        " " + word1,
-        " " + word2,
+        ' ' + word1,
+        ' ' + word2,
     )  # 非常必要的操作，不添加空格话，在Word为空时会比较麻烦
     dp = [[0 for _ in range(n + 1)] for _ in range(m + 1)]
     dp[0][0] = 0  # 初始化dp[0][0] = 0，因为空格对空格不需要任何操作，即0步
@@ -58,7 +59,7 @@ def get_allow(names):
     for name in unzip_element(names):
         for char in name:
             char_set.add(char)
-    res = ""
+    res = ''
     for char in char_set:
         res += char
     return res
@@ -69,45 +70,45 @@ def replace(origin_str) -> str:
     Args:
         origin_str (str): 原始字符串
     """
-    if origin_str[0] == "0" and len(origin_str) >= 3:  # U 艇识别为 0xxx
-        origin_str = "U" + origin_str[1:]
+    if origin_str[0] == '0' and len(origin_str) >= 3:  # U 艇识别为 0xxx
+        origin_str = 'U' + origin_str[1:]
     return origin_str
 
 
-def compare_box(A, B):
+def compare_box(a, b):
     """对 easyocr.readtext 返回的 box 进行排序"""
-    k1, k2 = A[0][0], B[0][0]
+    k1, k2 = a[0][0], b[0][0]
     if abs(k1[0] - k2[0]) <= 5 and abs(k1[1] - k2[1]) <= 5:
         return 0
     if abs(k1[1] - k2[1]) > 5:
         if k1[1] < k2[1]:
             return -1
-        else:
-            return 1
-    else:
-        if k1[0] < k2[1]:
-            return -1
-        else:
-            return 1
+        return 1
+    if k1[0] < k2[1]:
+        return -1
+    return 1
 
 
 def recognize(image, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3):
-    if ch_reader == None:
+    if ch_reader is None:
         load_ch_reader()
     if isinstance(image, str):
         image = cv_imread(image)
-    result = ch_reader.readtext(
+    return ch_reader.readtext(
         image,
         allowlist=char_list,
         min_size=min_size,
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    return result
 
 
 def recognize_single_number(
-    image, ex_list="", min_size=7, text_threshold=0.55, low_text=0.3
+    image,
+    ex_list='',
+    min_size=7,
+    text_threshold=0.55,
+    low_text=0.3,
 ):
     """识别单个数字
     Returns:
@@ -120,50 +121,53 @@ def recognize_single_number(
     return int(result[0][1])
 
 
-def recognize_number(image, ex_list="", min_size=7, text_threshold=0.55, low_text=0.3):
+def recognize_number(image, ex_list='', min_size=7, text_threshold=0.55, low_text=0.3):
     """识别数字和 ex_list 的字符, 返回识别结果列表,
     Returns:
         list(result): 一个 result 为 [position, text, confidence]
     """
-    if en_reader == None:
+    if en_reader is None:
         load_en_reader()
-    char_list = "0123456789"
+    char_list = '0123456789'
     for ch in ex_list:
         if char_list.find(ch) == -1:
             char_list += ch
-    result = en_reader.readtext(
+    return en_reader.readtext(
         image,
         allowlist=char_list,
         min_size=min_size,
         text_threshold=text_threshold,
         low_text=low_text,
     )
-    # print(f"recognize_number的识别结果为：{result}")
-    return result
 
 
 def filte_ship_name(result, names):
-    result = [x for x in result if x[1] != ""]  # 去除空匹配
+    result = [x for x in result if x[1] != '']  # 去除空匹配
     results = []
     sorted(result, key=functools.cmp_to_key(compare_box))
     for box in result:
-        res, lcs, name = "dsjfagiahsdifhaoisd", "", box[1]
+        res, name = 'dsjfagiahsdifhaoisd', box[1]
         name = replace(name)
         for _name in names:
-            if any([(_name.find(char) != -1) for char in name]):
+            if any((_name.find(char) != -1) for char in name):
                 dis1 = edit_distance(_name, name)
                 dis2 = edit_distance(res, name)
                 if dis1 < dis2:
                     res = _name
         results.append((res, box[0]))
     if len(results) == 0:
-        results.append(("Unknown", (0, 0)))
+        results.append(('Unknown', (0, 0)))
     # print(results)
     return results
 
 
 def _recognize_ship(
-    image, names, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3
+    image,
+    names,
+    char_list=None,
+    min_size=7,
+    text_threshold=0.55,
+    low_text=0.3,
 ):
     """识别没有预处理过的图片中的舰船, 返回识别结果列表,
     Returns:
@@ -171,7 +175,7 @@ def _recognize_ship(
     """
     if char_list is None:
         char_list = get_allow(names)
-    if ch_reader == None:
+    if ch_reader is None:
         load_ch_reader()
     result = recognize(
         image,
@@ -184,7 +188,12 @@ def _recognize_ship(
 
 
 def recognize_ship(
-    image, names, char_list=None, min_size=7, text_threshold=0.55, low_text=0.3
+    image,
+    names,
+    char_list=None,
+    min_size=7,
+    text_threshold=0.55,
+    low_text=0.3,
 ):
     """传入一张图片,返回舰船信息,包括名字和舰船型号
 
@@ -196,17 +205,17 @@ def recognize_ship(
     if isinstance(image, str):
         image_path = os.path.abspath(image)
     else:
-        image_path = os.path.join(TUNNEL_ROOT, "OCR.PNG")
-        cv2.imencode(".PNG", image)[1].tofile(image_path)
+        image_path = os.path.join(TUNNEL_ROOT, 'OCR.PNG')
+        cv2.imencode('.PNG', image)[1].tofile(image_path)
     if char_list is None:
         char_list = get_allow(names)
-    with open(os.path.join(TUNNEL_ROOT, "locator.in"), "w+") as f:
+    with open(os.path.join(TUNNEL_ROOT, 'locator.in'), 'w+') as f:
         f.write(image_path)
-    locator_exe = os.path.join(TUNNEL_ROOT, "locator.exe")
+    locator_exe = os.path.join(TUNNEL_ROOT, 'locator.exe')
     subprocess.run([locator_exe, TUNNEL_ROOT])
-    if os.path.exists(os.path.join(TUNNEL_ROOT, "1.PNG")):
+    if os.path.exists(os.path.join(TUNNEL_ROOT, '1.PNG')):
         result = _recognize_ship(
-            os.path.join(TUNNEL_ROOT, "1.PNG"),
+            os.path.join(TUNNEL_ROOT, '1.PNG'),
             names,
             char_list,
             min_size=min_size,
@@ -215,7 +224,7 @@ def recognize_ship(
         )
     else:
         result = _recognize_ship(
-            "1.PNG",
+            '1.PNG',
             names,
             char_list,
             min_size=min_size,
@@ -226,5 +235,5 @@ def recognize_ship(
     return result
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     pass

@@ -1,13 +1,13 @@
 import os
 import subprocess
-from typing import List, Tuple
+from typing import ClassVar
 
 import cv2
 import numpy as np
-from thefuzz import process
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
 from autowsgr.utils.io import cv_imread
+from autowsgr.utils.logger import Logger
 
 
 def edit_distance(word1, word2) -> int:
@@ -22,8 +22,8 @@ def edit_distance(word1, word2) -> int:
     if m == 0 and n == 0:
         return 0
     word1, word2 = (
-        " " + word1,
-        " " + word2,
+        ' ' + word1,
+        ' ' + word2,
     )  # 非常必要的操作，不添加空格话，在Word为空时会比较麻烦
     dp = [[0 for _ in range(n + 1)] for _ in range(m + 1)]
     dp[0][0] = 0  # 初始化dp[0][0] = 0，因为空格对空格不需要任何操作，即0步
@@ -48,38 +48,44 @@ def find_lcseque(s1, s2):
         for p2 in range(len(s2)):
             if s1[p1] == s2[p2]:
                 m[p1 + 1][p2 + 1] = m[p1][p2] + 1
-                d[p1 + 1][p2 + 1] = "ok"
+                d[p1 + 1][p2 + 1] = 'ok'
             elif m[p1 + 1][p2] > m[p1][p2 + 1]:
                 m[p1 + 1][p2 + 1] = m[p1 + 1][p2]
-                d[p1 + 1][p2 + 1] = "left"
+                d[p1 + 1][p2 + 1] = 'left'
             else:
                 m[p1 + 1][p2 + 1] = m[p1][p2 + 1]
-                d[p1 + 1][p2 + 1] = "up"
+                d[p1 + 1][p2 + 1] = 'up'
     (p1, p2) = (len(s1), len(s2))
     s = []
     while m[p1][p2]:  # 不为None时
         c = d[p1][p2]
-        if c == "ok":  # 匹配成功，插入该字符，并向左上角找下一个
+        if c == 'ok':  # 匹配成功，插入该字符，并向左上角找下一个
             s.append(s1[p1 - 1])
             p1 -= 1
             p2 -= 1
-        if c == "left":  # 根据标记，向左找下一个
+        if c == 'left':  # 根据标记，向左找下一个
             p2 -= 1
-        if c == "up":  # 根据标记，向上找下一个
+        if c == 'up':  # 根据标记，向上找下一个
             p1 -= 1
     s.reverse()
-    return "".join(s)
+    return ''.join(s)
 
 
 class OCRBackend:
-    WORD_REPLACE = None  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
+    WORD_REPLACE = (
+        None  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
+    )
 
-    def __init__(self, config, logger):
+    def __init__(self, config, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
     def read_text(
-        self, img, allowlist: List[str] = None, sort: str = "left-to-right", **kwargs
+        self,
+        img,
+        allowlist: list[str] | None = None,
+        sort: str = 'left-to-right',
+        **kwargs,
     ):
         """识别文字的具体实现，返回字符串格式识别结果"""
         raise NotImplementedError
@@ -103,16 +109,17 @@ class OCRBackend:
         new_height = int(original_height * scale_factor)
 
         # 使用cv2.resize函数等比例扩大图片
-        resized_image = cv2.resize(
-            image, (new_width, new_height), interpolation=cv2.INTER_LINEAR
+        return cv2.resize(
+            image,
+            (new_width, new_height),
+            interpolation=cv2.INTER_LINEAR,
         )
-        return resized_image
 
     def recognize(
         self,
         img,
-        allowlist: List[str] = None,
-        candidates: List[str] = None,
+        allowlist: list[str] | None = None,
+        candidates: list[str] | None = None,
         multiple=False,
         allow_nan=False,
         rgb_select=None,
@@ -145,9 +152,7 @@ class OCRBackend:
             result_img[~mask] = 255
 
             # 将处理后的图像转换回BGR格式
-            result_img_bgr = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
-
-            return result_img_bgr
+            return cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
 
         def split_image(img: np.ndarray):
             def is_key_line(line: np.ndarray):
@@ -174,33 +179,32 @@ class OCRBackend:
         def post_process_text(t):
             for k, v in self.WORD_REPLACE.items():
                 t = t.replace(k, v)
-            res, lcs, name = "dsjfagiahsdifhaoisd", "", t
+            res, name = 'dsjfagiahsdifhaoisd', t
             if candidates is None:
                 return name
             for _name in candidates:
-                if any([(_name.find(char) != -1) for char in name]):
-                    dis1 = edit_distance(_name, name) / (
-                        len(find_lcseque(_name, name)) + 1
-                    )
+                if any((_name.find(char) != -1) for char in name):
+                    dis1 = edit_distance(_name, name) / (len(find_lcseque(_name, name)) + 1)
                     dis2 = edit_distance(res, name) / (len(find_lcseque(res, name)) + 1)
                     if dis1 < dis2:
                         res = _name
             return res
 
         img = pre_process_rgb(img, rgb_select, tolerance)
-        if type(img) == type("1234"):
+        if type(img) is str:
             img = cv2.imdecode(
-                np.frombuffer(cv_imread(img), np.uint8), cv2.IMREAD_COLOR
+                np.frombuffer(cv_imread(img), np.uint8),
+                cv2.IMREAD_COLOR,
             )
         img = self.resize_image_proportionally(img, scale_factor)
         imgs, bias = split_image(img)
         results = []
-        for img, bia in zip(imgs, bias):
+        for img, bia in zip(imgs, bias, strict=False):
             _results = self.read_text(img, allowlist, **kwargs)
-            _results = [x for x in _results if x[1] != ""]  # 去除空匹配
+            _results = [x for x in _results if x[1] != '']  # 去除空匹配
             _results = [(t[0], post_process_text(t[1]), t[2]) for t in _results]
-            for i, result in enumerate(_results):
-                results.append(
+            for result in _results:
+                results.append(  # noqa: PERF401
                     (
                         [
                             (result[0][0]) // scale_factor,
@@ -208,82 +212,88 @@ class OCRBackend:
                         ],
                         result[1],
                         result[2],
-                    )
+                    ),
                 )
         if self.config.SHOW_OCR_INFO:
-            self.logger.debug(f"修正OCR结果：{results}")
+            self.logger.debug(f'修正OCR结果：{results}')
 
         if allow_nan and not results:
             return None
 
         if multiple:
             return results
-        else:
-            if not results:
-                results = ["Unkown"]
-            return results[0]
+        if not results:
+            results = ['Unknown']
+        return results[0]
 
     def recognize_number(
-        self, img, extra_chars="", multiple=False, allow_nan=False, **kwargs
+        self,
+        img,
+        extra_chars='',
+        multiple=False,
+        allow_nan=False,
+        **kwargs,
     ):
         """识别数字"""
 
         def process_number(t: str):
             # 今日胖次、掉落; 决战升级经验等
-            if "/" in t:
-                nums = t.split("/")
+            if '/' in t:
+                nums = t.split('/')
                 assert len(nums) == 2
                 return process_number(nums[0]), process_number(nums[1])
 
             # 决战，费用是f"x{cost}"格式
-            t = t.lstrip("xXKk")
+            t = t.lstrip('xXKk')
             # 战后经验值 f"Lv.{exp}"格式
-            t = t.lstrip("Lv.")
+            t = t.lstrip('Lv.')
             # 建造资源有前导0
-            if t != "0":
-                t = t.lstrip("0")
+            if t != '0':
+                t = t.lstrip('0')
 
             # 资源可以是K/M结尾
-            if t.endswith("K") or t.endswith("k"):
+            if t.endswith(('K', 'k')):
                 return eval(t[:-1]) * 1000
-            if t.endswith("M"):
+            if t.endswith('M'):
                 return eval(t[:-1]) * 1000000
 
             return eval(t)
 
         results = self.recognize(
-            img, allowlist="0123456789" + extra_chars, multiple=True, **kwargs
+            img,
+            allowlist='0123456789' + extra_chars,
+            multiple=True,
+            **kwargs,
         )
         results = [(t[0], process_number(t[1]), t[2]) for t in results]
         if self.config.SHOW_OCR_INFO:
-            self.logger.debug(f"数字解析结果：{results}")
+            self.logger.debug(f'数字解析结果：{results}')
 
         if allow_nan and not results:
             return None
 
         if multiple:
             return results
-        else:
-            if not len(results) == 1:
-                self.logger.warning(f"OCR识别数字失败: {results}")
-                results = []
-            return results[0]
+        if len(results) != 1:
+            self.logger.warning(f'OCR识别数字失败: {results}')
+            results = []
+        return results[0]
 
     def recognize_ship(self, image, candidates, **kwargs):
         """传入一张图片,返回舰船信息,包括名字和舰船型号"""
         if isinstance(image, str):
             image_path = os.path.abspath(image)
         else:
-            image_path = os.path.join(TUNNEL_ROOT, "OCR.PNG")
-            cv2.imencode(".PNG", image)[1].tofile(image_path)
-        with open(os.path.join(TUNNEL_ROOT, "locator.in"), "w+") as f:
+            image_path = os.path.join(TUNNEL_ROOT, 'OCR.PNG')
+            cv2.imencode('.PNG', image)[1].tofile(image_path)
+        with open(os.path.join(TUNNEL_ROOT, 'locator.in'), 'w+') as f:
             f.write(image_path)
-        locator_exe = os.path.join(TUNNEL_ROOT, "locator.exe")
+        locator_exe = os.path.join(TUNNEL_ROOT, 'locator.exe')
         subprocess.run([locator_exe, TUNNEL_ROOT])
-        if os.path.exists(os.path.join(TUNNEL_ROOT, "1.PNG")):
-            img_path = os.path.join(TUNNEL_ROOT, "1.PNG")
+        if os.path.exists(os.path.join(TUNNEL_ROOT, '1.PNG')):
+            img_path = os.path.join(TUNNEL_ROOT, '1.PNG')
         else:
-            img_path = "1.PNG"
+            img_path = '1.PNG'
         return self.recognize(img_path, candidates=candidates, multiple=True, **kwargs)
 
     # def recognize_time(self, img, format="%H:%M:%S"):
@@ -293,22 +303,22 @@ class OCRBackend:
 
 
 class EasyocrBackend(OCRBackend):
-    WORD_REPLACE = {
-        "鲍鱼": "鲃鱼",
-        "鲴鱼": "鲃鱼",
+    WORD_REPLACE: ClassVar[dict] = {
+        '鲍鱼': '鲃鱼',
+        '鲴鱼': '鲃鱼',
     }
 
     def __init__(self, config, logger) -> None:
         super().__init__(config, logger)
         import easyocr
 
-        self.reader = easyocr.Reader(["ch_sim", "en"])
+        self.reader = easyocr.Reader(['ch_sim', 'en'])
 
     def read_text(
         self,
         img,
-        allowlist: List[str] = None,
-        sort="left-to-right",
+        allowlist: list[str] | None = None,
+        sort='left-to-right',
         # TODO：以下参数可能需要调整，以获得最好OCR性能
         min_size=7,
         text_threshold=0.25,
@@ -332,21 +342,21 @@ class EasyocrBackend(OCRBackend):
         )
         results = [(get_center(r[0][0], r[0][2]), r[1], r[2]) for r in results]
 
-        if sort == "left-to-right":
+        if sort == 'left-to-right':
             results = sorted(results, key=lambda x: x[0][0])
-        elif sort == "top-to-bottom":
+        elif sort == 'top-to-bottom':
             results = sorted(results, key=lambda x: x[0][1])
         else:
-            raise ValueError(f"Invalid sort method: {sort}")
+            raise ValueError(f'Invalid sort method: {sort}')
 
         if self.config.SHOW_OCR_INFO:
-            self.logger.debug(f"原始OCR结果: {results}")
+            self.logger.debug(f'原始OCR结果: {results}')
         return results
 
 
 class PaddleOCRBackend(OCRBackend):
-    WORD_REPLACE = {
-        "鲍鱼": "鲃鱼",
+    WORD_REPLACE: ClassVar[dict] = {
+        '鲍鱼': '鲃鱼',
     }
 
     def __init__(self, config, logger) -> None:
@@ -354,61 +364,61 @@ class PaddleOCRBackend(OCRBackend):
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
         try:
             from paddleocr import PaddleOCR
-        except ModuleNotFoundError as e:
+        except ModuleNotFoundError:
             import subprocess
             import sys
 
             # 定义阿里云镜像地址
-            ALIYUN_PYPI_URL = "https://mirrors.aliyun.com/pypi/simple/"
-            self.logger.warning("paddleocr module not found, installing...")
+            aliyun_pypi_url = 'https://mirrors.aliyun.com/pypi/simple/'
+            self.logger.warning('paddleocr module not found, installing...')
             self.logger.warning(
-                "如果开启了 代理/VPN/梯子/加速器, 请关闭它们后重新运行脚本。"
+                '如果开启了 代理/VPN/梯子/加速器, 请关闭它们后重新运行脚本。',
             )
             subprocess.check_call(
                 [
                     sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "paddleocr==2.8.1",
-                    "-i",
-                    ALIYUN_PYPI_URL,
-                ]
+                    '-m',
+                    'pip',
+                    'install',
+                    'paddleocr==2.8.1',
+                    '-i',
+                    aliyun_pypi_url,
+                ],
             )
             subprocess.check_call(
                 [
                     sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "paddlepaddle==2.6.1",
-                    "-i",
-                    ALIYUN_PYPI_URL,
-                ]
+                    '-m',
+                    'pip',
+                    'install',
+                    'paddlepaddle==2.6.1',
+                    '-i',
+                    aliyun_pypi_url,
+                ],
             )
             try:
                 from paddleocr import PaddleOCR
 
-                print("paddleocr module installed and imported successfully.")
+                print('paddleocr module installed and imported successfully.')
             except ModuleNotFoundError:
-                print("Failed to install paddleocr module.")
+                print('Failed to install paddleocr module.')
                 exit(1)  # Exit with an error code if the installation fails
 
-            print("paddlepaddle module not found, installing...")
+            print('paddlepaddle module not found, installing...')
 
             try:
-                import paddle
+                import paddle  # noqa: F401
 
-                print("paddlepaddle module installed and imported successfully.")
+                print('paddlepaddle module installed and imported successfully.')
             except ModuleNotFoundError:
-                print("Failed to install paddlepaddle module.")
+                print('Failed to install paddlepaddle module.')
                 exit(1)  # Exit with an error code if the installation fails
 
         self.reader = PaddleOCR(
             use_angle_cls=True,
             use_gpu=True,
             show_log=False,
-            lang="ch",
+            lang='ch',
         )  # need to run only once to download and load model into memory
 
     def read_text(self, img, allowlist, **kwargs):
@@ -419,11 +429,8 @@ class PaddleOCRBackend(OCRBackend):
             return (x1 + x2) / 2, (y1 + y2) / 2
 
         results = self.reader.ocr(img, cls=False, **kwargs)
-        if results == [None]:
-            results = []
-        else:
-            results = results[0]
+        results = [] if results == [None] else results[0]
         results = [(get_center(r[0][1], r[0][3]), r[1][0], r[1][1]) for r in results]
         if self.config.SHOW_OCR_INFO:
-            self.logger.debug(f"原始OCR结果: {results}")
+            self.logger.debug(f'原始OCR结果: {results}')
         return results
