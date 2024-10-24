@@ -2,7 +2,7 @@ airtest
 easyocr>=1.7.1
 inquirer>=3.2.4
 keyboard
-opencv-contrib-python==4.5.4.60
+opencv-contrib-python==4.8.1.78
 opencv-python-headless==4.5.4.60
 opencv-python==4.5.4.60
 pre-commit
