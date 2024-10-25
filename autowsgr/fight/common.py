@@ -315,20 +315,18 @@ class FightPlan(ABC):
         """
         assert times >= 1
         expedition = Expedition(self.timer)
-        for _ in range(1, times):
-            self.timer.logger.info(f'已出击次数:{_}，目标次数{times}')
+        for i in range(times):
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)
             elif isinstance(self.timer.now_page, Node) and self.timer.now_page.name == 'map_page':
                 expedition.run(False)
                 self.timer.goto_game_page('map_page')
-
             fight_flag = self.run()
-
             if fight_flag not in ['SL', 'success']:
                 if fight_flag == 'dock is full':
                     return 'dock is full'
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
+            self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
         return 'OK'
 
     def run(self):
