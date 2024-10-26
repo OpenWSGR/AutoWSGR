@@ -8,8 +8,8 @@ from autowsgr.fight.normal_fight import NormalFightPlan
 from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import get_rewards, repair_by_bath, set_support
 from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
-from autowsgr.scripts.main import start_script
 from autowsgr.notification import miaotixing
+from autowsgr.scripts.main import start_script
 
 
 class DailyOperation:
