@@ -59,3 +59,7 @@ daily_automation:
 bath:
   bathroom_feature_count: 1 # 浴室数(购买的浴室装饰数, 最大为 3)
   bathroom_count: 2 # 修理位置总数(最大为 12)
+
+# =========== 喵提醒配置 ===========
+miao_code: " "  # 填入你的喵码
+text: " "   # 设置提醒内容
