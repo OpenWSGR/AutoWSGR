@@ -8,7 +8,7 @@ from autowsgr.fight.normal_fight import NormalFightPlan
 from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import get_rewards, repair_by_bath, set_support
 from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
-from autowsgr.notification import miaotixing
+from autowsgr.notification import miao_alert
 from autowsgr.scripts.main import start_script
 
 
@@ -79,7 +79,7 @@ class DailyOperation:
                 if ret == literals.OPERATION_SUCCESS_FLAG or ret == 'SL':
                     self.fight_complete_times[task_id][0] += 1
                 elif ret == literals.DOCK_FULL_FLAG:
-                    miaotixing.check_full_capacity_alert(self.config)
+                    miao_alert(0)
                     break  # 不解装则结束出征
 
                 if self.config.quick_repair_limit and self.timer.quick_repaired_cost >= int(
