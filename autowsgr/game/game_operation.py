@@ -215,7 +215,7 @@ def quick_repair(
             else:
                 need_repair[i] = False
 
-        if timer.config.DEBUG:
+        if timer.config.debug:
             timer.logger.debug('ship_stats:', ship_stats)
         if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
             timer.click(420, 420, times=2, delay=0.8)  # 进入修理页面

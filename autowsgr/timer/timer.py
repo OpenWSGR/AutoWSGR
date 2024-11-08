@@ -1,18 +1,17 @@
-import inspect
-import os
 import threading as th
 import time
 from typing import ClassVar
 
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, NetworkErr
-from autowsgr.constants.data_roots import DATA_ROOT, OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES
 from autowsgr.constants.ui import WSGR_UI, Node
 from autowsgr.port.common import Port
 from autowsgr.timer.backends import EasyocrBackend, PaddleOCRBackend
 from autowsgr.timer.controllers import AndroidController, WindowsController
-from autowsgr.utils.io import yaml_to_dict
+from autowsgr.types import OcrBackend
+from autowsgr.user_config import UserConfig
+from autowsgr.utils.io import create_nested_dict, recursive_dict_update, yaml_to_dict
 from autowsgr.utils.logger import Logger
 from autowsgr.utils.operator import unzip_element
 
@@ -40,114 +39,51 @@ class Timer(AndroidController, WindowsController):
 
     last_expedition_check_time = time.time()
 
-    def __init__(self, config, logger: Logger) -> None:
-        self.port = Port(logger)
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
-        # 初始化android控制器
-        WindowsController.__init__(self, config.emulator, logger)
-
-        dev = self.connect_android()
-        AndroidController.__init__(self, config, logger, dev)
-
-        if self.config.OCR_BACKEND == 'easyocr':
-            self.ocr_backend = EasyocrBackend(config, logger)
-        elif self.config.OCR_BACKEND == 'paddleocr':
-            self.ocr_backend = PaddleOCRBackend(config, logger)
-        else:
-            raise ValueError(f'Unknown OCR_BACKEND: {self.config.OCR_BACKEND}')
-
-        # 获取调用栈信息
-        stack = inspect.stack()
-        # 最初启动脚本的路径在调用栈的最后一个元素中
-        script_running_directory = os.path.abspath(stack[-1].filename)
-        # 从脚本运行目录查找plans和ship_name，如果存在则使用，不存在则使用默认的
-        # 加载plans文件夹
-        self.logger.info('尝试从脚本运行目录加载plans')
-        if os.path.exists(
-            os.path.abspath(os.path.join(script_running_directory, '..', 'plans')),
-        ):
-            config.PLAN_ROOT = os.path.abspath(
-                os.path.join(script_running_directory, '..', 'plans'),
-            )
-            self.logger.info(f'Succeed to load PLAN_ROOT: {self.config.PLAN_ROOT}')
-        else:
-            self.logger.warning(
-                f"从脚本运行目录加载plans失败，将会从默认目录 {os.path.join(DATA_ROOT, 'plans')} 加载plans",
-            )
-            config.PLAN_ROOT = os.path.join(DATA_ROOT, 'plans')
-
-        self.create_nested_dict(config.PLAN_ROOT)
-        self.plan_root_list = self.update_nested_dict(
-            self.create_nested_dict(os.path.join(DATA_ROOT, 'plans')),
-            self.create_nested_dict(config.PLAN_ROOT),
+        # config post init
+        self.plan_root_list = recursive_dict_update(
+            create_nested_dict(self.config.default_plan_root),
+            create_nested_dict(self.config.plan_root),
+        )
+        self.ship_names = unzip_element(
+            recursive_dict_update(
+                yaml_to_dict(self.config.default_ship_name_file),
+                yaml_to_dict(self.config.ship_name_file),
+            ),
         )
 
-        # 加载舰船名文件
-        defult_ship_names = yaml_to_dict(os.path.join(OCR_ROOT, 'ship_name.yaml'))
-        self.logger.info('尝试从脚本运行目录加载ship_names.yaml')
-        if os.path.exists(
-            os.path.abspath(
-                os.path.join(script_running_directory, '..', 'ship_names.yaml'),
-            ),
-        ):
-            config.SHIP_NAME_PATH = os.path.abspath(
-                os.path.join(script_running_directory, '..', 'ship_names.yaml'),
-            )
-            self.ship_names = yaml_to_dict(config.SHIP_NAME_PATH)
-            self.logger.info(f'Succeed to load ship_name file:{config.SHIP_NAME_PATH}')
-            self.ship_names = self.update_nested_dict(
-                defult_ship_names,
-                self.ship_names,
-            )
-        else:
-            self.ship_names = defult_ship_names
-        self.ship_names = unzip_element(list(self.ship_names.values()))
+        # 初始化android控制器
+        WindowsController.__init__(
+            self,
+            config.emulator_type,
+            config.emulator_name,
+            config.emulator_start_cmd,
+            config.emulator_process_name,
+            logger,
+        )
+        dev = self.connect_android()
+        AndroidController.__init__(
+            self,
+            dev,
+            config.show_android_input,
+            config.delay,
+            logger,
+        )
 
+        # 初始化 OCR 后端
+        match self.config.ocr_backend:
+            case OcrBackend.easyocr:
+                self.ocr_backend = EasyocrBackend(config, logger)
+            case OcrBackend.paddleocr:
+                self.ocr_backend = PaddleOCRBackend(config, logger)
+
+        self.port = Port(logger)
         self.init()
 
     # ========================= OCR 功能穿透 =========================
-    def create_nested_dict(self, directory):
-        """
-        创建一个嵌套字典，表示目录及其子目录中的文件
-        Args:
-            directory (str): 目录路径
-        Returns:
-            dict: 嵌套字典，表示目录结构
-        """
-        for root, _dirs, files in os.walk(directory):
-            # 获取相对于根目录的路径
-            rel_path = os.path.relpath(root, directory)
-            # 获取当前层级的字典
-            current_dict = self.plan_root_list
-            if rel_path != '.':
-                for part in rel_path.split(os.sep):
-                    current_dict = current_dict.setdefault(part, {})
-            # 将文件添加到当前层级的字典中
-            for file in files:
-                file_key = file[:-5] if file.endswith('.yaml') else file
-                # 赋予其绝对路径
-                current_dict[file_key] = os.path.abspath(os.path.join(root, file))
-        return self.plan_root_list
-
-    def update_nested_dict(self, d1, d2):
-        """
-        递归地更新嵌套字典 d1，使其包含 d2 中的所有键值对。
-        如果键在两个字典中都存在且对应的值也是字典，则递归更新。
-        Args:
-            d1 (dict): 要更新的字典
-            d2 (dict): 用于更新的字典
-        Returns:
-            dict: 更新后的字典 d1
-        """
-        for k, v in d2.items():
-            if k in d1 and isinstance(d1[k], dict) and isinstance(v, dict):
-                self.update_nested_dict(d1[k], v)
-            else:
-                d1[k] = v
-        return d1
-
     def recognize(
         self,
         img,
@@ -209,7 +145,7 @@ class Timer(AndroidController, WindowsController):
             self.set_page()
             self.logger.info(f'启动成功, 当前位置: {self.now_page.name}')
         except:
-            if 'CHECK_PAGE' in self.config.__dict__ and self.config.CHECK_PAGE:
+            if 'check_page' in self.config.__dict__ and self.config.check_page:
                 self.logger.warning('无法确定当前页面, 尝试重启游戏')
                 self.restart()
                 self.set_page()

@@ -200,7 +200,7 @@ class FightInfo(ABC):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        if self.config.SHOW_MATCH_FIGHT_STAGE:
+        if self.config.show_match_fight_stage:
             self.logger.debug('waiting:', possible_states, '  ')
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
@@ -231,7 +231,7 @@ class FightInfo(ABC):
                     delay = self.after_match_delay[self.state]
                     time.sleep(delay)
 
-                if self.config.SHOW_MATCH_FIGHT_STAGE:
+                if self.config.show_match_fight_stage:
                     self.logger.info(f'matched: {self.state}')
                 self._after_match()
 
@@ -525,7 +525,7 @@ class DecisionBlock:
                     rcondition += ch
                     last = i + 1
 
-            if self.config.SHOW_ENEMY_RULES:
+            if self.config.show_enemy_rules:
                 self.logger.info(rcondition)
             if eval(rcondition):
                 return act

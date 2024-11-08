@@ -4,15 +4,16 @@ from datetime import datetime
 
 from loguru import logger
 
+from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import save_image
 
 
 class Logger:
-    def __init__(self, config: dict) -> None:
-        self.config = config
-        self.log_dir = config['log_dir']
-        log_level = config.get('log_level', 'INFO')
+    def __init__(self, log_dir: str, log_level: str) -> None:
+        self.log_dir = log_dir
         self.log_level = log_level
+        os.makedirs(self.log_dir, exist_ok=True)
+        self.reset_level()
 
     def _configure_logger(self, log_level: str | int) -> None:
 
@@ -59,21 +60,16 @@ class Logger:
             catch=True,
         )
 
-    def save_config(self, config):
-        # write config file
-        config_str = json.dumps(
-            vars(config),
-            ensure_ascii=False,
-            indent=4,
-            sort_keys=True,
-        )
-        with open(
-            os.path.join(self.log_dir, 'config.json'),
-            'w',
-            encoding='utf-8',
-        ) as f:
-            f.write(config_str)
-        return config_str
+    def save_config(self, config: UserConfig):
+        with open(os.path.join(self.log_dir, 'config.json'), 'w', encoding='utf-8') as f:
+            json.dump(
+                config.asdict(),
+                f,
+                default=str,
+                indent=4,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
 
     def reset_level(self):
         logger.remove()
@@ -82,17 +78,17 @@ class Logger:
     def debug(self, *args):
         logger.debug(str(args))
 
-    def info(self, string):
+    def info(self, string: str) -> None:
         logger.info(string)
         # st.write(string)
 
-    def warning(self, string):
+    def warning(self, string: str) -> None:
         logger.warning('===================WARNING===================')
         logger.warning(string)
         logger.warning('====================END====================')
         # st.write(string)
 
-    def error(self, string):
+    def error(self, string: str) -> None:
         logger.error('===================ERROR===================')
         logger.error(string)
         logger.error('====================END====================')

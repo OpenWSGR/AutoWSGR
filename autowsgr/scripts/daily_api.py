@@ -1,5 +1,5 @@
 import time
-from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from autowsgr.constants import literals
 from autowsgr.fight.battle import BattlePlan
@@ -12,12 +12,15 @@ from autowsgr.notification import miao_alert
 from autowsgr.scripts.main import start_script
 
 
+if TYPE_CHECKING:
+    from autowsgr.user_config import DailyAutomationConfig
+
+
 class DailyOperation:
-    def __init__(self, setting_path=None) -> None:
+    def __init__(self, setting_path: str) -> None:
         self.timer = start_script(setting_path)
 
-        self.config = SimpleNamespace(**self.timer.config.daily_automation)
-        self.config.DEBUG = False
+        self.config: DailyAutomationConfig = self.timer.config.daily_automation
         self.complete_time = None
 
         if self.config.auto_expedition:
@@ -106,7 +109,7 @@ class DailyOperation:
             self._gain_bonus()
             time.sleep(360)
 
-    def _has_unfinished(self):
+    def _has_unfinished(self) -> bool:
         return any(times[0] < times[1] for times in self.fight_complete_times)
 
     def _get_unfinished(self) -> int | None:
@@ -118,28 +121,28 @@ class DailyOperation:
                 return i
         return None
 
-    def _expedition(self):
+    def _expedition(self) -> None:
         if self.config.auto_expedition:
             self.expedition_plan.run(True)
 
-    def _gain_bonus(self):
+    def _gain_bonus(self) -> None:
         if self.config.auto_gain_bonus:
             get_rewards(self.timer)
             self.timer.go_main_page()
 
-    def _bath_repair(self):
+    def _bath_repair(self) -> None:
         if self.config.auto_bath_repair:
             repair_by_bath(self.timer)
 
-    def _ship_max(self):
-        if not self.config.stop_maxship:
+    def _ship_max(self) -> bool:
+        if not self.config.stop_max_ship:
             return True
         if self.timer.got_ship_num < 500:
             return True
         self.timer.logger.info('船只数量已达到上限，结束出征')
         return False
 
-    def check_exercise(self):
+    def check_exercise(self) -> None:
         # 判断在哪个时间段
         now_time = time.localtime(time.time())
         hour = now_time.tm_hour

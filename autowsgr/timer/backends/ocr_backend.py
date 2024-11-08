@@ -214,7 +214,7 @@ class OCRBackend:
                         result[2],
                     ),
                 )
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'修正OCR结果：{results}')
 
         if allow_nan and not results:
@@ -266,7 +266,7 @@ class OCRBackend:
             **kwargs,
         )
         results = [(t[0], process_number(t[1]), t[2]) for t in results]
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'数字解析结果：{results}')
 
         if allow_nan and not results:
@@ -349,7 +349,7 @@ class EasyocrBackend(OCRBackend):
         else:
             raise ValueError(f'Invalid sort method: {sort}')
 
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'原始OCR结果: {results}')
         return results
 
@@ -431,6 +431,6 @@ class PaddleOCRBackend(OCRBackend):
         results = self.reader.ocr(img, cls=False, **kwargs)
         results = [] if results == [None] else results[0]
         results = [(get_center(r[0][1], r[0][3]), r[1][0], r[1][1]) for r in results]
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'原始OCR结果: {results}')
         return results

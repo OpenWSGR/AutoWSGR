@@ -296,7 +296,7 @@ class RepairTask(Task):
                 (0.513, 0.644),
             ]
 
-            for i in range(self.timer.config.bath['bathroom_feature_count']):
+            for i in range(self.timer.config.bathroom_feature_count):
                 timer.relative_click(*baths[i])
                 for j in range(4):
                     timer.relative_click(*repair_position[j])
@@ -324,7 +324,7 @@ class RepairTask(Task):
                             delay=1,
                         )  # 关闭快修选择界面
 
-            while len(available_time) < timer.config.bath['bathroom_count']:
+            while len(available_time) < timer.config.bathroom_count:
                 available_time.append(0)
             info = str(
                 [

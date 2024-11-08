@@ -7,7 +7,7 @@ emulator:
 game_app: "官服" #官服 小米 应用宝
 check_update: False # 是否在启动脚本时检查更新
 
-OCR_BACKEND: easyocr # 文字识别后端，有两种可选 "paddleocr", "easyocr"
+ocr_backend: easyocr # 文字识别后端，有两种可选 "paddleocr", "easyocr"
 
 LOG_PATH: "log"
 DELAY: 1.5
@@ -17,18 +17,16 @@ password:
 
 # ========== Logger设置 ==========
 DEBUG: True          #是否开启调试模式，如果为 True，则会输出更多的调试信息。
-SHOW_MAP_NODE: False      #是否显示地图节点信息。
-SHOW_ANDROID_INPUT: True # 是否显示 Android 输入的信息。
-SHOW_ENEMY_RULES: True # 是否显示敌人规则信息。
-SHOW_FIGHT_STAGE: True # 是否显示战斗阶段信息。
-SHOW_CHAPTER_INFO: True # 是否显示章节信息。
-SHOW_MATCH_FIGHT_STAGE: True # 是否显示当前阶段信息。
-SHOW_DECISIVE_BATTLE_INFO: True # 是否显示决战信息。
-SHOW_OCR_INFO: True    # 是否显示 OCR 识别信息。
+show_map_node: False      #是否显示地图节点信息。
+show_android_input: True # 是否显示 Android 输入的信息。
+show_enemy_rules: True # 是否显示敌人规则信息。
+show_chapter_info: True # 是否显示章节信息。
+show_match_fight_stage: True # 是否显示当前阶段信息。
+show_ocr_info: True    # 是否显示 OCR 识别信息。
 log_level: DEBUG # 调试模式 log_level 应该设置为 DEBUGlog
 # ========== 调试设置 ==============
 
-CHECK_PAGE: True # 是否在启动时检查游戏页面，建议为True
+check_page: True # 是否在启动时检查游戏页面，建议为True
 
 # ========== 解装设置 ===========
 
@@ -43,7 +41,7 @@ daily_automation:
   auto_battle: True # 自动打完每日战役次数
   battle_type: "困难潜艇" # 打哪个。可选名称参考"plans/battle/"
 
-  stop_maxship: False # 捞满500船时自动停止出击
+  stop_max_ship: False # 捞满500船时自动停止出击
   quick_repair_limit: 50 #使用快修的上限，一但达到上限将会停止日常出征，以防止没有更换舰队导致快修被耗尽
 
   auto_exercise: True #自动打完每日的三次演习
