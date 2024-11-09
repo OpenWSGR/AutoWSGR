@@ -101,6 +101,35 @@ class DailyAutomationConfig(BaseConfig):
 
 
 @dataclass(frozen=True)
+class DecisiveBattleConfig(BaseConfig):
+    chapter: int = 6
+    """决战章节,请保证为 [1, 6] 中的整数. Defaults to 6."""
+    level1: list[str] | None = None
+    """一级舰队"""
+    level2: list[str] | None = None
+    """二级舰队"""
+    flagship_priority: list[str] | None = None
+    """旗舰优先级队列"""
+    repair_level: int = 1
+    """维修策略，1为中破修，2为大破修"""
+    full_destroy: bool = False
+    """是否船舱满了解装舰船（仅限决战）"""
+
+    def __post_init__(self) -> None:
+        assert 1 <= self.chapter <= 6, '决战章节必须为 [1, 6] 中的整数'
+        if self.level1 is None:
+            object.__setattr__(
+                self,
+                'level1',
+                ['鲃鱼', 'U-1206', 'U-47', '射水鱼', 'U-96', 'U-1405'],
+            )
+        if self.level2 is None:
+            object.__setattr__(self, 'level2', ['U-81', '大青花鱼'])
+        if self.flagship_priority is None:
+            object.__setattr__(self, 'flagship_priority', ['U-1405', 'U-47', 'U-96', 'U-1206'])
+
+
+@dataclass(frozen=True)
 class UserConfig(BaseConfig):
     # 模拟器
     emulator_type: EmulatorType = EmulatorType.leidian
@@ -173,6 +202,8 @@ class UserConfig(BaseConfig):
     # 嵌套的下层配置
     daily_automation: DailyAutomationConfig | None = None
     """日常自动化配置"""
+    decisive_battle: DecisiveBattleConfig | None = None
+    """决战自动化配置"""
 
     def __post_init__(self) -> None:
         # 确保类型ok
@@ -228,5 +259,6 @@ class UserConfig(BaseConfig):
 ATTRIBUTE_RECURSIVE: Final[Mapping[str, Any]] = MappingProxyType(
     ChainMap(
         {'daily_automation': DailyAutomationConfig},
+        {'decisive_battle': DecisiveBattleConfig},
     ),
 )

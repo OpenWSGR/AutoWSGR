@@ -20,11 +20,11 @@ from autowsgr.utils.io import count, yaml_to_dict
 """
 
 
-def is_ship(element):
+def is_ship(element: str) -> bool:
     return element not in ['长跑训练', '肌肉记忆', '黑科技']
 
 
-def get_formation(fleet: Fleet, enemy: list):
+def get_formation(fleet: Fleet, enemy: list) -> Literal[4, 2]:
     anti_sub = count(['CL', 'DD', 'CVL'], enemy)
     if fleet.exist('U-1206') and anti_sub <= 1 or anti_sub <= 0:
         return 4
@@ -200,58 +200,20 @@ class DecisiveBattle:
     def run(self):
         self.run_for_times()
 
-    def __init__(
-        self,
-        timer: Timer,
-        chapter=6,
-        level1=None,
-        level2=None,
-        flagship_priority=None,
-        logic=None,
-        repair_level=1,
-        full_destroy=False,
-        *args,
-        **kwargs,
-    ) -> None:
-        """初始化控制模块
-        Important Information:
-            : 决战逻辑相当优秀, 不建议自行改写, 满配情况约需要 3~6 快速修复打完一轮 E6, 耗时约为 25mins
-            : 请保证可以直接使用上次选船通关, 暂时不支持自动选船
-        Args:
-            timer (Timer): 记录器
-            chapter (int, optional): 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
-            level1: 第一优先舰队, Defaults Recommend
-            level2: 第二优先舰船, Defaults Recommend
-            flagship_priority: 旗舰优先级, Defaults Recommend
-            logic: 逻辑模块, unsupported since now
-            repair_level: 维修策略，1为中破修，2为大破修，Defaults to 1.
-            full_destroy: 船舱满了之后是否自动解装，默认不解装.
-        Examples:
-            : 若当前决战进度为还没打 6-2-A, 则应填写 chapter=6, map=1, node='A'
-            : 可以支持断点开始
-        """
-        if level1 is None:
-            level1 = ['鲃鱼', 'U-1206', 'U-47', '射水鱼', 'U-96', 'U-1405']
-        if level2 is None:
-            level2 = ['U-81', '大青花鱼']
-        if flagship_priority is None:
-            flagship_priority = ['U-1405', 'U-47', 'U-96', 'U-1206']
-
+    def __init__(self, timer: Timer) -> None:
         self.timer = timer
-        self.config = timer.config
-        self.repair_strategy = repair_level
-        self.full_destroy = full_destroy
-        assert chapter <= 6 and chapter >= 1
-        self.stats = DecisiveStats(timer, chapter)
-        if logic is None:
-            self.logic = Logic(
-                self.timer,
-                self.stats,
-                level1,
-                level2,
-                flagship_priority,
-            )
-        self.__dict__.update(kwargs)
+        self.config = timer.config.decisive_battle
+
+        self.repair_strategy = self.config.repair_level
+        self.full_destroy = self.config.full_destroy
+        self.stats = DecisiveStats(timer, self.config.chapter)
+        self.logic = Logic(
+            self.timer,
+            self.stats,
+            self.config.level1,
+            self.config.level2,
+            self.config.flagship_priority,
+        )
 
     def buy_ticket(self, use='steel', times=3):
         self.enter_decisive_battle()

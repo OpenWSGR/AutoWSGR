@@ -1,5 +1,4 @@
 import time
-from typing import TYPE_CHECKING
 
 from autowsgr.constants import literals
 from autowsgr.fight.battle import BattlePlan
@@ -9,19 +8,13 @@ from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import get_rewards, repair_by_bath, set_support
 from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
 from autowsgr.notification import miao_alert
-from autowsgr.scripts.main import start_script
-
-
-if TYPE_CHECKING:
-    from autowsgr.user_config import DailyAutomationConfig
+from autowsgr.timer import Timer
 
 
 class DailyOperation:
-    def __init__(self, setting_path: str) -> None:
-        self.timer = start_script(setting_path)
-
-        self.config: DailyAutomationConfig = self.timer.config.daily_automation
-        self.complete_time = None
+    def __init__(self, timer: Timer) -> None:
+        self.timer = timer
+        self.config = timer.config.daily_automation
 
         if self.config.auto_expedition:
             self.expedition_plan = Expedition(self.timer)
@@ -35,6 +28,7 @@ class DailyOperation:
             )
         if self.config.auto_exercise:
             self.exercise_plan = NormalExercisePlan(self.timer, 'plan_1')
+            self.complete_time = None
 
         if self.config.auto_normal_fight:
             self.fight_plans = []
