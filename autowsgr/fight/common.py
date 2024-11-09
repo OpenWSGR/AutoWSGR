@@ -1,7 +1,6 @@
 import copy
 import time
 from abc import ABC, abstractmethod
-from typing import ClassVar
 
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
@@ -138,10 +137,8 @@ class FightEvent:
 class FightHistory:
     """记录并处理战斗历史信息"""
 
-    events: ClassVar[list] = []
-
     def __init__(self) -> None:
-        pass
+        self.events = []
 
     def add_event(self, event, point, action='继续', result='无'):
         self.events.append(FightEvent(event, point, action, result))
@@ -750,7 +747,7 @@ class IndependentFightPlan(FightPlan):
             end_image (MyTemplate): 整个战斗流程结束后的图片
         """
         super().__init__(timer)
-        default_args = yaml_to_dict(self.timer.plan_root_list['default'])
+        default_args = yaml_to_dict(self.timer.plan_tree['default'])
         node_defaults = default_args['node_defaults']
         node_args = yaml_to_dict(plan_path) if (plan_path is not None) else kwargs
         node_args = recursive_dict_update(node_defaults, node_args)

@@ -1,11 +1,12 @@
 import os
 import subprocess
-from typing import ClassVar
+from typing import Protocol
 
 import cv2
 import numpy as np
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import cv_imread
 from autowsgr.utils.logger import Logger
 
@@ -71,12 +72,13 @@ def find_lcseque(s1, s2):
     return ''.join(s)
 
 
-class OCRBackend:
-    WORD_REPLACE = (
-        None  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
-    )
+class OCRBackend(Protocol):
+    WORD_REPLACE: dict[
+        str,
+        str,
+    ]  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
 
-    def __init__(self, config, logger: Logger) -> None:
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
@@ -303,16 +305,15 @@ class OCRBackend:
 
 
 class EasyocrBackend(OCRBackend):
-    WORD_REPLACE: ClassVar[dict] = {
-        '鲍鱼': '鲃鱼',
-        '鲴鱼': '鲃鱼',
-    }
-
-    def __init__(self, config, logger) -> None:
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
         super().__init__(config, logger)
         import easyocr
 
         self.reader = easyocr.Reader(['ch_sim', 'en'])
+        self.WORD_REPLACE = {
+            '鲍鱼': '鲃鱼',
+            '鲴鱼': '鲃鱼',
+        }
 
     def read_text(
         self,
@@ -355,12 +356,12 @@ class EasyocrBackend(OCRBackend):
 
 
 class PaddleOCRBackend(OCRBackend):
-    WORD_REPLACE: ClassVar[dict] = {
-        '鲍鱼': '鲃鱼',
-    }
 
-    def __init__(self, config, logger) -> None:
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
         super().__init__(config, logger)
+        self.WORD_REPLACE = {
+            '鲍鱼': '鲃鱼',
+        }
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
         try:
             from paddleocr import PaddleOCR

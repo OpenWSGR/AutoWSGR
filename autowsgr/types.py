@@ -63,3 +63,15 @@ class GameAPP(StrEnum):
     official = '官服'
     xiaomi = '小米'
     tencent = '应用宝'
+
+    @property
+    def app_name(self) -> str:
+        match self.value:
+            case GameAPP.official:
+                return 'com.huanmeng.zhanjian2'
+            case GameAPP.xiaomi:
+                return 'com.hoolai.zjsnr.mi'
+            case GameAPP.tencent:
+                return 'com.tencent.tmgp.zhanjian2'
+            case _:
+                raise ValueError(f'没有为 {self.value} 设置包名，请手动指定')

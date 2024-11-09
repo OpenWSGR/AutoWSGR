@@ -1,6 +1,5 @@
 import threading as th
 import time
-from typing import ClassVar
 
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG
@@ -16,35 +15,39 @@ from autowsgr.utils.logger import Logger
 from autowsgr.utils.operator import unzip_element
 
 
-# TODO: fix class variable
 class Timer(AndroidController, WindowsController):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
-
-    # 战舰少女R专用控制器
-    everyday_check = True
-    ui = WSGR_UI
-    plan_root_list: ClassVar[dict] = {}
-    ship_stats: ClassVar[list] = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
-    enemy_type_count: ClassVar[dict] = {}  # 字典,每种敌人舰船分别有多少
-    now_page = None  # 当前所在 UI 名
-    resources = None  # 当前四项资源量
-    got_ship_num = 0  # 当天已掉落的船
-    got_loot_num = 0  # 当天已掉落的胖次
-    quick_repaired_cost = 0  # 消耗快修数量
-    """
-    以上时能用到的
-    以下是暂时用不到的
-    """
-    last_mission_completed = 0
-
-    last_expedition_check_time = time.time()
 
     def __init__(self, config: UserConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
-        # config post init
-        self.plan_root_list = recursive_dict_update(
+        self.initialize_resources()
+        self.initialize_controllers()
+        self.initialize_ocr()
+
+        # 初始化状态变量
+        self.everyday_check = True
+        self.ship_stats = [0, 0, 0, 0, 0, 0, 0]  # 我方舰船状态
+        self.enemy_type_count = {}  # 字典,每种敌人舰船分别有多少
+        self.now_page = None  # 当前所在 UI 名
+        self.resources = None  # 当前四项资源量
+        self.got_ship_num = 0  # 当天已掉落的船
+        self.got_loot_num = 0  # 当天已掉落的胖次
+        self.quick_repaired_cost = 0  # 消耗快修数量
+        """
+        以上时能用到的
+        以下是暂时用不到的
+        """
+        self.last_mission_completed = 0
+        self.last_expedition_check_time = time.time()
+        self.port = Port(logger)
+        self.init()
+
+    def initialize_resources(self) -> None:
+        # 加载资源
+        self.ui = WSGR_UI
+        self.plan_tree = recursive_dict_update(
             create_nested_dict(self.config.default_plan_root),
             create_nested_dict(self.config.plan_root),
         )
@@ -54,34 +57,36 @@ class Timer(AndroidController, WindowsController):
                 yaml_to_dict(self.config.ship_name_file),
             ).values(),
         )
+        self.logger.info('资源加载成功')
 
+    def initialize_controllers(self) -> None:
         # 初始化android控制器
         WindowsController.__init__(
             self,
-            config.emulator_type,
-            config.emulator_name,
-            config.emulator_start_cmd,
-            config.emulator_process_name,
-            logger,
+            self.config.emulator_type,
+            self.config.emulator_name,
+            self.config.emulator_start_cmd,
+            self.config.emulator_process_name,
+            self.logger,
         )
         dev = self.connect_android()
         AndroidController.__init__(
             self,
             dev,
-            config.show_android_input,
-            config.delay,
-            logger,
+            self.config.show_android_input,
+            self.config.delay,
+            self.logger,
         )
+        self.logger.info('控制器初始化成功')
 
+    def initialize_ocr(self) -> None:
         # 初始化 OCR 后端
         match self.config.ocr_backend:
             case OcrBackend.easyocr:
-                self.ocr_backend = EasyocrBackend(config, logger)
+                self.ocr_backend = EasyocrBackend(self.config, self.logger)
             case OcrBackend.paddleocr:
-                self.ocr_backend = PaddleOCRBackend(config, logger)
-
-        self.port = Port(logger)
-        self.init()
+                self.ocr_backend = PaddleOCRBackend(self.config, self.logger)
+        self.logger.info('OCR 后端初始化成功')
 
     # ========================= OCR 功能穿透 =========================
     def recognize(
@@ -131,16 +136,14 @@ class Timer(AndroidController, WindowsController):
     # ========================= 初级游戏控制 =========================
     def init(self):
         """初始化游戏状态, 以便进一步的控制"""
-        self.app_name = self.which_app
         # ========== 启动游戏 ==========
         if self.config.account is not None and self.config.password is not None:
             self.restart(account=self.config.account, password=self.config.password)
         if not self.is_game_running():
             self.start_game()
-        self.start_app(self.app_name)
+        self.start_app(self.config.app_name)
 
         # ========== 检查游戏页面状态 ============
-
         try:
             self.set_page()
             self.logger.info(f'启动成功, 当前位置: {self.now_page.name}')
@@ -160,7 +163,7 @@ class Timer(AndroidController, WindowsController):
 
     def start_game(self, account=None, password=None, delay=1.0):
         """启动游戏"""
-        self.start_app(self.app_name)
+        self.start_app(self.config.app_name)
         res = self.wait_images(
             [IMG.start_image[2]] + IMG.confirm_image[1:],
             0.85,
@@ -234,7 +237,7 @@ class Timer(AndroidController, WindowsController):
 
     def restart(self, times=0, *args, **kwargs):
         try:
-            self.shell(f'am force-stop {self.app_name}')
+            self.shell(f'am force-stop {self.config.app_name}')
             self.shell('input keyevent 3')
             self.start_game(**kwargs)
         except Exception:
@@ -576,16 +579,6 @@ class Timer(AndroidController, WindowsController):
         )
         self.click(res[0], res[1], delay=delay)
         return True
-
-    @property
-    def which_app(self):
-        if self.config.game_app == '官服':
-            start_game_app = 'com.huanmeng.zhanjian2'
-        elif self.config.game_app == '应用宝':
-            start_game_app = 'com.tencent.tmgp.zhanjian2'
-        elif self.config.game_app == '小米':
-            start_game_app = 'com.hoolai.zjsnr.mi'
-        return start_game_app
 
 
 def process_error(timer: Timer):

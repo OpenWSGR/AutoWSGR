@@ -144,6 +144,8 @@ class UserConfig(BaseConfig):
     # 游戏
     game_app: GameAPP = GameAPP.official
     """游戏版本。"""
+    app_name: str = field(init=False)
+    """游戏应用名。自动设置"""
     account: str | None = None
     """游戏账号"""
     password: str | None = None
@@ -214,7 +216,7 @@ class UserConfig(BaseConfig):
         if not isinstance(self.ocr_backend, OcrBackend):
             object.__setattr__(self, 'ocr_backend', OcrBackend(self.ocr_backend))
 
-        # 自动设置模模拟器连接名称 & 启动命令 & 进程名
+        # 模拟器
         if self.emulator_name is None:
             object.__setattr__(self, 'emulator_name', self.emulator_type.default_emulator_name)
         if self.emulator_start_cmd is None:
@@ -225,6 +227,9 @@ class UserConfig(BaseConfig):
                 'emulator_process_name',
                 os.path.basename(self.emulator_start_cmd),
             )
+
+        # 游戏
+        object.__setattr__(self, 'app_name', self.game_app.app_name)
 
         # 设置plan_root
         object.__setattr__(self, 'default_plan_root', os.path.join(DATA_ROOT, 'plans'))

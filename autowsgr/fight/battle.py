@@ -75,13 +75,13 @@ class BattlePlan(FightPlan):
         super().__init__(timer)
 
         # 加载默认配置
-        default_args = yaml_to_dict(self.timer.plan_root_list['default'])
+        default_args = yaml_to_dict(self.timer.plan_tree['default'])
         plan_defaults = default_args['battle_defaults']
         plan_defaults.update({'node_defaults': default_args['node_defaults']})
 
         # 加载计划配置
         if plan_path is not None:
-            plan_args = yaml_to_dict(self.timer.plan_root_list['battle'][plan_path])
+            plan_args = yaml_to_dict(self.timer.plan_tree['battle'][plan_path])
             args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
         else:
             args = plan_defaults
