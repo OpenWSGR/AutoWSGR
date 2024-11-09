@@ -52,7 +52,7 @@ class Timer(AndroidController, WindowsController):
             recursive_dict_update(
                 yaml_to_dict(self.config.default_ship_name_file),
                 yaml_to_dict(self.config.ship_name_file),
-            ),
+            ).values(),
         )
 
         # 初始化android控制器
