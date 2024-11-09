@@ -61,22 +61,9 @@ class Timer(AndroidController, WindowsController):
 
     def initialize_controllers(self) -> None:
         # 初始化android控制器
-        WindowsController.__init__(
-            self,
-            self.config.emulator_type,
-            self.config.emulator_name,
-            self.config.emulator_start_cmd,
-            self.config.emulator_process_name,
-            self.logger,
-        )
+        WindowsController.__init__(self, self.config, self.logger)
         dev = self.connect_android()
-        AndroidController.__init__(
-            self,
-            dev,
-            self.config.show_android_input,
-            self.config.delay,
-            self.logger,
-        )
+        AndroidController.__init__(self, dev, self.config, self.logger)
         self.logger.info('控制器初始化成功')
 
     def initialize_ocr(self) -> None:

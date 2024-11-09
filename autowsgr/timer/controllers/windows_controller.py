@@ -10,6 +10,7 @@ from airtest.core.api import connect_device
 
 from autowsgr.constants.custom_exceptions import CriticalErr
 from autowsgr.types import EmulatorType
+from autowsgr.user_config import UserConfig
 from autowsgr.utils.logger import Logger
 
 
@@ -20,18 +21,15 @@ from autowsgr.utils.logger import Logger
 class WindowsController:
     def __init__(
         self,
-        emulator_type: EmulatorType,
-        emulator_name: str,
-        emulator_start_cmd: str,
-        emulator_process_name: str,
+        config: UserConfig,
         logger: Logger,
     ) -> None:
         self.logger = logger
 
-        self.emulator_type = emulator_type
-        self.emulator_name = emulator_name
-        self.emulator_start_cmd = emulator_start_cmd
-        self.emulator_process_name = emulator_process_name
+        self.emulator_type = config.emulator_type
+        self.emulator_name = config.emulator_name
+        self.emulator_start_cmd = config.emulator_start_cmd
+        self.emulator_process_name = config.emulator_process_name
 
     # ======================== 网络 ========================
     def check_network(self):

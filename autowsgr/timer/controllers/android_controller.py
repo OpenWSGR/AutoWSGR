@@ -9,6 +9,7 @@ from airtest.core.android import Android
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.ocr.ship_name import recognize
+from autowsgr.user_config import UserConfig
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
@@ -29,13 +30,12 @@ class AndroidController:
     def __init__(
         self,
         dev: Android,
-        show_android_input: bool,
-        delay: float,
+        config: UserConfig,
         logger: Logger,
     ) -> None:
         self.dev = dev
-        self.show_android_input = show_android_input
-        self.delay = delay
+        self.show_android_input = config.show_android_input
+        self.delay = config.delay
         self.logger = logger
         self.update_screen()
         self.resolution = self.screen.shape[:2]
