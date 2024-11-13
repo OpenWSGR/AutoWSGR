@@ -1,0 +1,24 @@
+# 全部可设置选项参见 autowsgr/user_config.py
+# 所有项目如果不设置将使用默认值
+# ========= 全局设置 =========
+check_update: False
+emulator_type: 雷电
+dock_full_destroy: True
+
+# ========= 日常挂机策略设置 =========
+daily_automation:
+  battle_type: 困难巡洋
+
+  auto_normal_fight: True
+  normal_fight_tasks:
+    # - [8-2BJ, 4, 250] # 胖次
+    - [8-5AI, 2, 250] # 6鱼
+
+# ========= 决战设置 =========
+decisive_battle:
+  chapter: 6
+  level1: ["鲃鱼", "U-1206", "射水鱼", "U-96", "U-1405", "U-47"]
+  level2: ["U-81", "大青花鱼", "M-296", "U-505", "伊-25"]
+  flagship_priority: ["U-1405", "U-47", "U-1206"]
+  repair_level: 2
+  full_destroy: True
