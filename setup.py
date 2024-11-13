@@ -7,9 +7,17 @@ from setuptools import find_namespace_packages, setup
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 
-def _fetch_requirements(path):
+def _fetch_requirements(path: str) -> list:
+    requirements = []
     with open(path) as f:
-        return [r.strip() for r in f]
+        for r in f:
+            r = r.strip()
+            if r.startswith('-r'):
+                assert len(r.split()) == 2
+                requirements.extend(_fetch_requirements(r.split()[-1]))
+            else:
+                requirements.append(r)
+    return requirements
 
 
 def _fetch_readme():

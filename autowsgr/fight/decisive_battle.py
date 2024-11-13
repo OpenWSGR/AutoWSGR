@@ -43,7 +43,7 @@ class DB:
 
 
 class DecisiveStats:
-    def __init__(self, timer: Timer, chapter=6) -> None:
+    def __init__(self, timer: Timer, chapter: int = 6) -> None:
         # 选择战备舰队的点击位置
         self.timer = timer
         self.key_points = [
@@ -74,7 +74,7 @@ class DecisiveStats:
         self.ship_stats = [-1] * 7
         self.selections = []  # 获取战备舰队的元素
 
-    def next(self):
+    def next(self) -> Literal['quit', 'next', 'continue']:
         if self.node == self.map_end[self.chapter][self.map]:
             self.map += 1
             self.node = 'A'
@@ -86,7 +86,7 @@ class DecisiveStats:
     def enemy_now(self):
         return self.enemy[self.chapter][self.map][self.node]
 
-    def reset(self):
+    def reset(self) -> None:
         chapter = self.chapter
         self.__init__(self.timer)
         self.chapter = chapter
@@ -115,7 +115,7 @@ class Logic:
         self.flag_ships = list(flagship_priority)
         self.stats = stats
 
-    def _choose_ship(self, must=False):
+    def _choose_ship(self, must=False) -> list:
         lim = 6
         score = self.stats.score
         if self.stats.fleet.count() <= 1:
@@ -136,22 +136,22 @@ class Logic:
             result.append(next(iter(self.stats.selections.keys())))
         return result
 
-    def _use_skill(self):
+    def _use_skill(self) -> Literal[3, 0]:
         return 3 if (self.stats.node == 'A') else 0
 
-    def need_repair(self):
+    def need_repair(self) -> bool:
         return bool(1 in self.stats.ship_stats or 2 in self.stats.ship_stats)
 
-    def _up_level(self):
+    def _up_level(self) -> bool:
         return bool(self.stats.need - self.stats.exp <= 5 and self.stats.score >= 5)
 
-    def formation(self):
+    def formation(self) -> None:
         pass
 
-    def night(self):
+    def night(self) -> None:
         pass
 
-    def get_best_fleet(self):
+    def get_best_fleet(self) -> list[str]:
         ships = self.stats.ships
         self.logger.debug(f'拥有舰船: {ships}')
         best_ships = [
@@ -178,10 +178,10 @@ class Logic:
         self.logger.debug(f'当前最优：{best_ships}')
         return best_ships
 
-    def _retreat(self):
+    def _retreat(self) -> bool:
         return bool(count_ship(self.get_best_fleet()) < 2)
 
-    def _leave(self):
+    def _leave(self) -> Literal[False]:
         return False
 
 
@@ -190,14 +190,14 @@ class DecisiveBattle:
     目前仅支持 E5, E6, E4
     """
 
-    def run_for_times(self, times=1):
+    def run_for_times(self, times: int = 1) -> None:
         assert times >= 1
         self.start_fight()
         for _ in range(times - 1):
             self.reset_chapter()
             self.start_fight()
 
-    def run(self):
+    def run(self) -> None:
         self.run_for_times()
 
     def __init__(self, timer: Timer) -> None:
@@ -215,14 +215,14 @@ class DecisiveBattle:
             self.config.flagship_priority,
         )
 
-    def buy_ticket(self, use='steel', times=3):
+    def buy_ticket(self, use: str = 'steel', times: int = 3) -> None:
         self.enter_decisive_battle()
         position = {'oil': 184, 'ammo': 235, 'steel': 279, 'aluminum': 321}
         self.timer.click(458 * 0.75, 665 * 0.75, delay=1.5)
         self.timer.click(638, position[use], delay=1, times=times)
         self.timer.click(488, 405)
 
-    def recognize_map(self):
+    def recognize_map(self) -> int:
         CHECK_POINT = {
             4: [(0.381, 0.436), (0.596, 0.636), (0.778, 0.521)],
             5: [(0.418, 0.378), (0.760, 0.477), (0.550, 0.750)],
@@ -241,7 +241,7 @@ class DecisiveBattle:
         self.timer.logger.info('识别决战地图参数, 第 3 小节正在进行')
         return 3
 
-    def recognize_node(self, retry=0):
+    def recognize_node(self, retry: int = 0) -> str:
         position = self.timer.wait_images_position(
             IMG.fight_image[18:20],
             confidence=0.7,
@@ -274,7 +274,7 @@ class DecisiveBattle:
         # result = recognize(cropped_image, "ABCDEFGHIJK")
         # return result[0][1]
 
-    def detect(self, type='enter_map'):
+    def detect(self, type: str = 'enter_map'):
         """检查当前关卡状态
         Args:
             type:
@@ -300,12 +300,12 @@ class DecisiveBattle:
             )
         return _res[res]
 
-    def _go_map_page(self):
+    def _go_map_page(self) -> None:
         if self.detect('running') == 'fight_prepare':
             self.timer.click(30, 30)
             self.timer.wait_image(IMG.decisive_battle_image[1])
 
-    def go_fleet_page(self):
+    def go_fleet_page(self) -> None:
         if self.detect('running') == 'map':
             self.timer.click(900 * 0.75, 667 * 0.75)
             try:
@@ -318,7 +318,7 @@ class DecisiveBattle:
                 self.timer.logger.warning('进入出征准备页面失败，正在重试')
                 self.go_fleet_page()
 
-    def repair(self):
+    def repair(self) -> None:
         self.go_fleet_page()
         quick_repair(
             self.timer,
@@ -326,7 +326,7 @@ class DecisiveBattle:
         )  # TODO：我的中破比很高，先改成只修大破控制一下用桶
         # quick_repair(self.timer, 2)
 
-    def next(self):
+    def next(self) -> Literal['quit', 'next', 'continue']:
         res = self.stats.next()
         if res in ['next', 'quit']:
             self.timer.confirm_operation(timeout=5, must_confirm=1)  # 确认通关
@@ -334,7 +334,7 @@ class DecisiveBattle:
             get_ship(self.timer)
         return res
 
-    def choose(self, refreshed=False, rec_only=False):
+    def choose(self, refreshed: bool = False, rec_only: bool = False):
         # ===================获取备选项信息======================
         # 右上角资源位置
         RESOURCE_AREA = ((0.911, 0.082), (0.974, 0.037))
@@ -423,11 +423,11 @@ class DecisiveBattle:
         self.timer.click(580, 500)  # 关闭/确定
         return None
 
-    def up_level_assistant(self):
+    def up_level_assistant(self) -> None:
         self.timer.click(75, 667 * 0.75)
         self.stats.score -= 5
 
-    def use_skill(self, type=3):
+    def use_skill(self, type: int = 3) -> None:
         SKILL_POS = (0.2143, 0.894)
         SHIP_AREA = ((0.26, 0.715), (0.74, 0.685))
 
@@ -444,11 +444,11 @@ class DecisiveBattle:
                 self.stats.ships.add(ship)
         self.timer.relative_click(*SKILL_POS, times=2, delay=0.3)
 
-    def leave(self):
+    def leave(self) -> None:
         self.timer.click(36, 33)
         self.timer.click(360, 300)
 
-    def _get_chapter(self):
+    def _get_chapter(self) -> int:
         CHAPTER_AREA = ((0.818, 0.867), (0.875, 0.81))
         text = self.timer.recognize(
             crop_image(self.timer.get_screen(), *CHAPTER_AREA),
@@ -458,7 +458,7 @@ class DecisiveBattle:
         )[1]
         return int(text[-1])
 
-    def _move_chapter(self):
+    def _move_chapter(self) -> None:
         if self._get_chapter() < self.stats.chapter:
             self.timer.click(900, 507)
         elif self._get_chapter() > self.stats.chapter:
@@ -467,12 +467,15 @@ class DecisiveBattle:
             return
         self._move_chapter()
 
-    def enter_decisive_battle(self):
+    def enter_decisive_battle(self) -> None:
         self.timer.goto_game_page('decisive_battle_entrance')
         self.timer.click(115, 113, delay=1.5)
         self.detect()
 
-    def enter_map(self, check_map=True):
+    def enter_map(
+        self,
+        check_map=True,
+    ) -> Literal['full_destroy_success', 'other chapter is running', 'ok'] | None:
         self.stats.node = 'A'
         if check_map:
             self.enter_decisive_battle()
@@ -530,7 +533,7 @@ class DecisiveBattle:
             raise ImageNotFoundErr("Can't Identify on enter_map")
         return 'other chapter is running' if (res == 1) else 'ok'
 
-    def check_dock_full(self):
+    def check_dock_full(self) -> bool:
         """
         检查船舱是否满，船舱满了自动解装
         """
@@ -544,12 +547,12 @@ class DecisiveBattle:
             return False
         return False
 
-    def retreat(self):
+    def retreat(self) -> None:
         self._go_map_page()
         self.timer.click(36, 33)
         self.timer.click(600, 300)
 
-    def _get_exp(self, retry=0):
+    def _get_exp(self, retry: int = 0) -> None:
         EXP_AREA = ((0.018, 0.854), (0.092, 0.822))
         try:
             self.stats.exp = 0
@@ -579,7 +582,7 @@ class DecisiveBattle:
         except:
             self.timer.logger.warning('识别副官升级经验数值失败')
 
-    def _before_fight(self):
+    def _before_fight(self) -> Literal['retreat', 'leave'] | None:
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1):
             self.timer.click(300, 225)  # 选上中下路
             self.timer.confirm_operation(must_confirm=1)
@@ -614,10 +617,10 @@ class DecisiveBattle:
             self.repair()
         return None
 
-    def _after_fight(self):
+    def _after_fight(self) -> None:
         self.timer.logger.info(self.stats.ship_stats)
 
-    def _check_fleet(self):
+    def _check_fleet(self) -> None:
         self.stats.ships.clear()
         self.go_fleet_page()
         self.stats.fleet.detect()
@@ -647,7 +650,7 @@ class DecisiveBattle:
             after_get_delay=0.2,
         )
 
-    def _during_fight(self):
+    def _during_fight(self) -> None:
         formation = get_formation(self.stats.fleet, self.stats.enemy_now)
         night = self.stats.node in self.stats.key_points[self.stats.chapter][self.stats.map]
         plan = DecisiveBattlePlan(
@@ -659,11 +662,11 @@ class DecisiveBattle:
         plan.run()
         self.stats.ship_stats = plan.info.fight_history.get_fight_results()[-1].ship_stats
 
-    def _change_fleet(self, fleet):
+    def _change_fleet(self, fleet) -> None:
         self.go_fleet_page()
         self.stats.fleet.set_ship(fleet, order=True, search_method=None)
 
-    def fight(self):
+    def fight(self) -> Literal['quit', 'next', 'continue']:
         # try:
         res = self._before_fight()
         # except BaseException as e:
@@ -684,7 +687,7 @@ class DecisiveBattle:
         self._after_fight()
         return self.next()
 
-    def start_fight(self):
+    def start_fight(self) -> None:
         self.enter_map()
         while True:
             res = self.fight()
@@ -704,12 +707,12 @@ class DecisiveBattle:
         self.timer.confirm_operation(must_confirm=True)
         return None
 
-    def _reset(self):
+    def _reset(self) -> None:
         self.stats.reset()
 
 
 class DecisiveBattlePlan(BattlePlan):
-    def __init__(self, timer: Timer, formation, night, ship_stats) -> None:
+    def __init__(self, timer: Timer, formation: int, night: bool, ship_stats: list) -> None:
         super().__init__(timer, None)
         self.info = DecisiveBattleInfo(timer)
         self.info.ship_stats = ship_stats

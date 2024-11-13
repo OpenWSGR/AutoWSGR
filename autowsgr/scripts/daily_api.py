@@ -106,14 +106,14 @@ class DailyOperation:
     def _has_unfinished(self) -> bool:
         return any(times[0] < times[1] for times in self.fight_complete_times)
 
-    def _get_unfinished(self) -> int | None:
+    def _get_unfinished(self) -> int:
         for i, times in enumerate(self.fight_complete_times):
             if times[0] < times[1]:
                 self.timer.logger.info(
                     f'正在执行的PLAN：{self.fight_complete_times[i][2]}, 已出击次数：{self.fight_complete_times[i][0]}, 目标次数：{self.fight_complete_times[i][1]}, 消耗快修数量：{self.timer.quick_repaired_cost}, 已掉落船数量:{self.timer.got_ship_num}',
                 )
                 return i
-        return None
+        raise ValueError('没有未完成的任务')
 
     def _expedition(self) -> None:
         if self.config.auto_expedition:

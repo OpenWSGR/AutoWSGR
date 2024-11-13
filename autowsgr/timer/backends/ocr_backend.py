@@ -73,14 +73,12 @@ def find_lcseque(s1, s2):
 
 
 class OCRBackend(Protocol):
+    config: UserConfig
+    logger: Logger
     WORD_REPLACE: dict[
         str,
         str,
     ]  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
-
-    def __init__(self, config: UserConfig, logger: Logger) -> None:
-        self.config = config
-        self.logger = logger
 
     def read_text(
         self,
@@ -306,14 +304,15 @@ class OCRBackend(Protocol):
 
 class EasyocrBackend(OCRBackend):
     def __init__(self, config: UserConfig, logger: Logger) -> None:
-        super().__init__(config, logger)
-        import easyocr
-
-        self.reader = easyocr.Reader(['ch_sim', 'en'])
+        self.config = config
+        self.logger = logger
         self.WORD_REPLACE = {
             '鲍鱼': '鲃鱼',
             '鲴鱼': '鲃鱼',
         }
+        import easyocr
+
+        self.reader = easyocr.Reader(['ch_sim', 'en'])
 
     def read_text(
         self,
@@ -358,62 +357,13 @@ class EasyocrBackend(OCRBackend):
 class PaddleOCRBackend(OCRBackend):
 
     def __init__(self, config: UserConfig, logger: Logger) -> None:
-        super().__init__(config, logger)
+        self.config = config
+        self.logger = logger
         self.WORD_REPLACE = {
             '鲍鱼': '鲃鱼',
         }
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
-        try:
-            from paddleocr import PaddleOCR
-        except ModuleNotFoundError:
-            import subprocess
-            import sys
-
-            # 定义阿里云镜像地址
-            aliyun_pypi_url = 'https://mirrors.aliyun.com/pypi/simple/'
-            self.logger.warning('paddleocr module not found, installing...')
-            self.logger.warning(
-                '如果开启了 代理/VPN/梯子/加速器, 请关闭它们后重新运行脚本。',
-            )
-            subprocess.check_call(
-                [
-                    sys.executable,
-                    '-m',
-                    'pip',
-                    'install',
-                    'paddleocr==2.8.1',
-                    '-i',
-                    aliyun_pypi_url,
-                ],
-            )
-            subprocess.check_call(
-                [
-                    sys.executable,
-                    '-m',
-                    'pip',
-                    'install',
-                    'paddlepaddle==2.6.1',
-                    '-i',
-                    aliyun_pypi_url,
-                ],
-            )
-            try:
-                from paddleocr import PaddleOCR
-
-                print('paddleocr module installed and imported successfully.')
-            except ModuleNotFoundError:
-                print('Failed to install paddleocr module.')
-                exit(1)  # Exit with an error code if the installation fails
-
-            print('paddlepaddle module not found, installing...')
-
-            try:
-                import paddle  # noqa: F401
-
-                print('paddlepaddle module installed and imported successfully.')
-            except ModuleNotFoundError:
-                print('Failed to install paddlepaddle module.')
-                exit(1)  # Exit with an error code if the installation fails
+        from paddleocr import PaddleOCR
 
         self.reader = PaddleOCR(
             use_angle_cls=True,
