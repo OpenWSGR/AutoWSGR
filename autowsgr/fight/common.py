@@ -1,7 +1,6 @@
 import copy
 import time
 from abc import ABC, abstractmethod
-from typing import ClassVar
 
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
@@ -138,10 +137,8 @@ class FightEvent:
 class FightHistory:
     """记录并处理战斗历史信息"""
 
-    events: ClassVar[list] = []
-
     def __init__(self) -> None:
-        pass
+        self.events = []
 
     def add_event(self, event, point, action='继续', result='无'):
         self.events.append(FightEvent(event, point, action, result))
@@ -200,7 +197,7 @@ class FightInfo(ABC):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        if self.config.SHOW_MATCH_FIGHT_STAGE:
+        if self.config.show_match_fight_stage:
             self.logger.debug('waiting:', possible_states, '  ')
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
@@ -231,7 +228,7 @@ class FightInfo(ABC):
                     delay = self.after_match_delay[self.state]
                     time.sleep(delay)
 
-                if self.config.SHOW_MATCH_FIGHT_STAGE:
+                if self.config.show_match_fight_stage:
                     self.logger.info(f'matched: {self.state}')
                 self._after_match()
 
@@ -525,7 +522,7 @@ class DecisionBlock:
                     rcondition += ch
                     last = i + 1
 
-            if self.config.SHOW_ENEMY_RULES:
+            if self.config.show_enemy_rules:
                 self.logger.info(rcondition)
             if eval(rcondition):
                 return act
@@ -750,7 +747,7 @@ class IndependentFightPlan(FightPlan):
             end_image (MyTemplate): 整个战斗流程结束后的图片
         """
         super().__init__(timer)
-        default_args = yaml_to_dict(self.timer.plan_root_list['default'])
+        default_args = yaml_to_dict(self.timer.plan_tree['default'])
         node_defaults = default_args['node_defaults']
         node_args = yaml_to_dict(plan_path) if (plan_path is not None) else kwargs
         node_args = recursive_dict_update(node_defaults, node_args)

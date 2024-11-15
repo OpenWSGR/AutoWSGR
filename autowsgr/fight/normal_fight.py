@@ -129,7 +129,7 @@ class NormalFightInfo(FightInfo):
         if pos is None:
             return
         self.ship_position = pos
-        if self.config.SHOW_MAP_NODE:
+        if self.config.show_map_node:
             self.timer.logger.debug(self.ship_position)
 
     def _update_ship_point(self):
@@ -146,7 +146,7 @@ class NormalFightInfo(FightInfo):
             ):
                 self.node = ch
 
-        if self.config.SHOW_MAP_NODE:
+        if self.config.show_map_node:
             self.timer.logger.debug(self.node)
 
     def load_point_positions(self, map_path):
@@ -195,12 +195,12 @@ class NormalFightPlan(FightPlan):
         super().__init__(timer)
 
         # 从配置文件加载计划
-        default_args = yaml_to_dict(self.timer.plan_root_list['default'])
+        default_args = yaml_to_dict(self.timer.plan_tree['default'])
         if os.path.isabs(plan_path):
             plan_args = yaml_to_dict(plan_path)
         else:
             plan_args = yaml_to_dict(
-                self.timer.plan_root_list['normal_fight'][plan_path],
+                self.timer.plan_tree['normal_fight'][plan_path],
             )
 
         # 从参数加载计划
@@ -431,7 +431,7 @@ class NormalFightPlan(FightPlan):
         try:
             if now_chapter is None:
                 now_chapter = self._get_chapter()
-            if self.config.SHOW_CHAPTER_INFO:
+            if self.config.show_chapter_info:
                 self.timer.logger.debug('NowChapter:', now_chapter)
             if now_chapter > target_chapter:
                 if now_chapter - target_chapter >= 3:
@@ -521,7 +521,7 @@ class NormalFightPlan(FightPlan):
 
         now_map = self._get_map(chapter)
         try:
-            if self.config.SHOW_CHAPTER_INFO:
+            if self.config.show_chapter_info:
                 self.timer.logger.debug('now_map:', now_map)
             if target_map > now_map:
                 for i in range(target_map - now_map):

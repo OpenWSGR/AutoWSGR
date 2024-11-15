@@ -1,5 +1,4 @@
 import time
-from types import SimpleNamespace
 
 from autowsgr.constants import literals
 from autowsgr.fight.battle import BattlePlan
@@ -9,16 +8,13 @@ from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import get_rewards, repair_by_bath, set_support
 from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
 from autowsgr.notification import miao_alert
-from autowsgr.scripts.main import start_script
+from autowsgr.timer import Timer
 
 
 class DailyOperation:
-    def __init__(self, setting_path=None) -> None:
-        self.timer = start_script(setting_path)
-
-        self.config = SimpleNamespace(**self.timer.config.daily_automation)
-        self.config.DEBUG = False
-        self.complete_time = None
+    def __init__(self, timer: Timer) -> None:
+        self.timer = timer
+        self.config = timer.config.daily_automation
 
         if self.config.auto_expedition:
             self.expedition_plan = Expedition(self.timer)
@@ -32,6 +28,7 @@ class DailyOperation:
             )
         if self.config.auto_exercise:
             self.exercise_plan = NormalExercisePlan(self.timer, 'plan_1')
+            self.complete_time = None
 
         if self.config.auto_normal_fight:
             self.fight_plans = []
@@ -106,40 +103,40 @@ class DailyOperation:
             self._gain_bonus()
             time.sleep(360)
 
-    def _has_unfinished(self):
+    def _has_unfinished(self) -> bool:
         return any(times[0] < times[1] for times in self.fight_complete_times)
 
-    def _get_unfinished(self) -> int | None:
+    def _get_unfinished(self) -> int:
         for i, times in enumerate(self.fight_complete_times):
             if times[0] < times[1]:
                 self.timer.logger.info(
                     f'正在执行的PLAN：{self.fight_complete_times[i][2]}, 已出击次数：{self.fight_complete_times[i][0]}, 目标次数：{self.fight_complete_times[i][1]}, 消耗快修数量：{self.timer.quick_repaired_cost}, 已掉落船数量:{self.timer.got_ship_num}',
                 )
                 return i
-        return None
+        raise ValueError('没有未完成的任务')
 
-    def _expedition(self):
+    def _expedition(self) -> None:
         if self.config.auto_expedition:
             self.expedition_plan.run(True)
 
-    def _gain_bonus(self):
+    def _gain_bonus(self) -> None:
         if self.config.auto_gain_bonus:
             get_rewards(self.timer)
             self.timer.go_main_page()
 
-    def _bath_repair(self):
+    def _bath_repair(self) -> None:
         if self.config.auto_bath_repair:
             repair_by_bath(self.timer)
 
-    def _ship_max(self):
-        if not self.config.stop_maxship:
+    def _ship_max(self) -> bool:
+        if not self.config.stop_max_ship:
             return True
         if self.timer.got_ship_num < 500:
             return True
         self.timer.logger.info('船只数量已达到上限，结束出征')
         return False
 
-    def check_exercise(self):
+    def check_exercise(self) -> None:
         # 判断在哪个时间段
         now_time = time.localtime(time.time())
         hour = now_time.tm_hour

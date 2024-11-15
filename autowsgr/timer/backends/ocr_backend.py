@@ -1,11 +1,12 @@
 import os
 import subprocess
-from typing import ClassVar
+from typing import Protocol
 
 import cv2
 import numpy as np
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import cv_imread
 from autowsgr.utils.logger import Logger
 
@@ -71,14 +72,13 @@ def find_lcseque(s1, s2):
     return ''.join(s)
 
 
-class OCRBackend:
-    WORD_REPLACE = (
-        None  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
-    )
-
-    def __init__(self, config, logger: Logger) -> None:
-        self.config = config
-        self.logger = logger
+class OCRBackend(Protocol):
+    config: UserConfig
+    logger: Logger
+    WORD_REPLACE: dict[
+        str,
+        str,
+    ]  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
 
     def read_text(
         self,
@@ -214,7 +214,7 @@ class OCRBackend:
                         result[2],
                     ),
                 )
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'修正OCR结果：{results}')
 
         if allow_nan and not results:
@@ -266,7 +266,7 @@ class OCRBackend:
             **kwargs,
         )
         results = [(t[0], process_number(t[1]), t[2]) for t in results]
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'数字解析结果：{results}')
 
         if allow_nan and not results:
@@ -303,13 +303,13 @@ class OCRBackend:
 
 
 class EasyocrBackend(OCRBackend):
-    WORD_REPLACE: ClassVar[dict] = {
-        '鲍鱼': '鲃鱼',
-        '鲴鱼': '鲃鱼',
-    }
-
-    def __init__(self, config, logger) -> None:
-        super().__init__(config, logger)
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
+        self.config = config
+        self.logger = logger
+        self.WORD_REPLACE = {
+            '鲍鱼': '鲃鱼',
+            '鲴鱼': '鲃鱼',
+        }
         import easyocr
 
         self.reader = easyocr.Reader(['ch_sim', 'en'])
@@ -349,70 +349,21 @@ class EasyocrBackend(OCRBackend):
         else:
             raise ValueError(f'Invalid sort method: {sort}')
 
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'原始OCR结果: {results}')
         return results
 
 
 class PaddleOCRBackend(OCRBackend):
-    WORD_REPLACE: ClassVar[dict] = {
-        '鲍鱼': '鲃鱼',
-    }
 
-    def __init__(self, config, logger) -> None:
-        super().__init__(config, logger)
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
+        self.config = config
+        self.logger = logger
+        self.WORD_REPLACE = {
+            '鲍鱼': '鲃鱼',
+        }
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
-        try:
-            from paddleocr import PaddleOCR
-        except ModuleNotFoundError:
-            import subprocess
-            import sys
-
-            # 定义阿里云镜像地址
-            aliyun_pypi_url = 'https://mirrors.aliyun.com/pypi/simple/'
-            self.logger.warning('paddleocr module not found, installing...')
-            self.logger.warning(
-                '如果开启了 代理/VPN/梯子/加速器, 请关闭它们后重新运行脚本。',
-            )
-            subprocess.check_call(
-                [
-                    sys.executable,
-                    '-m',
-                    'pip',
-                    'install',
-                    'paddleocr==2.8.1',
-                    '-i',
-                    aliyun_pypi_url,
-                ],
-            )
-            subprocess.check_call(
-                [
-                    sys.executable,
-                    '-m',
-                    'pip',
-                    'install',
-                    'paddlepaddle==2.6.1',
-                    '-i',
-                    aliyun_pypi_url,
-                ],
-            )
-            try:
-                from paddleocr import PaddleOCR
-
-                print('paddleocr module installed and imported successfully.')
-            except ModuleNotFoundError:
-                print('Failed to install paddleocr module.')
-                exit(1)  # Exit with an error code if the installation fails
-
-            print('paddlepaddle module not found, installing...')
-
-            try:
-                import paddle  # noqa: F401
-
-                print('paddlepaddle module installed and imported successfully.')
-            except ModuleNotFoundError:
-                print('Failed to install paddlepaddle module.')
-                exit(1)  # Exit with an error code if the installation fails
+        from paddleocr import PaddleOCR
 
         self.reader = PaddleOCR(
             use_angle_cls=True,
@@ -431,6 +382,6 @@ class PaddleOCRBackend(OCRBackend):
         results = self.reader.ocr(img, cls=False, **kwargs)
         results = [] if results == [None] else results[0]
         results = [(get_center(r[0][1], r[0][3]), r[1][0], r[1][1]) for r in results]
-        if self.config.SHOW_OCR_INFO:
+        if self.config.show_ocr_info:
             self.logger.debug(f'原始OCR结果: {results}')
         return results

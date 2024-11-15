@@ -1,4 +1,3 @@
-import os
 import time
 
 from autowsgr.game.build import BuildManager
@@ -7,7 +6,7 @@ from autowsgr.scripts.main import start_script
 
 resources = [90, 30, 90, 30]
 
-timer = start_script(f'{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml')
+timer = start_script('./user_settings.yaml')
 build_manager = BuildManager(timer)
 
 while build_manager.has_empty_slot():

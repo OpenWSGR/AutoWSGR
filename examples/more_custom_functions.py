@@ -1,14 +1,13 @@
-import os
 import time
 
-import autowsgr.fight.normal_fight as nf
-import autowsgr.scripts.daily_api as da
+from autowsgr.fight.normal_fight import NormalFightPlan
 from autowsgr.game.build import BuildManager
 from autowsgr.game.game_operation import cook
+from autowsgr.scripts.daily_api import DailyOperation
 from autowsgr.scripts.main import start_script
 
 
-timer = start_script(f'{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml')
+timer = start_script('./user_settings.yaml')
 
 
 def week(start=1, start_times=0, fleet_id=4, change=True):
@@ -19,9 +18,9 @@ def week(start=1, start_times=0, fleet_id=4, change=True):
     if change:
         changes[start] = -1
     for i in range(start, 10):
-        plan = nf.NormalFightPlan(
+        plan = NormalFightPlan(
             timer,
-            timer.plan_root_list['week'][i],
+            timer.plan_tree['week'][i],
             fleet_id,
             changes[i],
         )
@@ -50,9 +49,6 @@ def day():
 
 week()
 
-# day()  # 日常做菜
-
-operation = da.DailyOperation(
-    f'{os.path.dirname(os.path.abspath(__file__))}/user_settings.yaml',
-)
+# 日常，可以实现日常出击，战役，演习等操作
+operation = DailyOperation(timer)
 operation.run()

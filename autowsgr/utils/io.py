@@ -54,6 +54,31 @@ def recursive_dict_update(d, u, skip=None):
     return d
 
 
+def create_nested_dict(directory: str) -> dict:
+    """
+    创建一个嵌套字典，表示目录及其子目录中的文件
+    Args:
+        directory (str): 目录路径
+    Returns:
+        dict: 嵌套字典，表示目录结构
+    """
+    ret = {}
+    for root, _dirs, files in os.walk(directory):
+        # 获取相对于根目录的路径
+        rel_path = os.path.relpath(root, directory)
+        # 获取当前层级的字典
+        current_dict = ret
+        if rel_path != '.':
+            for part in rel_path.split(os.sep):
+                current_dict = current_dict.setdefault(part, {})
+        # 将文件添加到当前层级的字典中
+        for file in files:
+            file_key = os.path.splitext(file)[0]
+            # 赋予其绝对路径
+            current_dict[file_key] = os.path.abspath(os.path.join(root, file))
+    return ret
+
+
 def get_file_suffix_name(path):
     """返回文件后缀名,不包含 '.'
 

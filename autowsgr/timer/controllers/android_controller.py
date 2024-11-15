@@ -9,6 +9,7 @@ from airtest.core.android import Android
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.ocr.ship_name import recognize
+from autowsgr.user_config import UserConfig
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
@@ -26,10 +27,16 @@ class AndroidController:
     用于提供底层的控制接口
     """
 
-    def __init__(self, config, logger: Logger, dev: Android) -> None:
-        self.config = config
-        self.logger = logger
+    def __init__(
+        self,
+        dev: Android,
+        config: UserConfig,
+        logger: Logger,
+    ) -> None:
         self.dev = dev
+        self.show_android_input = config.show_android_input
+        self.delay = config.delay
+        self.logger = logger
         self.update_screen()
         self.resolution = self.screen.shape[:2]
         self.resolution = self.resolution[::-1]
@@ -98,7 +105,7 @@ class AndroidController:
             enable_subprocess == False:None
             enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
-        if self.config.SHOW_ANDROID_INPUT:
+        if self.show_android_input:
             self.logger.debug(f'click ({x:.3f} {y:.3f})')
         x, y = relative_to_absolute((x, y), self.resolution)
 
@@ -117,7 +124,7 @@ class AndroidController:
 
         for _ in range(times):
             self.shell(f'input tap {x!s} {y!s}')
-            time.sleep(delay * self.config.DELAY)
+            time.sleep(delay * self.delay)
         return None
 
     def click(self, x, y, times=1, delay=0.3, enable_subprocess=False):
@@ -156,7 +163,7 @@ class AndroidController:
         x2, y2 = relative_to_absolute((x2, y2), self.resolution)
         duration = int(duration * 1000)
         input_str = f'input swipe {x1!s} {y1!s} {x2!s} {y2!s} {duration}'
-        if self.config.SHOW_ANDROID_INPUT:
+        if self.show_android_input:
             self.logger.debug(input_str)
         self.shell(input_str)
         time.sleep(delay)

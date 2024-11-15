@@ -36,7 +36,7 @@ class EventFightPlan20240930(Event, NormalFightPlan):
         if os.path.isabs(plan_path):
             plan_path = plan_path
         else:
-            plan_path = timer.plan_root_list['event'][event][plan_path]
+            plan_path = timer.plan_tree['event'][event][plan_path]
         self.event_name = event
         NormalFightPlan.__init__(self, timer, plan_path, fleet_id=fleet_id)
         Event.__init__(self, timer, event)
