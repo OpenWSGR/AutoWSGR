@@ -1,4 +1,3 @@
-import os
 import sys
 import threading as th
 import time
@@ -9,7 +8,7 @@ from autowsgr.constants.other_constants import ALL_PAGES
 from autowsgr.constants.ui import WSGR_UI, Node
 from autowsgr.port.common import Port
 from autowsgr.timer.backends import EasyocrBackend, PaddleOCRBackend
-from autowsgr.timer.controllers import AndroidController, WindowsController, MacController
+from autowsgr.timer.controllers import AndroidController, MacController, WindowsController
 from autowsgr.types import OcrBackend
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import create_nested_dict, recursive_dict_update, yaml_to_dict
@@ -65,9 +64,9 @@ class Timer(AndroidController):
     def initialize_controllers(self) -> None:
         # 适配mac，windows
         controller_fun = {
-            "win32" : lambda: WindowsController(self.config, self.logger),
-            "linux" : {},
-            "darwin" : lambda: MacController(self.config, self.logger)
+            'win32': lambda: WindowsController(self.config, self.logger),
+            'linux': {},
+            'darwin': lambda: MacController(self.config, self.logger),
         }
         self.ControllerAdapter = controller_fun[sys.platform]()
         # 初始化android控制器

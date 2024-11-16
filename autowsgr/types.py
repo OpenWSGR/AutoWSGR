@@ -1,7 +1,10 @@
 import os
 import sys
-if sys.platform == "win32":
+
+
+if sys.platform == 'win32':
     import winreg
+
 from enum import Enum
 
 
@@ -42,9 +45,9 @@ def windows_auto_emulator_path(self):
                 raise ValueError(f'没有为 {self.value} 设置安装路径查找方法，请手动指定')
     except FileNotFoundError:
         raise FileNotFoundError(f'没有找到 {self.value} 的安装路径')
-    pass
 
-def mac_auto_emulator_path()->str:
+
+def mac_auto_emulator_path() -> str:
     # 开始查找mac上的mumu模拟器，这里只适配了mumu模拟器
     # 全局安装目录-不存在的时候再去当前用户应用目录
     path = '/Applications/MuMuPlayer.app/Contents/MacOS'
@@ -73,9 +76,9 @@ class EmulatorType(StrEnum):
     @property
     def auto_emulator_path(self) -> str:
         adapter_fun = {
-            "win32": lambda: windows_auto_emulator_path(self),
-            "linux": lambda: '',
-            "darwin":lambda: mac_auto_emulator_path(),
+            'win32': lambda: windows_auto_emulator_path(self),
+            'linux': lambda: '',
+            'darwin': lambda: mac_auto_emulator_path(),
         }
         return adapter_fun[sys.platform]()
 

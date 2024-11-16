@@ -1,5 +1,4 @@
 import json
-import os
 import subprocess
 import time
 
@@ -15,7 +14,7 @@ class MacController:
         self.logger = logger
         self.emulator_name = config.emulator_name
         self.device = None
-        self.path = config.emulator_start_cmd#
+        self.path = config.emulator_start_cmd  #
         self.prot = self.emulator_name.split(':')[-1]
 
     def check_network(self):
