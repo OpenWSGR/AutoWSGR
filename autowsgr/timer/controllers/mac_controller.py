@@ -6,11 +6,13 @@ import airtest.core.android
 import requests
 from airtest.core.api import connect_device
 
+from autowsgr.game.recognize import start_go
 from autowsgr.utils.logger import Logger
 
 
 class MacController:
     def __init__(self, config, logger: Logger) -> None:
+        start_go()
         self.logger = logger
         self.emulator_name = config.emulator_name
         self.device = None

@@ -1,6 +1,8 @@
+from autowsgr.game.recognize import enemy_condition
 import math
 import os
 import subprocess
+
 
 import numpy as np
 from PIL import Image
@@ -203,20 +205,8 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     # 处理图像并将参数传递给识别图像的程序
     img = Image.fromarray(timer.screen).convert('L')
     img = img.resize((960, 540))
-    input_path = os.path.join(TUNNEL_ROOT, 'args.in')
-    output_path = os.path.join(TUNNEL_ROOT, 'res.out')
-    delete_file(output_path)
-    args = 'recognize\n6\n'
-    for area in TYPE_SCAN_AREA[type]:
-        arr = np.array(img.crop(area))
-        args += matrix_to_str(arr)
-    with open(input_path, 'w') as f:
-        f.write(args)
-    recognize_enemy_exe = os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe')
-    subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
-
+    res = enemy_condition(timer, img, type)
     # 获取并解析结果
-    res = read_file(os.path.join(TUNNEL_ROOT, 'res.out')).split()
     enemy_type_count['ALL'] = 0
     for x in res:
         enemy_type_count[x] += 1

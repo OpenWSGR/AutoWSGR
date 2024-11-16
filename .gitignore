@@ -125,3 +125,5 @@ transfer-gym/
 .idea/workspace.xml
 *.xml
 other_data/ship_name.html
+/autowsgr/bin/image_recognize/args.json
+/autowsgr/bin/image_recognize/templateData.json
