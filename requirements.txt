@@ -1,11 +1,11 @@
-airtest @ git+https://github.com/OpenWSGR/Airtest.git@dev
+airtest-openwsgr
 easyocr>=1.7.1
 inquirer>=3.2.4
 keyboard
 loguru
 opencv-contrib-python
-opencv-python-headless
 opencv-python
+opencv-python-headless
 pre-commit
 rich
 thefuzz
