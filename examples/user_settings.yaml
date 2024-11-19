@@ -2,8 +2,7 @@
 # 所有项目如果不设置将使用默认值
 # ========= 全局设置 =========
 check_update: False
-emulator_type: MuMu
-emulator_name: 127.0.0.1:16480
+emulator_type: 雷电
 dock_full_destroy: True
 
 # ========= 日常挂机策略设置 =========
@@ -13,7 +12,7 @@ daily_automation:
   auto_normal_fight: True
   normal_fight_tasks:
     # - [8-2BJ, 4, 250] # 胖次
-    - [9-1B, 3, 1000] # 6鱼
+    - [8-5AI, 2, 250] # 6鱼
 
 # ========= 决战设置 =========
 decisive_battle:
