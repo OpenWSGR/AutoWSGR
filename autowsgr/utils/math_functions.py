@@ -1,7 +1,8 @@
 import numpy as np
+from scipy.spatial import distance
 
 
-def cal_dis(p1, p2):
+def cal_dis(p1: int, p2: int):
     """计算两个点的欧几里得距离的平方
     Args:
         p1 : 第一个点的坐标
@@ -15,7 +16,7 @@ def cal_dis(p1, p2):
     """
     if len(p1) != len(p2):
         raise ValueError('Dimensions do not equal')
-    return sum((p1[i] - p2[i]) * (p1[i] - p2[i]) for i in range(len(p1)))
+    return distance.euclidean(p1, p2) ** 2
 
 
 def get_nearest(position, points):
