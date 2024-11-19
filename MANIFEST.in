@@ -1,2 +1,2 @@
-include version.txt
+include LICENSE
 include requirements.txt
