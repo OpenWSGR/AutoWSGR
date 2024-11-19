@@ -1,10 +1,6 @@
-import platform
 import re
-import subprocess
-import sys
 
 from setuptools import find_namespace_packages, setup
-from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 
 def _fetch_requirements(path: str) -> list:
@@ -41,41 +37,9 @@ def find_version(filepath: str) -> str:
         raise RuntimeError('Unable to find version string.')
 
 
-def install_wheel():
-    try:
-        import wheel  # noqa: F401
-    except ImportError:
-        subprocess.run(['pip', 'install', 'wheel'])
-
-
-install_wheel()
-
-
-def _fetch_package_name():
-    return 'autowsgr'
-
-
-# Custom wheel class to modify the wheel name
-class bdist_wheel(_bdist_wheel):
-    def finalize_options(self):
-        _bdist_wheel.finalize_options(self)
-        self.root_is_pure = False
-
-    def get_tag(self):
-        python_version = f'cp{sys.version_info.major}{sys.version_info.minor}'
-        abi_tag = f'{python_version}'
-
-        if platform.system() == 'Linux':
-            platform_tag = 'manylinux1_x86_64'
-        else:
-            platform_tag = platform.system().lower()
-
-        return python_version, abi_tag, platform_tag
-
-
 # Setup configuration
 setup(
-    name=_fetch_package_name(),
+    name='autowsgr',
     version=find_version('autowsgr/__init__.py'),
     packages=find_namespace_packages(
         include=['autowsgr*', 'awsg*'],
@@ -89,14 +53,9 @@ setup(
     long_description=_fetch_readme(),
     long_description_content_type='text/markdown',
     install_requires=_fetch_requirements('requirements.txt'),
-    setup_requires=['wheel'],
-    dependency_links=[
-        'https://download.pytorch.org/whl/cu123',
-    ],
-    python_requires='>=3.10',
+    python_requires='>=3.10,<3.13',
     package_data={
         '': [
-            'version.txt',
             'data/**',
             'requirements.txt',
             'bin/**',
@@ -106,9 +65,9 @@ setup(
     classifiers=[
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Environment :: GPU :: NVIDIA CUDA',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: System :: Distributed Computing',
     ],
-    cmdclass={'bdist_wheel': bdist_wheel},
 )
