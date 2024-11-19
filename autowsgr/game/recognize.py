@@ -13,48 +13,9 @@ from PIL.Image import Image
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
 from autowsgr.constants.positions import TYPE_SCAN_AREA
-
-def start_go():
-    recognize_enemy_exe = os.path.join(TUNNEL_ROOT, 'main')
-    result = subprocess.Popen([recognize_enemy_exe], cwd=TUNNEL_ROOT, text=True, shell=True)
-    print(f'Return code: {result.returncode}')
-    print(f'Standard output: {result.stdout}')
-    print(f'Standard error: {result.stderr}')
-    ping()
-
-
-def ping():
-    response = requests.get('http://0.0.0.0:8080/ping', timeout=5)
-    if response.status_code == 200:
-        print('go服务正常')
-    else:
-        start_go()
-
-    threading.Timer(3, ping).start()
-
-
-def repeat_task(interval, function, *args, **kwargs):
-    """
-    重复执行任务的函数。
-
-    :param interval: 任务之间的间隔时间（秒）
-    :param function: 要执行的函数
-    :param args: 传递给函数的位置参数
-    :param kwargs: 传递给函数的关键字参数
-    """
-
-    def wrapper():
-        try:
-            function(*args, **kwargs)
-        except Exception as e:
-            print(f'An error occurred: {e}')
-        finally:
-            # 重新设置定时器
-            threading.Timer(interval, wrapper).start()
-
-    # 第一次启动定时器
-    threading.Timer(interval, wrapper).start()
-
+from autowsgr.game.my_cnocr import MyCnOcr
+from autowsgr.utils.io import delete_file, read_file
+from autowsgr.utils.math_functions import matrix_to_str
 
 def __get_insteps(timer, img: Image, type='exercise'):
     plat = sys.platform
@@ -91,30 +52,11 @@ def get_enemy_condition_win(img: Image, type='exercise'):
     return read_file(os.path.join(TUNNEL_ROOT, 'res.out')).split()
 
 def get_enemy_condition_mac(timer, img: Image, type='exercise'):
-    global go_port
-
-    req = []
+    result = []
+    ocr = MyCnOcr()
     for area in TYPE_SCAN_AREA[type]:
         arr = np.array(img.crop(area))
-
-        groupPoints = []
-        for points in arr.tolist():
-            groupPoints.extend(points)
-
-        req.append(groupPoints)
-
-    headers = {
-        'Content-Type': 'application/json',
-    }
-    data = json.dumps(req)
-
-    result = ''
-    response = requests.post('http://0.0.0.0:8080/enemy', data=data, headers=headers, timeout=5)
-    if response.status_code == 200:
-        resp = response.json()
-        timer.logger.debug('enemys:' + str(resp['result']))
-        result = resp['result']
-    else:
-        timer.logger.error(f'get_enemy_condition filed!! http status_code {response.status_code}')
+        res = ocr.enemy(arr)
+        result.append(res)
 
     return result

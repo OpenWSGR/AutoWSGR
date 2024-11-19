@@ -43,18 +43,14 @@ class MyCnOcr:
             return res[0]["text"]
         else:
             return ""
-    def enemy(self,img:Image):
+    def enemy(self,img):
         model = "ch_ppocr_mobile_v2.0"
 
-
-        req = []
-        for area in TYPE_SCAN_AREA[1]:
-            arr = np.array(img.crop(area))
-
-            res = self.ocr[model].ocr(arr)
-            req.append(res)
-            print(res)
-        return req
+        typeText = self.ocr[model].ocr(img)
+        if len(typeText) > 0:
+            return CN_TYPE_TO_EN_TYPE.get(typeText[0]["text"])
+        else:
+            return "NO"
 
 def filterF(result):
     if result["score"] <= 0.5:
