@@ -1,14 +1,10 @@
-from autowsgr.game.recognize import enemy_condition
 import math
 import os
-import subprocess
 
-
-import numpy as np
 from PIL import Image
 
 from autowsgr.constants.colors import COLORS
-from autowsgr.constants.data_roots import OCR_ROOT, TUNNEL_ROOT
+from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import (
     AADG,
@@ -34,11 +30,12 @@ from autowsgr.constants.other_constants import (
     SC,
     SS,
 )
-from autowsgr.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
+from autowsgr.constants.positions import BLOOD_BAR_POSITION
+from autowsgr.game.recognize import enemy_condition
 from autowsgr.timer import Timer
 from autowsgr.utils.api_image import crop_image
-from autowsgr.utils.io import delete_file, read_file, yaml_to_dict
-from autowsgr.utils.math_functions import cal_dis, check_color, matrix_to_str
+from autowsgr.utils.io import yaml_to_dict
+from autowsgr.utils.math_functions import cal_dis, check_color
 
 
 class Resources:
@@ -194,6 +191,7 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
         SC: 0,
         BBV: 0,
         'AP': 0,
+        "CG":0
     }
 
     if type == 'exercise':

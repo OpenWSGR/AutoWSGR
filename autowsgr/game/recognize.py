@@ -4,11 +4,8 @@
 import os
 import subprocess
 import sys
-import threading
-import numpy as np
-import json
 
-import requests
+import numpy as np
 from PIL.Image import Image
 
 from autowsgr.constants.data_roots import TUNNEL_ROOT
@@ -16,6 +13,7 @@ from autowsgr.constants.positions import TYPE_SCAN_AREA
 from autowsgr.game.my_cnocr import MyCnOcr
 from autowsgr.utils.io import delete_file, read_file
 from autowsgr.utils.math_functions import matrix_to_str
+
 
 def __get_insteps(timer, img: Image, type='exercise'):
     plat = sys.platform
@@ -44,7 +42,7 @@ def get_enemy_condition_win(img: Image, type='exercise'):
     with open(input_path, 'w') as f:
         f.write(args)
     recognize_enemy_exe = os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe')
-    result = subprocess.run([recognize_enemy_exe], cwd=TUNNEL_ROOT)
+    result = subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
     print(f'Return code: {result.returncode}')
     print(f'Standard output: {result.stdout}')
     print(f'Standard error: {result.stderr}')

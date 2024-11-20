@@ -1,10 +1,10 @@
-from airtest.core.api import connect_device
-import cnocr
-import numpy as np
-from PIL import Image
+import sys
+
+if sys.platform == "darwin":
+    import cnocr
 
 from autowsgr.constants.other_constants import CN_TYPE_TO_EN_TYPE
-from autowsgr.constants.positions import TYPE_SCAN_AREA
+
 
 class MyCnOcr:
     def __init__(self):
@@ -60,21 +60,3 @@ def filterF(result):
     if result["text"] == "J":
         return True
     return result["score"] > 0.83 and result["text"] != ""
-
-if __name__ == '__main__':
-    mycn = MyCnOcr()
-
-    for k, p in enumerate(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]):
-    # for k, p in enumerate(["B"]):
-        res = mycn.myMap(f'./node/{p}.PNG')
-        print(res)
-
-    # mycn.d("")
-    # s = "127.0.0.1:16416"
-    # android = f'Android:///{s}'
-    # dev = connect_device(android)
-    # img = dev.snapshot(quality=99)
-    # imgs = Image.fromarray(img).convert('L')
-    # imgs = imgs.resize((960, 540))
-    # mycn = MyCnOcr()
-    # print(mycn.e(imgs))
