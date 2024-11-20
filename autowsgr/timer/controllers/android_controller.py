@@ -33,6 +33,7 @@ class AndroidController:
         config: UserConfig,
         logger: Logger,
     ) -> None:
+        self.screen = None
         self.dev = dev
         self.show_android_input = config.show_android_input
         self.delay = config.delay
@@ -264,6 +265,8 @@ class AndroidController:
         """
         if this_methods is None:
             this_methods = ['tpl']
+        if self.screen is None:
+            self.update_screen()
         return locate_image_center(self.screen, query, confidence, this_methods)
 
     def get_image_position(
