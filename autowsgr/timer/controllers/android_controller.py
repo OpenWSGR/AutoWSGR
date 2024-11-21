@@ -265,8 +265,6 @@ class AndroidController:
         """
         if this_methods is None:
             this_methods = ['tpl']
-        if self.screen is None:
-            self.update_screen()
         return locate_image_center(self.screen, query, confidence, this_methods)
 
     def get_image_position(
