@@ -53,7 +53,8 @@ class Timer(AndroidController):
         start_time = time.time()
 
         self.screen = self.dev.snapshot(quality=99)
-        while self.screen == None:
+        while self.screen is None:
+            # 为了防止CPU占用过高，可以添加一个短暂的休眠
             time.sleep(1)
             # 获取当前时间
             current_time = time.time()
@@ -69,8 +70,6 @@ class Timer(AndroidController):
 
             # 这里可以放置循环中的其他操作
             print(f"已过去 {elapsed_time:.2f} 秒")
-
-            # 为了防止CPU占用过高，可以添加一个短暂的休眠
             self.screen = self.dev.snapshot(quality=99)
 
 
