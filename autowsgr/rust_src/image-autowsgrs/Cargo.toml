@@ -1,0 +1,16 @@
+[package]
+name = "image-autowsgrs"
+version = "0.1.0"
+edition = "2021"
+[workspace]
+members = ["vessel-type"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[build-dependencies]
+vessel-type = { path = "./vessel-type" }
+strum = "0.26"
+
+[dependencies]
+vessel-type = { path = "./vessel-type" }

@@ -1,0 +1,8 @@
+[package]
+name = "vessel-type"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+strum = "0.26"
+strum_macros = "0.26"
