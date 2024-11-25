@@ -26,7 +26,7 @@ def is_ship(element: str) -> bool:
 
 def get_formation(fleet: Fleet, enemy: list) -> Literal[4, 2]:
     anti_sub = count(['CL', 'DD', 'CVL'], enemy)
-    if fleet.exist('U-1206') and anti_sub <= 1 or anti_sub <= 0:
+    if (fleet.exist('U-1206') and anti_sub <= 1) or anti_sub <= 0:
         return 4
     return 2
 
