@@ -75,6 +75,7 @@ class Timer(AndroidController, WindowsController):
             case OcrBackend.paddleocr:
                 self.ocr_backend = PaddleOCRBackend(self.config, self.logger)
         self.logger.info('OCR 后端初始化成功')
+
     def update_screen(self):
         # 记录开始时间
         start_time = time.time()
@@ -94,6 +95,7 @@ class Timer(AndroidController, WindowsController):
                 raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
 
             self.screen = self.dev.snapshot(quality=99)
+
     # ========================= OCR 功能穿透 =========================
     def recognize(
         self,
