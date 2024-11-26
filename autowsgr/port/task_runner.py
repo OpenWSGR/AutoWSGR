@@ -3,7 +3,7 @@ import time
 
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ShipNotFoundErr
-from autowsgr.game.build import BuildManager  # noqa: TCH001
+from autowsgr.game.build import BuildManager  # noqa: TC001
 from autowsgr.game.game_operation import (
     change_ship,
     destroy_ship,
