@@ -19,6 +19,7 @@ class Timer(AndroidController, WindowsController):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
 
     def __init__(self, config: UserConfig, logger: Logger) -> None:
+        self.screen = None
         self.config = config
         self.logger = logger
 
@@ -74,7 +75,25 @@ class Timer(AndroidController, WindowsController):
             case OcrBackend.paddleocr:
                 self.ocr_backend = PaddleOCRBackend(self.config, self.logger)
         self.logger.info('OCR 后端初始化成功')
+    def update_screen(self):
+        # 记录开始时间
+        start_time = time.time()
 
+        self.screen = self.dev.snapshot(quality=99)
+        while self.screen is None:
+            # 为了防止CPU占用过高，可以添加一个短暂的休眠
+            time.sleep(1)
+            # 获取当前时间
+            current_time = time.time()
+
+            # 计算已过去的时间
+            elapsed_time = current_time - start_time
+
+            # 如果已过去的时间超过30秒
+            if elapsed_time > 10:
+                raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
+
+            self.screen = self.dev.snapshot(quality=99)
     # ========================= OCR 功能穿透 =========================
     def recognize(
         self,
