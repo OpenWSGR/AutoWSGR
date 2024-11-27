@@ -19,7 +19,6 @@ class Timer(AndroidController, WindowsController):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
 
     def __init__(self, config: UserConfig, logger: Logger) -> None:
-        self.screen = None
         self.config = config
         self.logger = logger
 

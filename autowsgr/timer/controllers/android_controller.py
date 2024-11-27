@@ -37,6 +37,7 @@ class AndroidController:
         self.show_android_input = config.show_android_input
         self.delay = config.delay
         self.logger = logger
+        self.screen = None
         self.update_screen()
         self.resolution = self.screen.shape[:2]
         self.resolution = self.resolution[::-1]
