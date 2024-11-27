@@ -7,7 +7,7 @@ from collections.abc import Iterable
 import cv2
 from airtest.core.android import Android
 
-from autowsgr.constants.custom_exceptions import ImageNotFoundErr
+from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
 from autowsgr.ocr.ship_name import recognize
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.api_image import (
@@ -207,7 +207,12 @@ class AndroidController:
 
     # ======== 屏幕相关 ========
     def update_screen(self):
-        self.screen = self.dev.snapshot(quality=99)
+        start_time = time.time()
+        while screen := self.dev.snapshot(quality=99) is None:
+            if time.time() - start_time > 10:
+                raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
+            time.sleep(0.1)
+        self.screen = screen
 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
         """获取屏幕图片
