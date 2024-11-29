@@ -209,7 +209,7 @@ class AndroidController:
     # ======== 屏幕相关 ========
     def update_screen(self):
         start_time = time.time()
-        while screen := self.dev.snapshot(quality=99) is None:
+        while (screen := self.dev.snapshot(quality=99)) is None:
             if time.time() - start_time > 10:
                 raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
             time.sleep(0.1)
