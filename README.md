@@ -1,10 +1,10 @@
 <div align=center>
-<img src="https://raw.githubusercontent.com/huan-yp/Auto-WSGR/main/.assets/logo.png">
+<img src="https://raw.githubusercontent.com/OpenWSGR/AutoWSGR/main/.assets/logo.png">
 </div>
 
 ## 项目简介
 
-![](https://img.shields.io/github/repo-size/huan-yp/Auto-WSGR) ![](https://img.shields.io/pypi/v/autowsgr) ![](https://img.shields.io/pypi/dm/autowsgr) ![](https://img.shields.io/github/issues/huan-yp/Auto-WSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
+![](https://img.shields.io/github/repo-size/OpenWSGR/AutoWSGR) ![](https://img.shields.io/pypi/v/autowsgr) ![](https://img.shields.io/pypi/dm/autowsgr) ![](https://img.shields.io/github/issues/OpenWSGR/AutoWSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
 
 用 python 与 c++ 实现的 战舰少女R 的自动化流水线 & 数据统计一体化脚本, 提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口.
 
@@ -21,10 +21,10 @@
 
 ## 贡献者
 
-<a href="https://github.com/huan-yp/Auto-WSGR/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=huan-yp/Auto-WSGR" />
+<a href="https://github.com/OpenWSGR/AutoWSGR/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=OpenWSGR/AutoWSGR" />
 </a>
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=huan-yp/Auto-WSGR&type=Date)](https://star-history.com/#huan-yp/Auto-WSGR&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=OpenWSGR/AutoWSGR&type=Date)](https://star-history.com/#OpenWSGR/AutoWSGR&Date)
