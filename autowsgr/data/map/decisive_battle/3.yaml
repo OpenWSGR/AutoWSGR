@@ -7,17 +7,17 @@ key_points:
     - ""
   4:
     - ""
-    - "CFH"
+    - "ABCDEFH"
     - "BFH"
     - "DHJ"
   5:
     - ""
-    - "DFH"
+    - "ABCDEFH"
     - "DGJ"
     - "CGJ"
   6:
     - ""
-    - "BGJ"
+    - "ABCDEGJ"
     - "CHJ"
     - "DGJ"
 map_end:
