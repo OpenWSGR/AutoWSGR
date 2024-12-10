@@ -322,6 +322,8 @@ class FightPlan(ABC):
             if fight_flag not in ['SL', 'success']:
                 if fight_flag == 'dock is full':
                     return 'dock is full'
+                if fight_flag == literals.SKIP_FIGHT:
+                    return literals.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
             self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
         return 'OK'
@@ -356,7 +358,7 @@ class FightPlan(ABC):
         elif ret == literals.FIGHT_END_FLAG:
             self.timer.set_page(self.info.end_page)
             return ret
-        elif ret == literals.BATTLE_TIMES_EXCEED:
+        elif ret == literals.BATTLE_TIMES_EXCEED or ret == literals.SKIP_FIGHT:
             return ret
         else:
             self.logger.error('无法进入战斗, 原因未知! 屏幕状态已记录')

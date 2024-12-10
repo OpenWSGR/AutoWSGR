@@ -33,5 +33,6 @@ fleet_id: 3 # 该任务占用的舰队编号, 不能用第1舰队
 times: 200 # 任务次数
 max_repair_time: 86400 # 最大修理时间(秒), 超出该时间则使用快速修复, 这里是 1 天也就是相当于不允许使用快修.
 quick_repair: False # 不存在能够参与轮换的舰队时是否使用快修.
+quick_register: False # 是否启用快速注册
 destroy_ship_types: null # 要解装哪些舰船, null 表示全部解装
 # destroy_ship_types: ["DD", "CA", "CV"] 只解装驱逐, 重巡, 航母
