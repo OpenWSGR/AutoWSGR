@@ -14,7 +14,6 @@ from autowsgr.game.game_operation import (
     move_team,
     quick_repair,
 )
-from autowsgr.ocr.ship_name import _recognize_ship
 from autowsgr.port.common import Ship
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer.timer import Timer
@@ -353,7 +352,7 @@ class RepairTask(Task):
                     timer.logger.info(f'检查中:{(i, j)}')
                     if '快速修理' in [
                         result[1]
-                        for result in timer.recognize_screen_relative(
+                        for result in self.recognize_screen_relative(
                             0.279,
                             0.319,
                             0.372,
@@ -362,7 +361,7 @@ class RepairTask(Task):
                     ]:
                         timer.logger.info('此位置有舰船修理中')
                         seconds = self.port.bathroom._time_to_seconds(
-                            timer.recognize_screen_relative(0.413, 0.544, 0.506, 0.596)[0][1],
+                            self.recognize_screen_relative(0.413, 0.544, 0.506, 0.596)[0][1],
                         )
                         timer.logger.info(f'预期用时: {seconds} 秒')
                         available_time.append(time.time() + seconds)
@@ -389,7 +388,7 @@ class RepairTask(Task):
         last_result = None
         self.timer.goto_game_page('choose_repair_page')
         while True:
-            time_costs = self.timer.recognize_screen_relative(
+            time_costs = self.recognize_screen_relative(
                 0.041,
                 0.866,
                 0.966,
@@ -401,14 +400,14 @@ class RepairTask(Task):
                 text = time_cost[1].replace(' ', '')
                 if text.startswith('耗时') and len(text) == 11:
                     # 整个图像截取完全
-                    x = 0.041 + time_cost[0][0][0] / self.timer.screen.shape[1]
+                    x = 0.041 + time_cost[0][0] / self.timer.screen.shape[1]
                     y = 0.741
-                    img = crop_rectangle_relative(self.timer.screen, x, y, 0.12, 0.042)
-                    name = _recognize_ship(img, self.timer.ship_names)
+                    img = crop_rectangle_relative(self.timer.screen, x - 0.06, y, 0.12, 0.042)
+                    name = self.timer.recognize(img, candidates=self.timer.ship_names)
                     if len(name) == 0:
                         # 单字船名识别失败
                         continue
-                    name = name[0][0]
+                    name = name[1]
                     seconds = self.port.bathroom._time_to_seconds(text[3:])
                     if name == self.ship.name:
                         if self.max_repiar_time <= seconds:
@@ -439,6 +438,14 @@ class RepairTask(Task):
             if time_costs == last_result:
                 raise BaseException('未找到目标舰船')
             last_result = time_costs
+
+    def recognize_screen_relative(self, left, top, right, bottom, update=False):
+        if update:
+            self.timer.update_screen()
+        return self.timer.recognize(
+            crop_rectangle_relative(self.timer.screen, left, top, right - left, bottom - top),
+            multiple=True,
+        )
 
 
 class OtherTask(Task):
