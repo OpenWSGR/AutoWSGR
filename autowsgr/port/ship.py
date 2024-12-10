@@ -7,7 +7,6 @@ from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.game.game_operation import move_team
-from autowsgr.ocr.ship_name import recognize_number
 from autowsgr.timer import Timer
 from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
@@ -84,7 +83,7 @@ class Fleet:
             (0.303, 0.566),
             (0.420, 0.566),
             (0.537, 0.566),
-            (0.653, 0.566),
+            (0.654, 0.566),
         ]
         SIZE = (0.023, 0.024)
         screen = self.timer.get_screen()
@@ -99,7 +98,7 @@ class Fleet:
             )
             img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
-            self.levels[i] = int(recognize_number(img, min_size=3)[0][1])
+            self.levels[i] = int(self.timer.ocr_backend.recognize_number(img, min_size=3)[1])
             # print(levels)
         self.timer.logger.info(f'等级识别结果: {self.levels}')
 

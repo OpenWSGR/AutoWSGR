@@ -37,19 +37,28 @@
 ### 如何贡献 How to Contribute
 
 1. 为你的特性或错误修复创建一个新的分支。
+   1. 如果你不是项目管理者：从 GitHub 仓库 (<https://github.com/OpenWSGR/AutoWSGR>) 创建一个 Fork 仓库，随后克隆并创建自己的功能分支。
 
-    ```bash
-    git fetch --all
-    git checkout main
-    git checkout -b yourname/my-feature-branch
-    ```
+        ```bash
+        git clone https://github.com/<yourname>/AutoWSGR
+        cd AutoWSGR
+        git checkout -b <my-feature-branch>
+        ```
+
+    2. 如果你是项目管理员：可以不用Fork，转为在主仓库创建一个分支。
+
+        ```bash
+        git fetch --all
+        git checkout main
+        git checkout -b <my-feature-branch>
+        ```
 
 2. 做出你的变更并将它们提交到分支。提交前不要忘记运行 `pre-commit` 检查。
 
 3. 将你的变更推送到远程仓库并创建一个合并请求。
 
     ```bash
-    git push -u origin yourname/my-feature-branch
+    git push -u origin <my-feature-branch>
     ```
 
 4. 转到 GitHub 仓库 (<https://github.com/OpenWSGR/AutoWSGR>) 并创建一个新的合并请求。
@@ -75,7 +84,7 @@
 
 ## 文档 Documentation
 
-如果你对代码库进行了更改，请更新 [用户文档](https://www.notion.so/56a26bfe32da4931a6a1ece332173211?v=428430662def42a2a7ea6dac48238d50)。同样鼓励在代码中编写注释和文档字符串。
+如果你对代码库进行了更改，请更新 [用户文档](https://docs-autowsgr.notion.site/)。同样鼓励在代码中编写注释和文档字符串。
 
 ------
 

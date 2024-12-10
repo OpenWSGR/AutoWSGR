@@ -220,7 +220,7 @@ class UI:
         self._add_edge(
             fight_prepare_page,
             map_page,
-            self._construct_clicks_method([(30, 30, 1, 0)]),
+            self._construct_clicks_method([(33, 30, 1, 0)]),
         )
         self._add_edge(
             fight_prepare_page,

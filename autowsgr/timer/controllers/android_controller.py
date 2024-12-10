@@ -7,13 +7,11 @@ from collections.abc import Iterable
 import cv2
 from airtest.core.android import Android
 
-from autowsgr.constants.custom_exceptions import ImageNotFoundErr
-from autowsgr.ocr.ship_name import recognize
+from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
-    crop_rectangle_relative,
     locate_image_center,
     relative_to_absolute,
 )
@@ -37,6 +35,7 @@ class AndroidController:
         self.show_android_input = config.show_android_input
         self.delay = config.delay
         self.logger = logger
+        self.screen = None
         self.update_screen()
         self.resolution = self.screen.shape[:2]
         self.resolution = self.resolution[::-1]
@@ -142,14 +141,6 @@ class AndroidController:
         x, y = absolute_to_relative((x, y), (960, 540))
         self.relative_click(x, y, times, delay, enable_subprocess)
 
-    # ===========图像函数============
-    def recognize_screen_relative(self, left, top, right, bottom, update=False):
-        if update:
-            self.update_screen()
-        return recognize(
-            crop_rectangle_relative(self.screen, left, top, right - left, bottom - top),
-        )
-
     def relative_swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5):
         """匀速滑动模拟器相对坐标 (x1, y1) 到 (x2, y2).
         Args:
@@ -207,7 +198,12 @@ class AndroidController:
 
     # ======== 屏幕相关 ========
     def update_screen(self):
-        self.screen = self.dev.snapshot(quality=99)
+        start_time = time.time()
+        while (screen := self.dev.snapshot(quality=99)) is None:
+            if time.time() - start_time > 10:
+                raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
+            time.sleep(0.1)
+        self.screen = screen
 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
         """获取屏幕图片

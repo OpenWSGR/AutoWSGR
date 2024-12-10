@@ -6,7 +6,7 @@ from autowsgr.scripts.main import start_script
 
 
 timer = start_script('./user_settings.yaml')
-plan = NormalFightPlan(timer, 'normal_fight/9-3AD.yaml')
+plan = NormalFightPlan(timer, '9-3AD.yaml')
 runner = TaskRunner()  # 注册 TaskRunner
 runner.tasks.append(
     FightTask(

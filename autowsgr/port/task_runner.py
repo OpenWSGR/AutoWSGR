@@ -1,9 +1,11 @@
 import datetime
+import queue
+import threading
 import time
 
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ShipNotFoundErr
-from autowsgr.game.build import BuildManager  # noqa: TCH001
+from autowsgr.game.build import BuildManager  # noqa: TC001
 from autowsgr.game.game_operation import (
     change_ship,
     destroy_ship,
@@ -11,7 +13,6 @@ from autowsgr.game.game_operation import (
     move_team,
     quick_repair,
 )
-from autowsgr.ocr.ship_name import _recognize_ship
 from autowsgr.port.common import Ship
 from autowsgr.port.ship import Fleet
 from autowsgr.timer.timer import Timer
@@ -63,6 +64,8 @@ class FightTask(Task):
             all_ships: 所有参与轮换的舰船
         """
         super().__init__(timer)
+        self.quick_register = False
+        self.last_exec = time.time()
         self.plan = plan
         self.quick_repair = False
         self.destroy_ship_types = None
@@ -78,6 +81,38 @@ class FightTask(Task):
         if file_path != '':
             self.__dict__.update(yaml_to_dict(file_path))
         self.__dict__.update(kwargs)
+
+        # 处理填写不规范的一些问题
+        if self.repair_mode is None:
+            self.repair_mode = {}
+        if self.level_limit is None:
+            self.level_limit = {}
+
+        # 快速注册 (等级直接设置成 1, 打完一遍后会更新掉)
+        if self.quick_register:
+
+            def get_input():
+                enable_quick = input() == 'y'
+                q.put(enable_quick)
+
+            print('检测到你在当前任务中启用了快速注册')
+            print('请确认以下所有舰船均为绿血且不处于修复状态:')
+            print(self.all_ships)
+            print('确认吗(y/n)')
+
+            q = queue.Queue()
+            th = threading.Thread(target=get_input)
+            th.start()
+            th.join(10)
+            if not q.empty() and q.get():
+                for ship in self.all_ships:
+                    tmp = self.port.register_ship(ship)
+                    tmp.level = 1
+                    tmp.statu = 0
+                return
+            self.timer.logger.info('放弃快速注册')
+
+        # 注册舰船
         if any(not self.port.have_ship(ship) for ship in self.all_ships):
             self.timer.logger.info('含有未注册的舰船, 正在注册中...')
 
@@ -195,7 +230,10 @@ class FightTask(Task):
         return tasks
 
     def run(self):
-        # 应该退出的情况: 1.等级限制 2.不允许快修, 需要等待 3. 船坞已满, 需清理
+        # 应该退出的情况: 1.等级限制 2.不允许快修, 需要等待 3. 船坞已满, 需清理 4. 战斗任务已经执行完毕
+        if self.times <= 0:
+            return True, []
+
         statu, fleet = self.build_fleet()
         if statu == 1:
             return True, []
@@ -214,6 +252,7 @@ class FightTask(Task):
             raise ValueError('没有指定战斗策略')
         plan = self.plan
         plan.fleet = fleet
+        plan.fleet_id = self.fleet_id
         plan.repair_mode = [3] * 6
         # 设置战时快修
         if statu == 2:
@@ -305,7 +344,7 @@ class RepairTask(Task):
                     timer.logger.info(f'检查中:{(i, j)}')
                     if '快速修理' in [
                         result[1]
-                        for result in timer.recognize_screen_relative(
+                        for result in self.recognize_screen_relative(
                             0.279,
                             0.319,
                             0.372,
@@ -314,7 +353,7 @@ class RepairTask(Task):
                     ]:
                         timer.logger.info('此位置有舰船修理中')
                         seconds = self.port.bathroom._time_to_seconds(
-                            timer.recognize_screen_relative(0.413, 0.544, 0.506, 0.596)[0][1],
+                            self.recognize_screen_relative(0.413, 0.544, 0.506, 0.596)[0][1],
                         )
                         timer.logger.info(f'预期用时: {seconds} 秒')
                         available_time.append(time.time() + seconds)
@@ -341,7 +380,7 @@ class RepairTask(Task):
         last_result = None
         self.timer.goto_game_page('choose_repair_page')
         while True:
-            time_costs = self.timer.recognize_screen_relative(
+            time_costs = self.recognize_screen_relative(
                 0.041,
                 0.866,
                 0.966,
@@ -353,14 +392,14 @@ class RepairTask(Task):
                 text = time_cost[1].replace(' ', '')
                 if text.startswith('耗时') and len(text) == 11:
                     # 整个图像截取完全
-                    x = 0.041 + time_cost[0][0][0] / self.timer.screen.shape[1]
+                    x = 0.041 + time_cost[0][0] / self.timer.screen.shape[1]
                     y = 0.741
-                    img = crop_rectangle_relative(self.timer.screen, x, y, 0.12, 0.042)
-                    name = _recognize_ship(img, self.timer.ship_names)
+                    img = crop_rectangle_relative(self.timer.screen, x - 0.06, y, 0.12, 0.042)
+                    name = self.timer.recognize(img, candidates=self.timer.ship_names)
                     if len(name) == 0:
                         # 单字船名识别失败
                         continue
-                    name = name[0][0]
+                    name = name[1]
                     seconds = self.port.bathroom._time_to_seconds(text[3:])
                     if name == self.ship.name:
                         if self.max_repiar_time <= seconds:
@@ -391,6 +430,14 @@ class RepairTask(Task):
             if time_costs == last_result:
                 raise BaseException('未找到目标舰船')
             last_result = time_costs
+
+    def recognize_screen_relative(self, left, top, right, bottom, update=False):
+        if update:
+            self.timer.update_screen()
+        return self.timer.recognize(
+            crop_rectangle_relative(self.timer.screen, left, top, right - left, bottom - top),
+            multiple=True,
+        )
 
 
 class OtherTask(Task):
@@ -442,9 +489,18 @@ class OtherTask(Task):
         return True, []
 
 
+class DecisiveFightTask(Task):
+    def __init__(self, timer) -> None:
+        super().__init__(timer)
+
+    def run(self):
+        pass
+
+
 class TaskRunner:
-    def __init__(self) -> None:
+    def __init__(self, timer: Timer) -> None:
         self.tasks = []
+        self.timer = timer
 
     def run(self):
         while True:
@@ -453,9 +509,15 @@ class TaskRunner:
             id = 0
             while id < len(self.tasks):
                 task = self.tasks[id]
+                self.timer.logger.info(f'当前任务类型: {type(task)}')
+                if 'times' in task.__dict__:
+                    self.timer.logger.info(f'当前任务剩余次数: {task.times}')
                 statu, new_tasks = task.run()
                 if statu:
                     self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
                     break
                 self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]
                 id += 1
+            if len(self.tasks):
+                self.timer.logger('本次全部任务已经执行完毕')
+                return
