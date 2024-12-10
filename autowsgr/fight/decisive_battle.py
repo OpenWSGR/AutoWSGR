@@ -691,9 +691,9 @@ class DecisiveBattle:
         self.enter_map()
         while True:
             res = self.fight()
-            if res == 'quit':
+            if res == 'quit':  # 全流程完成
                 return
-            if res == 'next':
+            if res == 'next':  # 下一个关卡
                 self.enter_map(False)
 
     def reset_chapter(self) -> None | Literal[True]:

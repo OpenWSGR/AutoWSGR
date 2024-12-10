@@ -1,4 +1,6 @@
 import datetime
+import queue
+import threading
 import time
 
 from autowsgr.constants import literals
@@ -63,6 +65,7 @@ class FightTask(Task):
             all_ships: 所有参与轮换的舰船
         """
         super().__init__(timer)
+        self.quick_register = False
         self.last_exec = time.time()
         self.plan = plan
         self.quick_repair = False
@@ -86,6 +89,31 @@ class FightTask(Task):
         if self.level_limit is None:
             self.level_limit = {}
 
+        # 快速注册 (等级直接设置成 1, 打完一遍后会更新掉)
+        if self.quick_register:
+
+            def get_input():
+                enable_quick = input() == 'y'
+                q.put(enable_quick)
+
+            print('检测到你在当前任务中启用了快速注册')
+            print('请确认以下所有舰船均为绿血且不处于修复状态:')
+            print(self.all_ships)
+            print('确认吗(y/n)')
+
+            q = queue.Queue()
+            th = threading.Thread(target=get_input)
+            th.start()
+            th.join(10)
+            if not q.empty() and q.get():
+                for ship in self.all_ships:
+                    tmp = self.port.register_ship(ship)
+                    tmp.level = 1
+                    tmp.statu = 0
+                return
+            self.timer.logger.info('放弃快速注册')
+
+        # 注册舰船
         if any(not self.port.have_ship(ship) for ship in self.all_ships):
             self.timer.logger.info('含有未注册的舰船, 正在注册中...')
 
@@ -452,6 +480,14 @@ class OtherTask(Task):
             else:
                 return False, []
         return True, []
+
+
+class DecisiveFightTask(Task):
+    def __init__(self, timer) -> None:
+        super().__init__(timer)
+
+    def run(self):
+        pass
 
 
 class TaskRunner:
