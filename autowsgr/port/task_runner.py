@@ -5,6 +5,7 @@ import time
 
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ShipNotFoundErr
+from autowsgr.fight.decisive_battle import DecisiveBattle, Logic
 from autowsgr.game.build import BuildManager  # noqa: TC001
 from autowsgr.game.game_operation import (
     change_ship,
@@ -15,10 +16,72 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.ocr.ship_name import _recognize_ship
 from autowsgr.port.common import Ship
-from autowsgr.port.ship import Fleet
+from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer.timer import Timer
 from autowsgr.utils.api_image import crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
+
+
+def quick_register(timer: Timer, ships):
+    def get_input():
+        enable_quick = input() == 'y'
+        q.put(enable_quick)
+
+    print('检测到你在当前任务中启用了快速注册')
+    print('请确认以下所有舰船均为绿血且不处于修复状态:')
+    print(ships)
+    print('确认吗(y/n)')
+
+    q = queue.Queue()
+    th = threading.Thread(target=get_input)
+    th.start()
+    th.join(10)
+    if not q.empty() and q.get():
+        for ship in ships:
+            if not timer.port.have_ship(ship):
+                tmp = timer.port.register_ship(ship)
+                tmp.level = 1
+                tmp.statu = 0
+        return True
+    timer.logger.info('放弃快速注册')
+    return False
+
+
+def register(timer: Timer, ships, fleet_id):
+    if any(not timer.port.have_ship(ship) for ship in ships):
+        timer.logger.info('含有未注册的舰船, 正在注册中...')
+
+        # 检查当前舰队中是否含有未初始化的舰船并将其初始化
+        timer.goto_game_page('fight_prepare_page')
+        fleet = Fleet(timer, fleet_id)
+        fleet.detect()
+        if any(ship in ships for ship in fleet.ships):
+            timer.logger.info('该舰队中处于修复状态的舰船正在被快速修复')
+            quick_repair(timer, 3, switch_back=True)
+
+        for i, ship in enumerate(fleet.ships):
+            if ship in ships and not timer.port.have_ship(ship):
+                tmp = timer.port.register_ship(ship)
+                tmp.level = fleet.levels[i]
+                tmp.statu = detect_ship_stats(timer)[i]
+
+        # 逐个初始化舰船, 效率较低, 待优化
+        for ship in ships:
+            if not timer.port.have_ship(ship):  #
+                timer.logger.info(f'正在尝试注册 {ship}')
+                try:
+                    change_ship(timer, fleet_id, 1, ship)
+                    quick_repair(timer, 3, switch_back=True)
+                except ShipNotFoundErr:
+                    timer.relative_click(0.05, 0.05)
+                    timer.logger.warning(f'舰船 {ship} 注册失败, 放弃注册')
+                    continue
+                    # raise BaseException(f"未找到 {ship} 舰船")
+                tmp = timer.port.register_ship(ship)
+                tmp.statu = detect_ship_stats(timer)[1]
+                fleet.detect()
+                tmp.level = fleet.levels[1]
+        timer.port.show_fleet()
 
 
 class Task:
@@ -89,70 +152,15 @@ class FightTask(Task):
         if self.level_limit is None:
             self.level_limit = {}
 
-        # 快速注册 (等级直接设置成 1, 打完一遍后会更新掉)
-        if self.quick_register:
+        # 添加到舰船名字列表中
+        for ship in self.all_ships:
+            if ship not in self.timer.ship_names:
+                self.timer.ship_names.append(ship)
 
-            def get_input():
-                enable_quick = input() == 'y'
-                q.put(enable_quick)
-
-            print('检测到你在当前任务中启用了快速注册')
-            print('请确认以下所有舰船均为绿血且不处于修复状态:')
-            print(self.all_ships)
-            print('确认吗(y/n)')
-
-            q = queue.Queue()
-            th = threading.Thread(target=get_input)
-            th.start()
-            th.join(10)
-            if not q.empty() and q.get():
-                for ship in self.all_ships:
-                    tmp = self.port.register_ship(ship)
-                    tmp.level = 1
-                    tmp.statu = 0
-                return
-            self.timer.logger.info('放弃快速注册')
-
-        # 注册舰船
-        if any(not self.port.have_ship(ship) for ship in self.all_ships):
-            self.timer.logger.info('含有未注册的舰船, 正在注册中...')
-
-            # 添加到舰船名字列表中
-            for ship in self.all_ships:
-                if ship not in self.timer.ship_names:
-                    self.timer.ship_names.append(ship)
-
-            # 检查当前舰队中是否含有未初始化的舰船并将其初始化
-            self.timer.goto_game_page('fight_prepare_page')
-            fleet = Fleet(self.timer, self.fleet_id)
-            fleet.detect()
-            if any(ship in self.all_ships for ship in fleet.ships):
-                self.timer.logger.info('该舰队中处于修复状态的舰船正在被快速修复')
-                quick_repair(self.timer, 3, switch_back=True)
-
-            for i, ship in enumerate(fleet.ships):
-                if ship in self.all_ships and not self.port.have_ship(ship):
-                    tmp = self.port.register_ship(ship)
-                    tmp.level = fleet.levels[i]
-                    tmp.statu = detect_ship_stats(self.timer)[i]
-
-            # 逐个初始化舰船, 效率较低, 待优化
-            for ship in self.all_ships:
-                if not self.port.have_ship(ship):  #
-                    self.timer.logger.info(f'正在尝试注册 {ship}')
-                    try:
-                        change_ship(self.timer, self.fleet_id, 1, ship)
-                        quick_repair(timer, 3, switch_back=True)
-                    except ShipNotFoundErr:
-                        self.timer.relative_click(0.05, 0.05)
-                        self.timer.logger.warning(f'舰船 {ship} 注册失败, 放弃注册')
-                        continue
-                        # raise BaseException(f"未找到 {ship} 舰船")
-                    tmp = self.port.register_ship(ship)
-                    tmp.statu = detect_ship_stats(self.timer)[1]
-                    fleet.detect()
-                    tmp.level = fleet.levels[1]
-            self.port.show_fleet()
+        # 注册舰船 (等级直接设置成 1, 打完一遍后会更新掉)
+        if self.quick_register and quick_register(timer, self.all_ships):
+            return
+        register(timer, self.all_ships, self.fleet_id)
 
     def build_fleet(self, ignore_statu=False):
         """尝试组建出征舰队"""
@@ -482,18 +490,110 @@ class OtherTask(Task):
         return True, []
 
 
-class DecisiveFightTask(Task):
+class DecisiveLogic(Logic):
+    def __init__(self, timer, stats, level1, level2, flagship_priority) -> None:
+        super().__init__(timer, stats, level1, level2, flagship_priority)
+
+    def _get_best_fleet(self):
+        return super().get_best_fleet()
+
+    def get_best_fleet(self):
+        def ship_available(ship):
+            # return ship in ships and self.timer.port.have_ship(ship) and self.timer.port.get_ship_by_name(ship).statu < 2 # 大破修
+            return (
+                ship in ships
+                and self.timer.port.have_ship(ship)
+                and self.timer.port.get_ship_by_name(ship).statu < 1
+            )  # 中破修
+
+        ships = self.stats.ships
+        self.logger.debug(f'拥有舰船: {ships}')
+        best_ships = [
+            '',
+        ]
+        for ship in self.level1:
+            if not ship_available(ship) or len(best_ships) == 7:
+                continue
+            best_ships.append(ship)
+        for ship in self.level2:
+            if not ship_available(ship) or len(best_ships) == 7 or ship in self.level1:
+                continue
+            best_ships.append(ship)
+
+        for flag_ship in self.flag_ships:
+            if flag_ship not in best_ships:
+                continue
+            p = best_ships.index(flag_ship)
+            best_ships[p], best_ships[1] = best_ships[1], best_ships[p]
+            break
+
+        for _ in range(len(best_ships), 7):
+            best_ships.append('')  # noqa: PERF401
+        self.logger.debug(f'(考虑破损情况)当前最优：{best_ships}')
+        return best_ships
+
+    def _leave(self):
+        return count_ship(self.get_best_fleet()) != count_ship(self._get_best_fleet())
+
+
+class DecisiveFight(DecisiveBattle):
     def __init__(self, timer) -> None:
         super().__init__(timer)
+        self.logic = DecisiveLogic(
+            self.timer,
+            self.stats,
+            self.config.level1,
+            self.config.level2,
+            self.config.flagship_priority,
+        )
+
+    def can_fight(self):
+        return count_ship(self.logic.get_best_fleet()) == count_ship(self.logic._get_best_fleet())
+
+
+class DecisiveFightTask(Task):
+    def __init__(self, timer, enable_quick_register=True, fleet_id=4) -> None:
+        """
+        Args:
+            enable_quick_register (bool, optional): 是否启用快速注册. Defaults to False.
+            fleet_id (int, optional): 注册舰队时占用的舰队编号. Defaults to 4.
+        """
+        super().__init__(timer)
+        self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
+        self.db = DecisiveFight(self.timer)
+        if enable_quick_register and quick_register(timer, self.ships):
+            return
+        register(timer, self.ships, fleet_id)
+
+    def check_repair(self):
+        tasks = []
+        for ship in self.ships:
+            ship = self.timer.port.get_ship_by_name(ship)
+            # if ship.statu > 1 and ship.statu < 3: # 大破修
+            if ship.statu > 0 and ship.statu < 2:  # 中破修
+                self.timer.logger.info(f'{ship.name} 需要修复')
+                tasks.append(RepairTask(self.timer, ship))
+        return tasks
 
     def run(self):
-        pass
+        if not self.db.can_fight():
+            self.timer.logger.info('无法组合出足量的战斗舰船, 任务暂停中')
+            return False, []
+
+        res = self.db.run()
+        if res == 'leave':
+            self.timer.logger.info('战斗舰船发生破损, 暂离修复中....')
+            return True, [*self.check_repair(), self]
+        return True, []
 
 
 class TaskRunner:
     def __init__(self, timer: Timer) -> None:
         self.tasks = []
         self.timer = timer
+
+    def add_decisive_task(self):
+        self.tasks.append(DecisiveFightTask(self.timer))
 
     def run(self):
         while True:
@@ -511,6 +611,6 @@ class TaskRunner:
                     break
                 self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]
                 id += 1
-            if len(self.tasks):
+            if len(self.tasks) == 0:
                 self.timer.logger('本次全部任务已经执行完毕')
                 return

@@ -57,19 +57,25 @@ class Fleet:
                 return False
         return True
 
-    def detect(self, check_level=False):
+    def detect(self, check_level=False, reg=False):
         """在对应的战斗准备页面检查舰船"""
         assert self.timer.wait_image(IMG.identify_images['fight_prepare_page'])
+
         if self.fleet_id is not None:
             move_team(self.timer, self.fleet_id)
+
         ships = self.timer.recognize_ship(
             self.timer.get_screen()[433:459],
             self.timer.ship_names,
         )
         self.ships = [None] * 7
+
         for rk, ship in enumerate(ships):
+            if reg and not self.timer.port.have_ship():
+                self.timer.port.register_ship(ship[1])
             self.ships[rk + 1] = ship[1]
         self.timer.logger.info(f'舰船识别结果为: {self.ships}')
+
         try:
             self.check_level()
         except IndexError as e:
