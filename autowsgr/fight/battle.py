@@ -109,7 +109,13 @@ class BattlePlan(FightPlan):
         self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         self.info.ship_stats = detect_ship_stats(self.timer)
         quick_repair(self.timer, self.repair_mode, ship_stats=self.info.ship_stats)
-        return start_march(self.timer)
+        try:
+            return start_march(self.timer)
+        except TimeoutError:
+            self.logger.warning(
+                '由于进入战斗超时跳过了一次战役, 请检查战役队伍中是否有舰船正在远征',
+            )
+            return literals.SKIP_FIGHT
 
     def _make_decision(self, *args, **kwargs) -> str:
         state = self.update_state() if 'skip_update' not in kwargs else self.info.state

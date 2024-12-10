@@ -63,6 +63,7 @@ class FightTask(Task):
             all_ships: 所有参与轮换的舰船
         """
         super().__init__(timer)
+        self.last_exec = time.time()
         self.plan = plan
         self.quick_repair = False
         self.destroy_ship_types = None
@@ -78,6 +79,13 @@ class FightTask(Task):
         if file_path != '':
             self.__dict__.update(yaml_to_dict(file_path))
         self.__dict__.update(kwargs)
+
+        # 处理填写不规范的一些问题
+        if self.repair_mode is None:
+            self.repair_mode = {}
+        if self.level_limit is None:
+            self.level_limit = {}
+
         if any(not self.port.have_ship(ship) for ship in self.all_ships):
             self.timer.logger.info('含有未注册的舰船, 正在注册中...')
 
@@ -195,7 +203,10 @@ class FightTask(Task):
         return tasks
 
     def run(self):
-        # 应该退出的情况: 1.等级限制 2.不允许快修, 需要等待 3. 船坞已满, 需清理
+        # 应该退出的情况: 1.等级限制 2.不允许快修, 需要等待 3. 船坞已满, 需清理 4. 战斗任务已经执行完毕
+        if self.times <= 0:
+            return True, []
+
         statu, fleet = self.build_fleet()
         if statu == 1:
             return True, []
@@ -214,6 +225,7 @@ class FightTask(Task):
             raise ValueError('没有指定战斗策略')
         plan = self.plan
         plan.fleet = fleet
+        plan.fleet_id = self.fleet_id
         plan.repair_mode = [3] * 6
         # 设置战时快修
         if statu == 2:
@@ -443,8 +455,9 @@ class OtherTask(Task):
 
 
 class TaskRunner:
-    def __init__(self) -> None:
+    def __init__(self, timer: Timer) -> None:
         self.tasks = []
+        self.timer = timer
 
     def run(self):
         while True:
@@ -453,9 +466,15 @@ class TaskRunner:
             id = 0
             while id < len(self.tasks):
                 task = self.tasks[id]
+                self.timer.logger.info(f'当前任务类型: {type(task)}')
+                if 'times' in task.__dict__:
+                    self.timer.logger.info(f'当前任务剩余次数: {task.times}')
                 statu, new_tasks = task.run()
                 if statu:
                     self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
                     break
                 self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]
                 id += 1
+            if len(self.tasks):
+                self.timer.logger('本次全部任务已经执行完毕')
+                return
