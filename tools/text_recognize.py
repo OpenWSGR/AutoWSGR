@@ -1,8 +1,8 @@
 from time import time
 
 import cv2
+from tools.ship_name import recognize
 
-from autowsgr.ocr.ship_name import recognize
 from autowsgr.scripts.main import start_script
 from autowsgr.utils.api_image import absolute_to_relative
 

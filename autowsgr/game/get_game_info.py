@@ -1,12 +1,11 @@
 import math
 import os
-import subprocess
 
 import numpy as np
 from PIL import Image
 
 from autowsgr.constants.colors import COLORS
-from autowsgr.constants.data_roots import OCR_ROOT, TUNNEL_ROOT
+from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import (
     AADG,
@@ -35,8 +34,8 @@ from autowsgr.constants.other_constants import (
 from autowsgr.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from autowsgr.timer import Timer
 from autowsgr.utils.api_image import crop_image
-from autowsgr.utils.io import delete_file, read_file, yaml_to_dict
-from autowsgr.utils.math_functions import cal_dis, check_color, matrix_to_str
+from autowsgr.utils.io import yaml_to_dict
+from autowsgr.utils.math_functions import cal_dis, check_color
 
 
 class Resources:
@@ -206,20 +205,14 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     # 处理图像并将参数传递给识别图像的程序
     img = Image.fromarray(timer.screen).convert('L')
     img = img.resize((960, 540))
-    input_path = os.path.join(TUNNEL_ROOT, 'args.in')
-    output_path = os.path.join(TUNNEL_ROOT, 'res.out')
-    delete_file(output_path)
-    args = 'recognize\n6\n'
+    imgs = []
     for area in TYPE_SCAN_AREA[type]:
         arr = np.array(img.crop(area))
-        args += matrix_to_str(arr)
-    with open(input_path, 'w') as f:
-        f.write(args)
-    recognize_enemy_exe = os.path.join(TUNNEL_ROOT, 'recognize_enemy.exe')
-    subprocess.run([recognize_enemy_exe, TUNNEL_ROOT])
+        imgs.append(arr)
 
     # 获取并解析结果
-    res = read_file(os.path.join(TUNNEL_ROOT, 'res.out')).split()
+    res = timer.ocr_backend.bin.recognize_enemy(imgs).split()
+
     enemy_type_count['ALL'] = 0
     for x in res:
         enemy_type_count[x] += 1

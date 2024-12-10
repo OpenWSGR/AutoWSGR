@@ -8,12 +8,10 @@ import cv2
 from airtest.core.android import Android
 
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
-from autowsgr.ocr.ship_name import recognize
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
-    crop_rectangle_relative,
     locate_image_center,
     relative_to_absolute,
 )
@@ -142,14 +140,6 @@ class AndroidController:
         """
         x, y = absolute_to_relative((x, y), (960, 540))
         self.relative_click(x, y, times, delay, enable_subprocess)
-
-    # ===========图像函数============
-    def recognize_screen_relative(self, left, top, right, bottom, update=False):
-        if update:
-            self.update_screen()
-        return recognize(
-            crop_rectangle_relative(self.screen, left, top, right - left, bottom - top),
-        )
 
     def relative_swipe(self, x1, y1, x2, y2, duration=0.5, delay=0.5):
         """匀速滑动模拟器相对坐标 (x1, y1) 到 (x2, y2).
