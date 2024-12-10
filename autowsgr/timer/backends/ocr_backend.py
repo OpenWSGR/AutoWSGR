@@ -1,11 +1,11 @@
 import os
-import subprocess
 from typing import Protocol
 
 import cv2
 import numpy as np
 
-from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.constants.data_roots import BIN_ROOT
+from autowsgr.timer.backends.api_dll import ApiDll
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import cv_imread
 from autowsgr.utils.logger import Logger
@@ -79,6 +79,10 @@ class OCRBackend(Protocol):
         str,
         str,
     ]  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
+    bin: ApiDll
+
+    def __init_subclass__(cls) -> None:
+        cls.bin = ApiDll(os.path.join(BIN_ROOT, 'image_autowsgrs.bin'))
 
     def read_text(
         self,
@@ -283,18 +287,23 @@ class OCRBackend(Protocol):
         """传入一张图片,返回舰船信息,包括名字和舰船型号"""
         if isinstance(image, str):
             image_path = os.path.abspath(image)
+            img = cv2.imread(image_path)
         else:
-            image_path = os.path.join(TUNNEL_ROOT, 'OCR.PNG')
-            cv2.imencode('.PNG', image)[1].tofile(image_path)
-        with open(os.path.join(TUNNEL_ROOT, 'locator.in'), 'w+') as f:
-            f.write(image_path)
-        locator_exe = os.path.join(TUNNEL_ROOT, 'locator.exe')
-        subprocess.run([locator_exe, TUNNEL_ROOT])
-        if os.path.exists(os.path.join(TUNNEL_ROOT, '1.PNG')):
-            img_path = os.path.join(TUNNEL_ROOT, '1.PNG')
-        else:
-            img_path = '1.PNG'
-        return self.recognize(img_path, candidates=candidates, multiple=True, **kwargs)
+            img = image
+        location = self.bin.locate(img)
+        ret = []
+        for i in range(len(location)):
+            res = self.recognize(
+                img[location[i][0] - 1 : location[i][1] + 1],
+                multiple=True,
+                candidates=candidates,
+                **kwargs,
+            )
+            for j in range(len(res)):
+                res[j][0][1] = res[j][0][1] + location[i][0] - 1
+            ret += res
+
+        return ret
 
     # def recognize_time(self, img, format="%H:%M:%S"):
     #     """识别时间"""
@@ -362,6 +371,7 @@ class PaddleOCRBackend(OCRBackend):
         self.WORD_REPLACE = {
             '鲍鱼': '鲃鱼',
         }
+
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
         from paddleocr import PaddleOCR
 

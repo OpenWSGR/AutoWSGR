@@ -1,9 +1,8 @@
 import os
-import subprocess
 from typing import Literal
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
-from autowsgr.constants.data_roots import MAP_ROOT, TUNNEL_ROOT
+from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
@@ -11,7 +10,7 @@ from autowsgr.game.game_operation import destroy_ship, get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer import Timer
-from autowsgr.utils.api_image import crop_image, crop_rectangle_relative, cv2
+from autowsgr.utils.api_image import crop_image, crop_rectangle_relative
 from autowsgr.utils.io import count, yaml_to_dict
 
 
@@ -254,23 +253,17 @@ class DecisiveBattle:
             0.042,
             1,
         )
-        image_path = os.path.join(TUNNEL_ROOT, '1.PNG')
-        cv2.imencode('.PNG', cropped_image)[1].tofile(image_path)
-        processor = os.path.join(TUNNEL_ROOT, 'process_recognize_map.exe')
-        subprocess.run([processor, image_path])
-        # cropped_image = cv2.imread(image_path)
-        with open(os.path.join(TUNNEL_ROOT, '1.out')) as f:
-            result = f.read()
-            if result != '':
-                self.timer.logger.info(f'识别决战地图参数, 第 {result[0]} 节点正在进行')
-                return result[0]
-            if retry > 3:
-                self.timer.logger.warning('识别决战地图参数失败, 退出逻辑')
-                raise BaseException
-            self.timer.logger.warning(
-                f'识别决战地图参数失败, 正在重试第 {retry + 1} 次',
-            )
-            return self.recognize_node(retry + 1)
+        result = self.timer.ocr_backend.bin.recognize_map(cropped_image)
+        if result != '0':
+            self.timer.logger.info(f'识别决战地图参数, 第 {result[0]} 节点正在进行')
+            return result[0]
+        if retry > 3:
+            self.timer.logger.warning('识别决战地图参数失败, 退出逻辑')
+            raise BaseException
+        self.timer.logger.warning(
+            f'识别决战地图参数失败, 正在重试第 {retry + 1} 次',
+        )
+        return self.recognize_node(retry + 1)
         # result = recognize(cropped_image, "ABCDEFGHIJK")
         # return result[0][1]
 
