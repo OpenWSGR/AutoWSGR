@@ -20,7 +20,7 @@ def week(start=1, start_times=0, fleet_id=4, change=True):
     for i in range(start, 10):
         plan = NormalFightPlan(
             timer,
-            timer.plan_tree['week'][i],
+            timer.plan_tree['week'][f'{i}'],
             fleet_id,
             changes[i],
         )
