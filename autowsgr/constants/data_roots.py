@@ -8,5 +8,3 @@ SETTING_ROOT = join(DATA_ROOT, 'settings')
 OCR_ROOT = join(DATA_ROOT, 'ocr')
 
 BIN_ROOT = join(dirname(DATA_ROOT), 'bin')
-TUNNEL_ROOT = join(BIN_ROOT, 'image_recognize')
-ADB_ROOT = join(BIN_ROOT, 'adb')

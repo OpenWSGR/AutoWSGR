@@ -1,9 +1,3 @@
-import os
-import subprocess
-
-from airtest.core.error import AdbError
-
-from autowsgr.constants.data_roots import TUNNEL_ROOT
 from autowsgr.game.build import BuildManager
 from autowsgr.timer import Timer
 from autowsgr.user_config import UserConfig
@@ -32,13 +26,7 @@ def start_script(settings_path=None) -> Timer:
     logger = Logger(config.log_dir, config.log_level)
     logger.save_config(config)
 
-    try:
-        timer = Timer(config, logger)
-        timer.port.factory = BuildManager(timer)
-    except AdbError:
-        adb_exe = os.path.join(os.path.dirname(TUNNEL_ROOT), 'adb', 'adb.exe')
-        subprocess.run([adb_exe, 'devices', '-l'])
-        logger.warning('Adb 连接模拟器失败, 正在清除原有连接并重试')
-        timer = Timer(config, logger)
+    timer = Timer(config, logger)
+    timer.port.factory = BuildManager(timer)
 
     return timer

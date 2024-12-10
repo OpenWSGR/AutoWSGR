@@ -4,7 +4,7 @@ from typing import Protocol
 import cv2
 import numpy as np
 
-from autowsgr.constants.data_roots import TUNNEL_ROOT
+from autowsgr.constants.data_roots import BIN_ROOT
 from autowsgr.timer.backends.api_dll import ApiDll
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import cv_imread
@@ -80,6 +80,9 @@ class OCRBackend(Protocol):
         str,
     ]  # 记录中文ocr识别的错误用于替换。主要针对词表缺失的情况，会导致稳定的识别为另一个字
     bin: ApiDll
+
+    def __init_subclass__(cls) -> None:
+        cls.bin = ApiDll(os.path.join(BIN_ROOT, 'image_autowsgrs.bin'))
 
     def read_text(
         self,
@@ -316,7 +319,6 @@ class EasyocrBackend(OCRBackend):
             '鲍鱼': '鲃鱼',
             '鲴鱼': '鲃鱼',
         }
-        self.bin = ApiDll(TUNNEL_ROOT)
         import easyocr
 
         self.reader = easyocr.Reader(['ch_sim', 'en'])
@@ -369,7 +371,6 @@ class PaddleOCRBackend(OCRBackend):
         self.WORD_REPLACE = {
             '鲍鱼': '鲃鱼',
         }
-        self.bin = ApiDll(TUNNEL_ROOT)
 
         # TODO:后期单独训练模型，提高识别准确率，暂时使用现成的模型
         from paddleocr import PaddleOCR

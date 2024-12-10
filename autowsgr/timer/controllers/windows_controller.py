@@ -115,13 +115,20 @@ class WindowsController:
         getLogger('airtest').setLevel(ERROR)
 
         start_time = time.time()
+        from airtest.core.error import AdbError
+
         while time.time() - start_time <= 30:
             try:
                 dev = connect_device(dev_name)
+                dev.snapshot()
                 self.logger.info('Android Connected!')
                 return dev
-            except:
-                self.logger.error('连接模拟器失败！')
+            except AdbError:
+                self.logger.error('Adb 连接模拟器失败, 正在清除原有连接并重试')
+                from airtest.core.android.adb import ADB
+
+                adb = ADB().get_adb_path()
+                subprocess.run([adb, 'devices', '-l'])
 
         self.logger.error('连接模拟器失败！')
         raise CriticalErr('连接模拟器失败！')
