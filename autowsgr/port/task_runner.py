@@ -429,7 +429,6 @@ class RepairTask(Task):
                         self.timer.relative_click(x, y)
                         self.timer.set_page('bath_page')
                         self.ship.set_repair(seconds)
-                        self.port.bathroom.add_repair(text[3:])
                         return True, []
 
                     self.timer.logger.debug(f'识别到舰船: {name}')
