@@ -569,6 +569,8 @@ class DecisiveFightTask(Task):
         self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
         self.db = DecisiveFight(self.timer)
         self.db.rships = self.ships
+        if all(self.timer.port.have_ship(ship) for ship in self.ships):
+            return
         if enable_quick_register and quick_register(timer, self.ships):
             return
         register(timer, self.ships, fleet_id)
