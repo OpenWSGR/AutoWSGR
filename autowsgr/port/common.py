@@ -88,6 +88,9 @@ class WorkShop:
 
 
 class BathRoom(WorkShop):
+    def __init__(self) -> None:
+        super().__init__()
+
     def add_repair(self, time_cost: str) -> bool:
         super().add_work(time_cost)
 

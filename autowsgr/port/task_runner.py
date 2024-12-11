@@ -7,6 +7,7 @@ from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ShipNotFoundErr
 from autowsgr.fight.decisive_battle import DecisiveBattle, Logic
 from autowsgr.game.build import BuildManager  # noqa: TC001
+from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import (
     change_ship,
     destroy_ship,
@@ -568,6 +569,7 @@ class DecisiveFightTask(Task):
         super().__init__(timer)
         self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
         self.db = DecisiveFight(self.timer)
+        self.db.rships = self.ships
         if enable_quick_register and quick_register(timer, self.ships):
             return
         register(timer, self.ships, fleet_id)
@@ -590,7 +592,7 @@ class DecisiveFightTask(Task):
         res = self.db.run()
         if res == 'leave':
             self.timer.logger.info('战斗舰船发生破损, 暂离修复中....')
-            return True, [*self.check_repair(), self]
+            return False, self.check_repair()
         return True, []
 
 
@@ -621,3 +623,6 @@ class TaskRunner:
             if len(self.tasks) == 0:
                 self.timer.logger('本次全部任务已经执行完毕')
                 return
+            print('当轮任务已完成, 正在检查远征')
+            time.sleep(30)
+            Expedition(self.timer).run(True)
