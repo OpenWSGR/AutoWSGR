@@ -180,7 +180,7 @@ class Logic:
         return best_ships
 
     def _retreat(self) -> bool:
-        if issubclass(type(self), Logic):
+        if type(self) is not Logic:
             return count_ship(self._get_best_fleet()) < 2
         return count_ship(self.get_best_fleet()) < 2
 
@@ -552,6 +552,7 @@ class DecisiveBattle:
         self.timer.relative_click(0.372, 0.584)
         self.detect()
         self.timer.relative_click(0.03, 0.08)
+        self.timer.go_main_page()
 
     def _get_exp(self, retry: int = 0) -> None:
         EXP_AREA = ((0.018, 0.854), (0.092, 0.822))
@@ -605,10 +606,13 @@ class DecisiveBattle:
         if self.stats.fleet.empty() and not self.stats.is_begin():
             self._check_fleet()
         self.fleet = self.logic.get_best_fleet()
-        # if self.logic._leave() or (2 in self.stats.ship_stats and issubclass(type(self), DecisiveBattle)): # 大破修
+        # if self.logic._leave() or (
+        #     type(self) is not DecisiveBattle
+        #     and any(self.timer.port.get_ship_by_name(ship).statu in [2] for ship in self.rships)
+        # ):  # 大破修
         if self.logic._leave() or (
-            (1 in self.stats.ship_stats or 2 in self.stats.ship_stats)
-            and issubclass(type(self), DecisiveBattle)
+            type(self) is not DecisiveBattle
+            and any(self.timer.port.get_ship_by_name(ship).statu in [1, 2] for ship in self.rships)
         ):  # 中破修
             self.leave()
             return 'leave'
