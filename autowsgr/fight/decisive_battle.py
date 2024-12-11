@@ -1,9 +1,8 @@
 import os
-import subprocess
 from typing import Literal
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
-from autowsgr.constants.data_roots import MAP_ROOT, TUNNEL_ROOT
+from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.battle import BattleInfo, BattlePlan
 from autowsgr.fight.common import start_march
@@ -11,7 +10,7 @@ from autowsgr.game.game_operation import destroy_ship, get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer import Timer
-from autowsgr.utils.api_image import crop_image, crop_rectangle_relative, cv2
+from autowsgr.utils.api_image import crop_image, crop_rectangle_relative
 from autowsgr.utils.io import count, yaml_to_dict
 
 
@@ -111,7 +110,9 @@ class Logic:
         self.logger = timer.logger
 
         self.level1 = list(set(level1))
-        self.level2 = list({'长跑训练', '肌肉记忆', *self.level1, *level2, '黑科技'})
+        self.level2 = list(
+            {'长跑训练', '肌肉记忆', *self.level1, *level2, '黑科技'},
+        )  # 包括 level1 和可用增益
         self.flag_ships = list(flagship_priority)
         self.stats = stats
 
@@ -175,11 +176,13 @@ class Logic:
 
         for _ in range(len(best_ships), 7):
             best_ships.append('')  # noqa: PERF401
-        self.logger.debug(f'当前最优：{best_ships}')
+        self.logger.debug(f'(不考虑破损情况) 当前最优：{best_ships}')
         return best_ships
 
     def _retreat(self) -> bool:
-        return bool(count_ship(self.get_best_fleet()) < 2)
+        if issubclass(type(self), Logic):
+            return count_ship(self._get_best_fleet()) < 2
+        return count_ship(self.get_best_fleet()) < 2
 
     def _leave(self) -> Literal[False]:
         return False
@@ -190,15 +193,16 @@ class DecisiveBattle:
     目前仅支持 E5, E6, E4
     """
 
-    def run_for_times(self, times: int = 1) -> None:
+    def run_for_times(self, times: int = 1) -> Literal['leave', 'quit']:
         assert times >= 1
-        self.start_fight()
+        res = self.start_fight()
         for _ in range(times - 1):
             self.reset_chapter()
-            self.start_fight()
+            res = self.start_fight()
+        return res
 
-    def run(self) -> None:
-        self.run_for_times()
+    def run(self) -> Literal['leave', 'quit']:
+        return self.run_for_times()
 
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
@@ -254,23 +258,17 @@ class DecisiveBattle:
             0.042,
             1,
         )
-        image_path = os.path.join(TUNNEL_ROOT, '1.PNG')
-        cv2.imencode('.PNG', cropped_image)[1].tofile(image_path)
-        processor = os.path.join(TUNNEL_ROOT, 'process_recognize_map.exe')
-        subprocess.run([processor, image_path])
-        # cropped_image = cv2.imread(image_path)
-        with open(os.path.join(TUNNEL_ROOT, '1.out')) as f:
-            result = f.read()
-            if result != '':
-                self.timer.logger.info(f'识别决战地图参数, 第 {result[0]} 节点正在进行')
-                return result[0]
-            if retry > 3:
-                self.timer.logger.warning('识别决战地图参数失败, 退出逻辑')
-                raise BaseException
-            self.timer.logger.warning(
-                f'识别决战地图参数失败, 正在重试第 {retry + 1} 次',
-            )
-            return self.recognize_node(retry + 1)
+        result = self.timer.ocr_backend.bin.recognize_map(cropped_image)
+        if result != '0':
+            self.timer.logger.info(f'识别决战地图参数, 第 {result[0]} 节点正在进行')
+            return result[0]
+        if retry > 3:
+            self.timer.logger.warning('识别决战地图参数失败, 退出逻辑')
+            raise BaseException
+        self.timer.logger.warning(
+            f'识别决战地图参数失败, 正在重试第 {retry + 1} 次',
+        )
+        return self.recognize_node(retry + 1)
         # result = recognize(cropped_image, "ABCDEFGHIJK")
         # return result[0][1]
 
@@ -444,10 +442,6 @@ class DecisiveBattle:
                 self.stats.ships.add(ship)
         self.timer.relative_click(*SKILL_POS, times=2, delay=0.3)
 
-    def leave(self) -> None:
-        self.timer.click(36, 33)
-        self.timer.click(360, 300)
-
     def _get_chapter(self) -> int:
         CHAPTER_AREA = ((0.818, 0.867), (0.875, 0.81))
         text = self.timer.recognize(
@@ -552,6 +546,13 @@ class DecisiveBattle:
         self.timer.click(36, 33)
         self.timer.click(600, 300)
 
+    def leave(self) -> None:
+        self._go_map_page()
+        self.timer.click(36, 33)
+        self.timer.relative_click(0.372, 0.584)
+        self.detect()
+        self.timer.relative_click(0.03, 0.08)
+
     def _get_exp(self, retry: int = 0) -> None:
         EXP_AREA = ((0.018, 0.854), (0.092, 0.822))
         try:
@@ -603,15 +604,19 @@ class DecisiveBattle:
 
         if self.stats.fleet.empty() and not self.stats.is_begin():
             self._check_fleet()
-        _fleet = self.logic.get_best_fleet()
+        self.fleet = self.logic.get_best_fleet()
+        # if self.logic._leave() or (2 in self.stats.ship_stats and issubclass(type(self), DecisiveBattle)): # 大破修
+        if self.logic._leave() or (
+            (1 in self.stats.ship_stats or 2 in self.stats.ship_stats)
+            and issubclass(type(self), DecisiveBattle)
+        ):  # 中破修
+            self.leave()
+            return 'leave'
         if self.logic._retreat():
             self.retreat()
             return 'retreat'
-        if self.logic._leave():
-            self.leave()
-            return 'leave'
-        if self.stats.fleet != _fleet:
-            self._change_fleet(_fleet)
+        if self.stats.fleet != self.fleet:
+            self._change_fleet(self.fleet)
             self.stats.ship_stats = detect_ship_stats(self.timer)
         if self.logic.need_repair():
             self.repair()
@@ -622,11 +627,20 @@ class DecisiveBattle:
 
     def _check_fleet(self) -> None:
         self.stats.ships.clear()
+
         self.go_fleet_page()
         self.stats.fleet.detect()
+
         for ship in self.stats.fleet.ships[1:]:
             self.stats.ships.add(ship)
         self.stats.ship_stats = detect_ship_stats(self.timer)
+
+        for i in range(1, 7):
+            if self.timer.port.have_ship(self.stats.fleet.ships[i]):
+                ship = self.timer.port.get_ship_by_name(self.stats.fleet.ships[i])
+                if ship.statu != 3:
+                    ship.statu = self.stats.ship_stats[i]
+
         self.timer.relative_click(0.1, 0.5)
         res = self.timer.wait_images(
             IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]],
@@ -661,6 +675,9 @@ class DecisiveBattle:
         )
         plan.run()
         self.stats.ship_stats = plan.info.fight_history.get_fight_results()[-1].ship_stats
+        for i in range(1, 7):
+            if self.timer.port.have_ship(self.fleet[i]):
+                self.timer.port.get_ship_by_name(self.fleet[i]).statu = self.stats.ship_stats[i]
 
     def _change_fleet(self, fleet) -> None:
         self.go_fleet_page()
@@ -683,17 +700,21 @@ class DecisiveBattle:
             self.enter_map(check_map=False)
             self._reset()
             return self.fight()
+        if res == 'leave':
+            # 修复受损舰船
+            return 'leave'
+
         self._during_fight()
         self._after_fight()
         return self.next()
 
-    def start_fight(self) -> None:
+    def start_fight(self) -> Literal['quit', 'leave']:
         self.enter_map()
         while True:
             res = self.fight()
-            if res == 'quit':
-                return
-            if res == 'next':
+            if res == 'leave' or res == 'quit':
+                return res
+            if res == 'next':  # 下一个关卡
                 self.enter_map(False)
 
     def reset_chapter(self) -> None | Literal[True]:

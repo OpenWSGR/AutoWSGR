@@ -51,8 +51,13 @@ class DailyOperation:
         # 自动战役，直到超过次数
         if self.config.auto_battle:
             ret = literals.OPERATION_SUCCESS_FLAG
+            cnt = 0
             while ret is not literals.BATTLE_TIMES_EXCEED:
                 ret = self.battle_plan.run()
+                cnt += 1
+                if cnt > 13:
+                    self.timer.logger.warning('战役没能正常执行完毕, 请检查日志排查原因')
+                    break
 
         # 自动开启战役支援
         if self.config.auto_set_support:

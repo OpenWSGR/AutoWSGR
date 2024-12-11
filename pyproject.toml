@@ -61,12 +61,8 @@ ignore = [
     "W505",
     # ANN002 Missing type annotation for `*args`
     # ANN003 Missing type annotation for `**kwargs`
-    # ANN101: missing type annotation for `self` in method
-    # ANN102: missing type annotation for `cls` in classmethod
     "ANN002",
     "ANN003",
-    "ANN101",
-    "ANN102",
     # ANN401: dynamically typed expressions (typing.Any) are disallowed
     "ANN401",
     # S101: use of `assert` detected

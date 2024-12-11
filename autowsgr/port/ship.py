@@ -7,7 +7,6 @@ from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.game.game_operation import move_team
-from autowsgr.ocr.ship_name import recognize_number
 from autowsgr.timer import Timer
 from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
@@ -57,19 +56,25 @@ class Fleet:
                 return False
         return True
 
-    def detect(self, check_level=False):
+    def detect(self, check_level=False, reg=False):
         """在对应的战斗准备页面检查舰船"""
         assert self.timer.wait_image(IMG.identify_images['fight_prepare_page'])
+
         if self.fleet_id is not None:
             move_team(self.timer, self.fleet_id)
+
         ships = self.timer.recognize_ship(
             self.timer.get_screen()[433:459],
             self.timer.ship_names,
         )
         self.ships = [None] * 7
+
         for rk, ship in enumerate(ships):
+            if reg and not self.timer.port.have_ship():
+                self.timer.port.register_ship(ship[1])
             self.ships[rk + 1] = ship[1]
         self.timer.logger.info(f'舰船识别结果为: {self.ships}')
+
         try:
             self.check_level()
         except IndexError as e:
@@ -84,7 +89,7 @@ class Fleet:
             (0.303, 0.566),
             (0.420, 0.566),
             (0.537, 0.566),
-            (0.653, 0.566),
+            (0.654, 0.566),
         ]
         SIZE = (0.023, 0.024)
         screen = self.timer.get_screen()
@@ -99,7 +104,7 @@ class Fleet:
             )
             img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
-            self.levels[i] = int(recognize_number(img, min_size=3)[0][1])
+            self.levels[i] = int(self.timer.ocr_backend.recognize_number(img, min_size=3)[1])
             # print(levels)
         self.timer.logger.info(f'等级识别结果: {self.levels}')
 

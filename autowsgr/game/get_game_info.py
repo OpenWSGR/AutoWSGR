@@ -1,6 +1,7 @@
 import math
 import os
 
+import numpy as np
 from PIL import Image
 
 from autowsgr.constants.colors import COLORS
@@ -30,8 +31,7 @@ from autowsgr.constants.other_constants import (
     SC,
     SS,
 )
-from autowsgr.constants.positions import BLOOD_BAR_POSITION
-from autowsgr.game.recognize import enemy_condition
+from autowsgr.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from autowsgr.timer import Timer
 from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import yaml_to_dict
@@ -191,7 +191,6 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
         SC: 0,
         BBV: 0,
         'AP': 0,
-        "CG":0
     }
 
     if type == 'exercise':
@@ -206,8 +205,14 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     # 处理图像并将参数传递给识别图像的程序
     img = Image.fromarray(timer.screen).convert('L')
     img = img.resize((960, 540))
-    res = enemy_condition(timer, img, type)
+    imgs = []
+    for area in TYPE_SCAN_AREA[type]:
+        arr = np.array(img.crop(area))
+        imgs.append(arr)
+
     # 获取并解析结果
+    res = timer.ocr_backend.bin.recognize_enemy(imgs).split()
+
     enemy_type_count['ALL'] = 0
     for x in res:
         enemy_type_count[x] += 1
