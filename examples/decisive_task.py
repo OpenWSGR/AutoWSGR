@@ -4,7 +4,7 @@ from autowsgr.port.task_runner import TaskRunner
 from autowsgr.scripts.main import start_script
 
 
-timer = start_script('./tests/user_settings.yaml')
+timer = start_script('./user_settings.yaml')
 runner = TaskRunner(timer)  # 注册 TaskRunner
 runner.add_decisive_task()
 runner.run()
