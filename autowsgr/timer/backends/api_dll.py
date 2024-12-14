@@ -1,8 +1,10 @@
 import ctypes
 import os
 import sys
-import numpy
 from ctypes import POINTER, c_char, c_char_p, c_int32, c_size_t, c_uint8, c_void_p, cast, cdll
+
+import numpy
+
 
 class ApiDll:
     def __init__(self, path) -> None:

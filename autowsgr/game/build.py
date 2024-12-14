@@ -6,6 +6,7 @@ from autowsgr.timer import Timer
 from autowsgr.utils.api_image import absolute_to_relative, crop_image, match_nearest_index
 from autowsgr.utils.time import get_eta, str2time
 
+
 # 开始建造，建造完成，快速建造 三个按钮的中心位置
 BUILD_POSITIONS = {
     'ship': [

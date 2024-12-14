@@ -68,7 +68,7 @@ class Timer(AndroidController):
             'darwin': lambda: MacController(self.config, self.logger),
         }
 
-        if sys.platform== "linux":
+        if sys.platform == 'linux':
             raise CriticalErr('linux 暂未支持')
 
         self.ControllerAdapter = controller_fun[sys.platform]()
