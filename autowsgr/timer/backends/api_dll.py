@@ -1,12 +1,12 @@
 import ctypes
-from ctypes import POINTER, c_char, c_char_p, c_int32, c_size_t, c_uint8, c_void_p, cast, cdll
-
+import os
+import sys
 import numpy
-
+from ctypes import POINTER, c_char, c_char_p, c_int32, c_size_t, c_uint8, c_void_p, cast, cdll
 
 class ApiDll:
     def __init__(self, path) -> None:
-        self.dll = cdll.LoadLibrary(path)
+        self.dll = cdll.LoadLibrary(os.path.join(path, f'{sys.platform}_image_autowsgrs.bin'))
         self.dll.locate.argtypes = c_void_p, POINTER(c_int32 * 100)
         self.dll.locate.restype = c_int32
         self.dll.recognize_enemy.argtypes = (c_void_p, c_char_p)
