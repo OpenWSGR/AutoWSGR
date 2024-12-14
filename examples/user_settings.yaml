@@ -13,7 +13,7 @@ daily_automation:
   auto_normal_fight: True
   normal_fight_tasks:
     # - [8-2BJ, 4, 250] # 胖次
-    - [9-1B, 3, 50] # 6鱼
+    - [8-5AI, 2, 250] # 6鱼
 
 # ========= 决战设置 =========
 decisive_battle:
