@@ -6,6 +6,7 @@ import airtest.core.android
 import requests
 from airtest.core.api import connect_device
 
+from autowsgr.constants.custom_exceptions import CriticalErr
 from autowsgr.utils.logger import Logger
 
 
@@ -42,8 +43,9 @@ class MacController:
         try:
             self.device = connect_device(android)
             return self.device
-        except Exception as e:
-            self.logger.error(f'{android} connection refused:{e}')
+        except Exception:
+            self.logger.error('连接模拟器失败！')
+            raise CriticalErr('连接模拟器失败！')
 
     def is_android_online(self):
         marsh = self.__get_info_all()

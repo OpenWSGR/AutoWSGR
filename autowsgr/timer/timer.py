@@ -46,33 +46,6 @@ class Timer(AndroidController):
         self.port = Port(logger)
         self.init()
 
-    # 这里是重写 android_controller 的 update_screen 用来处理 airtest 截图为None问题
-    # 当你截图为None，就重新截图，直到成功，超过30s还是 none 就尝试重启模拟器
-    def update_screen(self):
-        # 记录开始时间
-        start_time = time.time()
-
-        self.screen = self.dev.snapshot(quality=99)
-        while self.screen is None:
-            # 为了防止CPU占用过高，可以添加一个短暂的休眠
-            time.sleep(1)
-            # 获取当前时间
-            current_time = time.time()
-
-            # 计算已过去的时间
-            elapsed_time = current_time - start_time
-
-            # 如果已过去的时间超过30秒，则重启模拟器
-            if elapsed_time > 30:
-                self.logger.warning("截图持续返回 None，模拟器可能已经失去响应")
-                self.logger.warning("尝试重启模拟器")
-                self.restart()
-
-            # 这里可以放置循环中的其他操作
-            print(f"已过去 {elapsed_time:.2f} 秒")
-            self.screen = self.dev.snapshot(quality=99)
-
-
     def initialize_resources(self) -> None:
         # 加载资源
         self.ui = WSGR_UI
@@ -92,9 +65,12 @@ class Timer(AndroidController):
         # 适配mac，windows
         controller_fun = {
             'win32': lambda: WindowsController(self.config, self.logger),
-            'linux': {},
             'darwin': lambda: MacController(self.config, self.logger),
         }
+
+        if sys.platform== "linux":
+            raise CriticalErr('linux 暂未支持')
+
         self.ControllerAdapter = controller_fun[sys.platform]()
         # 初始化android控制器
         dev = self.ControllerAdapter.connect_android()
