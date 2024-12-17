@@ -128,7 +128,7 @@ class WindowsController:
                 from airtest.core.android.adb import ADB
 
                 adb = ADB().get_adb_path()
-                subprocess.run([adb, 'devices', '-l'])
+                subprocess.run([adb, 'kill-server'])
 
         self.logger.error('连接模拟器失败！')
         raise CriticalErr('连接模拟器失败！')
