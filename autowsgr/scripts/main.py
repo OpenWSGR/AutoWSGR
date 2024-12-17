@@ -25,7 +25,7 @@ def start_script(settings_path=None) -> Timer:
         check_for_updates()
 
     # logger
-    logging.getLogger("airtest").setLevel(logging.ERROR)
+    logging.getLogger('airtest').setLevel(logging.ERROR)
     logger = Logger(config.log_dir, config.log_level)
     logger.save_config(config)
 
