@@ -82,7 +82,7 @@ class OCRBackend(Protocol):
     bin: ApiDll
 
     def __init_subclass__(cls) -> None:
-        cls.bin = ApiDll(os.path.join(BIN_ROOT, 'image_autowsgrs.bin'))
+        cls.bin = ApiDll(os.path.join(BIN_ROOT))
 
     def read_text(
         self,

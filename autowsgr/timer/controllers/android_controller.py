@@ -31,6 +31,7 @@ class AndroidController:
         config: UserConfig,
         logger: Logger,
     ) -> None:
+        self.screen = None
         self.dev = dev
         self.show_android_input = config.show_android_input
         self.delay = config.delay

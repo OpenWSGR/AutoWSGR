@@ -1,5 +1,6 @@
 # 全部可设置选项参见 autowsgr/user_config.py
 # 所有项目如果不设置将使用默认值
+# 注意⚠️ mac 端目前仅支持 MuMu 12 pro emulator_type: MuMu并且在全局设置中添加一行 如下：emulator_name=127.0.0.1:your_prot
 # ========= 全局设置 =========
 check_update: False
 emulator_type: 雷电

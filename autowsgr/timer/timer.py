@@ -1,3 +1,4 @@
+import sys
 import threading as th
 import time
 
@@ -7,7 +8,7 @@ from autowsgr.constants.other_constants import ALL_PAGES
 from autowsgr.constants.ui import WSGR_UI, Node
 from autowsgr.port.common import Port
 from autowsgr.timer.backends import EasyocrBackend, PaddleOCRBackend
-from autowsgr.timer.controllers import AndroidController, WindowsController
+from autowsgr.timer.controllers import AndroidController, MacController, WindowsController
 from autowsgr.types import OcrBackend
 from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import create_nested_dict, recursive_dict_update, yaml_to_dict
@@ -15,10 +16,11 @@ from autowsgr.utils.logger import Logger
 from autowsgr.utils.operator import unzip_element
 
 
-class Timer(AndroidController, WindowsController):
+class Timer(AndroidController):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
 
     def __init__(self, config: UserConfig, logger: Logger) -> None:
+        self.ControllerAdapter = None
         self.config = config
         self.logger = logger
 
@@ -60,9 +62,18 @@ class Timer(AndroidController, WindowsController):
         self.logger.info('资源加载成功')
 
     def initialize_controllers(self) -> None:
+        # 适配mac，windows
+        controller_fun = {
+            'win32': lambda: WindowsController(self.config, self.logger),
+            'darwin': lambda: MacController(self.config, self.logger),
+        }
+
+        if sys.platform == 'linux':
+            raise CriticalErr('linux 暂未支持')
+
+        self.ControllerAdapter = controller_fun[sys.platform]()
         # 初始化android控制器
-        WindowsController.__init__(self, self.config, self.logger)
-        dev = self.connect_android()
+        dev = self.ControllerAdapter.connect_android()
         AndroidController.__init__(self, dev, self.config, self.logger)
         self.logger.info('控制器初始化成功')
 
@@ -228,16 +239,16 @@ class Timer(AndroidController, WindowsController):
             self.shell('input keyevent 3')
             self.start_game(**kwargs)
         except Exception:
-            if not self.is_android_online():
+            if not self.ControllerAdapter.is_android_online():
                 pass
 
             elif times == 1:
                 raise CriticalErr('on restart,')
 
-            elif not self.check_network():
+            elif not self.ControllerAdapter.check_network():
                 for i in range(11):
                     time.sleep(10)
-                    if self.check_network():
+                    if self.ControllerAdapter.check_network():
                         break
                     if i == 10:
                         raise NetworkErr
@@ -245,7 +256,7 @@ class Timer(AndroidController, WindowsController):
             elif self.is_game_running():
                 raise CriticalErr('CriticalErr on restart function')
 
-            self.connect_android()
+            self.ControllerAdapter.connect_android()
             self.restart(times + 1, *args, **kwargs)
 
     def is_other_device_login(self, timeout=2):
@@ -289,7 +300,7 @@ class Timer(AndroidController, WindowsController):
 
             # 等待网络恢复
 
-            if not self.wait_network():
+            if not self.ControllerAdapter.wait_network():
                 raise NetworkErr("can't connect to www.moefantasy.com")
 
             # 处理网络问题
@@ -570,9 +581,9 @@ class Timer(AndroidController, WindowsController):
 
 def process_error(timer: Timer):
     print('processing errors')
-    if not timer.is_android_online() or not timer.is_game_running():
-        timer.restart_android()
-        timer.connect_android()
+    if not timer.ControllerAdapter.is_android_online() or not timer.is_game_running():
+        timer.ControllerAdapter.restart_android()
+        timer.ControllerAdapter.connect_android()
 
         return 'Android Restarted'
 
