@@ -8,5 +8,6 @@ opencv-python
 opencv-python-headless
 pre-commit
 rich
+strenum
 thefuzz
 wheel
