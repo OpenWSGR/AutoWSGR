@@ -1,0 +1,7 @@
+# E2 BCD 驱逐大于等于6
+chapter: E
+map: 2
+selected_nodes: [B,C]
+node_defaults:
+  proceed: True
+  formation: 4
