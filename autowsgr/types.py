@@ -103,12 +103,12 @@ class EmulatorType(StrEnum):
             raise FileNotFoundError(f'没有找到 {self.value} 的安装路径')
 
     def macos_auto_emulator_path(self) -> str:
-        """Windows自动识别模拟器路径"""
+        """macOS自动识别模拟器路径"""
         match self.value:
             case EmulatorType.mumu:
-                path = '/Applications/MuMuPlayer.app/Contents/MacOS'
+                path = '/Applications/MuMuPlayer.app'
             case EmulatorType.bluestacks:
-                path = '/Applications/BlueStacks.app/Contents/MacOS'
+                path = '/Applications/BlueStacks.app'
             case _:
                 raise ValueError(f'没有为 {self.value} 设置安装路径查找方法，请手动指定')
 

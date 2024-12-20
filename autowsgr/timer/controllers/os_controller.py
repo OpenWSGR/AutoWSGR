@@ -3,13 +3,12 @@ import os
 import re
 import subprocess
 import time
-from logging import ERROR, getLogger
-from subprocess import check_output
 from typing import Protocol
 
 import airtest.core.android
 import requests
 from airtest.core.api import connect_device
+from airtest.core.error import AdbError
 
 from autowsgr.constants.custom_exceptions import CriticalErr
 from autowsgr.types import EmulatorType
@@ -18,15 +17,67 @@ from autowsgr.utils.logger import Logger
 
 
 class OSController(Protocol):
-    def check_network(self) -> bool: ...
+    logger: Logger
+    emulator_type: EmulatorType
+    emulator_name: str
+    emulator_start_cmd: str
+    emulator_process_name: str
+    dev_name: str  # emulator_name 添加类似 Android:/// 前缀, 自动设置
 
-    def wait_network(self, timeout: int = 1000) -> bool: ...
+    def check_network(self) -> bool:
+        """检查网络状况
+
+        Returns:
+            bool:网络正常返回 True,否则返回 False
+        """
+        response = requests.get('https://www.moefantasy.com', timeout=5)
+
+        return response.status_code == 200
+
+    def wait_network(self, timeout=1000) -> bool:
+        """等待到网络恢复"""
+        start_time = time.time()
+        while time.time() - start_time <= timeout:
+            if self.check_network():
+                return True
+            time.sleep(10)
+
+        return False
 
     def is_android_online(self) -> bool: ...
 
-    def connect_android(self) -> airtest.core.android.Android: ...
+    def connect_android(self) -> airtest.core.android.Android:
+        """连接指定安卓设备
+        Returns:
+            dev: airtest.
+        """
+        if not self.is_android_online():
+            self.restart_android()
+            time.sleep(15)
+        start_time = time.time()
+        while time.time() - start_time <= 30:
+            try:
+                dev = connect_device(self.dev_name)
+                dev.snapshot()
+                self.logger.info('Android Connected!')
+                return dev
+            except AdbError:
+                self.logger.error('Adb 连接模拟器失败, 正在清除原有连接并重试')
+                from airtest.core.android.adb import ADB
 
-    def restart_android(self) -> None: ...
+                adb = ADB().get_adb_path()
+                subprocess.run([adb, 'kill-server'])
+
+        self.logger.error('连接模拟器失败！')
+        raise CriticalErr('连接模拟器失败！')
+
+    def kill_android(self) -> None: ...
+
+    def start_android(self) -> None: ...
+
+    def restart_android(self) -> None:
+        self.kill_android()
+        self.start_android()
 
 
 class WindowsController(OSController):
@@ -42,27 +93,62 @@ class WindowsController(OSController):
         self.emulator_start_cmd = config.emulator_start_cmd
         self.emulator_process_name = config.emulator_process_name
 
-    # ======================== 网络 ========================
-    def check_network(self):
-        """检查网络状况
+        match self.emulator_type:
+            case EmulatorType.leidian | EmulatorType.bluestacks:
+                self.dev_name = f'ANDROID:///{self.emulator_name}'
+            case _:
+                self.dev_name = f'Android:///{self.emulator_name}'
 
+    def is_android_online(self) -> bool:
+        """判断 timer 给定的设备是否在线
         Returns:
-            bool:网络正常返回 True,否则返回 False
+            bool: 在线返回 True, 否则返回 False
         """
-        return os.system('ping www.moefantasy.com') == 0
-
-    def wait_network(self, timeout=1000):
-        """等待到网络恢复"""
-        start_time = time.time()
-        while time.time() - start_time <= timeout:
-            if self.check_network():
+        match self.emulator_type:
+            case EmulatorType.leidian:
+                raw_res = self.__ldconsole('isrunning')
+                self.logger.debug('EmulatorType status: ' + raw_res)
+                return raw_res == 'running'
+            case EmulatorType.yunshouji:
                 return True
-            time.sleep(10)
+            case _:
+                # TODO: 检查是否所有windows版本返回都是中文
+                raw_res = subprocess.check_output(
+                    f'tasklist /fi "ImageName eq {self.emulator_process_name}',
+                ).decode('gbk')
+                return 'PID' in raw_res
 
-        return False
+    def kill_android(self) -> None:
+        try:
+            match self.emulator_type:
+                case EmulatorType.leidian:
+                    self.__ldconsole('quit')
+                case EmulatorType.yunshouji:
+                    self.logger.info('云手机无需关闭')
+                case _:
+                    subprocess.run(['taskkill', '-f', '-im', self.emulator_process_name])
+        except Exception as e:
+            raise CriticalErr(f'停止模拟器失败: {e}')
 
-    # ======================== 模拟器 ========================
-    def ldconsole(self, command, command_arg='', global_command=False):
+    def start_android(self) -> None:
+        try:
+            match self.emulator_type:
+                case EmulatorType.leidian:
+                    self.__ldconsole('launch')
+                case EmulatorType.yunshouji:
+                    self.logger.info('云手机无需启动')
+                case _:
+                    os.popen(self.emulator_start_cmd)
+
+            start_time = time.time()
+            while not self.is_android_online():
+                time.sleep(1)
+                if time.time() - start_time > 120:
+                    raise TimeoutError('模拟器启动超时！')
+        except Exception as e:
+            raise CriticalErr(f'模拟器启动失败: {e}')
+
+    def __ldconsole(self, command, command_arg='', global_command=False) -> str:
         """
         使用雷电命令行控制模拟器。
 
@@ -92,7 +178,6 @@ class WindowsController(OSController):
         else:
             cmd = [console_dir, command_arg]
 
-        # 使用subprocess.Popen来执行命令
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -101,177 +186,56 @@ class WindowsController(OSController):
         )
         output, error = process.communicate()
 
-        # 获取命令执行的输出
         return (
             output.decode('utf-8', errors='replace')
             if output
             else error.decode('utf-8', errors='replace')
         )
 
-    def connect_android(self) -> airtest.core.android.Android:
-        """连接指定安卓设备
-        Returns:
-            dev: airtest.
-        """
-        if not self.is_android_online():
-            self.restart_android()
-            time.sleep(15)
-
-        match self.emulator_type:
-            case EmulatorType.leidian | EmulatorType.bluestacks:
-                dev_name = f'ANDROID:///{self.emulator_name}'
-            case _:
-                dev_name = f'Android:///{self.emulator_name}'
-
-        getLogger('airtest').setLevel(ERROR)
-
-        start_time = time.time()
-        from airtest.core.error import AdbError
-
-        while time.time() - start_time <= 30:
-            try:
-                dev = connect_device(dev_name)
-                dev.snapshot()
-                self.logger.info('Android Connected!')
-                return dev
-            except AdbError:
-                self.logger.error('Adb 连接模拟器失败, 正在清除原有连接并重试')
-                from airtest.core.android.adb import ADB
-
-                adb = ADB().get_adb_path()
-                subprocess.run([adb, 'kill-server'])
-
-        self.logger.error('连接模拟器失败！')
-        raise CriticalErr('连接模拟器失败！')
-
-    def is_android_online(self) -> bool:
-        """判断 timer 给定的设备是否在线
-        Returns:
-            bool: 在线返回 True, 否则返回 False
-        """
-        match self.emulator_type:
-            case EmulatorType.leidian:
-                raw_res = self.ldconsole('isrunning')
-                self.logger.debug('EmulatorType status: ' + raw_res)
-                return raw_res == 'running'
-            case EmulatorType.yunshouji:
-                return True
-            case _:
-                # TODO: 检查是否所有windows版本返回都是中文
-                raw_res = check_output(
-                    f'tasklist /fi "ImageName eq {self.emulator_process_name}',
-                ).decode('gbk')
-                return 'PID' in raw_res
-
-    def kill_android(self) -> None:
-        try:
-            match self.emulator_type:
-                case EmulatorType.leidian:
-                    self.ldconsole('quit')
-                case EmulatorType.yunshouji:
-                    self.logger.info('云手机无需关闭')
-                case _:
-                    subprocess.run(['taskkill', '-f', '-im', self.emulator_process_name])
-        except Exception as e:
-            raise CriticalErr(f'停止模拟器失败: {e}')
-
-    def start_android(self) -> None:
-        try:
-            match self.emulator_type:
-                case EmulatorType.leidian:
-                    self.ldconsole('launch')
-                case EmulatorType.yunshouji:
-                    self.logger.info('云手机无需启动')
-                case _:
-                    os.popen(self.emulator_start_cmd)
-
-            start_time = time.time()
-            while not self.is_android_online():
-                time.sleep(1)
-                if time.time() - start_time > 120:
-                    raise TimeoutError('模拟器启动超时！')
-        except Exception as e:
-            raise CriticalErr(f'模拟器启动失败: {e}')
-
-    def restart_android(self) -> None:
-        self.kill_android()
-        self.start_android()
-
 
 class MacController(OSController):
-    def __init__(self, config, logger: Logger) -> None:
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
         self.logger = logger
+
+        self.emulator_type = config.emulator_type
         self.emulator_name = config.emulator_name
-        self.device = None
-        self.path = config.emulator_start_cmd  #
-        self.prot = self.emulator_name.split(':')[-1]
+        self.emulator_start_cmd = config.emulator_start_cmd
+        self.emulator_process_name = config.emulator_process_name
 
-    def check_network(self):
-        """检查网络状况
+        self.dev_name = f'Android:///{self.emulator_name}'
+        if self.emulator_type == EmulatorType.mumu:
+            self.mumu_tool = os.path.join(config.emulator_start_cmd, 'Contents/MacOS/mumutool')
+            self.prot = self.emulator_name.split(':')[-1]
 
-        Returns:
-            bool:网络正常返回 True,否则返回 False
-        """
-        response = requests.get('https://www.moefantasy.com', timeout=5)
-
-        return response.status_code == 200
-
-    def wait_network(self, timeout=1000):
-        """等待到网络恢复"""
-        start_time = time.time()
-        while time.time() - start_time <= timeout:
-            if self.check_network():
-                return True
-            time.sleep(10)
-
-        return False
-
-    def connect_android(self) -> airtest.core.android.Android:
-        android = f'Android:///{self.emulator_name}'
+    def is_android_online(self) -> bool:
         try:
-            self.device = connect_device(android)
-            return self.device
-        except Exception:
-            self.logger.error('连接模拟器失败！')
-            raise CriticalErr('连接模拟器失败！')
+            subprocess.check_output(f'pgrep -f {self.emulator_process_name}', shell=True)
+            if self.emulator_type == EmulatorType.mumu:
+                marsh = self.__get_mumu_info()
+                return any(self.prot == v.get('adb_port') for v in marsh['return']['results'])
+            return True
+        except subprocess.CalledProcessError:
+            return False
 
-    def is_android_online(self):
-        marsh = self.__get_info_all()
-        return any(self.prot == v.get('adb_port') for v in marsh['return']['results'])
+    def kill_android(self) -> None:
+        subprocess.Popen(f'pkill -9 -f {self.emulator_process_name}', shell=True)
 
-    def restart_android(self):
-        self.__start_android()
+    def start_android(self) -> None:
+        subprocess.Popen(f'open -a {self.emulator_start_cmd}', shell=True)
+        if self.emulator_type == EmulatorType.mumu:
+            marsh = self.__get_mumu_info()
+            for k, v in enumerate(marsh['return']['results']):
+                if self.prot == v.get('adb_port'):
+                    cmd = f'{self.mumu_tool} restart {k}'
+                    subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        shell=True,
+                    )
 
-    def __kill_android(self):
-        marsh = self.__get_info_all()
-        for k, v in enumerate(marsh['return']['results']):
-            if self.prot == v.get('adb_port'):
-                cmd = f'.{self.path}/mumutool close {k}'
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True,
-                )
-
-        return True
-
-    def __start_android(self):
-        marsh = self.__get_info_all()
-
-        for k, v in enumerate(marsh['return']['results']):
-            if self.prot == v.get('adb_port'):
-                cmd = f'{self.path}/mumutool restart {k}'
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    shell=True,
-                )
-        return True
-
-    def __get_info_all(self):
-        cmd = f'{self.path}/mumutool info all'
+    def __get_mumu_info(self) -> dict:
+        cmd = f'{self.mumu_tool} info all'
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
