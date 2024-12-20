@@ -1,3 +1,5 @@
+import logging
+
 from autowsgr.game.build import BuildManager
 from autowsgr.timer import Timer
 from autowsgr.user_config import UserConfig
@@ -23,6 +25,7 @@ def start_script(settings_path=None) -> Timer:
         check_for_updates()
 
     # logger
+    logging.getLogger('airtest').setLevel(logging.ERROR)
     logger = Logger(config.log_dir, config.log_level)
     logger.save_config(config)
 

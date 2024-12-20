@@ -12,7 +12,7 @@ from typing_extensions import Self
 import rich
 
 from autowsgr.constants.data_roots import DATA_ROOT, OCR_ROOT
-from autowsgr.types import EmulatorType, GameAPP, OcrBackend
+from autowsgr.types import EmulatorType, GameAPP, OcrBackend, OSType
 
 
 @dataclass(frozen=True)
@@ -131,6 +131,10 @@ class DecisiveBattleConfig(BaseConfig):
 
 @dataclass(frozen=True)
 class UserConfig(BaseConfig):
+    # 系统
+    os_type: OSType = field(init=False)
+    """操作系统类型。自动设置"""
+
     # 模拟器
     emulator_type: EmulatorType = EmulatorType.leidian
     """模拟器类型。mumu模拟器现在截图效率较低，后续会进行优化"""
@@ -208,6 +212,9 @@ class UserConfig(BaseConfig):
     """决战自动化配置"""
 
     def __post_init__(self) -> None:
+        # 自动获取系统类型
+        object.__setattr__(self, 'os_type', OSType.auto())
+
         # 确保类型ok
         if not isinstance(self.emulator_type, EmulatorType):
             object.__setattr__(self, 'emulator_type', EmulatorType(self.emulator_type))
@@ -218,9 +225,17 @@ class UserConfig(BaseConfig):
 
         # 模拟器
         if self.emulator_name is None:
-            object.__setattr__(self, 'emulator_name', self.emulator_type.default_emulator_name)
+            object.__setattr__(
+                self,
+                'emulator_name',
+                self.emulator_type.default_emulator_name(self.os_type),
+            )
         if self.emulator_start_cmd is None:
-            object.__setattr__(self, 'emulator_start_cmd', self.emulator_type.auto_emulator_path)
+            object.__setattr__(
+                self,
+                'emulator_start_cmd',
+                self.emulator_type.auto_emulator_path(self.os_type),
+            )
         if self.emulator_process_name is None:
             object.__setattr__(
                 self,
