@@ -218,6 +218,8 @@ class MacController(OSController):
             return False
 
     def kill_android(self) -> None:
+        if self.emulator_type == EmulatorType.mumu:
+            return
         subprocess.Popen(f'pkill -9 -f {self.emulator_process_name}', shell=True)
 
     def start_android(self) -> None:
