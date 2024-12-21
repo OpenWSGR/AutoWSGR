@@ -95,7 +95,7 @@ class WindowsController(OSController):
 
         match self.emulator_type:
             case EmulatorType.leidian | EmulatorType.bluestacks:
-                self.dev_name = f'ANDROID:///{self.emulator_name}'
+                self.dev_name = f'Android:///{self.emulator_name}'
             case _:
                 self.dev_name = f'Android:///{self.emulator_name}'
 

@@ -62,6 +62,10 @@ class EventFightPlan20241219(Event, NormalFightPlan):
         """选择并进入战斗地图(chapter-map)"""
         self.change_difficulty(chapter_id)
 
+    def _go_map_page(self):
+        self.timer.go_main_page()
+        self.timer.click_image(self.event_image[5], timeout=10)
+
     def _is_alpha(self):
         return self.timer.check_pixel(
             (794, 312),
