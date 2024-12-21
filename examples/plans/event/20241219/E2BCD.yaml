@@ -1,7 +1,7 @@
-# E2 BC 舰船数量大于等于6
+# E2 BCD 舰船数量大于等于6
 chapter: E
 map: 2
-selected_nodes: [B,C]
+selected_nodes: [B,C,D]
 node_defaults:
   proceed: True
   formation: 4
