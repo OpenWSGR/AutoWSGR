@@ -1,0 +1,8 @@
+# E9 练战术 带路条件无
+chapter: H
+map: 3
+from_alpha: True
+selected_nodes: [A]
+node_defaults:
+  proceed: False
+  formation: 4
