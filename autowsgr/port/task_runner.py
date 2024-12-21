@@ -559,13 +559,14 @@ class DecisiveFight(DecisiveBattle):
 
 
 class DecisiveFightTask(Task):
-    def __init__(self, timer, enable_quick_register=True, fleet_id=4) -> None:
+    def __init__(self, timer, times, enable_quick_register=True, fleet_id=4) -> None:
         """
         Args:
             enable_quick_register (bool, optional): 是否启用快速注册. Defaults to False.
             fleet_id (int, optional): 注册舰队时占用的舰队编号. Defaults to 4.
         """
         super().__init__(timer)
+        self.times = times
         self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
         self.db = DecisiveFight(self.timer)
         self.db.rships = self.ships
@@ -586,14 +587,19 @@ class DecisiveFightTask(Task):
         return tasks
 
     def run(self):
-        if not self.db.can_fight():
-            self.timer.logger.info('无法组合出足量的战斗舰船, 任务暂停中')
-            return False, []
+        while self.times > 0:
+            if not self.db.can_fight():
+                self.timer.logger.info('无法组合出足量的战斗舰船, 任务暂停中')
+                return False, []
 
-        res = self.db.run()
-        if res == 'leave':
-            self.timer.logger.info('战斗舰船发生破损, 暂离修复中....')
-            return False, self.check_repair()
+            res = self.db.run()
+
+            if res == 'leave':
+                self.timer.logger.info('战斗舰船发生破损, 暂离修复中....')
+                return False, self.check_repair()
+            self.times -= 1
+            self.db = DecisiveFight(self.timer)
+            self.db.rships = self.ships
         return True, []
 
 
@@ -602,8 +608,10 @@ class TaskRunner:
         self.tasks = []
         self.timer = timer
 
-    def add_decisive_task(self):
-        self.tasks.append(DecisiveFightTask(self.timer))
+    def add_decisive_task(self, times=1):
+        if any(isinstance(task, DecisiveFightTask) for task in self.tasks):
+            raise ValueError('已经存在决战任务, 不允许再次添加')
+        self.tasks.append(DecisiveFightTask(self.timer, times))
 
     def run(self):
         while True:
