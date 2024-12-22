@@ -40,6 +40,13 @@ class EmulatorType(StrEnum):
     yunshouji = '云手机'
     others = '其他'
 
+    def check_emulator_type(self) -> None:
+        """检查模拟器名称是否合法"""
+        if self.emulator_type not in ['雷电', '蓝叠', 'MuMu', '云手机', '其他']:
+            raise ValueError(
+                f'不支持的模拟器 {self.emulator_type}, 请手动检查模拟器名称是否按照预设中填写',
+            )
+
     def default_emulator_name(self, os: OSType) -> str:
         """自动获取默认模拟器连接名称"""
         if os == OSType.windows:
