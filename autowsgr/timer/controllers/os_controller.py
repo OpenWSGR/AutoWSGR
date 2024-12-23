@@ -92,12 +92,7 @@ class WindowsController(OSController):
         self.emulator_name = config.emulator_name
         self.emulator_start_cmd = config.emulator_start_cmd
         self.emulator_process_name = config.emulator_process_name
-
-        match self.emulator_type:
-            case EmulatorType.leidian | EmulatorType.bluestacks:
-                self.dev_name = f'Android:///{self.emulator_name}'
-            case _:
-                self.dev_name = f'Android:///{self.emulator_name}'
+        self.dev_name = f'Android:///{self.emulator_name}'
 
     def is_android_online(self) -> bool:
         """判断 timer 给定的设备是否在线
@@ -201,8 +196,8 @@ class MacController(OSController):
         self.emulator_name = config.emulator_name
         self.emulator_start_cmd = config.emulator_start_cmd
         self.emulator_process_name = config.emulator_process_name
-
         self.dev_name = f'Android:///{self.emulator_name}'
+
         if self.emulator_type == EmulatorType.mumu:
             self.mumu_tool = os.path.join(config.emulator_start_cmd, 'Contents/MacOS/mumutool')
             self.prot = self.emulator_name.split(':')[-1]
