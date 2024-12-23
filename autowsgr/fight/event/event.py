@@ -34,7 +34,7 @@ class Event:
         """
         res = self.timer.wait_images(self.common_image.hard + self.common_image.easy)
         if res is None:
-            self.logger.error('ImageNotFoundErr: difficulty image not found')
+            self.logger.warning('ImageNotFoundErr: difficulty image not found')
             if self.timer.wait_image(self.event_image[2]):
                 self.logger.info(
                     '成功进入活动页面，未检测到切换难度图标，请检查是否通关简单难度',

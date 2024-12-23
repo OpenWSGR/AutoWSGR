@@ -8,7 +8,10 @@ dock_full_destroy: True
 
 # ========= 日常挂机策略设置 =========
 daily_automation:
+  auto_battle: True
   battle_type: 困难巡洋
+
+  auto_exercise: True
 
   auto_normal_fight: True
   normal_fight_tasks:

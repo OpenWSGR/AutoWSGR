@@ -215,6 +215,9 @@ class UserConfig(BaseConfig):
         # 自动获取系统类型
         object.__setattr__(self, 'os_type', OSType.auto())
 
+        # 检查模拟器类型是否合法
+        EmulatorType.check_emulator_type(self)
+
         # 确保类型ok
         if not isinstance(self.emulator_type, EmulatorType):
             object.__setattr__(self, 'emulator_type', EmulatorType(self.emulator_type))
