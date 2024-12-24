@@ -65,7 +65,7 @@ class EventFightPlan20241219(Event, NormalFightPlan):
     def _go_map_page(self):
         self.timer.go_main_page()
         self.timer.click_image(self.event_image[5], timeout=10)
-        if self.timer.image_exist(self.event_image[6], timeout=2):
+        if self.timer.wait_image(self.event_image[6], timeout=2):
             self.timer.relative_click(0.618, 0.564)
             self._go_map_page()
 
