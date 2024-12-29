@@ -3,6 +3,7 @@ import datetime
 import threading as th
 import time
 from collections.abc import Iterable
+from concurrent.futures import ProcessPoolExecutor
 
 import cv2
 from airtest.core.android import Android
@@ -31,6 +32,8 @@ class AndroidController:
         config: UserConfig,
         logger: Logger,
     ) -> None:
+        self._pool = ProcessPoolExecutor()
+
         self.screen = None
         self.dev = dev
         self.show_android_input = config.show_android_input
@@ -246,32 +249,13 @@ class AndroidController:
         color.reverse()
         return cal_dis(color, bgr_color) < distance**2
 
-    def locate_center_on_screen(
-        self,
-        query: MyTemplate,
-        confidence=0.85,
-        this_methods=None,
-    ):
-        """从屏幕中找出和模板图像匹配度最高的矩阵区域的中心坐标
-            参考 locate_image_center
-        Returns:
-            如果找到返回一个二元组表示绝对坐标
-
-            否则返回 None
-        """
-        if this_methods is None:
-            this_methods = ['tpl']
-        return locate_image_center(self.screen, query, confidence, this_methods)
-
     def get_image_position(
         self,
         image,
         need_screen_shot=True,
         confidence=0.85,
-        this_methods=None,
     ):
         """从屏幕中找出和多张模板图像匹配度超过阈值的矩阵区域的中心坐标,如果有多个,返回第一个
-            参考 locate_center_on_screen
         Args:
             need_screen_shot (int, optional): 是否重新截取屏幕. Defaults to 1.
         Returns:
@@ -279,18 +263,21 @@ class AndroidController:
 
             否则返回 None
         """
-        if this_methods is None:
-            this_methods = ['tpl']
         images = image
         if not isinstance(images, Iterable):
             images = [images]
         if need_screen_shot:
             self.update_screen()
         for image in images:
-            res = self.locate_center_on_screen(image, confidence, this_methods)
+            res = locate_image_center(self.screen, image, confidence)
             if res is not None:
                 rel_pos = absolute_to_relative(res, self.resolution)
                 return relative_to_absolute(rel_pos, (960, 540))
+        # results = self._pool.map(partial(locate_image_center, self.screen, confidence=confidence), images)
+        # for res in results:
+        #     if res is not None:
+        #         rel_pos = absolute_to_relative(res, self.resolution)
+        #         return relative_to_absolute(rel_pos, (960, 540))
         return None
 
     def image_exist(
@@ -298,22 +285,16 @@ class AndroidController:
         images,
         need_screen_shot=True,
         confidence=0.85,
-        this_methods=None,
     ):
         """判断图像是否存在于屏幕中
         Returns:
             bool:如果存在为 True 否则为 False
         """
-        if this_methods is None:
-            this_methods = ['tpl']
         if not isinstance(images, list):
             images = [images]
         if need_screen_shot:
             self.update_screen()
-        return any(
-            self.get_image_position(image, False, confidence, this_methods) is not None
-            for image in images
-        )
+        return self.get_image_position(images, False, confidence) is not None
 
     def wait_image(
         self,
@@ -322,7 +303,6 @@ class AndroidController:
         timeout=10,
         gap=0.15,
         after_get_delay=0,
-        this_methods=None,
     ):
         """等待一张图片出现在屏幕中,置信度超过一定阈值(支持多图片)
 
@@ -333,13 +313,11 @@ class AndroidController:
 
             否则返回 False
         """
-        if this_methods is None:
-            this_methods = ['tpl']
         if timeout < 0:
             raise ValueError("arg 'timeout' should at least be 0 but is ", str(timeout))
         start_time = time.time()
         while True:
-            x = self.get_image_position(image, True, confidence, this_methods)
+            x = self.get_image_position(image, True, confidence)
             if x is not None:
                 time.sleep(after_get_delay)
                 return x
@@ -394,6 +372,11 @@ class AndroidController:
                 if self.image_exist(image, False, confidence):
                     time.sleep(after_get_delay)
                     return res
+            # exists = self._pool.map(partial(self.image_exist, confidence=confidence), [image for _, image in images])
+            # for (res, _), exist in zip(images, exists):
+            #     if exist:
+            #         time.sleep(after_get_delay)
+            #         return res
             time.sleep(gap)
             if time.time() - start_time > timeout:
                 return None
@@ -444,13 +427,6 @@ class AndroidController:
 
         self.click(*pos, delay=delay)
         return pos
-
-    def click_images(self, images, must_click=False, timeout=0, delay=0.5):
-        """点击一些图片中第一张出现的,如果有多个,点击第一个
-        Returns:
-            bool:如果找到图片返回匹配位置，未找到则返回None
-        """
-        return self.click_image(images, must_click, timeout, delay)
 
     def log_screen(
         self,

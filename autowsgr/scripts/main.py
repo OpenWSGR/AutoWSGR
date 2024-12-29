@@ -1,5 +1,7 @@
 import logging
 
+from airtest.core.settings import Settings as ST  # noqa
+
 from autowsgr.game.build import BuildManager
 from autowsgr.timer import Timer
 from autowsgr.user_config import UserConfig
@@ -16,6 +18,9 @@ def start_script(settings_path=None) -> Timer:
     Returns:
         Timer: 该模拟器的记录器
     """
+    # airtest全局设置
+    ST.CVSTRATEGY = ['tpl']
+
     # config
     config_dict = yaml_to_dict(settings_path)
     config = UserConfig.from_dict(config_dict)
