@@ -15,7 +15,7 @@ lines_after_imports = 2
 multi_line_output = 3
 
 [tool.codespell]
-ignore-words = "docs/spelling_wordlist.txt"
+ignore-words = ".assets/spelling_wordlist.txt"
 
 [tool.ruff]
 target-version = "py310"
