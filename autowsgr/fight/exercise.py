@@ -123,9 +123,17 @@ class NormalExerciseInfo(FightInfo):
 
 
 class NormalExercisePlan(FightPlan):
-    """ " 常规战斗的决策模块"""
+    """
+    常规战斗的决策模块
 
-    def __init__(self, timer: Timer, plan_path) -> None:
+    Args:
+        plan_path: 以 PLAN_ROOT/exercise 为根的相对路径
+
+        fleet_id: 指定舰队编号, 如果为 None 则使用计划中的参数
+
+    """
+
+    def __init__(self, timer: Timer, plan_path: str, fleet_id: int | None) -> None:
         super().__init__(timer)
 
         # 加载默认配置
@@ -140,6 +148,11 @@ class NormalExercisePlan(FightPlan):
 
         # 加载节点配置
         node_defaults = self.node_defaults
+
+        # 从参数加载计划
+        if fleet_id is not None:
+            node_defaults['fleet_id'] = fleet_id  # 舰队编号
+
         self.nodes = {}
         for node_name in self.selected_nodes:
             node_args = copy.deepcopy(node_defaults)

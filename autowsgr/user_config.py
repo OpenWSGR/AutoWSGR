@@ -88,6 +88,8 @@ class DailyAutomationConfig(BaseConfig):
     """打哪个战役"""
     auto_exercise: bool = True
     """自动打完每日的三次演习"""
+    exercise_fleet_id: int | None = None
+    """演习出征舰队"""
 
     # 常规战
     auto_normal_fight: bool = True
