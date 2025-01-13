@@ -27,7 +27,11 @@ class DailyOperation:
                 plan_path=self.config.battle_type,
             )
         if self.config.auto_exercise:
-            self.exercise_plan = NormalExercisePlan(self.timer, 'plan_1')
+            self.exercise_plan = NormalExercisePlan(
+                self.timer,
+                plan_path='plan_1',
+                fleet_id=self.config.exercise_fleet_id,
+            )
             self.complete_time = None
 
         if self.config.auto_normal_fight:

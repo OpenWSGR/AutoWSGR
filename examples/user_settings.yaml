@@ -12,6 +12,7 @@ daily_automation:
   battle_type: 困难巡洋
 
   auto_exercise: True
+  exercise_fleet_id: 2 # 演习出征舰队
 
   auto_normal_fight: True
   normal_fight_tasks:
