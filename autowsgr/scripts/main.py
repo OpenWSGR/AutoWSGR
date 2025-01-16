@@ -22,7 +22,7 @@ def start_script(settings_path=None) -> Timer:
     ST.CVSTRATEGY = ['tpl']
 
     # config
-    config_dict = yaml_to_dict(settings_path)
+    config_dict = {} if settings_path is None else yaml_to_dict(settings_path)
     config = UserConfig.from_dict(config_dict)
     config.pprint()
 
