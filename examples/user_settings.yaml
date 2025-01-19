@@ -54,6 +54,8 @@ daily_automation:
 
   # 捞到每天最大舰船(500)时停止
   stop_max_ship: True
+  # 捞到每天最大胖次(50)时停止
+  stop_max_loot: True
 
 # ========= 决战设置 =========
 decisive_battle:
