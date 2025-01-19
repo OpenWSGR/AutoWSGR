@@ -593,7 +593,8 @@ class DecisiveBattle:
             timeout=2,
         ):
             self.choose()  # 获取战备舰队
-        self._get_exp()
+        # 升级副官坏了,经验检测也停用
+        # self._get_exp()
         self.timer.wait_image(IMG.decisive_battle_image[9])
         self.stats.node = self.recognize_node()
         # 升级副官, 现在这功能坏掉了
