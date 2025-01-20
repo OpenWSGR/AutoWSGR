@@ -58,6 +58,11 @@ def click_result(timer: Timer, max_times=1):
     """点击加速两页战果界面"""
     timer.wait_images(IMG.fight_image[14])
     while timer.wait_image(IMG.fight_image[14], timeout=0.5):
+        if timer.image_exist(IMG.fight_result['LOOT'], need_screen_shot=True):
+            timer.got_loot_num += 1
+            timer.logger.info(f'捞到胖次! 当前胖次数:{timer.got_loot_num}')
+        else:
+            timer.logger.debug('没有胖次')
         timer.click(915, 515, delay=0.25, times=1)
 
 

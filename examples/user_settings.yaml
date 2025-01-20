@@ -54,8 +54,8 @@ daily_automation:
     - [8-5AI, 2, 250] # 6鱼
 
   # 快修消耗上限，达到时终止常规战出征。
-  # 注释掉或者填 None 则无上限
-  quick_repair_limit: None
+  # 注释掉则无上限
+  # quick_repair_limit: None
 
   # 捞到每天最大舰船(500)时停止
   stop_max_ship: True
