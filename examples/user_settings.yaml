@@ -1,29 +1,76 @@
 # 全部可设置选项参见 autowsgr/user_config.py
 # 所有项目如果不设置将使用默认值
-# 注意⚠️ mac 端目前仅支持 MuMu 12 pro emulator_type: MuMu并且在全局设置中添加一行 如下：emulator_name: 127.0.0.1:your_prot
+# 注意⚠️ mac 端目前仅支持 MuMu 12 pro
+
+# MuMu 请参考下方说明, 在全局设置中添加一行 emulator_name
+# emulator_type: MuMu
+# emulator_name: 127.0.0.1:your_port
+
 # ========= 全局设置 =========
 check_update: False
-emulator_type: 雷电
 dock_full_destroy: True
 
+# 浴室数(购买的浴室装饰数, 最大为 3) 说明: 未来可能自动获取
+bathroom_feature_count: 1
+# 修理位置总数(最大为 12) 说明: 未来可能自动获取
+bathroom_count: 2
+
+# ========= 模拟器类型 =========
+emulator_type: 雷电
+# emulator_type: MuMu
+# emulator_name: 127.0.0.1:your_port
+
 # ========= 日常挂机策略设置 =========
+# 若需要启用/禁用某项功能, 请手动修改对应的 True/False, 或者添加 # 注释掉使用默认值
 daily_automation:
+
+  # 自动重复远征
+  auto_expedition: True
+
+  # 当有任务完成时自动点击
+  auto_gain_bonus: True
+
+  # 空闲时自动澡堂修理
+  auto_bath_repair: True
+
+  # 自动开启战役支援
+  auto_set_support: True
+
+  # 自动打完每日战役次数
   auto_battle: True
+  # 战役难度
   battle_type: 困难巡洋
 
+  # 自动演习
   auto_exercise: True
+  # 演习出征舰队
   exercise_fleet_id: 2 # 演习出征舰队
 
+  # 按自定义任务进行常规战
   auto_normal_fight: True
+  # 常规战任务列表
   normal_fight_tasks:
     # - [8-2BJ, 4, 250] # 胖次
     - [8-5AI, 2, 250] # 6鱼
 
+  # 快修消耗上限，达到时终止常规战出征。
+  # 注释掉或者填 None 则无上限
+  quick_repair_limit: None
+
+  # 捞到每天最大舰船(500)时停止
+  stop_max_ship: True
+
 # ========= 决战设置 =========
 decisive_battle:
+  # 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
   chapter: 6
+  # 一级舰队
   level1: ["鲃鱼", "U-1206", "射水鱼", "U-96", "U-1405", "U-47"]
+  # 二级舰队
   level2: ["U-81", "大青花鱼", "M-296", "U-505", "伊-25"]
+  # 旗舰优先级队列
   flagship_priority: ["U-1405", "U-47", "U-1206"]
+  # 维修策略, 1 为中破修, 2 为大破修
   repair_level: 2
+  # 船舱满了解装舰船（仅限决战）
   full_destroy: True

@@ -113,7 +113,7 @@ class DecisiveBattleConfig(BaseConfig):
     flagship_priority: list[str] | None = None
     """旗舰优先级队列"""
     repair_level: int = 1
-    """维修策略，1为中破修，2为大破修"""
+    """维修策略, 1 为中破修, 2 为大破修"""
     full_destroy: bool = False
     """是否船舱满了解装舰船（仅限决战）"""
 
@@ -167,7 +167,7 @@ class UserConfig(BaseConfig):
     check_page: bool = True
     """是否在启动时检查游戏页面"""
     dock_full_destroy: bool = True
-    """船坞已满时自动清空，若设置为false则船坞已满后终止所有常规出征任务"""
+    """船坞已满时自动清空, 若设置为false则船坞已满后终止所有常规出征任务"""
     bathroom_feature_count: int = 1
     """浴室数(购买的浴室装饰数, 最大为 3) TODO: 可自动获取"""
     bathroom_count: int = 2
@@ -187,7 +187,7 @@ class UserConfig(BaseConfig):
     log_dir: str = field(init=False)
     """日志保存路径。自动创建日期文件夹。"""
     debug: bool = True
-    """是否开启调试模式，如果为 True，则会输出更多的调试信息。"""
+    """是否开启调试模式，如果为 True, 则会输出更多的调试信息。"""
     log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
     """调试模式log_level应该设置为DEBUG"""
     show_map_node: bool = False
