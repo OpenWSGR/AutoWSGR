@@ -10,13 +10,18 @@
 check_update: False
 dock_full_destroy: True
 
+# 浴室数(购买的浴室装饰数, 最大为 3) 说明: 未来可能自动获取
+bathroom_feature_count: 1
+# 修理位置总数(最大为 12) 说明: 未来可能自动获取
+bathroom_count: 2
+
 # ========= 模拟器类型 =========
 emulator_type: 雷电
 # emulator_type: MuMu
 # emulator_name: 127.0.0.1:your_port
 
 # ========= 日常挂机策略设置 =========
-# 若不需要某项功能, 请在对应的 True 或者 False 行前面加上 # 注释掉
+# 若需要启用/禁用某项功能, 请手动修改对应的 True/False, 或者添加 # 注释掉使用默认值
 daily_automation:
 
   # 自动重复远征

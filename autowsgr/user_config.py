@@ -63,15 +63,15 @@ class BaseConfig:
 @dataclass(frozen=True)
 class DailyAutomationConfig(BaseConfig):
     # Routine
-    auto_expedition: bool = False
+    auto_expedition: bool = True
     """自动重复远征"""
-    auto_gain_bonus: bool = False
+    auto_gain_bonus: bool = True
     """当有任务完成时自动点击"""
-    auto_bath_repair: bool = False
+    auto_bath_repair: bool = True
     """空闲时自动澡堂修理"""
     auto_set_support: bool = False
     """自动开启战役支援"""
-    auto_battle: bool = False
+    auto_battle: bool = True
     """自动打完每日战役次数"""
     battle_type: Literal[
         '简单航母',
@@ -86,13 +86,13 @@ class DailyAutomationConfig(BaseConfig):
         '困难战列',
     ] = '困难潜艇'
     """打哪个战役"""
-    auto_exercise: bool = False
+    auto_exercise: bool = True
     """自动打完每日的三次演习"""
     exercise_fleet_id: int | None = None
     """演习出征舰队"""
 
     # 常规战
-    auto_normal_fight: bool = False
+    auto_normal_fight: bool = True
     """按自定义任务进行常规战"""
     normal_fight_tasks: list[str] = field(default_factory=list)
     """常规战任务列表"""
