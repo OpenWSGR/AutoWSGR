@@ -63,15 +63,15 @@ class BaseConfig:
 @dataclass(frozen=True)
 class DailyAutomationConfig(BaseConfig):
     # Routine
-    auto_expedition: bool = False
+    auto_expedition: bool = True
     """自动重复远征"""
-    auto_gain_bonus: bool = False
+    auto_gain_bonus: bool = True
     """当有任务完成时自动点击"""
-    auto_bath_repair: bool = False
+    auto_bath_repair: bool = True
     """空闲时自动澡堂修理"""
     auto_set_support: bool = False
     """自动开启战役支援"""
-    auto_battle: bool = False
+    auto_battle: bool = True
     """自动打完每日战役次数"""
     battle_type: Literal[
         '简单航母',
@@ -86,13 +86,13 @@ class DailyAutomationConfig(BaseConfig):
         '困难战列',
     ] = '困难潜艇'
     """打哪个战役"""
-    auto_exercise: bool = False
+    auto_exercise: bool = True
     """自动打完每日的三次演习"""
     exercise_fleet_id: int | None = None
     """演习出征舰队"""
 
     # 常规战
-    auto_normal_fight: bool = False
+    auto_normal_fight: bool = True
     """按自定义任务进行常规战"""
     normal_fight_tasks: list[str] = field(default_factory=list)
     """常规战任务列表"""
@@ -113,7 +113,7 @@ class DecisiveBattleConfig(BaseConfig):
     flagship_priority: list[str] | None = None
     """旗舰优先级队列"""
     repair_level: int = 1
-    """维修策略, 1 为中破修, 2 为大破修"""
+    """维修策略，1为中破修，2为大破修"""
     full_destroy: bool = False
     """是否船舱满了解装舰船（仅限决战）"""
 
@@ -167,7 +167,7 @@ class UserConfig(BaseConfig):
     check_page: bool = True
     """是否在启动时检查游戏页面"""
     dock_full_destroy: bool = True
-    """船坞已满时自动清空, 若设置为false则船坞已满后终止所有常规出征任务"""
+    """船坞已满时自动清空，若设置为false则船坞已满后终止所有常规出征任务"""
     bathroom_feature_count: int = 1
     """浴室数(购买的浴室装饰数, 最大为 3) TODO: 可自动获取"""
     bathroom_count: int = 2
@@ -187,7 +187,7 @@ class UserConfig(BaseConfig):
     log_dir: str = field(init=False)
     """日志保存路径。自动创建日期文件夹。"""
     debug: bool = True
-    """是否开启调试模式，如果为 True, 则会输出更多的调试信息。"""
+    """是否开启调试模式，如果为 True，则会输出更多的调试信息。"""
     log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
     """调试模式log_level应该设置为DEBUG"""
     show_map_node: bool = False
