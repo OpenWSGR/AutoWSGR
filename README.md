@@ -1,5 +1,5 @@
 <div align=center>
-<img src="https://raw.githubusercontent.com/OpenWSGR/AutoWSGR/main/.assets/logo.png">
+<img src="https://raw.githubusercontent.com/OpenWSGR/AutoWSGR/main/docs/logo.png">
 </div>
 
 ## 项目简介
