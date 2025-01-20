@@ -65,6 +65,7 @@ class BattleInfo(FightInfo):
         self.timer.update_screen()
 
     def _after_match(self):
+        self.timer.logger.info('调用 BattleInfo._after_match() #68')
         if self.state == 'get_ship':
             get_ship(self.timer)
         super()._after_match()

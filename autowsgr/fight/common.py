@@ -60,6 +60,10 @@ class FightResultInfo:
         if self.result is None:
             timer.log_screen()
             timer.logger.warning("can't identify fight result, screen logged")
+        if timer.image_exist(IMG.fight_image['LOOT'], need_screen_shot=False):
+            self.loot = True
+        else:
+            self.loot = False
 
     def __str__(self) -> str:
         return f'MVP 为 {self.mvp} 号位, 战果为 {self.result}'
@@ -254,6 +258,9 @@ class FightInfo(ABC):
         if self.state == 'result':
             try:
                 result = FightResultInfo(self.timer, self.ship_stats)
+                if result.loot:
+                    self.timer.got_loot_num += 1
+                    self.timer.logger.info(f'胖次:{self.timer.got_loot_num}')
                 self.ship_stats = result.ship_stats
                 self.fight_history.add_event(
                     '战果结算',
@@ -724,11 +731,13 @@ class DecisionBlock:
             return 'no', literals.FIGHT_CONTINUE_FLAG
 
         if state == 'result':
+            self.timer.logger.info('调用 DecisionBlock.make_decision() #738')
             # time.sleep(1.5)
             # self.timer.click(900, 500, times=2, delay=0.2)
             click_result(self.timer)
             return None, literals.FIGHT_CONTINUE_FLAG
         if state == 'get_ship':
+            self.timer.logger.info('调用 DecisionBlock.make_decision() #744')
             get_ship(self.timer)
             return None, literals.FIGHT_CONTINUE_FLAG
         self.logger.error('Unknown State')
