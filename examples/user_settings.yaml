@@ -54,17 +54,16 @@ daily_automation:
     - [8-5AI, 2, 250] # 6鱼
 
   # 快修消耗上限，达到时终止常规战出征。
-  # 在选项前添加 # 注释掉则无上限
-  # 注意⚠️ 请勿填写 None
-  # quick_repair_limit: None
+  # 在选项前添加 # 注释掉, 或填写 null 则无上限
+  quick_repair_limit: null
 
   # 捞到每天最大舰船(500)时停止
   stop_max_ship: True
+
   # 捞到每天最大胖次(50)时停止
   stop_max_loot: True
 
 # ========= 决战设置 =========
-# 注意⚠️ 如不想进行决战, 请在下列所有选项前添加 # 注释掉
 decisive_battle:
   # 决战章节,请保证为 [1, 6] 中的整数. Defaults to 6.
   chapter: 6
