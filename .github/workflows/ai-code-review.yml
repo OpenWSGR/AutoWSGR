@@ -43,3 +43,4 @@ jobs:
           MAX_PATCH_LENGTH: # if the patch/diff length is large than MAX_PATCH_LENGTH, will be ignored and won't review. By default, with no MAX_PATCH_LENGTH set, there is also no limit for the patch/diff length.
           IGNORE_PATTERNS: # glob pattern or regex pattern to ignore files, separated by comma
           INCLUDE_PATTERNS: # glob pattern or regex pattern to include files, separated by comma
+          LOG_LEVEL: debug
