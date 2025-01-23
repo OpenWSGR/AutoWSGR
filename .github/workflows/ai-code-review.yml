@@ -6,7 +6,7 @@ permissions:
   pull-requests: write
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize]
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       - uses: anc95/ChatGPT-CodeReview@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: sk-3ff29f9022e5442496d7e8df313d19df
           # Optional
           LANGUAGE: Chinese
           OPENAI_API_ENDPOINT: https://api.deepseek.com/v1
