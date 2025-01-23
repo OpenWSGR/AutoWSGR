@@ -100,6 +100,8 @@ class DailyAutomationConfig(BaseConfig):
     """快修消耗上限，达到时终止常规战出征。不填则无上限"""
     stop_max_ship: bool = False
     """是否获取完当天上限500船后终止常规战出征"""
+    stop_max_loot: bool = False
+    """是否获取完当天上限50胖次后终止常规战出征"""
 
 
 @dataclass(frozen=True)

@@ -76,7 +76,7 @@ class DailyOperation:
 
         # 自动出征
         if self.config.auto_normal_fight:
-            while self._has_unfinished() and self._ship_max():
+            while self._has_unfinished() and self._ship_max() and self._loot_max():
                 task_id = self._get_unfinished()
 
                 plan = self.fight_plans[task_id]
@@ -115,12 +115,19 @@ class DailyOperation:
     def _has_unfinished(self) -> bool:
         return any(times[0] < times[1] for times in self.fight_complete_times)
 
+    def _get_unfinished_plan_description(self, i: int) -> str:
+        plan_str = ''
+        plan_str += f'正在执行的PLAN: {self.fight_complete_times[i][2]}, '
+        plan_str += f'已出击次数/目标次数: {self.fight_complete_times[i][0]}/{self.fight_complete_times[i][1]}, '
+        plan_str += f'消耗快修数量: {self.timer.quick_repaired_cost}, '
+        plan_str += f'已掉落船数量: {self.timer.got_ship_num}, '
+        plan_str += f'已掉落胖次数量: {self.timer.got_loot_num}'
+        return plan_str
+
     def _get_unfinished(self) -> int:
         for i, times in enumerate(self.fight_complete_times):
             if times[0] < times[1]:
-                self.timer.logger.info(
-                    f'正在执行的PLAN：{self.fight_complete_times[i][2]}, 已出击次数：{self.fight_complete_times[i][0]}, 目标次数：{self.fight_complete_times[i][1]}, 消耗快修数量：{self.timer.quick_repaired_cost}, 已掉落船数量:{self.timer.got_ship_num}',
-                )
+                self.timer.logger.info(self._get_unfinished_plan_description(i))
                 return i
         raise ValueError('没有未完成的任务')
 
@@ -143,6 +150,14 @@ class DailyOperation:
         if self.timer.got_ship_num < 500:
             return True
         self.timer.logger.info('船只数量已达到上限，结束出征')
+        return False
+
+    def _loot_max(self) -> bool:
+        if not self.config.stop_max_loot:
+            return True
+        if self.timer.got_loot_num < 50:
+            return True
+        self.timer.logger.info('胖次数量已达到上限，结束出征')
         return False
 
     def check_exercise(self) -> None:
