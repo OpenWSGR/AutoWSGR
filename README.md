@@ -19,6 +19,8 @@
 
 注意： 开发者请**不要从pypi安装autowsgr**，改为 [本地模式](https://docs-autowsgr.notion.site/2-AutoWSGR-efeb69811b544604b944d5b5727317a4) 安装。
 
+本项目使用 [Lunar](https://github.com/0xWelt/Lunar) 进行代码自动审查，所有pr都有概率触发AI的评论。
+
 ## 贡献者
 
 <a href="https://github.com/OpenWSGR/AutoWSGR/graphs/contributors">
