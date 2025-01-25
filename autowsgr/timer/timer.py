@@ -40,7 +40,7 @@ class Timer(AndroidController):
         self.got_ship_num = 0  # 当天已掉落的船
         self.got_loot_num = 0  # 当天已掉落的胖次
         self.quick_repaired_cost = 0  # 消耗快修数量
-        self.can_get_loot = True  # 是否可以捞胖次
+        self.can_get_loot = False  # 是否可以捞胖次
         """
         以上时能用到的
         以下是暂时用不到的
