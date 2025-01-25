@@ -120,8 +120,9 @@ class DailyOperation:
         plan_str += f'正在执行的PLAN: {self.fight_complete_times[i][2]}, '
         plan_str += f'已出击次数/目标次数: {self.fight_complete_times[i][0]}/{self.fight_complete_times[i][1]}, '
         plan_str += f'消耗快修数量: {self.timer.quick_repaired_cost}, '
-        plan_str += f'已掉落船数量: {self.timer.got_ship_num}, '
-        plan_str += f'已掉落胖次数量: {self.timer.got_loot_num}'
+        plan_str += f'已掉落船数量: {self.timer.got_ship_num}'
+        if self.timer.can_get_loot:
+            plan_str += f', 已掉落胖次数量: {self.timer.got_loot_num}'
         return plan_str
 
     def _get_unfinished(self) -> int:

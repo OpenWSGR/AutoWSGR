@@ -143,12 +143,17 @@ def get_loot_and_ship(timer: Timer):
     try:
         timer.got_loot_num = ret.get('loot')
         if timer.got_loot_num is None:
+            timer.can_get_loot = False
             timer.got_loot_num = 0
     except:
         timer.logger.warning('赋值给got_loot_num失败')
+        timer.can_get_loot = False
         timer.got_loot_num = 0
-    timer.logger.info(f'已掉落胖次:{timer.got_loot_num}')
     timer.logger.info(f'已掉落舰船:{timer.got_ship_num}')
+    if timer.can_get_loot:
+        timer.logger.info(f'已掉落胖次:{timer.got_loot_num}')
+    else:
+        timer.logger.info('胖次活动未开启, 无法捞胖次')
     return ret
 
 
