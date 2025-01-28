@@ -41,7 +41,7 @@ def quick_register(timer: Timer, ships):
             if not timer.port.have_ship(ship):
                 tmp = timer.port.register_ship(ship)
                 tmp.level = 1
-                tmp.statu = 0
+                tmp.status = 0
         return True
     timer.logger.info('放弃快速注册')
     return False
@@ -63,7 +63,7 @@ def register(timer: Timer, ships, fleet_id):
             if ship in ships and not timer.port.have_ship(ship):
                 tmp = timer.port.register_ship(ship)
                 tmp.level = fleet.levels[i]
-                tmp.statu = detect_ship_stats(timer)[i]
+                tmp.status = detect_ship_stats(timer)[i]
 
         # 逐个初始化舰船, 效率较低, 待优化
         for ship in ships:
@@ -78,7 +78,7 @@ def register(timer: Timer, ships, fleet_id):
                     continue
                     # raise BaseException(f"未找到 {ship} 舰船")
                 tmp = timer.port.register_ship(ship)
-                tmp.statu = detect_ship_stats(timer)[1]
+                tmp.status = detect_ship_stats(timer)[1]
                 fleet.detect()
                 tmp.level = fleet.levels[1]
         timer.port.show_fleet()
@@ -205,7 +205,7 @@ class FightTask(Task):
                 if (
                     (
                         not ignore_statu
-                        and self.port.get_ship_by_name(ship).statu
+                        and self.port.get_ship_by_name(ship).status
                         < self.repair_mode.get(ship, self.default_repair_mode)
                     )
                     or ignore_statu
@@ -223,7 +223,7 @@ class FightTask(Task):
         tasks = []
         for name in self.all_ships:
             ship = self.port.get_ship_by_name(name)
-            if ship.statu != 3 and ship.statu >= self.repair_mode.get(
+            if ship.status != 3 and ship.status >= self.repair_mode.get(
                 ship,
                 self.default_repair_mode,
             ):
@@ -243,10 +243,10 @@ class FightTask(Task):
         if self.times <= 0:
             return True, []
 
-        statu, fleet = self.build_fleet()
-        if statu == 1:
+        status, fleet = self.build_fleet()
+        if status == 1:
             return True, []
-        if statu == 2 and not self.quick_repair:
+        if status == 2 and not self.quick_repair:
             return False, [*self.check_repair(), self]
         if self.port.ship_factory.full:
             tasks = [
@@ -264,15 +264,15 @@ class FightTask(Task):
         plan.fleet_id = self.fleet_id
         plan.repair_mode = [3] * 6
         # 设置战时快修
-        if statu == 2:
-            statu, fleet = self.build_fleet(True)
+        if status == 2:
+            status, fleet = self.build_fleet(True)
             for i, name in enumerate(fleet):
                 if name is None:
                     continue
                 ship = self.port.get_ship_by_name(name)
-                if ship.statu >= self.repair_mode.get(name, self.default_repair_mode):
+                if ship.status >= self.repair_mode.get(name, self.default_repair_mode):
                     self.timer.logger.info(f'舰船 {name} 的状态已经标记为修复')
-                    plan.repair_mode[i] = ship.statu
+                    plan.repair_mode[i] = ship.status
                     ship.set_repair(0)
         # 执行战斗
         ret = plan.run()
@@ -303,7 +303,7 @@ class FightTask(Task):
             ship = self.port.get_ship_by_name(name)
             if ship is not None:
                 ship.level = fleet.levels[i]
-                ship.statu = ship_stats[i]
+                ship.status = ship_stats[i]
 
         return True, [*self.check_repair(), self]
 
@@ -506,11 +506,11 @@ class DecisiveLogic(Logic):
 
     def get_best_fleet(self):
         def ship_available(ship):
-            # return ship in ships and self.timer.port.have_ship(ship) and self.timer.port.get_ship_by_name(ship).statu < 2 # 大破修
+            # return ship in ships and self.timer.port.have_ship(ship) and self.timer.port.get_ship_by_name(ship).status < 2 # 大破修
             return (
                 ship in ships
                 and self.timer.port.have_ship(ship)
-                and self.timer.port.get_ship_by_name(ship).statu < 1
+                and self.timer.port.get_ship_by_name(ship).status < 1
             )  # 中破修
 
         ships = self.stats.ships
@@ -580,8 +580,8 @@ class DecisiveFightTask(Task):
         tasks = []
         for ship in self.ships:
             ship = self.timer.port.get_ship_by_name(ship)
-            # if ship.statu > 1 and ship.statu < 3: # 大破修
-            if ship.statu > 0 and ship.statu < 2:  # 中破修
+            # if ship.status > 1 and ship.status < 3: # 大破修
+            if ship.status > 0 and ship.status < 2:  # 中破修
                 self.timer.logger.info(f'{ship.name} 需要修复')
                 tasks.append(RepairTask(self.timer, ship))
         return tasks
@@ -623,8 +623,8 @@ class TaskRunner:
                 self.timer.logger.info(f'当前任务类型: {type(task)}')
                 if 'times' in task.__dict__:
                     self.timer.logger.info(f'当前任务剩余次数: {task.times}')
-                statu, new_tasks = task.run()
-                if statu:
+                status, new_tasks = task.run()
+                if status:
                     self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
                     break
                 self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]

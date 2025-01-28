@@ -609,11 +609,11 @@ class DecisiveBattle:
         self.fleet = self.logic.get_best_fleet()
         # if self.logic._leave() or (
         #     type(self) is not DecisiveBattle
-        #     and any(self.timer.port.get_ship_by_name(ship).statu in [2] for ship in self.rships)
+        #     and any(self.timer.port.get_ship_by_name(ship).status in [2] for ship in self.rships)
         # ):  # 大破修
         if self.logic._leave() or (
             type(self) is not DecisiveBattle
-            and any(self.timer.port.get_ship_by_name(ship).statu in [1, 2] for ship in self.rships)
+            and any(self.timer.port.get_ship_by_name(ship).status in [1, 2] for ship in self.rships)
         ):  # 中破修
             self.leave()
             return 'leave'
@@ -643,8 +643,8 @@ class DecisiveBattle:
         for i in range(1, 7):
             if self.timer.port.have_ship(self.stats.fleet.ships[i]):
                 ship = self.timer.port.get_ship_by_name(self.stats.fleet.ships[i])
-                if ship.statu != 3:
-                    ship.statu = self.stats.ship_stats[i]
+                if ship.status != 3:
+                    ship.status = self.stats.ship_stats[i]
 
         self.timer.relative_click(0.1, 0.5)
         res = self.timer.wait_images(
@@ -682,7 +682,7 @@ class DecisiveBattle:
         self.stats.ship_stats = plan.info.fight_history.get_fight_results()[-1].ship_stats
         for i in range(1, 7):
             if self.timer.port.have_ship(self.fleet[i]):
-                self.timer.port.get_ship_by_name(self.fleet[i]).statu = self.stats.ship_stats[i]
+                self.timer.port.get_ship_by_name(self.fleet[i]).status = self.stats.ship_stats[i]
 
     def _change_fleet(self, fleet) -> None:
         self.go_fleet_page()

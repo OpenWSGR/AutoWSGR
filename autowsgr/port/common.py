@@ -16,16 +16,16 @@ class Ship:
 
     def __str__(self) -> str:
         table = ['绿血', '中破', '大破', '修理中']
-        return f'舰船名:{self.name}\n舰船状态:{table[self.statu]}\n舰船等级:{self.level}\n\n'
+        return f'舰船名:{self.name}\n舰船状态:{table[self.status]}\n舰船等级:{self.level}\n\n'
 
     @property
-    def statu(self):
+    def status(self):
         if self.is_repairing():
             return 3
         return self._statu
 
-    @statu.setter
-    def statu(self, new_statu):
+    @status.setter
+    def status(self, new_statu):
         self._statu = new_statu
 
     def set_repair(self, time_cost):
