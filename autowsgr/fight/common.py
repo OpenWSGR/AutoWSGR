@@ -18,7 +18,6 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.timer import Timer
-from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import get_nearest
 
 
@@ -695,11 +694,6 @@ class DecisionBlock:
                 },
                 action=value,
             )
-            # import random
-            # if random.random() > 0.5:
-            #     print("这次没点起")
-            # else:
-            #     self.timer.click(573, value * 100 - 20, delay=2)
             self.timer.click(573, value * 100 - 20, delay=2)
             return value, literals.FIGHT_CONTINUE_FLAG
         if state == 'night':
@@ -733,99 +727,3 @@ class DecisionBlock:
             return None, literals.FIGHT_CONTINUE_FLAG
         self.logger.error('Unknown State')
         raise BaseException
-
-
-class IndependentFightPlan(FightPlan):
-    def __init__(
-        self,
-        timer: Timer,
-        end_image,
-        plan_path=None,
-        *args,
-        **kwargs,
-    ) -> None:
-        """创建一个独立战斗模块, 处理从形如战役点击出征到收获舰船(或战果结算)的整个过程
-        Args:
-            end_image (MyTemplate): 整个战斗流程结束后的图片
-        """
-        super().__init__(timer)
-        default_args = yaml_to_dict(self.timer.plan_tree['default'])
-        node_defaults = default_args['node_defaults']
-        node_args = yaml_to_dict(plan_path) if (plan_path is not None) else kwargs
-        node_args = recursive_dict_update(node_defaults, node_args)
-        self.decision_block = DecisionBlock(timer, node_args)
-        self.info = IndependentFightInfo(timer, end_image)
-
-    def run(self):
-        super().fight()
-
-    def _make_decision(self, *args, **kwargs):
-        if 'skip_update' not in kwargs:
-            state = self.update_state()
-        if self.info.state == 'battle_page':
-            return literals.FIGHT_END_FLAG
-        if state == 'need SL':
-            return 'need SL'
-
-        # 进行通用NodeLevel决策
-        action, fight_stage = self.decision_block.make_decision(
-            self.info.state,
-            self.info.last_state,
-            self.info.last_action,
-            self.info,
-        )
-        self.info.last_action = action
-        return fight_stage
-
-
-class IndependentFightInfo(FightInfo):
-    def __init__(self, timer: Timer, end_image) -> None:
-        super().__init__(timer)
-
-        self.end_page = 'battle_page'
-
-        self.successor_states = {
-            'proceed': ['spot_enemy_success', 'formation', 'fight_period'],
-            'spot_enemy_success': {
-                'retreat': ['battle_page'],
-                'fight': ['formation', 'fight_period'],
-            },
-            'formation': ['fight_period'],
-            'fight_period': ['night', 'result'],
-            'night': {
-                'yes': ['night_fight_period'],
-                'no': [['result', 8]],
-            },
-            'night_fight_period': ['result'],
-            'result': ['battle_page'],  # 两页战果
-        }
-
-        self.state2image = {
-            'proceed': [IMG.fight_image[5], 5],
-            'spot_enemy_success': [IMG.fight_image[2], 15],
-            'formation': [IMG.fight_image[1], 15],
-            'fight_period': [IMG.symbol_image[4], 3],
-            'night': [IMG.fight_image[6], 120],
-            'night_fight_period': [IMG.symbol_image[4], 3],
-            'result': [IMG.fight_image[16], 60],
-            'battle_page': [end_image, 5],
-        }
-
-    def reset(self):
-        self.last_state = ''
-        self.last_action = ''
-        self.state = 'proceed'
-
-    def _before_match(self):
-        # 点击加速
-        if self.state in ['proceed']:
-            self.timer.click(
-                380,
-                520,
-                delay=0,
-                enable_subprocess=True,
-            )
-        self.timer.update_screen()
-
-    def _after_match(self):
-        pass  # 战役的敌方信息固定，不用获取
