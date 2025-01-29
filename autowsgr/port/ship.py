@@ -63,9 +63,10 @@ class Fleet:
         if self.fleet_id is not None:
             move_team(self.timer, self.fleet_id)
 
-        ships = self.timer.recognize_ship(
+        ships = self.timer.recognize(
             self.timer.get_screen()[433:459],
-            self.timer.ship_names,
+            candidates=self.timer.ship_names,
+            multiple=True,
         )
         self.ships = [None] * 7
 
