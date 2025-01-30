@@ -19,8 +19,9 @@ node_args:
     night: False
     proceed: True
   J:
+    enemy_rules:
+      - ["SAP<=1", "retreat"] # 不存在补给舰时撤退
     SL_when_spot_enemy_fails: True
     formation: 4
     night: False
     proceed: False
-    supply_ship_mode: 1 # 有补给舰则战斗，否则撤退

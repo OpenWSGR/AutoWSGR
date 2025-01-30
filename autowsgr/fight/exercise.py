@@ -20,8 +20,8 @@ class ExerciseDecisionBlock(DecisionBlock):
             max_times = self.max_refresh_times
             self.formation_chosen = self.formation
             while max_times >= 0:
-                info.enemys = get_enemy_condition(self.timer)
-                act = self._check_rules(info.enemys)
+                info.enemies = get_enemy_condition(self.timer)
+                act = self._check_rules(info.enemies)
                 if act == 'refresh':
                     if max_times > 0:
                         max_times -= 1

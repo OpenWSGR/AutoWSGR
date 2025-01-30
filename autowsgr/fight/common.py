@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG
-from autowsgr.constants.other_constants import ALL_SHIP_TYPES, SAP
+from autowsgr.constants.other_constants import ALL_SHIP_TYPES
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.constants.ui import Node
 from autowsgr.game.expedition import Expedition
@@ -18,6 +18,7 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.timer import Timer
+from autowsgr.user_config import NodeConfig
 from autowsgr.utils.math_functions import get_nearest
 
 
@@ -93,7 +94,7 @@ class FightEvent:
 
         ship_stats: 我方舰船状态(仅在 "继续前进" 事件存在)
 
-        enemys: 敌方舰船(仅在 "索敌成功" 事件存在), 字典或 "索敌失败"
+        enemies: 敌方舰船(仅在 "索敌成功" 事件存在), 字典或 "索敌失败"
 
         info: 其它额外信息(仅在 "自动回港" 事件存在)
 
@@ -168,7 +169,6 @@ class FightInfo(ABC):
 
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
-        self.config = timer.config
         self.logger = timer.logger
 
         self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
@@ -177,7 +177,7 @@ class FightInfo(ABC):
         self.last_state = ''
         self.last_action = ''
         self.state = ''
-        self.enemys = {}  # 敌方舰船列表
+        self.enemies = {}  # 敌方舰船列表
         self.ship_stats = []  # 我方舰船血量列表
         self.oil = 10  # 我方剩余油量
         self.ammo = 10  # 我方剩余弹药量
@@ -196,7 +196,7 @@ class FightInfo(ABC):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        if self.config.show_match_fight_stage:
+        if self.timer.config.show_match_fight_stage:
             self.logger.debug('waiting:', possible_states, '  ')
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
@@ -227,7 +227,7 @@ class FightInfo(ABC):
                     delay = self.after_match_delay[self.state]
                     time.sleep(delay)
 
-                if self.config.show_match_fight_stage:
+                if self.timer.config.show_match_fight_stage:
                     self.logger.info(f'matched: {self.state}')
                 self._after_match()
 
@@ -249,7 +249,7 @@ class FightInfo(ABC):
     def _after_match(self):
         """匹配到状态后执行的操作"""
         if self.state == 'spot_enemy_success':
-            self.enemys = get_enemy_condition(self.timer, 'fight')
+            self.enemies = get_enemy_condition(self.timer, 'fight')
         if self.state == 'result':
             try:
                 result = FightResultInfo(self.timer, self.ship_stats)
@@ -277,7 +277,6 @@ class FightPlan(ABC):
     def __init__(self, timer: Timer) -> None:
         # 把 timer 引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
-        self.config = timer.config
         self.logger = timer.logger
         self.fight_logs = []
 
@@ -349,7 +348,7 @@ class FightPlan(ABC):
             pass
         elif ret == literals.DOCK_FULL_FLAG:
             # 自动解装功能
-            if self.config.dock_full_destroy:
+            if self.timer.config.dock_full_destroy:
                 self.timer.relative_click(0.38, 0.565)
                 destroy_ship(self.timer)
                 return self.run()
@@ -499,17 +498,17 @@ class DecisionBlock:
 
     def __init__(self, timer: Timer, args) -> None:
         self.timer = timer
-        self.config = timer.config
         self.logger = timer.logger
 
-        self.__dict__.update(args)
+        # self.__dict__.update(args)
+        self.config = NodeConfig.from_dict(args)
 
         # 用于根据规则设置阵型
         self.set_formation_by_rule = False
         self.formation_by_rule = 0
 
-    def _check_rules(self, enemys: dict):
-        for rule in self.enemy_rules:
+    def _check_rules(self, enemies: dict):
+        for rule in self.config.enemy_rules:
             condition, act = rule
             rcondition = ''
             last = 0
@@ -517,13 +516,13 @@ class DecisionBlock:
                 if ord(ch) > ord('Z') or ord(ch) < ord('A'):
                     if last != i:
                         if condition[last:i] in ALL_SHIP_TYPES:
-                            rcondition += f"enemys.get('{condition[last:i]}', 0)"
+                            rcondition += enemies.get(condition[last:i], 0)
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch
                     last = i + 1
 
-            if self.config.show_enemy_rules:
+            if self.timer.config.show_enemy_rules:
                 self.logger.info(rcondition)
             if eval(rcondition):
                 return act
@@ -532,9 +531,9 @@ class DecisionBlock:
     def make_decision(self, state, last_state, last_action, info: FightInfo):
         # destroy_ship skip: extract-method
         """单个节点的决策"""
-        enemys = info.enemys
+        enemies = info.enemies
         if state in ['fight_period', 'night_fight_period']:
-            if self.SL_when_enter_fight:
+            if self.config.SL_when_enter_fight:
                 info.fight_history.add_event(
                     '进入战斗',
                     {
@@ -550,16 +549,14 @@ class DecisionBlock:
             return None, literals.FIGHT_CONTINUE_FLAG
 
         if state == 'spot_enemy_success':
-            retreat = (
-                self.supply_ship_mode == 1 and enemys.get(SAP, 0) == 0
-            )  # 功能: 遇到补给舰则战斗，否则撤退
+            retreat = False
             can_detour = self.timer.image_exist(
                 IMG.fight_image[13],
             )  # 判断该点是否可以迂回
             detour = can_detour and self.detour  # 由 Node 指定是否要迂回
 
             # 功能, 根据敌方阵容进行选择
-            act = self._check_rules(enemys=enemys)
+            act = self._check_rules(enemies=enemies)
 
             if act == 'retreat':
                 retreat = True
@@ -621,7 +618,7 @@ class DecisionBlock:
                 },
                 '战斗',
             )
-            if self.long_missile_support:
+            if self.config.long_missile_support:
                 image_missile_support = IMG.fight_image[17]
                 if self.timer.click_image(image=image_missile_support, timeout=2.5):
                     self.timer.logger.info('成功开启远程导弹支援')
@@ -633,9 +630,9 @@ class DecisionBlock:
             return 'fight', literals.FIGHT_CONTINUE_FLAG
         if state == 'formation':
             spot_enemy = last_state == 'spot_enemy_success'
-            value = self.formation
+            value = self.config.formation
             if spot_enemy:
-                if self.SL_when_detour_fails and last_action == 'detour':
+                if self.config.SL_when_detour_fails and last_action == 'detour':
                     info.fight_history.add_event(
                         '迂回',
                         {
@@ -650,7 +647,7 @@ class DecisionBlock:
                     info.fight_history.add_event(
                         '阵型选择',
                         {
-                            'enemys': enemys,
+                            'enemies': enemies,
                             'position': (
                                 info.node
                                 if 'node' in info.__dict__
@@ -666,11 +663,11 @@ class DecisionBlock:
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
             else:
-                if self.SL_when_spot_enemy_fails:
+                if self.config.SL_when_spot_enemy_fails:
                     info.fight_history.add_event(
                         '阵型选择',
                         {
-                            'enemys': '索敌失败',
+                            'enemies': '索敌失败',
                             'position': (
                                 info.node
                                 if 'node' in info.__dict__
@@ -680,12 +677,12 @@ class DecisionBlock:
                         action='SL',
                     )
                     return None, 'need SL'
-                if self.formation_when_spot_enemy_fails:
-                    value = self.formation_when_spot_enemy_fails
+                if self.config.formation_when_spot_enemy_fails:
+                    value = self.config.formation_when_spot_enemy_fails
             info.fight_history.add_event(
                 '阵型选择',
                 {
-                    'enemys': (enemys if last_state == 'spot_enemy_success' else '索敌失败'),
+                    'enemies': (enemies if last_state == 'spot_enemy_success' else '索敌失败'),
                     'position': (
                         info.node
                         if 'node' in info.__dict__
@@ -697,7 +694,7 @@ class DecisionBlock:
             self.timer.click(573, value * 100 - 20, delay=2)
             return value, literals.FIGHT_CONTINUE_FLAG
         if state == 'night':
-            is_night = self.night
+            is_night = self.config.night
             info.fight_history.add_event(
                 '是否夜战',
                 {

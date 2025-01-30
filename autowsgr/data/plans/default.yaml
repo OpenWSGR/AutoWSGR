@@ -21,9 +21,11 @@ node_defaults: #
   fleet_id: 2 # 队伍编号,可以在自己的方案中设置,机器人和玩家独立
   max_refresh_times: 2 # 默认最大刷新次数,可以分别对玩家和机器人设置
   # 索敌成功阶段
+  long_missile_support: False # 开启导巡的远程导弹支援
   detour: False # 是否迂回
   enemy_rules: [] # 每条按照 ["(类型 符号 数量) and/or ()", "操作"] 的字符串形式给出，从上到下执行第一条符合的命令。
-                  # 类型：舰船类型；符号：[>=、<=、>、<、==、!=]；数量：数字；操作：[retreat、detour、阵型数字(1-5)]
+                  # 类型：舰船类型；符号：[>=、<=、>、<、==、!=]；数量：数字；
+                  # 操作：[retreat、detour、阵型数字(1-5)]
                   # 如果在这里做了阵型选择决定，则优先级将高过下面的阵型选择。例子：["(SS >= 2)", "5"]
                   # and 的优先级高于 or
   # 阵型选择阶段
@@ -31,18 +33,13 @@ node_defaults: #
   SL_when_detour_fails: True # 是否迂回失败后退出
   SL_when_enter_fight: False # 进入战斗后是否大退
   formation: 2 # 正常情况阵型选择，1-5
-  formation_when_spot_enemy_fails: False # 启用时改为数字，索敌失败时阵型选择，1-5
+  formation_when_spot_enemy_fails: null # 索敌失败时阵型选择，1-5
   # 夜战选择阶段
   night: False # 是否夜战
   # 前进选择阶段
   proceed: False # 结束后是否继续
   proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
                                          # [1,2,2,2,2,-1]: 旗舰中破回家, 2-5 号位大破回家,忽略 6 号位的状态
-
-  # 特殊情况
-  supply_ship_mode: 0 # 0：无额外操作  1：有补给舰则战斗，否则撤退
-  # 开启导巡的远程导弹支援
-  long_missile_support: False
 
 exercise_defaults:
   chapter: 'exercise' # 不要改动
