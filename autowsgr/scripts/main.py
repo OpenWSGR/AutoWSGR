@@ -2,9 +2,9 @@ import logging
 
 from airtest.core.settings import Settings as ST  # noqa
 
+from autowsgr.configs import UserConfig
 from autowsgr.game.build import BuildManager
 from autowsgr.timer import Timer
-from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.logger import Logger
 from autowsgr.utils.update import check_for_updates

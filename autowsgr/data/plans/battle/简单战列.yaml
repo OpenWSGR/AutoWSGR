@@ -3,8 +3,4 @@ map: 3 # 简单1-5 困难6-10
 
 # NodeLevel
 node_args:
-  # 阵型选择阶段
   formation: 5 # 正常情况阵型选择，1-5
-  # 夜战选择阶段
-  night: True # 是否夜战
-  SL_when_enter_fight: False # 是否在进入战斗时SL，如果要刷战术，建议设为True

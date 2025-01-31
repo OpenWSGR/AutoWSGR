@@ -2,6 +2,7 @@ import copy
 import time
 from abc import ABC, abstractmethod
 
+from autowsgr.configs import NodeConfig
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG
@@ -18,7 +19,6 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.timer import Timer
-from autowsgr.user_config import NodeConfig
 from autowsgr.utils.math_functions import get_nearest
 
 
@@ -516,7 +516,7 @@ class DecisionBlock:
                 if ord(ch) > ord('Z') or ord(ch) < ord('A'):
                     if last != i:
                         if condition[last:i] in ALL_SHIP_TYPES:
-                            rcondition += enemies.get(condition[last:i], 0)
+                            rcondition += str(enemies.get(condition[last:i], 0))
                         else:
                             rcondition += condition[last:i]
                     rcondition += ch

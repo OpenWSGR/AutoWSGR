@@ -1,6 +1,8 @@
+import copy
 import os
 import time
 
+from autowsgr.configs import FightConfig
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
@@ -10,7 +12,6 @@ from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_mar
 from autowsgr.game.game_operation import change_ships, move_team, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
 from autowsgr.timer import Timer
-from autowsgr.user_config import FightConfig
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import cal_dis
 
@@ -191,36 +192,22 @@ class NormalFightPlan(FightPlan):
         Raises:
             BaseException: _description_
         """
-
         super().__init__(timer)
-
         # 从配置文件加载计划
-        default_args = yaml_to_dict(self.timer.plan_tree['default'])
-        if os.path.isabs(plan_path):
-            plan_args = yaml_to_dict(plan_path)
-        else:
-            plan_args = yaml_to_dict(
-                self.timer.plan_tree['normal_fight'][plan_path],
-            )
-
-        # 从参数加载计划
+        plan_args = yaml_to_dict(
+            self.timer.plan_tree['normal_fight'][plan_path],
+        )
         if fleet_id is not None:
             plan_args['fleet_id'] = fleet_id  # 舰队编号
         if fleet != -1:
             plan_args['fleet'] = fleet
-
-        # 检查参数完整情况
         assert 'fleet_id' in plan_args, '未指定作战舰队'
-
-        # 从默认参数加载
-        plan_defaults = default_args['normal_fight_defaults']
-        args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
-        self.config = FightConfig.from_dict(args)
+        self.config = FightConfig.from_dict(plan_args)
 
         # 加载节点配置
         self.nodes = {}
         for node_name in self.config.selected_nodes:
-            node_args = {}
+            node_args = copy.deepcopy(plan_args.get('node_defaults', {}))
             if (
                 'node_args' in plan_args
                 and plan_args['node_args'] is not None

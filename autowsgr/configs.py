@@ -317,7 +317,7 @@ class FightConfig(BaseConfig):
 
     def __post_init__(self) -> None:
         if isinstance(self.repair_mode, list):
-            object.__setattr__(self, 'repair_mode', [RepairMode[r] for r in self.repair_mode])
+            object.__setattr__(self, 'repair_mode', [RepairMode(r) for r in self.repair_mode])
         else:
             object.__setattr__(
                 self,
@@ -327,6 +327,26 @@ class FightConfig(BaseConfig):
 
         if not isinstance(self.fight_condition, FightCondition):
             object.__setattr__(self, 'fight_condition', FightCondition(self.fight_condition))
+
+
+@dataclass(frozen=True)
+class BattleConfig(FightConfig):
+    repair_mode: RepairMode | list[RepairMode] = RepairMode.moderate_damage
+    """修理方案。1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案"""
+
+
+@dataclass(frozen=True)
+class ExerciseConfig(FightConfig):
+    selected_nodes: list[str] = field(default_factory=lambda: ['player', 'robot'])
+    """仅使用默认值"""
+    discard: bool = False
+    """TODO: 检查逻辑"""
+    exercise_times: int = 4
+    """最大玩家演习次数"""
+    robot: bool = True
+    """是否打机器人"""
+    max_refresh_times: int = 2
+    """最大刷新次数"""
 
 
 # @dataclass(frozen=True)
@@ -402,4 +422,8 @@ ATTRIBUTE_RECURSIVE: Final[Mapping[str, Any]] = MappingProxyType(
         {'decisive_battle': DecisiveBattleConfig},
         # {'enemy_rules': EnemyRule},
     ),
+)
+
+ATTRIBUTE_IGNORE: Final[set[str]] = frozenset(
+    'node_args',
 )
