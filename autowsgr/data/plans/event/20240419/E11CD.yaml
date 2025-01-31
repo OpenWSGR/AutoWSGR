@@ -1,9 +1,0 @@
-# E11 CD 夜战练级
-# 没有带路条件
-chapter: H
-map: 5
-selected_nodes: [C,D]
-from_alpha: False
-node_defaults:
-  proceed: False
-  formation: 4

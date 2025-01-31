@@ -1,7 +1,0 @@
-# E2 BC 舰船数量大于等于6
-chapter: E
-map: 2
-selected_nodes: [B,C]
-node_defaults:
-  proceed: True
-  formation: 4

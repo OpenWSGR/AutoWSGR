@@ -1,7 +1,0 @@
-# E10 AG 双连夜战练级
-chapter: H
-map: 4
-selected_nodes: [G, A]
-node_defaults:
-  proceed: True
-  formation: 4

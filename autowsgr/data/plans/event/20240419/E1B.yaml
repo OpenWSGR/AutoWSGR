@@ -1,9 +1,0 @@
-# E1炸鱼点炸鱼，3SS + 2DD
-# α入口：不带CV+最低速≤27
-chapter: E
-map: 1
-from_alpha: True
-selected_nodes: [B]
-node_defaults:
-  proceed: False
-  formation: 5
