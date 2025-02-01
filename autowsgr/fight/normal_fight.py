@@ -194,9 +194,12 @@ class NormalFightPlan(FightPlan):
         """
         super().__init__(timer)
         # 从配置文件加载计划
-        plan_args = yaml_to_dict(
-            self.timer.plan_tree['normal_fight'][plan_path],
+        plan_path = (
+            plan_path
+            if os.path.isabs(plan_path)
+            else self.timer.plan_tree['normal_fight'][plan_path]
         )
+        plan_args = yaml_to_dict(plan_path)
         if fleet_id is not None:
             plan_args['fleet_id'] = fleet_id  # 舰队编号
         if fleet != -1:

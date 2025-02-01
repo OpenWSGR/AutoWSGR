@@ -499,8 +499,6 @@ class DecisionBlock:
     def __init__(self, timer: Timer, args) -> None:
         self.timer = timer
         self.logger = timer.logger
-
-        # self.__dict__.update(args)
         self.config = NodeConfig.from_dict(args)
 
         # 用于根据规则设置阵型

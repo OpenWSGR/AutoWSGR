@@ -30,17 +30,6 @@ def get_formation(fleet: Fleet, enemy: list) -> Literal[4, 2]:
     return 2
 
 
-class DB:
-    def __init__(self, *args, **kwargs) -> None:
-        self.__dict__.update(kwargs)
-
-    def make_decision(self, state):
-        rule = self.__dict__
-        if state in rule:
-            return rule[state]
-        return None
-
-
 class DecisiveStats:
     def __init__(self, timer: Timer, chapter: int = 6) -> None:
         # 选择战备舰队的点击位置

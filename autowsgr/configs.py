@@ -315,6 +315,10 @@ class FightConfig(BaseConfig):
     fight_condition: FightCondition = FightCondition.aim
     """战况选择。1.稳步前进 2.火力万岁 3.小心翼翼 4.瞄准 5.搜索阵型"""
 
+    # 活动专属
+    from_alpha: bool = True
+    """入口选择。True 为从 alpha 入口进入, False 为从 beta 入口进入"""
+
     def __post_init__(self) -> None:
         if isinstance(self.repair_mode, list):
             object.__setattr__(self, 'repair_mode', [RepairMode(r) for r in self.repair_mode])

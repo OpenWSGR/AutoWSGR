@@ -4,7 +4,7 @@ from enum import Enum
 from typing_extensions import Self
 
 
-class StrEnum(str, Enum):
+class BaseEnum(Enum):
     """提供更友好的中文报错信息"""
 
     @classmethod
@@ -13,13 +13,12 @@ class StrEnum(str, Enum):
         raise ValueError(f'"{value}" 不是合法的{cls.__name__}取值. 支持的有: [{supported_values}]')
 
 
-class IntEnum(int, Enum):
-    """提供更友好的中文报错信息"""
+class StrEnum(str, BaseEnum):
+    pass
 
-    @classmethod
-    def _missing_(cls, value: str) -> None:
-        supported_values = ', '.join(cls.__members__.values())
-        raise ValueError(f'"{value}" 不是合法的{cls.__name__}取值. 支持的有: [{supported_values}]')
+
+class IntEnum(int, BaseEnum):
+    pass
 
 
 """如果有一些功能在主程序中尚未支持（比如linux系统），请在本模块中对其进行raise
