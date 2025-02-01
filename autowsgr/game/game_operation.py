@@ -38,8 +38,11 @@ def get_ship(timer: Timer):
             ship_name, ship_type = recognize_get_ship(timer)
         except Exception as e:
             print(e)
+        current_screen = timer.screen.copy()
         timer.click(915, 515, delay=0.25, times=1)
-        timer.confirm_operation()
+        if timer.confirm_operation():
+            timer.logger.info('获得新船, 已截图!')
+            timer.logger.log_image(current_screen)
     timer.logger.info(f'获取舰船: {ship_name} {ship_type}')
     return ship_name, ship_type
 
