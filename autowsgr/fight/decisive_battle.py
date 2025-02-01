@@ -739,11 +739,10 @@ class DecisiveBattle:
 
 class DecisiveBattlePlan(BattlePlan):
     def __init__(self, timer: Timer, formation: int, night: bool, ship_stats: list) -> None:
-        super().__init__(timer, None)
+        plan_args = {'node_args': {'formation': formation, 'night': night}}
+        super().__init__(timer, plan_args=plan_args)
         self.info = DecisiveBattleInfo(timer)
         self.info.ship_stats = ship_stats
-        self.node.formation = formation
-        self.node.night = night
 
     def _enter_fight(self, *args, **kwargs):
         return start_march(self.timer)

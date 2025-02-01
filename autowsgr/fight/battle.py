@@ -72,10 +72,14 @@ class BattleInfo(FightInfo):
 
 
 class BattlePlan(FightPlan):
-    def __init__(self, timer, plan_path) -> None:
+    def __init__(self, timer, plan_path: str | None = None, plan_args: dict | None = None) -> None:
         super().__init__(timer)
         # 加载计划配置
-        plan_args = yaml_to_dict(self.timer.plan_tree['battle'][plan_path])
+        file_plan_args = (
+            yaml_to_dict(self.timer.plan_tree['battle'][plan_path]) if plan_path else {}
+        )
+        file_plan_args.update(plan_args or {})
+        plan_args = file_plan_args
         self.config = BattleConfig.from_dict(plan_args)
 
         # 加载节点配置
