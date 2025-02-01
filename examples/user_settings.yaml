@@ -9,7 +9,11 @@
 # ========= 全局设置 =========
 
 # 显示调试信息
-debug: True
+debug: False
+
+# 输出信息等级
+# DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level: INFO
 
 check_update: False
 dock_full_destroy: True
