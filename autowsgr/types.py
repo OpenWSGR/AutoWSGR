@@ -4,13 +4,21 @@ from enum import Enum
 from typing_extensions import Self
 
 
-class StrEnum(str, Enum):
+class BaseEnum(Enum):
     """提供更友好的中文报错信息"""
 
     @classmethod
     def _missing_(cls, value: str) -> None:
         supported_values = ', '.join(cls.__members__.values())
         raise ValueError(f'"{value}" 不是合法的{cls.__name__}取值. 支持的有: [{supported_values}]')
+
+
+class StrEnum(str, BaseEnum):
+    pass
+
+
+class IntEnum(int, BaseEnum):
+    pass
 
 
 """如果有一些功能在主程序中尚未支持（比如linux系统），请在本模块中对其进行raise
@@ -140,3 +148,41 @@ class GameAPP(StrEnum):
                 return 'com.tencent.tmgp.zhanjian2'
             case _:
                 raise ValueError(f'没有为 {self.value} 设置包名，请手动指定')
+
+
+class RepairMode(IntEnum):
+    moderate_damage = 1
+    """中破就修"""
+    severe_damage = 2
+    """大破才修"""
+
+
+class FightCondition(IntEnum):
+    steady_advance = 1
+    """稳步前进"""
+    firepower_forever = 2
+    """火力万岁"""
+    caution = 3
+    """小心翼翼"""
+    aim = 4
+    """瞄准"""
+    search_formation = 5
+    """搜索阵型"""
+
+
+class Formation(IntEnum):
+    single_column = 1
+    """单纵阵"""
+    double_column = 2
+    """复纵阵"""
+    circular = 3
+    """轮型阵"""
+    wedge = 4
+    """梯形阵"""
+    single_horizontal = 5
+    """单横阵"""
+
+
+class SearchEnemyAction(StrEnum):
+    retreat = 'retreat'
+    detour = 'detour'

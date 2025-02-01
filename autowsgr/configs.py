@@ -12,7 +12,15 @@ from typing_extensions import Self
 import rich
 
 from autowsgr.constants.data_roots import DATA_ROOT, OCR_ROOT
-from autowsgr.types import EmulatorType, GameAPP, OcrBackend, OSType
+from autowsgr.types import (
+    EmulatorType,
+    FightCondition,
+    Formation,
+    GameAPP,
+    OcrBackend,
+    OSType,
+    RepairMode,
+)
 
 
 @dataclass(frozen=True)
@@ -26,7 +34,12 @@ class BaseConfig:
         for f in fields(cls):
             if f.name in data and f.init:
                 if f.name in ATTRIBUTE_RECURSIVE:
-                    kwargs[f.name] = ATTRIBUTE_RECURSIVE[f.name].from_dict(data.pop(f.name))
+                    if f.type is list:
+                        kwargs[f.name] = [
+                            ATTRIBUTE_RECURSIVE[f.name].from_dict(d) for d in data.pop(f.name)
+                        ]
+                    else:
+                        kwargs[f.name] = ATTRIBUTE_RECURSIVE[f.name].from_dict(data.pop(f.name))
                 else:
                     kwargs[f.name] = data.pop(f.name)
 
@@ -280,9 +293,141 @@ class UserConfig(BaseConfig):
         )
 
 
+@dataclass(frozen=True)
+class FightConfig(BaseConfig):
+    chapter: int | str = 1
+    """章节号"""
+    map: int | str = 1
+    """地图号"""
+    fleet_id: int = 1
+    """舰队号"""
+    fleet: list[str] | None = None
+    """舰队成员 (按名字区分), 为 None 则不变
+        fleet: ["", "吹雪", "明斯克", "胡德", "赤诚", "",]
+        填 "" 或者不填则代表该位置无舰船 0 号位(第一个)填 "" 占位
+        上例的舰队最终为: 吹雪 明斯克 胡德 赤诚 5号位无舰船 6号位无舰船
+        现有策略填写时用的作者的船舱名, 记得修改
+    """
+    repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
+    """修理方案。1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案"""
+    selected_nodes: list[str] = field(default_factory=list)
+    """选择要打的节点，白名单模式，一旦到达不要的节点就SL"""
+    fight_condition: FightCondition = FightCondition.aim
+    """战况选择。1.稳步前进 2.火力万岁 3.小心翼翼 4.瞄准 5.搜索阵型"""
+
+    # 活动专属
+    from_alpha: bool = True
+    """入口选择。True 为从 alpha 入口进入, False 为从 beta 入口进入"""
+
+    def __post_init__(self) -> None:
+        if isinstance(self.repair_mode, list):
+            object.__setattr__(self, 'repair_mode', [RepairMode(r) for r in self.repair_mode])
+        else:
+            object.__setattr__(
+                self,
+                'repair_mode',
+                [RepairMode(self.repair_mode) for _ in range(6)],
+            )
+
+        if not isinstance(self.fight_condition, FightCondition):
+            object.__setattr__(self, 'fight_condition', FightCondition(self.fight_condition))
+
+
+@dataclass(frozen=True)
+class BattleConfig(FightConfig):
+    repair_mode: RepairMode | list[RepairMode] = RepairMode.moderate_damage
+    """修理方案。1:中破就修 2:只修大破；也可以用列表指定6个位置不同修理方案"""
+
+
+@dataclass(frozen=True)
+class ExerciseConfig(FightConfig):
+    selected_nodes: list[str] = field(default_factory=lambda: ['player', 'robot'])
+    """仅使用默认值"""
+    discard: bool = False
+    """TODO: 检查逻辑"""
+    exercise_times: int = 4
+    """最大玩家演习次数"""
+    robot: bool = True
+    """是否打机器人"""
+    max_refresh_times: int = 2
+    """最大刷新次数"""
+
+
+# @dataclass(frozen=True)
+# class EnemyRule(BaseConfig):
+#     condition: str
+#     """触发条件"""
+#     action: SearchEnemyAction | Formation
+#     """进行动作，或者选择阵型"""
+
+#     def __post_init__(self) -> None:
+#         if isinstance(self.action, int):
+#             object.__setattr__(self, 'action', Formation(self.action))
+#         else:
+#             object.__setattr__(self, 'action', SearchEnemyAction(self.action))
+
+
+@dataclass(frozen=True)
+class NodeConfig(BaseConfig):
+    # 索敌阶段
+    long_missile_support: bool = False
+    """（当存在时）是否开启导巡的远程导弹支援"""
+    detour: bool = False
+    """（当存在时）是否进行迂回"""
+    enemy_rules: list[str] = field(default_factory=list)
+    """每条按照 ["(类型 符号 数量) and/or ()", "操作"] 的字符串形式给出，从上到下执行第一条符合的命令。
+    类型：舰船类型；符号：[>=、<=、>、<、==、!=]；数量：数字；
+    操作：[retreat、detour、阵型数字(1-5)]
+    如果在这里做了阵型选择决定，则优先级将高过下面的阵型选择。例子：["(SS >= 2)", 5]
+    and 的优先级高于 or"""
+
+    # 阵型选择阶段
+    SL_when_spot_enemy_fails: bool = False
+    """索敌失败时是否SL"""
+    SL_when_detour_fails: bool = True
+    """迂回失败是否退出"""
+    SL_when_enter_fight: bool = False
+    """进入战斗是否退出"""
+    formation: Formation = Formation.double_column
+    """阵型选择"""
+    formation_when_spot_enemy_fails: Formation = Formation.double_column
+    """索敌失败时阵型选择"""
+
+    # 夜战, 前进阶段
+    night: bool = False
+    """是否夜战"""
+    proceed: bool = True
+    """是否前进"""
+    proceed_stop: RepairMode | list[RepairMode] = RepairMode.severe_damage
+    """达到指定破损状态时结束。1:中破 2:大破；也可以用列表指定6个位置不同"""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.formation, Formation):
+            object.__setattr__(self, 'formation', Formation(self.formation))
+        if not isinstance(self.formation_when_spot_enemy_fails, Formation):
+            object.__setattr__(
+                self,
+                'formation_when_spot_enemy_fails',
+                Formation(self.formation_when_spot_enemy_fails),
+            )
+        if isinstance(self.proceed_stop, list):
+            object.__setattr__(self, 'proceed_stop', [RepairMode[r] for r in self.proceed_stop])
+        else:
+            object.__setattr__(
+                self,
+                'proceed_stop',
+                [RepairMode(self.proceed_stop) for _ in range(6)],
+            )
+
+
 ATTRIBUTE_RECURSIVE: Final[Mapping[str, Any]] = MappingProxyType(
     ChainMap(
         {'daily_automation': DailyAutomationConfig},
         {'decisive_battle': DecisiveBattleConfig},
+        # {'enemy_rules': EnemyRule},
     ),
+)
+
+ATTRIBUTE_IGNORE: Final[set[str]] = frozenset(
+    'node_args',
 )

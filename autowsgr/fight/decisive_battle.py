@@ -30,17 +30,6 @@ def get_formation(fleet: Fleet, enemy: list) -> Literal[4, 2]:
     return 2
 
 
-class DB:
-    def __init__(self, *args, **kwargs) -> None:
-        self.__dict__.update(kwargs)
-
-    def make_decision(self, state):
-        rule = self.__dict__
-        if state in rule:
-            return rule[state]
-        return None
-
-
 class DecisiveStats:
     def __init__(self, timer: Timer, chapter: int = 6) -> None:
         # 选择战备舰队的点击位置
@@ -739,11 +728,10 @@ class DecisiveBattle:
 
 class DecisiveBattlePlan(BattlePlan):
     def __init__(self, timer: Timer, formation: int, night: bool, ship_stats: list) -> None:
-        super().__init__(timer, None)
+        plan_args = {'node_args': {'formation': formation, 'night': night}}
+        super().__init__(timer, plan_args=plan_args)
         self.info = DecisiveBattleInfo(timer)
         self.info.ship_stats = ship_stats
-        self.node.formation = formation
-        self.node.night = night
 
     def _enter_fight(self, *args, **kwargs):
         return start_march(self.timer)

@@ -39,7 +39,7 @@ class EventFightPlan20250123(Event, NormalFightPlan):
         Event.__init__(self, timer, event)
 
     def _load_fight_info(self):
-        self.info = EventFightInfo20250123(self.timer, self.chapter, self.map)
+        self.info = EventFightInfo20250123(self.timer, self.config.chapter, self.config.map)
         self.info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
 
     def _change_fight_map(self, chapter_id, map_id):
@@ -52,11 +52,11 @@ class EventFightPlan20250123(Event, NormalFightPlan):
 
     def _go_fight_prepare_page(self) -> None:
         if not self.timer.image_exist(self.info.event_image[1]):
-            self.timer.relative_click(*NODE_POSITION[self.map])
+            self.timer.relative_click(*NODE_POSITION[self.config.map])
 
         if not self.timer.click_image(self.event_image[1], timeout=10):
             self.timer.logger.warning('进入战斗准备页面失败,重新尝试进入战斗准备页面')
-            self.timer.relative_click(*NODE_POSITION[self.map])
+            self.timer.relative_click(*NODE_POSITION[self.config.map])
             self.timer.click_image(self.event_image[1], timeout=10)
 
         try:

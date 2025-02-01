@@ -226,7 +226,7 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
             enemy_type_count['ALL'] += 1
     enemy_type_count[NAP] = enemy_type_count['AP'] - enemy_type_count[SAP]
     count = {k: v for k, v in enemy_type_count.items() if v}
-    timer.logger.debug('enemys:' + str(count))
+    timer.logger.debug('enemies:' + str(count))
     return count
 
 

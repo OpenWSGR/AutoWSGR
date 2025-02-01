@@ -1,10 +1,11 @@
+from autowsgr.configs import BattleConfig
 from autowsgr.constants import literals
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
 from autowsgr.game.game_operation import get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.timer import Timer
-from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
+from autowsgr.utils.io import yaml_to_dict
 
 
 """
@@ -71,44 +72,34 @@ class BattleInfo(FightInfo):
 
 
 class BattlePlan(FightPlan):
-    def __init__(self, timer, plan_path=None) -> None:
+    def __init__(self, timer, plan_path: str | None = None, plan_args: dict | None = None) -> None:
         super().__init__(timer)
-
-        # 加载默认配置
-        default_args = yaml_to_dict(self.timer.plan_tree['default'])
-        plan_defaults = default_args['battle_defaults']
-        plan_defaults.update({'node_defaults': default_args['node_defaults']})
-
         # 加载计划配置
-        if plan_path is not None:
-            plan_args = yaml_to_dict(self.timer.plan_tree['battle'][plan_path])
-            args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
-        else:
-            args = plan_defaults
-        self.__dict__.update(args)
+        file_plan_args = (
+            yaml_to_dict(self.timer.plan_tree['battle'][plan_path]) if plan_path else {}
+        )
+        file_plan_args.update(plan_args or {})
+        plan_args = file_plan_args
+        self.config = BattleConfig.from_dict(plan_args)
 
         # 加载节点配置
-        node_defaults = self.node_defaults
-        if plan_path is not None:
-            node_args = recursive_dict_update(node_defaults, plan_args['node_args'])
-        else:
-            node_args = node_defaults
+        node_args = plan_args.get('node_args', {})
         self.node = DecisionBlock(timer, node_args)
         self.info = BattleInfo(timer)
 
     def _go_fight_prepare_page(self):
         self.timer.goto_game_page('battle_page')
         now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
-        hard = self.map > 5
+        hard = self.config.map > 5
         if now_hard != hard:
             self.timer.click(800, 80, delay=1)
 
     def _enter_fight(self) -> str:
         self._go_fight_prepare_page()
-        self.timer.click(180 * ((self.map - 1) % 5 + 1), 200)
+        self.timer.click(180 * ((self.config.map - 1) % 5 + 1), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         self.info.ship_stats = detect_ship_stats(self.timer)
-        quick_repair(self.timer, self.repair_mode, ship_stats=self.info.ship_stats)
+        quick_repair(self.timer, self.config.repair_mode, ship_stats=self.info.ship_stats)
         try:
             return start_march(self.timer)
         except TimeoutError:

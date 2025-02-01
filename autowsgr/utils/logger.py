@@ -4,7 +4,7 @@ from datetime import datetime
 
 from loguru import logger
 
-from autowsgr.user_config import UserConfig
+from autowsgr.configs import UserConfig
 from autowsgr.utils.io import save_image
 
 

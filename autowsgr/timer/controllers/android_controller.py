@@ -8,8 +8,8 @@ from concurrent.futures import ProcessPoolExecutor
 import cv2
 from airtest.core.android import Android
 
+from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
-from autowsgr.user_config import UserConfig
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,

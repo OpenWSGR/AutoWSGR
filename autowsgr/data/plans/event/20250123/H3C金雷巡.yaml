@@ -1,9 +1,0 @@
-# H3C金雷巡
-# 带路条件：带潜艇+船数<6
-# 敌方配置：6个88血两轮，低命中低反潜雷巡
-chapter: H
-map: 3
-selected_nodes: [C]
-node_defaults:
-  formation: 4
-  night: True

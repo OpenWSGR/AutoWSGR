@@ -1,5 +1,6 @@
 import copy
 
+from autowsgr.configs import ExerciseConfig
 from autowsgr.constants import literals
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
@@ -15,22 +16,29 @@ from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 
 
 class ExerciseDecisionBlock(DecisionBlock):
+    def __init__(
+        self,
+        timer: Timer,
+        node_args: dict,
+        max_refresh_times: int,
+        fleet_id: int,
+    ) -> None:
+        super().__init__(timer, node_args)
+        self.max_refresh_times = max_refresh_times
+        self.fleet_id = fleet_id
+
     def make_decision(self, state, last_state, last_action, info: FightInfo):
         if state == 'rival_info':
             max_times = self.max_refresh_times
-            self.formation_chosen = self.formation
+            self.formation_chosen = self.config.formation
             while max_times >= 0:
-                info.enemys = get_enemy_condition(self.timer)
-                act = self._check_rules(info.enemys)
+                info.enemies = get_enemy_condition(self.timer)
+                act = self._check_rules(info.enemies)
                 if act == 'refresh':
                     if max_times > 0:
                         max_times -= 1
                         self.timer.click(665, 400, delay=0.75)
                     else:
-                        if False:
-                            # if self.discard:
-                            self.timer.click(878, 136, delay=1)
-                            return 'discard', literals.FIGHT_CONTINUE_FLAG
                         break
                 elif isinstance(act, int):
                     self.formation_chosen = act
@@ -65,7 +73,6 @@ class NormalExerciseInfo(FightInfo):
     def __init__(self, timer: Timer) -> None:
         super().__init__(timer)
         self.end_page = 'exercise_page'
-        self.robot = True
         self.successor_states = {
             'exercise_page': ['rival_info'],
             'rival_info': {
@@ -136,32 +143,27 @@ class NormalExercisePlan(FightPlan):
     def __init__(self, timer: Timer, plan_path: str, fleet_id: int | None) -> None:
         super().__init__(timer)
 
-        # 加载默认配置
-        default_args = yaml_to_dict(self.timer.plan_tree['default'])
-        plan_defaults = default_args['exercise_defaults']
-        plan_defaults.update({'node_defaults': default_args['node_defaults']})
-
         # 加载计划配置
         plan_args = yaml_to_dict(self.timer.plan_tree['exercise'][plan_path])
-        args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
-        self.__dict__.update(args)
-
-        # 加载节点配置
-        node_defaults = self.node_defaults
-
-        # 从参数加载计划
         if fleet_id is not None:
-            node_defaults['fleet_id'] = fleet_id  # 舰队编号
+            plan_args['fleet_id'] = fleet_id  # 舰队编号
+        assert 'fleet_id' in plan_args, '未指定作战舰队'
+        self.config = ExerciseConfig.from_dict(plan_args)
 
         self.nodes = {}
-        for node_name in self.selected_nodes:
-            node_args = copy.deepcopy(node_defaults)
+        for node_name in self.config.selected_nodes:
+            node_args = copy.deepcopy(plan_args.get('node_defaults', {}))
             if node_name in plan_args['node_args']:
                 node_args = recursive_dict_update(
                     node_args,
                     plan_args['node_args'][node_name],
                 )
-            self.nodes[node_name] = ExerciseDecisionBlock(timer, node_args)
+            self.nodes[node_name] = ExerciseDecisionBlock(
+                timer,
+                node_args,
+                self.config.max_refresh_times,
+                self.config.fleet_id,
+            )
 
         # 构建信息存储结构
         self.info = NormalExerciseInfo(self.timer)
@@ -173,7 +175,7 @@ class NormalExercisePlan(FightPlan):
         :return: 进入战斗状态信息，包括['success', 'dock is full'].
         """
         self.timer.goto_game_page('exercise_page')
-        self._exercise_times = self.exercise_times
+        self._exercise_times = self.config.exercise_times
         self.exercise_stats = [None, None]
         return literals.OPERATION_SUCCESS_FLAG
 
@@ -190,7 +192,7 @@ class NormalExercisePlan(FightPlan):
                 self.rival = 'player'
                 self.timer.click(770, (pos + 1) * 110 - 10)
                 return literals.FIGHT_CONTINUE_FLAG
-            if self.robot and self.exercise_stats[1]:
+            if 'robot' in self.config.selected_nodes and self.exercise_stats[1]:
                 self.timer.swipe(800, 200, 800, 400)  # 上滑
                 self.timer.click(770, 100)
                 self.rival = 'robot'

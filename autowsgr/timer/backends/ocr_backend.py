@@ -4,9 +4,9 @@ from typing import Protocol
 import cv2
 import numpy as np
 
+from autowsgr.configs import UserConfig
 from autowsgr.constants.data_roots import BIN_ROOT
 from autowsgr.timer.backends.api_dll import ApiDll
-from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import cv_imread
 from autowsgr.utils.logger import Logger
 

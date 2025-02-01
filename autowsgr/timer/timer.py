@@ -1,6 +1,7 @@
 import threading as th
 import time
 
+from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES
@@ -14,7 +15,6 @@ from autowsgr.timer.controllers import (
     WindowsController,
 )
 from autowsgr.types import OcrBackend, OSType
-from autowsgr.user_config import UserConfig
 from autowsgr.utils.io import create_nested_dict, recursive_dict_update, yaml_to_dict
 from autowsgr.utils.logger import Logger
 from autowsgr.utils.operator import unzip_element

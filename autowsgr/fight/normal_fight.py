@@ -2,6 +2,7 @@ import copy
 import os
 import time
 
+from autowsgr.configs import FightConfig
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
@@ -23,18 +24,18 @@ MAP_NUM = [5, 6, 4, 4, 5, 4, 5, 5, 4]  # 每一章的地图数量
 
 
 class NormalFightInfo(FightInfo):
-    # ==================== Unified Interface ====================
     def __init__(self, timer: Timer, chapter_id, map_id) -> None:
         super().__init__(timer)
 
         self.point_positions = None
-        self.end_page = 'map_page'
         self.map_image = IMG.identify_images.map_page
         self.ship_image = [IMG.symbol_image[8], IMG.symbol_image[13]]
         self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map_id  # 节点名
         self.ship_position = (0, 0)
         self.node = 'A'  # 常规地图战斗中,当前战斗点位的编号
+        # 实现通用 FightInfo 接口
+        self.end_page = 'map_page'
         self.successor_states = {
             'proceed': {
                 'yes': [
@@ -129,7 +130,7 @@ class NormalFightInfo(FightInfo):
         if pos is None:
             return
         self.ship_position = pos
-        if self.config.show_map_node:
+        if self.timer.config.show_map_node:
             self.timer.logger.debug(self.ship_position)
 
     def _update_ship_point(self):
@@ -146,7 +147,7 @@ class NormalFightInfo(FightInfo):
             ):
                 self.node = ch
 
-        if self.config.show_map_node:
+        if self.timer.config.show_map_node:
             self.timer.logger.debug(self.node)
 
     def load_point_positions(self, map_path):
@@ -191,40 +192,25 @@ class NormalFightPlan(FightPlan):
         Raises:
             BaseException: _description_
         """
-
         super().__init__(timer)
-
         # 从配置文件加载计划
-        default_args = yaml_to_dict(self.timer.plan_tree['default'])
-        if os.path.isabs(plan_path):
-            plan_args = yaml_to_dict(plan_path)
-        else:
-            plan_args = yaml_to_dict(
-                self.timer.plan_tree['normal_fight'][plan_path],
-            )
-
-        # 从参数加载计划
+        plan_path = (
+            plan_path
+            if os.path.isabs(plan_path)
+            else self.timer.plan_tree['normal_fight'][plan_path]
+        )
+        plan_args = yaml_to_dict(plan_path)
         if fleet_id is not None:
             plan_args['fleet_id'] = fleet_id  # 舰队编号
         if fleet != -1:
             plan_args['fleet'] = fleet
-
-        # 检查参数完整情况
-        if 'fleet_id' not in plan_args:
-            self.logger.warning(
-                f"未指定作战舰队, 默认采用第 {default_args['normal_fight_defaults']['fleet_id']} 舰队作战",
-            )
-
-        # 从默认参数加载
-        plan_defaults = default_args['normal_fight_defaults']
-        plan_defaults.update({'node_defaults': default_args['node_defaults']})
-        args = recursive_dict_update(plan_defaults, plan_args, skip=['node_args'])
-        self.__dict__.update(args)
+        assert 'fleet_id' in plan_args, '未指定作战舰队'
+        self.config = FightConfig.from_dict(plan_args)
 
         # 加载节点配置
         self.nodes = {}
-        for node_name in self.selected_nodes:
-            node_args = copy.deepcopy(self.node_defaults)
+        for node_name in self.config.selected_nodes:
+            node_args = copy.deepcopy(plan_args.get('node_defaults', {}))
             if (
                 'node_args' in plan_args
                 and plan_args['node_args'] is not None
@@ -237,12 +223,12 @@ class NormalFightPlan(FightPlan):
             self.nodes[node_name] = DecisionBlock(timer, node_args)
         self._load_fight_info()
 
-    def _load_fight_info(self):
+    def _load_fight_info(self) -> None:
         # 信息记录器
-        self.info = NormalFightInfo(self.timer, self.chapter, self.map)
+        self.info = NormalFightInfo(self.timer, self.config.chapter, self.config.map)
         self.info.load_point_positions(os.path.join(MAP_ROOT, 'normal'))
 
-    def _go_map_page(self):
+    def _go_map_page(self) -> None:
         """活动多点战斗必须重写该模块"""
         """ 进入选择战斗地图的页面 """
         """ 这个模块负责的工作在战斗结束后如果需要进行重复战斗, 则不会进行 """
@@ -262,32 +248,26 @@ class NormalFightPlan(FightPlan):
 
         :return: 进入战斗状态信息，包括['success', 'dock is full'].
         """
-        if self.chapter != self.timer.port.chapter or self.map != self.timer.port.map:
+        if self.config.chapter != self.timer.port.chapter or self.config.map != self.timer.port.map:
             self._go_map_page()
-            self._change_fight_map(self.chapter, self.map)
-            self.timer.port.chapter = self.chapter
-            self.timer.port.map = self.map
-        # if not hasattr(self, "level_checked"):
+            self._change_fight_map(self.config.chapter, self.config.map)
+            self.timer.port.chapter = self.config.chapter
+            self.timer.port.map = self.config.map
         self.timer.wait_images(
             [self.info.map_image, IMG.identify_images['fight_prepare_page']],
             timeout=3,
         )
         self._go_fight_prepare_page()
-        move_team(self.timer, self.fleet_id)
-        if self.fleet is not None and self.timer.port.fleet[self.fleet_id] != self.fleet:
-            change_ships(self.timer, self.fleet_id, self.fleet)
-            self.timer.port.fleet[self.fleet_id] = self.fleet[:]
+        move_team(self.timer, self.config.fleet_id)
+        if (
+            self.config.fleet is not None
+            and self.timer.port.fleet[self.config.fleet_id] != self.config.fleet
+        ):
+            change_ships(self.timer, self.config.fleet_id, self.config.fleet)
+            self.timer.port.fleet[self.config.fleet_id] = self.config.fleet[:]
 
         self.info.ship_stats = detect_ship_stats(self.timer)
-        quick_repair(self.timer, self.repair_mode, self.info.ship_stats)
-
-        # TODO: 这里应该只catch network error，太宽的catch会导致其他错误被隐藏
-        # except AssertionError:
-        #     if "process_err" in kwargs and kwargs["process_err"] == False:
-        #         raise ImageNotFoundErr("进入战斗前置界面错误")
-        #     self.logger.warning("进入战斗前置界面不正确")
-        #     self.timer.process_bad_network()
-        #     return self._enter_fight(process_err=False)
+        quick_repair(self.timer, self.config.repair_mode, self.info.ship_stats)
 
         return start_march(self.timer)
 
@@ -309,7 +289,7 @@ class NormalFightPlan(FightPlan):
             return literals.FIGHT_END_FLAG
 
         if state == 'fight_condition':
-            value = self.fight_condition
+            value = self.config.fight_condition
             self.timer.click(*FIGHT_CONDITIONS_POSITION[value])
             self.info.last_action = value
             self.info.fight_history.add_event(
@@ -317,18 +297,17 @@ class NormalFightPlan(FightPlan):
                 {'position': self.info.node},
                 value,
             )
-            # self.fight_recorder.append(StageRecorder(self.info, self.timer))
             return literals.FIGHT_CONTINUE_FLAG
 
         # 不在白名单之内 SL
-        if self.info.node not in self.selected_nodes:
+        if self.info.node not in self.config.selected_nodes:
             # 可以撤退点撤退
             if state == 'spot_enemy_success':
                 self.timer.click(677, 492, delay=0)
                 self.info.last_action = 'retreat'
                 self.info.fight_history.add_event(
                     '索敌成功',
-                    {'position': self.info.node, 'enemys': '不在预设点, 不进行索敌'},
+                    {'position': self.info.node, 'enemies': '不在预设点, 不进行索敌'},
                     '撤退',
                 )
                 return literals.FIGHT_END_FLAG
@@ -349,9 +328,9 @@ class NormalFightPlan(FightPlan):
                 return 'need SL'
 
         elif state == 'proceed':
-            is_proceed = self.nodes[self.info.node].proceed and check_blood(
+            is_proceed = self.nodes[self.info.node].config.proceed and check_blood(
                 self.info.ship_stats,
-                self.nodes[self.info.node].proceed_stop,
+                self.nodes[self.info.node].config.proceed_stop,
             )
 
             if is_proceed:
@@ -380,8 +359,6 @@ class NormalFightPlan(FightPlan):
             )
             return 'fight end'
 
-        # Todo:燃油耗尽自动回港
-
         # 进行通用 NodeLevel 决策
         action, fight_stage = self.nodes[self.info.node].make_decision(
             state,
@@ -390,7 +367,6 @@ class NormalFightPlan(FightPlan):
             self.info,
         )
         self.info.last_action = action
-        # self.fight_recorder.append(StageRecorder(self.info, self.timer))
 
         return fight_stage
 
@@ -431,7 +407,7 @@ class NormalFightPlan(FightPlan):
         try:
             if now_chapter is None:
                 now_chapter = self._get_chapter()
-            if self.config.show_chapter_info:
+            if self.timer.config.show_chapter_info:
                 self.timer.logger.debug('NowChapter:', now_chapter)
             if now_chapter > target_chapter:
                 if now_chapter - target_chapter >= 3:
@@ -521,7 +497,7 @@ class NormalFightPlan(FightPlan):
 
         now_map = self._get_map(chapter)
         try:
-            if self.config.show_chapter_info:
+            if self.timer.config.show_chapter_info:
                 self.timer.logger.debug('now_map:', now_map)
             if target_map > now_map:
                 for i in range(target_map - now_map):
@@ -573,5 +549,5 @@ class NormalFightPlan(FightPlan):
 
         self._move_chapter(chapter)
         self._move_map(map, chapter)
-        self.info.chapter = self.chapter
-        self.info.map = self.map
+        self.info.chapter = self.config.chapter
+        self.info.map = self.config.map

@@ -53,13 +53,11 @@ class EventFightPlanYYYYMMDD(Event, NormalFightPlan):
 
         if from_alpha is not None:
             self.from_alpha = from_alpha
-
-        # 如果未指定入口则默认从 alpha 进入
-        if 'from_alpha' not in self.__dict__:
-            self.from_alpha = True
+        else:
+            self.from_alpha = self.config.from_alpha
 
     def _load_fight_info(self):
-        self.info = EventFightInfoYYYYMMDD(self.timer, self.chapter, self.map)
+        self.info = EventFightInfoYYYYMMDD(self.timer, self.config.chapter, self.config.map)
         self.info.load_point_positions(os.path.join(MAP_ROOT, 'event', self.event_name))
 
     def _change_fight_map(self, chapter_id, map_id):
@@ -105,7 +103,7 @@ class EventFightPlanYYYYMMDD(Event, NormalFightPlan):
                 )  # 点击取消每日答题按钮
 
         if not self.timer.image_exist(self.info.event_image[1]):
-            self.timer.relative_click(*NODE_POSITION[self.map])
+            self.timer.relative_click(*NODE_POSITION[self.config.map])
 
         # 选择入口
         if self._is_alpha() != self.from_alpha:
@@ -114,7 +112,7 @@ class EventFightPlanYYYYMMDD(Event, NormalFightPlan):
 
         if not self.timer.click_image(self.event_image[1], timeout=10):
             self.timer.logger.warning('进入战斗准备页面失败,重新尝试进入战斗准备页面')
-            self.timer.relative_click(*NODE_POSITION[self.map])
+            self.timer.relative_click(*NODE_POSITION[self.config.map])
             self.timer.click_image(self.event_image[1], timeout=10)
 
         try:

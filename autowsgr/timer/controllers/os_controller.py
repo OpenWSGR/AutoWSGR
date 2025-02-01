@@ -10,9 +10,9 @@ import requests
 from airtest.core.api import connect_device
 from airtest.core.error import AdbError
 
+from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr
 from autowsgr.types import EmulatorType
-from autowsgr.user_config import UserConfig
 from autowsgr.utils.logger import Logger
 
 
