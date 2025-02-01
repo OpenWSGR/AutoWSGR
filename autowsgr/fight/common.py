@@ -1,11 +1,11 @@
 import copy
 import time
-from abc import ABC, abstractmethod
+from typing_extensions import Protocol
 
 from autowsgr.configs import NodeConfig
 from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
-from autowsgr.constants.image_templates import IMG
+from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.other_constants import ALL_SHIP_TYPES
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.constants.ui import Node
@@ -138,7 +138,7 @@ class FightHistory:
     """记录并处理战斗历史信息"""
 
     def __init__(self) -> None:
-        self.events = []
+        self.events: list[FightEvent] = []
 
     def add_event(self, event, point, action='继续', result='无'):
         self.events.append(FightEvent(event, point, action, result))
@@ -164,19 +164,38 @@ class FightHistory:
         return ''.join(str(event) + '\n' for event in self.events)
 
 
-class FightInfo(ABC):
+class FightInfo(Protocol):
     """存储战斗中需要用到的所有状态信息, 以及更新逻辑"""
+
+    # =============== 静态属性 ===============
+    end_page: str
+    """结束战斗后的页面，用于判断是否已经返回战斗外界面"""
+    successor_states: dict[str, list[str] | dict[str, list[str]]]
+    """战斗流程的有向图建模。格式为:
+        1. {状态名: [后继状态1, 后继状态2, ...]}
+        2. {状态名: {动作1: [后继状态1, 后继状态2, ...], 动作2: [后继状态1, 后继状态2, ...]}}
+    """
+    state2image: dict[str, list[MyTemplate, float]]
+    """所需用到的图片模板。格式为 {状态明： [模板，等待时间(秒)]}"""
+    after_match_delay: dict[str, float]
+    """匹配成功后的延时。格式为 {状态名: 延时时间(秒)}"""
+
+    # =============== 运行时属性 ===============
+    last_state: str
+    """上一个状态 s_{t-1}"""
+    last_action: str
+    """上一个动作 a_{t-1}"""
+    state: str
+    """当前状态 s_t"""
 
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
         self.logger = timer.logger
 
-        self.successor_states = {}  # 战斗流程的有向图建模，在不同动作有不同后继时才记录动作
-        self.state2image = {}  # 所需用到的图片模板。格式为 [模板，等待时间]
-        self.after_match_delay = {}  # 匹配成功后的延时。格式为 {状态名 : 延时时间(s),}
         self.last_state = ''
         self.last_action = ''
         self.state = ''
+
         self.enemies = {}  # 敌方舰船列表
         self.ship_stats = []  # 我方舰船血量列表
         self.oil = 10  # 我方剩余油量
@@ -242,7 +261,6 @@ class FightInfo(ABC):
             self.logger.log_image(image, f'match_{time.time()!s}.PNG')
         raise ImageNotFoundErr
 
-    @abstractmethod
     def _before_match(self):
         """每一轮尝试匹配状态前执行的操作"""
 
@@ -268,12 +286,13 @@ class FightInfo(ABC):
             except Exception as e:
                 self.logger.warning(f'战果结算记录失败：{e}')
 
-    @abstractmethod
     def reset(self):
         """需要记录与初始化的战斗信息"""
 
 
-class FightPlan(ABC):
+class FightPlan(Protocol):
+    info: FightInfo
+
     def __init__(self, timer: Timer) -> None:
         # 把 timer 引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
@@ -474,13 +493,11 @@ class FightPlan(ABC):
             return self.update_state(try_times=kwargs['try_times'] + 1)
         return state
 
-    @abstractmethod
     def _enter_fight(self) -> str:
-        pass
+        """进入战斗前的操作"""
 
-    @abstractmethod
     def _make_decision(self, *args, **kwargs) -> str:
-        pass
+        """决策函数"""
 
     # =============== 战斗中通用的操作 ===============
     def _sl(self):

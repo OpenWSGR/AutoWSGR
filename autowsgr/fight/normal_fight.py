@@ -24,18 +24,18 @@ MAP_NUM = [5, 6, 4, 4, 5, 4, 5, 5, 4]  # 每一章的地图数量
 
 
 class NormalFightInfo(FightInfo):
-    # ==================== Unified Interface ====================
     def __init__(self, timer: Timer, chapter_id, map_id) -> None:
         super().__init__(timer)
 
         self.point_positions = None
-        self.end_page = 'map_page'
         self.map_image = IMG.identify_images.map_page
         self.ship_image = [IMG.symbol_image[8], IMG.symbol_image[13]]
         self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map_id  # 节点名
         self.ship_position = (0, 0)
         self.node = 'A'  # 常规地图战斗中,当前战斗点位的编号
+        # 实现通用 FightInfo 接口
+        self.end_page = 'map_page'
         self.successor_states = {
             'proceed': {
                 'yes': [
