@@ -2,11 +2,8 @@ import copy
 import datetime
 import os
 import warnings
-from collections import ChainMap
-from collections.abc import Mapping
 from dataclasses import KW_ONLY, asdict, dataclass, field, fields
-from types import MappingProxyType
-from typing import Any, Final, Literal, TextIO
+from typing import Any, Literal, TextIO
 from typing_extensions import Self
 
 import rich
@@ -46,6 +43,8 @@ class BaseConfig:
         self = cls(**kwargs)
         sentinel = object()
         for key, value in data.items():
+            if key in ATTRIBUTE_IGNORE:
+                continue
             self_value = getattr(self, key, sentinel)
             if self_value is sentinel:
                 warnings.warn(f'Unexpected key: {key!r}', stacklevel=2)
@@ -420,14 +419,12 @@ class NodeConfig(BaseConfig):
             )
 
 
-ATTRIBUTE_RECURSIVE: Final[Mapping[str, Any]] = MappingProxyType(
-    ChainMap(
-        {'daily_automation': DailyAutomationConfig},
-        {'decisive_battle': DecisiveBattleConfig},
-        # {'enemy_rules': EnemyRule},
-    ),
-)
-
-ATTRIBUTE_IGNORE: Final[set[str]] = frozenset(
+ATTRIBUTE_RECURSIVE = {
+    'daily_automation': DailyAutomationConfig,
+    'decisive_battle': DecisiveBattleConfig,
+    # {'enemy_rules': EnemyRule},
+}
+ATTRIBUTE_IGNORE = {
+    'node_defaults',
     'node_args',
-)
+}
