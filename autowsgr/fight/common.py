@@ -568,7 +568,7 @@ class DecisionBlock:
             can_detour = self.timer.image_exist(
                 IMG.fight_image[13],
             )  # 判断该点是否可以迂回
-            detour = can_detour and self.detour  # 由 Node 指定是否要迂回
+            detour = can_detour and self.config.detour  # 由 Node 指定是否要迂回
 
             # 功能, 根据敌方阵容进行选择
             act = self._check_rules(enemies=enemies)
