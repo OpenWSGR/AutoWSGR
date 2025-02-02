@@ -20,5 +20,6 @@ node_defaults:
   # 夜战选择阶段
   night: False # 是否夜战
   SL_when_spot_enemy_fails: True
+  proceed: False
 
 node_args:

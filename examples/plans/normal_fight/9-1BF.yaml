@@ -22,3 +22,4 @@ node_args:
   F:
     formation: 5
     night: False
+    proceed: False

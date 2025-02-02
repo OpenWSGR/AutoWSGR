@@ -19,5 +19,6 @@ node_defaults:
   formation: 5 # 正常情况阵型选择，1-5
   # 夜战选择阶段
   night: False # 是否夜战
+  proceed: False
 
 node_args:

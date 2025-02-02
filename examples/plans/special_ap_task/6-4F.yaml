@@ -21,3 +21,5 @@ node_defaults:
   proceed: True # 结束后是否继续
 
 node_args:
+  F:
+    proceed: False

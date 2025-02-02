@@ -7,3 +7,4 @@ selected_nodes: [C]
 node_defaults:
   formation: 4
   night: True
+  proceed: False

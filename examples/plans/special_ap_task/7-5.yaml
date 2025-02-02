@@ -25,3 +25,5 @@ node_args:
   A:
     enemy_rules:
       - [SS > 0, retreat]
+  G:
+    proceed: False

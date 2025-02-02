@@ -30,3 +30,4 @@ node_args:
     night: True
     formation: 4
     enemy_rules: [ ]
+    proceed: False
