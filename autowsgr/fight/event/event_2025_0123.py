@@ -22,15 +22,19 @@ class EventFightPlan20250123(Event, NormalFightPlan):
         self,
         timer: Timer,
         plan_path,
+        plan_folder=None,
         fleet_id=None,
         event='20250123',
     ) -> None:
         """
         Args:
+            plan_folder : 本次活动 plan 文件夹的路径, 绝对路径!!!
             fleet_id : 新的舰队参数, 优先级高于 plan 文件, 如果为 None 则使用计划参数.
         """
         if os.path.isabs(plan_path):
             plan_path = plan_path
+        elif plan_folder is not None:
+            plan_path = os.path.join(plan_folder, f'{plan_path}.yaml')
         else:
             plan_path = timer.plan_tree['event'][event][plan_path]
 
