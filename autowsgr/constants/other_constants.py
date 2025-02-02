@@ -1,3 +1,6 @@
+from typing import Literal
+
+
 ALL_SHIP_TYPES = [
     'BB',
     'BC',
@@ -185,3 +188,29 @@ _SHIP_TYPE_CLICK = {
 }
 SHIP_TYPE_CLICK = {key: (value[0] + 645, value[1] + 109) for key, value in _SHIP_TYPE_CLICK.items()}
 # 舰船类型筛选点击位置 1280x720 标准
+
+SHIP_TYPES = Literal[
+    '航母',
+    '轻母',
+    '装母',
+    '战列',
+    '航战',
+    '战巡',
+    '重巡',
+    '航巡',
+    '雷巡',
+    '轻巡',
+    '重炮',
+    '驱逐',
+    '潜母',
+    '潜艇',
+    '炮潜',
+    '补给',
+    '导驱',
+    '防驱',
+    '导巡',
+    '防巡',
+    '大巡',
+    '导战',
+    '其他',
+]

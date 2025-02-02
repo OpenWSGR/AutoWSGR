@@ -73,7 +73,11 @@ def click_result(timer: Timer, max_times=1):
 
 
 def destroy_ship(timer: Timer, ship_types=None):
-    """解装舰船，目前仅支持：全部解装+保留装备"""
+    """解装舰船，目前仅支持：全部解装+保留装备
+    Args:
+        timer (Timer): _description_
+        ship_types (list[str], optional): Override Config 里面的解装舰船类型. Defaults to None. 若为 None 则使用 Config 中的配置
+    """
 
     timer.go_main_page()
     timer.goto_game_page('destroy_page')
@@ -82,14 +86,16 @@ def destroy_ship(timer: Timer, ship_types=None):
     timer.click(90, 206, delay=1.5)  # 点添加
 
     # 选择舰船类型
-    if ship_types is not None:
-        timer.relative_click(0.912, 0.681)
-        for ship_type in ship_types:
-            timer.relative_click(
-                *absolute_to_relative(SHIP_TYPE_CLICK[ship_type], (1280, 720)),
-                delay=0.8,
-            )
-        timer.relative_click(0.9, 0.85, delay=1.5)
+    if timer.config.destroy_ship_types_filter:
+        destroy_types = ship_types if ship_types is not None else timer.config.destory_ship_types
+        if destroy_types is not None:
+            timer.relative_click(0.912, 0.681)
+            for ship_type in destroy_types:
+                timer.relative_click(
+                    *absolute_to_relative(SHIP_TYPE_CLICK[ship_type], (1280, 720)),
+                    delay=0.8,
+                )
+            timer.relative_click(0.9, 0.85, delay=1.5)
 
     timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
     timer.relative_click(0.915, 0.906, delay=1.5)  # 确定
