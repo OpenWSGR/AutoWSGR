@@ -87,7 +87,7 @@ def destroy_ship(timer: Timer, ship_types=None):
 
     # 选择舰船类型
     if timer.config.destroy_ship_types_filter:
-        destroy_types = ship_types if ship_types is not None else timer.config.destory_ship_types
+        destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
         if destroy_types is not None:
             timer.relative_click(0.912, 0.681)
             for ship_type in destroy_types:
