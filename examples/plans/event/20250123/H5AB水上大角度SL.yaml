@@ -1,8 +1,11 @@
-# H5AB纸BB-SL-水面大角度
+# H5AB纸BB
+# 练水上舰的大角度
 # 敌方配置：6个233低命中低火力BB
 chapter: H
 map: 5
 selected_nodes: [A,B]
 node_defaults:
   formation: 4
+  night: False
+  proceed: False
   SL_when_enter_fight: True
