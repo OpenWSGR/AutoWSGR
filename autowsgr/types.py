@@ -3,8 +3,6 @@ import sys
 from enum import Enum
 from typing_extensions import Self
 
-from autowsgr.timer.timer import Timer
-
 
 class BaseEnum(Enum):
     """提供更友好的中文报错信息"""
@@ -215,6 +213,7 @@ class ShipTypes(StrEnum):
     BG = '导战'
     Other = '其他'
 
+    @property
     def relative_position_in_destroy(self) -> tuple[float, float]:
         dict = {
             ShipTypes.CV: (0.555, 0.197),
@@ -242,6 +241,3 @@ class ShipTypes(StrEnum):
             ShipTypes.Other: (0.738, 0.561),
         }
         return dict[self.value]
-
-    def click_in_destroy(self, timer: Timer):
-        timer.relative_click(*self.relative_position_in_destroy(), delay=0.8)

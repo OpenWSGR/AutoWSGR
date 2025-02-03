@@ -91,7 +91,7 @@ def destroy_ship(timer: Timer, ship_types: list[ShipTypes] | None = None):
         if destroy_types is not None:
             timer.relative_click(0.912, 0.681)
             for ship_type in destroy_types:
-                ship_type.click_in_destroy(timer)
+                timer.relative_click(*ship_type.relative_position_in_destroy, delay=0.8)
             timer.relative_click(0.9, 0.85, delay=1.5)
 
     timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择

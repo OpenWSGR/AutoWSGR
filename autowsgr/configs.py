@@ -243,6 +243,14 @@ class UserConfig(BaseConfig):
             object.__setattr__(self, 'game_app', GameAPP(self.game_app))
         if not isinstance(self.ocr_backend, OcrBackend):
             object.__setattr__(self, 'ocr_backend', OcrBackend(self.ocr_backend))
+        for type in self.destroy_ship_types:
+            if not isinstance(type, ShipTypes):
+                object.__setattr__(
+                    self,
+                    'destroy_ship_types',
+                    [ShipTypes(t) for t in self.destroy_ship_types],
+                )
+                break
 
         # 模拟器
         if self.emulator_name is None:
