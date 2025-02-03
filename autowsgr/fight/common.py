@@ -371,7 +371,7 @@ class FightPlan(Protocol):
         elif ret == literals.DOCK_FULL_FLAG:
             # 自动解装功能
             if self.timer.config.dock_full_destroy and retry_times < max_try_times:
-                self.logger.DEBUG(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
+                self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
                 self.timer.relative_click(0.38, 0.565)
                 destroy_ship(self.timer)
                 return self.run(retry_times + 1)

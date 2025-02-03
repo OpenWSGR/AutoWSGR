@@ -26,7 +26,7 @@ destroy_ship_types_filter: True
 # 要解装的船只类型, 参照 autowsgr/constants/other_constants 中的 ship_types, 使用中文
 destroy_ship_types:
   # - 航母
-  - 潜艇
+  # - 潜艇
 
 # 浴室数(购买的浴室装饰数, 最大为 3) 说明: 未来可能自动获取
 bathroom_feature_count: 1
