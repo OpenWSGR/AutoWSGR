@@ -5,7 +5,7 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
 from autowsgr.timer import Timer
-from autowsgr.types import ShipTypes
+from autowsgr.types import ShipType
 from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
@@ -72,11 +72,11 @@ def click_result(timer: Timer, max_times=1):
         timer.click(915, 515, delay=0.25, times=1)
 
 
-def destroy_ship(timer: Timer, ship_types: list[ShipTypes] | None = None):
+def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
     """解装舰船，目前仅支持：全部解装+保留装备
     Args:
         timer (Timer): _description_
-        ship_types (list[ShipTypes], optional): Override Config 里面的解装舰船类型. Defaults to None. 若为 None 则使用 Config 中的配置
+        ship_types (list[ShipType], optional): Override Config 里面的解装舰船类型. Defaults to None. 若为 None 则使用 Config 中的配置
     """
 
     timer.go_main_page()

@@ -17,7 +17,7 @@ from autowsgr.types import (
     OcrBackend,
     OSType,
     RepairMode,
-    ShipTypes,
+    ShipType,
 )
 
 
@@ -197,7 +197,7 @@ class UserConfig(BaseConfig):
     """舰船名文件。不填写则使用default_ship_name_file"""
     destroy_ship_types_filter: bool = True
     """是否开启解装时的舰种过滤"""
-    destroy_ship_types: list[ShipTypes] | None = None
+    destroy_ship_types: list[ShipType] | None = None
     """要解装的船的舰种, 参照constants/other_constants.py中的SHIP_TYPES"""
 
     # Log
@@ -244,11 +244,11 @@ class UserConfig(BaseConfig):
         if not isinstance(self.ocr_backend, OcrBackend):
             object.__setattr__(self, 'ocr_backend', OcrBackend(self.ocr_backend))
         for type in self.destroy_ship_types:
-            if not isinstance(type, ShipTypes):
+            if not isinstance(type, ShipType):
                 object.__setattr__(
                     self,
                     'destroy_ship_types',
-                    [ShipTypes(t) for t in self.destroy_ship_types],
+                    [ShipType(t) for t in self.destroy_ship_types],
                 )
                 break
 

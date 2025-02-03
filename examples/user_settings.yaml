@@ -23,7 +23,7 @@ dock_full_destroy: True
 
 # 是否根据船只类型进行解装
 destroy_ship_types_filter: True
-# 要解装的船只类型, 参照 autowsgr/constants/other_constants 中的 ship_types, 使用中文
+# 要解装的船只类型, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文
 destroy_ship_types:
   # - 航母
   # - 潜艇

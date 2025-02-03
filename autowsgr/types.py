@@ -188,7 +188,7 @@ class SearchEnemyAction(StrEnum):
     detour = 'detour'
 
 
-class ShipTypes(StrEnum):
+class ShipType(StrEnum):
     CV = '航母'
     CVL = '轻母'
     AV = '装母'
@@ -216,28 +216,28 @@ class ShipTypes(StrEnum):
     @property
     def relative_position_in_destroy(self) -> tuple[float, float]:
         dict = {
-            ShipTypes.CV: (0.555, 0.197),
-            ShipTypes.CVL: (0.646, 0.197),
-            ShipTypes.AV: (0.738, 0.197),
-            ShipTypes.BB: (0.830, 0.197),
-            ShipTypes.BBV: (0.922, 0.197),
-            ShipTypes.BC: (0.556, 0.288),
-            ShipTypes.CA: (0.646, 0.288),
-            ShipTypes.CAV: (0.738, 0.288),
-            ShipTypes.CLT: (0.830, 0.288),
-            ShipTypes.CL: (0.922, 0.288),
-            ShipTypes.BM: (0.556, 0.379),
-            ShipTypes.DD: (0.646, 0.379),
-            ShipTypes.SSV: (0.738, 0.379),
-            ShipTypes.SS: (0.830, 0.379),
-            ShipTypes.SC: (0.922, 0.379),
-            ShipTypes.NAP: (0.555, 0.470),
-            ShipTypes.ASDG: (0.646, 0.470),
-            ShipTypes.AADG: (0.738, 0.470),
-            ShipTypes.KP: (0.830, 0.470),
-            ShipTypes.CG: (0.922, 0.470),
-            ShipTypes.CBG: (0.555, 0.561),
-            ShipTypes.BG: (0.646, 0.561),
-            ShipTypes.Other: (0.738, 0.561),
+            ShipType.CV: (0.555, 0.197),
+            ShipType.CVL: (0.646, 0.197),
+            ShipType.AV: (0.738, 0.197),
+            ShipType.BB: (0.830, 0.197),
+            ShipType.BBV: (0.922, 0.197),
+            ShipType.BC: (0.556, 0.288),
+            ShipType.CA: (0.646, 0.288),
+            ShipType.CAV: (0.738, 0.288),
+            ShipType.CLT: (0.830, 0.288),
+            ShipType.CL: (0.922, 0.288),
+            ShipType.BM: (0.556, 0.379),
+            ShipType.DD: (0.646, 0.379),
+            ShipType.SSV: (0.738, 0.379),
+            ShipType.SS: (0.830, 0.379),
+            ShipType.SC: (0.922, 0.379),
+            ShipType.NAP: (0.555, 0.470),
+            ShipType.ASDG: (0.646, 0.470),
+            ShipType.AADG: (0.738, 0.470),
+            ShipType.KP: (0.830, 0.470),
+            ShipType.CG: (0.922, 0.470),
+            ShipType.CBG: (0.555, 0.561),
+            ShipType.BG: (0.646, 0.561),
+            ShipType.Other: (0.738, 0.561),
         }
         return dict[self.value]
