@@ -1,7 +1,6 @@
 ---
 name: 💪 改进建议
 description: 分享你认为 AutoWSGR 可以改进的地方
-labels: [enhancement]
 type: Feature
 body:
   - type: markdown

@@ -1,7 +1,7 @@
 ---
 name: 🐛 问题反馈
 description: 创建报告以帮助我们修复你遇到的问题
-labels: [bug]
+type: Bug
 body:
   - type: markdown
     attributes:
