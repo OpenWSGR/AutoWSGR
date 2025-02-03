@@ -389,7 +389,7 @@ class NodeConfig(BaseConfig):
     """进入战斗是否退出"""
     formation: Formation = Formation.double_column
     """阵型选择"""
-    formation_when_spot_enemy_fails: Formation = Formation.double_column
+    formation_when_spot_enemy_fails: Formation | None = None
     """索敌失败时阵型选择"""
 
     # 夜战, 前进阶段
@@ -403,7 +403,10 @@ class NodeConfig(BaseConfig):
     def __post_init__(self) -> None:
         if not isinstance(self.formation, Formation):
             object.__setattr__(self, 'formation', Formation(self.formation))
-        if not isinstance(self.formation_when_spot_enemy_fails, Formation):
+        if (
+            not isinstance(self.formation_when_spot_enemy_fails, Formation)
+            and self.formation_when_spot_enemy_fails is not None
+        ):
             object.__setattr__(
                 self,
                 'formation_when_spot_enemy_fails',
