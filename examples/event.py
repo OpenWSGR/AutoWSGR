@@ -9,10 +9,8 @@ plan = EventFightPlan20250123(
     plan_path='H1AB炸鱼',
     fleet_id=4,
 )
-# plan_path处可填写plan的yaml文件的绝对地址
-# 若运行目录在examples文件夹, 也可使用相对地址直接填写plan的文件名
-# 或者可以填写plan_folder的绝对路径, 然后plan_path填写plan的文件名
-# 详细的plan名可在plans/event/20250123查看，fleet_id为出击编队
+# plan_path处可填写plan的yaml文件的绝对地址, 也可使用相对地址直接填写plan的文件名
+# 详细的plan名可在data/plans/event/20250123查看，fleet_id为出击编队
 
 
 plan.run_for_times(
