@@ -3,6 +3,8 @@ import sys
 from enum import Enum
 from typing_extensions import Self
 
+from autowsgr.timer.timer import Timer
+
 
 class BaseEnum(Enum):
     """提供更友好的中文报错信息"""
@@ -186,3 +188,60 @@ class Formation(IntEnum):
 class SearchEnemyAction(StrEnum):
     retreat = 'retreat'
     detour = 'detour'
+
+
+class ShipTypes(StrEnum):
+    CV = '航母'
+    CVL = '轻母'
+    AV = '装母'
+    BB = '战列'
+    BBV = '航战'
+    BC = '战巡'
+    CA = '重巡'
+    CAV = '航巡'
+    CLT = '雷巡'
+    CL = '轻巡'
+    BM = '重炮'
+    DD = '驱逐'
+    SSV = '潜母'
+    SS = '潜艇'
+    SC = '炮潜'
+    NAP = '补给'
+    ASDG = '导驱'
+    AADG = '防驱'
+    KP = '导巡'
+    CG = '防巡'
+    CBG = '大巡'
+    BG = '导战'
+    Other = '其他'
+
+    def relative_position_in_destroy(self) -> tuple[float, float]:
+        dict = {
+            ShipTypes.CV: (0.555, 0.197),
+            ShipTypes.CVL: (0.646, 0.197),
+            ShipTypes.AV: (0.738, 0.197),
+            ShipTypes.BB: (0.830, 0.197),
+            ShipTypes.BBV: (0.922, 0.197),
+            ShipTypes.BC: (0.556, 0.288),
+            ShipTypes.CA: (0.646, 0.288),
+            ShipTypes.CAV: (0.738, 0.288),
+            ShipTypes.CLT: (0.830, 0.288),
+            ShipTypes.CL: (0.922, 0.288),
+            ShipTypes.BM: (0.556, 0.379),
+            ShipTypes.DD: (0.646, 0.379),
+            ShipTypes.SSV: (0.738, 0.379),
+            ShipTypes.SS: (0.830, 0.379),
+            ShipTypes.SC: (0.922, 0.379),
+            ShipTypes.NAP: (0.555, 0.470),
+            ShipTypes.ASDG: (0.646, 0.470),
+            ShipTypes.AADG: (0.738, 0.470),
+            ShipTypes.KP: (0.830, 0.470),
+            ShipTypes.CG: (0.922, 0.470),
+            ShipTypes.CBG: (0.555, 0.561),
+            ShipTypes.BG: (0.646, 0.561),
+            ShipTypes.Other: (0.738, 0.561),
+        }
+        return dict[self.value]
+
+    def click_in_destroy(self, timer: Timer):
+        timer.relative_click(*self.relative_position_in_destroy(), delay=0.8)

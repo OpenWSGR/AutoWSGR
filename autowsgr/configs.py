@@ -9,7 +9,6 @@ from typing_extensions import Self
 import rich
 
 from autowsgr.constants.data_roots import DATA_ROOT, OCR_ROOT
-from autowsgr.constants.other_constants import SHIP_TYPES
 from autowsgr.types import (
     EmulatorType,
     FightCondition,
@@ -18,6 +17,7 @@ from autowsgr.types import (
     OcrBackend,
     OSType,
     RepairMode,
+    ShipTypes,
 )
 
 
@@ -197,7 +197,7 @@ class UserConfig(BaseConfig):
     """舰船名文件。不填写则使用default_ship_name_file"""
     destroy_ship_types_filter: bool = True
     """是否开启解装时的舰种过滤"""
-    destroy_ship_types: list[SHIP_TYPES] | None = None
+    destroy_ship_types: list[ShipTypes] | None = None
     """要解装的船的舰种, 参照constants/other_constants.py中的SHIP_TYPES"""
 
     # Log
