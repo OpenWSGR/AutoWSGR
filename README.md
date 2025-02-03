@@ -17,7 +17,7 @@
 
 欢迎有一定python基础的同学加入开发，共同完善这个项目。您可以实现新的功能，也可以改进现有功能，或者修复bug。如果您有好的想法，也可以提出issue或加qq群讨论。一些经过讨论确定需要实现的任务在 [Projects](https://github.com/orgs/OpenWSGR/projects/2) 中有列出，你可以从中选择能力之内的项目着手贡献。
 
-开发前请仔细阅读 [贡献指南](CONTRIBUTING.md) 和 [用户文档](https://docs-autowsgr.notion.site)。特别注意： 开发者请**不要从pypi安装autowsgr**，改为 [本地模式](https://docs-autowsgr.notion.site/2-AutoWSGR-efeb69811b544604b944d5b5727317a4) 安装。
+开发前请仔细阅读 [贡献指南](.github/CONTRIBUTING.md) 和 [用户文档](https://docs-autowsgr.notion.site)。特别注意： 开发者请**不要从pypi安装autowsgr**，改为 [本地模式](https://docs-autowsgr.notion.site/2-AutoWSGR-efeb69811b544604b944d5b5727317a4) 安装。
 
 本项目使用 [Lunar](https://github.com/0xWelt/Lunar) 进行代码自动审查，所有pr都有概率触发AI的评论。
 
