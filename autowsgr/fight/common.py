@@ -18,7 +18,7 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
 from autowsgr.utils.math_functions import get_nearest
 
 
@@ -525,9 +525,9 @@ class DecisionBlock:
 
         # 用于根据规则设置阵型
         self.set_formation_by_rule = False
-        self.formation_by_rule = 0
+        self.formation_by_rule = Formation.double_column
 
-    def _check_rules(self, enemies: dict):
+    def _check_rules(self, enemies: dict) -> SearchEnemyAction | Formation:
         for rule in self.config.enemy_rules:
             condition, act = rule
             rcondition = ''
@@ -545,8 +545,10 @@ class DecisionBlock:
             if self.timer.config.show_enemy_rules:
                 self.logger.info(rcondition)
             if eval(rcondition):
-                return act
-        return None
+                if isinstance(act, str):
+                    return SearchEnemyAction(act)
+                return Formation(act)
+        return SearchEnemyAction.no_action
 
     def make_decision(self, state, last_state, last_action, info: FightInfo):
         # destroy_ship skip: extract-method
@@ -578,15 +580,15 @@ class DecisionBlock:
             # 功能, 根据敌方阵容进行选择
             act = self._check_rules(enemies=enemies)
 
-            if act == 'retreat':
+            if act == SearchEnemyAction.retreat:
                 retreat = True
-            elif act == 'detour':
+            elif act == SearchEnemyAction.detour:
                 try:
                     assert can_detour, '该点无法迂回, 但是规则中指定了迂回'
                 except AssertionError:
                     raise ValueError('该点无法迂回, 但在规则中指定了迂回')
                 detour = True
-            elif isinstance(act, int):
+            elif isinstance(act, Formation):
                 self.set_formation_by_rule = True
                 self.formation_by_rule = act
 
@@ -711,7 +713,7 @@ class DecisionBlock:
                 },
                 action=value,
             )
-            self.timer.click(573, value * 100 - 20, delay=2)
+            self.timer.relative_click(*value.relative_position, delay=2)
             return value, ConditionFlag.FIGHT_CONTINUE
         if state == 'night':
             is_night = self.config.night
