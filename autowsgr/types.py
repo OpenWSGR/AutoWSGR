@@ -169,6 +169,17 @@ class FightCondition(IntEnum):
     search_formation = 5
     """搜索阵型"""
 
+    @property
+    def relative_click_position(self) -> tuple[float, float]:
+        return [
+            None,
+            [0.215, 0.409],
+            [0.461, 0.531],
+            [0.783, 0.362],
+            [0.198, 0.764],
+            [0.763, 0.74],
+        ][self.value]
+
 
 class Formation(IntEnum):
     single_column = 1

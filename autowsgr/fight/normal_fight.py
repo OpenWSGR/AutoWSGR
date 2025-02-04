@@ -7,7 +7,6 @@ from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
-from autowsgr.constants.positions import FIGHT_CONDITIONS_POSITION
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
 from autowsgr.game.game_operation import change_ships, move_team, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
@@ -290,7 +289,7 @@ class NormalFightPlan(FightPlan):
 
         if state == 'fight_condition':
             value = self.config.fight_condition
-            self.timer.click(*FIGHT_CONDITIONS_POSITION[value])
+            self.timer.relative_click(*value.relative_click_position)
             self.info.last_action = value
             self.info.fight_history.add_event(
                 '战况选择',
