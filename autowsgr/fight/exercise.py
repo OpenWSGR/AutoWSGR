@@ -1,12 +1,12 @@
 import copy
 
 from autowsgr.configs import ExerciseConfig
-from autowsgr.constants import literals
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
 from autowsgr.game.game_operation import detect_ship_stats, move_team, quick_repair
 from autowsgr.game.get_game_info import get_enemy_condition, get_exercise_stats
 from autowsgr.timer import Timer
+from autowsgr.types import ConditionFlag
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 
 
@@ -46,23 +46,23 @@ class ExerciseDecisionBlock(DecisionBlock):
                     break
 
             self.timer.click(804, 390, delay=0)
-            return 'fight', literals.FIGHT_CONTINUE_FLAG
+            return 'fight', ConditionFlag.FIGHT_CONTINUE
 
         if state == 'fight_prepare_page':
             move_team(self.timer, self.fleet_id)
             info.ship_stats = detect_ship_stats(self.timer)
             quick_repair(self.timer, ship_stats=info.ship_stats)
-            if start_march(self.timer) != literals.OPERATION_SUCCESS_FLAG:
+            if start_march(self.timer) != ConditionFlag.OPERATION_SUCCESS:
                 return self.make_decision(state, last_state, last_action, info)
-            return None, literals.FIGHT_CONTINUE_FLAG
+            return None, ConditionFlag.FIGHT_CONTINUE
 
         if state == 'spot_enemy_success':
             self.timer.click(900, 500, delay=0)
-            return None, literals.FIGHT_CONTINUE_FLAG
+            return None, ConditionFlag.FIGHT_CONTINUE
 
         if state == 'formation':
             self.timer.click(573, self.formation_chosen * 100 - 20, delay=2)
-            return None, literals.FIGHT_CONTINUE_FLAG
+            return None, ConditionFlag.FIGHT_CONTINUE
 
         return super().make_decision(state, last_state, last_action, info)
 
@@ -177,7 +177,7 @@ class NormalExercisePlan(FightPlan):
         self.timer.goto_game_page('exercise_page')
         self._exercise_times = self.config.exercise_times
         self.exercise_stats = [None, None]
-        return literals.OPERATION_SUCCESS_FLAG
+        return ConditionFlag.OPERATION_SUCCESS
 
     def _make_decision(self, *args, **kwargs):
         state = self.update_state() if 'skip_update' not in kwargs else self.info.state
@@ -191,15 +191,15 @@ class NormalExercisePlan(FightPlan):
                 pos = self.exercise_stats[2:].index(True)
                 self.rival = 'player'
                 self.timer.click(770, (pos + 1) * 110 - 10)
-                return literals.FIGHT_CONTINUE_FLAG
+                return ConditionFlag.FIGHT_CONTINUE
             if 'robot' in self.config.selected_nodes and self.exercise_stats[1]:
                 self.timer.swipe(800, 200, 800, 400)  # 上滑
                 self.timer.click(770, 100)
                 self.rival = 'robot'
                 self.exercise_stats[1] = False
-                return literals.FIGHT_CONTINUE_FLAG
+                return ConditionFlag.FIGHT_CONTINUE
 
-            return literals.FIGHT_END_FLAG
+            return ConditionFlag.FIGHT_END
 
         # 进行通用NodeLevel决策
         action, fight_stage = self.nodes[self.rival].make_decision(

@@ -3,7 +3,6 @@ import queue
 import threading
 import time
 
-from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ShipNotFoundErr
 from autowsgr.fight.decisive_battle import DecisiveBattle, Logic
 from autowsgr.game.build import BuildManager  # noqa: TC001
@@ -18,7 +17,7 @@ from autowsgr.game.game_operation import (
 from autowsgr.port.common import Ship
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer.timer import Timer
-from autowsgr.types import ShipType
+from autowsgr.types import ConditionFlag, ShipType
 from autowsgr.utils.api_image import crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
 
@@ -278,7 +277,7 @@ class FightTask(Task):
         # 执行战斗
         ret = plan.run()
         # 处理船坞已满
-        if ret == literals.DOCK_FULL_FLAG:
+        if ret == ConditionFlag.DOCK_FULL:
             return False, [
                 OtherTask(
                     self.timer,

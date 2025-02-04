@@ -3,7 +3,6 @@ import os
 import time
 
 from autowsgr.configs import FightConfig
-from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
@@ -12,6 +11,7 @@ from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_mar
 from autowsgr.game.game_operation import change_ships, move_team, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
 from autowsgr.timer import Timer
+from autowsgr.types import ConditionFlag
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import cal_dis
 
@@ -286,7 +286,7 @@ class NormalFightPlan(FightPlan):
                 '自动回港',
                 {'position': self.info.node, 'info': '正常'},
             )
-            return literals.FIGHT_END_FLAG
+            return ConditionFlag.FIGHT_END
 
         if state == 'fight_condition':
             value = self.config.fight_condition
@@ -297,7 +297,7 @@ class NormalFightPlan(FightPlan):
                 {'position': self.info.node},
                 value,
             )
-            return literals.FIGHT_CONTINUE_FLAG
+            return ConditionFlag.FIGHT_CONTINUE
 
         # 不在白名单之内 SL
         if self.info.node not in self.config.selected_nodes:
@@ -310,7 +310,7 @@ class NormalFightPlan(FightPlan):
                     {'position': self.info.node, 'enemies': '不在预设点, 不进行索敌'},
                     '撤退',
                 )
-                return literals.FIGHT_END_FLAG
+                return ConditionFlag.FIGHT_END
             # 不能撤退退游戏
             if state == 'formation':
                 self.info.fight_history.add_event(
@@ -341,7 +341,7 @@ class NormalFightPlan(FightPlan):
                     {'position': self.info.node, 'ship_stats': self.info.ship_stats},
                     '前进',
                 )
-                return literals.FIGHT_CONTINUE_FLAG
+                return ConditionFlag.FIGHT_CONTINUE
             self.timer.click(615, 350)
             self.info.last_action = 'no'
             self.info.fight_history.add_event(
@@ -349,7 +349,7 @@ class NormalFightPlan(FightPlan):
                 {'position': self.info.node, 'ship_stats': self.info.ship_stats},
                 '回港',
             )
-            return literals.FIGHT_END_FLAG
+            return ConditionFlag.FIGHT_END
 
         elif state == 'flagship_severe_damage':
             self.timer.click_image(IMG.fight_image[4], must_click=True, delay=0.25)

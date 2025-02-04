@@ -256,3 +256,13 @@ class DestroyShipWorkMode(IntEnum):
     """拆哪些船"""
     exclude = 2
     """不拆哪些船"""
+
+
+class ConditionFlag(StrEnum):
+    DOCK_FULL = 'dock is full'
+    FIGHT_END = 'fight end'
+    FIGHT_CONTINUE = 'fight continue'
+    OPERATION_SUCCESS = 'success'
+    BATTLE_TIMES_EXCEED = 'out of times'
+    SKIP_FIGHT = 'skip fight'
+    SL = 'SL'

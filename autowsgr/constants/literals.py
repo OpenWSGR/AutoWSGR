@@ -1,6 +1,0 @@
-DOCK_FULL_FLAG = 'dock is full'
-FIGHT_END_FLAG = 'fight end'
-FIGHT_CONTINUE_FLAG = 'fight continue'
-OPERATION_SUCCESS_FLAG = 'success'
-BATTLE_TIMES_EXCEED = 'out of times'
-SKIP_FIGHT = 'skip fight'
