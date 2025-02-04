@@ -199,7 +199,7 @@ class UserConfig(BaseConfig):
     destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.include
     """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
     destroy_ship_types: list[ShipType] | None = None
-    """要解装的船的舰种, 参照constants/other_constants.py中的SHIP_TYPES"""
+    """指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文"""
 
     # Log
     log_root: str = 'log'
