@@ -86,7 +86,7 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
     timer.click(90, 206, delay=1.5)  # 点添加
 
     # 选择舰船类型
-    if timer.config.destroy_ship_types_filter:
+    if timer.config.destroy_ship_workmode is not DestroyShipWorkMode.disable:
         destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
 
         if timer.config.destroy_ship_workmode is DestroyShipWorkMode.exclude:

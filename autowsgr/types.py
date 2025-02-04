@@ -250,6 +250,8 @@ class ShipType(StrEnum):
 class DestroyShipWorkMode(IntEnum):
     """拆解工作模式"""
 
+    disable = 0
+    """不启用舰种分类"""
     include = 1
     """拆哪些船"""
     exclude = 2

@@ -196,10 +196,8 @@ class UserConfig(BaseConfig):
     """默认舰船名文件。"""
     ship_name_file: str | None = None
     """舰船名文件。不填写则使用default_ship_name_file"""
-    destroy_ship_types_filter: bool = True
-    """是否开启解装时的舰种过滤"""
     destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.include
-    """解装舰船的工作模式. include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
+    """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
     destroy_ship_types: list[ShipType] | None = None
     """要解装的船的舰种, 参照constants/other_constants.py中的SHIP_TYPES"""
 
