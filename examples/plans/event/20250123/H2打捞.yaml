@@ -1,0 +1,14 @@
+# 5鱼捞中路
+chapter: H
+map: 2
+selected_nodes: [B,G,H,M]
+node_defaults:
+  formation: 4
+  night: False
+  proceed: True
+
+node_args:
+  M:
+    formation: 4
+    night: True
+    proceed: False
