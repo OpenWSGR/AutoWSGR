@@ -86,12 +86,12 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
     timer.click(90, 206, delay=1.5)  # 点添加
 
     # 选择舰船类型
-    if timer.config.destroy_ship_workmode is not DestroyShipWorkMode.disable:
+    if timer.config.destroy_ship_work_mode is not DestroyShipWorkMode.disable:
         destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
 
-        if timer.config.destroy_ship_workmode is DestroyShipWorkMode.exclude:
+        if timer.config.destroy_ship_work_mode is DestroyShipWorkMode.exclude:
             intended_destroy_types = [x for x in ShipType.enum_all_type() if x not in destroy_types]
-        elif timer.config.destroy_ship_workmode is DestroyShipWorkMode.include:
+        elif timer.config.destroy_ship_work_mode is DestroyShipWorkMode.include:
             intended_destroy_types = destroy_types
         else:
             raise ValueError('不支持的解装模式')
