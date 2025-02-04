@@ -4,7 +4,7 @@ map: 2
 selected_nodes: [B,G,H,M]
 repair_mode: 1
 node_defaults:
-  formation: 4
+  formation: 2
   night: False
   proceed: True
 
