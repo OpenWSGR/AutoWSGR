@@ -5,7 +5,7 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
 from autowsgr.timer import Timer
-from autowsgr.types import ShipType
+from autowsgr.types import DestroyShipWorkMode, ShipType
 from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
@@ -88,9 +88,17 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
     # 选择舰船类型
     if timer.config.destroy_ship_types_filter:
         destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
-        if destroy_types is not None:
+
+        if timer.config.destroy_ship_workmode is DestroyShipWorkMode.exclude:
+            intended_destroy_types = [x for x in ShipType.enum_all_type if x not in destroy_types]
+        elif timer.config.destroy_ship_workmode is DestroyShipWorkMode.include:
+            intended_destroy_types = destroy_types
+        else:
+            raise ValueError('不支持的解装模式')
+
+        if intended_destroy_types is not None:
             timer.relative_click(0.912, 0.681)
-            for ship_type in destroy_types:
+            for ship_type in intended_destroy_types:
                 timer.relative_click(*ship_type.relative_position_in_destroy, delay=0.8)
             timer.relative_click(0.9, 0.85, delay=1.5)
 

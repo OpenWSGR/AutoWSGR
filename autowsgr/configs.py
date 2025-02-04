@@ -10,6 +10,7 @@ import rich
 
 from autowsgr.constants.data_roots import DATA_ROOT, OCR_ROOT
 from autowsgr.types import (
+    DestroyShipWorkMode,
     EmulatorType,
     FightCondition,
     Formation,
@@ -197,6 +198,8 @@ class UserConfig(BaseConfig):
     """舰船名文件。不填写则使用default_ship_name_file"""
     destroy_ship_types_filter: bool = True
     """是否开启解装时的舰种过滤"""
+    destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.include
+    """解装舰船的工作模式. include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
     destroy_ship_types: list[ShipType] | None = None
     """要解装的船的舰种, 参照constants/other_constants.py中的SHIP_TYPES"""
 
@@ -251,6 +254,12 @@ class UserConfig(BaseConfig):
                     [ShipType(t) for t in self.destroy_ship_types],
                 )
                 break
+        if not isinstance(self.destroy_ship_workmode, DestroyShipWorkMode):
+            object.__setattr__(
+                self,
+                'destroy_ship_workmode',
+                DestroyShipWorkMode(self.destroy_ship_workmode),
+            )
 
         # 模拟器
         if self.emulator_name is None:

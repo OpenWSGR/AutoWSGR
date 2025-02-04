@@ -241,3 +241,16 @@ class ShipType(StrEnum):
             ShipType.Other: (0.738, 0.561),
         }
         return dict[self.value]
+
+    @property
+    def enum_all_type(self) -> list:
+        return list(ShipType.__members__.values())
+
+
+class DestroyShipWorkMode(IntEnum):
+    """拆解工作模式"""
+
+    include = 1
+    """拆哪些船"""
+    exclude = 2
+    """不拆哪些船"""

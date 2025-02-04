@@ -23,10 +23,12 @@ dock_full_destroy: True
 
 # 是否根据船只类型进行解装
 destroy_ship_types_filter: True
-# 要解装的船只类型, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文
+# 指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文
 destroy_ship_types:
   # - 航母
   # - 潜艇
+# 解装工作模式, 1 是黑名单模式, 解装指定的舰种, 2 是白名单模式, 保留指定的舰种
+destroy_ship_workmode: 1
 
 # 浴室数(购买的浴室装饰数, 最大为 3) 说明: 未来可能自动获取
 bathroom_feature_count: 1
