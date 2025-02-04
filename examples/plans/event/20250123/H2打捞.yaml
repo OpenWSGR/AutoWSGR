@@ -9,6 +9,8 @@ node_defaults:
   proceed: True
 
 node_args:
+  B:
+    SL_when_spot_enemy_fails: True
   M:
     formation: 4
     night: True
