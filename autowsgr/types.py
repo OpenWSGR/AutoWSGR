@@ -193,8 +193,13 @@ class Formation(IntEnum):
     single_horizontal = 5
     """单横阵"""
 
+    @property
+    def relative_position(self) -> tuple[float, float]:
+        return 0.597, self.value * 0.185 - 0.037
+
 
 class SearchEnemyAction(StrEnum):
+    no_action = 'no_action'
     retreat = 'retreat'
     detour = 'detour'
 
