@@ -196,7 +196,7 @@ class UserConfig(BaseConfig):
     """默认舰船名文件。"""
     ship_name_file: str | None = None
     """舰船名文件。不填写则使用default_ship_name_file"""
-    destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.include
+    destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.disable
     """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
     destroy_ship_types: list[ShipType] | None = None
     """指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文"""
