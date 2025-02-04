@@ -3,7 +3,6 @@ import time
 from typing_extensions import Protocol
 
 from autowsgr.configs import NodeConfig
-from autowsgr.constants import literals
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.other_constants import ALL_SHIP_TYPES
@@ -19,7 +18,7 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition
 from autowsgr.timer import Timer
-from autowsgr.types import Formation, SearchEnemyAction
+from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
 from autowsgr.utils.math_functions import get_nearest
 
 
@@ -31,10 +30,10 @@ def start_march(timer: Timer, position=(900, 500)):
             timer.click(*position, 1, delay=0)
             time.sleep(1)
         if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
-            return literals.DOCK_FULL_FLAG
+            return ConditionFlag.DOCK_FULL
         if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0, confidence=0.8):
             time.sleep(1)
-            return literals.BATTLE_TIMES_EXCEED
+            return ConditionFlag.BATTLE_TIMES_EXCEED
         if time.time() - start_time > 15:
             if timer.process_bad_network():
                 if timer.identify_page('fight_prepare_page'):
@@ -42,7 +41,7 @@ def start_march(timer: Timer, position=(900, 500)):
                 NetworkErr('stats unknown')
             else:
                 raise TimeoutError('map_fight prepare timeout')
-    return literals.OPERATION_SUCCESS_FLAG
+    return ConditionFlag.OPERATION_SUCCESS
 
 
 class FightResultInfo:
@@ -304,15 +303,15 @@ class FightPlan(Protocol):
         self.info.reset()  # 初始化战斗信息
         while True:
             ret = self._make_decision()
-            if ret == literals.FIGHT_CONTINUE_FLAG:
+            if ret == ConditionFlag.FIGHT_CONTINUE:
                 continue
             if ret == 'need SL':
                 self._sl()
-                return 'SL'
-            if ret == literals.FIGHT_END_FLAG:
+                return ConditionFlag.SL
+            if ret == ConditionFlag.FIGHT_END:
                 self.timer.set_page(self.info.end_page)
                 self.fight_logs.append(self.info.fight_history)
-                return 'success'
+                return ConditionFlag.OPERATION_SUCCESS
 
     def run_for_times(self, times, gap=1800):
         """多次执行同一任务, 自动进行远征操作
@@ -341,8 +340,8 @@ class FightPlan(Protocol):
             if fight_flag not in ['SL', 'success']:
                 if fight_flag == 'dock is full':
                     return 'dock is full'
-                if fight_flag == literals.SKIP_FIGHT:
-                    return literals.SKIP_FIGHT
+                if fight_flag == ConditionFlag.SKIP_FIGHT:
+                    return ConditionFlag.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
             self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
         return 'OK'
@@ -368,9 +367,9 @@ class FightPlan(Protocol):
         # 战斗前逻辑
         ret = self._enter_fight()
 
-        if ret == literals.OPERATION_SUCCESS_FLAG:
+        if ret == ConditionFlag.OPERATION_SUCCESS:
             pass
-        elif ret == literals.DOCK_FULL_FLAG:
+        elif ret == ConditionFlag.DOCK_FULL:
             # 自动解装功能
             if self.timer.config.dock_full_destroy and retry_times < max_try_times:
                 self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
@@ -378,10 +377,10 @@ class FightPlan(Protocol):
                 destroy_ship(self.timer)
                 return self.run(retry_times + 1)
             return ret
-        elif ret == literals.FIGHT_END_FLAG:
+        elif ret == ConditionFlag.FIGHT_END:
             self.timer.set_page(self.info.end_page)
             return ret
-        elif ret == literals.BATTLE_TIMES_EXCEED or ret == literals.SKIP_FIGHT:
+        elif ret == ConditionFlag.BATTLE_TIMES_EXCEED or ret == ConditionFlag.SKIP_FIGHT:
             return ret
         else:
             self.logger.error('无法进入战斗, 原因未知! 屏幕状态已记录')
@@ -499,7 +498,7 @@ class FightPlan(Protocol):
             return self.update_state(try_times=kwargs['try_times'] + 1)
         return state
 
-    def _enter_fight(self) -> str:
+    def _enter_fight(self) -> ConditionFlag:
         """进入战斗前的操作"""
 
     def _make_decision(self, *args, **kwargs) -> str:
@@ -569,7 +568,7 @@ class DecisionBlock:
                     'SL',
                 )
                 return None, 'need SL'
-            return None, literals.FIGHT_CONTINUE_FLAG
+            return None, ConditionFlag.FIGHT_CONTINUE
 
         if state == 'spot_enemy_success':
             retreat = False
@@ -606,7 +605,7 @@ class DecisionBlock:
                     },
                     '撤退',
                 )
-                return 'retreat', literals.FIGHT_END_FLAG
+                return 'retreat', ConditionFlag.FIGHT_END
             if detour:
                 image_detour = IMG.fight_image[13]
                 if self.timer.click_image(image=image_detour, timeout=2.5):
@@ -628,7 +627,7 @@ class DecisionBlock:
                     },
                     '迂回',
                 )
-                return 'detour', literals.FIGHT_CONTINUE_FLAG
+                return 'detour', ConditionFlag.FIGHT_CONTINUE
 
             info.fight_history.add_event(
                 '索敌成功',
@@ -650,7 +649,7 @@ class DecisionBlock:
                     raise ImageNotFoundErr("can't found image of long_missile_support")
             self.timer.click(855, 501, delay=0.2)
             # self.timer.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
-            return 'fight', literals.FIGHT_CONTINUE_FLAG
+            return 'fight', ConditionFlag.FIGHT_CONTINUE
         if state == 'formation':
             spot_enemy = last_state == 'spot_enemy_success'
             value = self.config.formation
@@ -715,7 +714,7 @@ class DecisionBlock:
                 action=value,
             )
             self.timer.relative_click(*value.relative_position, delay=2)
-            return value, literals.FIGHT_CONTINUE_FLAG
+            return value, ConditionFlag.FIGHT_CONTINUE
         if state == 'night':
             is_night = self.config.night
             info.fight_history.add_event(
@@ -733,17 +732,17 @@ class DecisionBlock:
             match_night(self.timer, is_night)
             if is_night:
                 # self.timer.click(325, 350)
-                return 'yes', literals.FIGHT_CONTINUE_FLAG
+                return 'yes', ConditionFlag.FIGHT_CONTINUE
             # self.timer.click(615, 350)
-            return 'no', literals.FIGHT_CONTINUE_FLAG
+            return 'no', ConditionFlag.FIGHT_CONTINUE
 
         if state == 'result':
             # time.sleep(1.5)
             # self.timer.click(900, 500, times=2, delay=0.2)
             click_result(self.timer)
-            return None, literals.FIGHT_CONTINUE_FLAG
+            return None, ConditionFlag.FIGHT_CONTINUE
         if state == 'get_ship':
             get_ship(self.timer)
-            return None, literals.FIGHT_CONTINUE_FLAG
+            return None, ConditionFlag.FIGHT_CONTINUE
         self.logger.error('Unknown State')
         raise BaseException

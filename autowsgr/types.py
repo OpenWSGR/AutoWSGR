@@ -12,6 +12,10 @@ class BaseEnum(Enum):
         supported_values = ', '.join(cls.__members__.values())
         raise ValueError(f'"{value}" 不是合法的{cls.__name__}取值. 支持的有: [{supported_values}]')
 
+    @classmethod
+    def enum(cls) -> list:
+        return list(cls.__members__.values())
+
 
 class StrEnum(str, BaseEnum):
     pass
@@ -258,10 +262,6 @@ class ShipType(StrEnum):
         }
         return dict[self.value]
 
-    @classmethod
-    def enum_all_type(cls) -> list:
-        return list(ShipType.__members__.values())
-
 
 class DestroyShipWorkMode(IntEnum):
     """拆解工作模式"""
@@ -272,3 +272,13 @@ class DestroyShipWorkMode(IntEnum):
     """拆哪些船"""
     exclude = 2
     """不拆哪些船"""
+
+
+class ConditionFlag(StrEnum):
+    DOCK_FULL = 'dock is full'
+    FIGHT_END = 'fight end'
+    FIGHT_CONTINUE = 'fight continue'
+    OPERATION_SUCCESS = 'success'
+    BATTLE_TIMES_EXCEED = 'out of times'
+    SKIP_FIGHT = 'skip fight'
+    SL = 'SL'

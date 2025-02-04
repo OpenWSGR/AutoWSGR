@@ -1,6 +1,5 @@
 import time
 
-from autowsgr.constants import literals
 from autowsgr.fight.battle import BattlePlan
 from autowsgr.fight.exercise import NormalExercisePlan
 from autowsgr.fight.normal_fight import NormalFightPlan
@@ -9,6 +8,7 @@ from autowsgr.game.game_operation import get_rewards, repair_by_bath, set_suppor
 from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
 from autowsgr.notification import miao_alert
 from autowsgr.timer import Timer
+from autowsgr.types import ConditionFlag
 
 
 class DailyOperation:
@@ -35,7 +35,7 @@ class DailyOperation:
             self.complete_time = None
 
         if self.config.auto_normal_fight:
-            self.fight_plans = []
+            self.fight_plans: list[NormalFightPlan] = []
             self.fight_complete_times = []
             for plan in self.config.normal_fight_tasks if self.config.normal_fight_tasks else []:
                 self.fight_plans.append(
@@ -54,9 +54,9 @@ class DailyOperation:
     def run(self):
         # 自动战役，直到超过次数
         if self.config.auto_battle:
-            ret = literals.OPERATION_SUCCESS_FLAG
+            ret = ConditionFlag.OPERATION_SUCCESS
             cnt = 0
-            while ret is not literals.BATTLE_TIMES_EXCEED:
+            while ret is not ConditionFlag.BATTLE_TIMES_EXCEED:
                 ret = self.battle_plan.run()
                 cnt += 1
                 if cnt > 13:
@@ -82,9 +82,9 @@ class DailyOperation:
                 plan = self.fight_plans[task_id]
                 ret = plan.run()
 
-                if ret == literals.OPERATION_SUCCESS_FLAG or ret == 'SL':
+                if ret == ConditionFlag.OPERATION_SUCCESS or ret == ConditionFlag.SL:
                     self.fight_complete_times[task_id][0] += 1
-                elif ret == literals.DOCK_FULL_FLAG:
+                elif ret == ConditionFlag.DOCK_FULL:
                     miao_alert.miao_alert(0)
                     break  # 不解装则结束出征
 

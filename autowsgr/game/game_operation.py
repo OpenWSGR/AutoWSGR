@@ -90,7 +90,7 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
         destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
 
         if timer.config.destroy_ship_work_mode is DestroyShipWorkMode.exclude:
-            intended_destroy_types = [x for x in ShipType.enum_all_type() if x not in destroy_types]
+            intended_destroy_types = [x for x in ShipType.enum() if x not in destroy_types]
         elif timer.config.destroy_ship_work_mode is DestroyShipWorkMode.include:
             intended_destroy_types = destroy_types
         else:
