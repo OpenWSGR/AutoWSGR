@@ -35,7 +35,7 @@ class DailyOperation:
             self.complete_time = None
 
         if self.config.auto_normal_fight:
-            self.fight_plans = []
+            self.fight_plans: list[NormalFightPlan] = []
             self.fight_complete_times = []
             for plan in self.config.normal_fight_tasks if self.config.normal_fight_tasks else []:
                 self.fight_plans.append(
@@ -82,7 +82,7 @@ class DailyOperation:
                 plan = self.fight_plans[task_id]
                 ret = plan.run()
 
-                if ret == ConditionFlag.OPERATION_SUCCESS or ret == 'SL':
+                if ret == ConditionFlag.OPERATION_SUCCESS or ret == ConditionFlag.SL:
                     self.fight_complete_times[task_id][0] += 1
                 elif ret == ConditionFlag.DOCK_FULL:
                     miao_alert.miao_alert(0)
