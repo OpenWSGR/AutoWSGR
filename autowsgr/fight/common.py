@@ -329,6 +329,7 @@ class FightPlan(Protocol):
         """
         assert times >= 1
         expedition = Expedition(self.timer)
+        self.timer.goto_game_page('map_page')
         for i in range(times):
             if time.time() - self.timer.last_expedition_check_time >= gap:
                 expedition.run(True)

@@ -1,5 +1,4 @@
-"""获取 UI 树
-"""
+"""获取 UI 树"""
 
 
 class SwitchMethod:
