@@ -24,7 +24,7 @@ dock_full_destroy: True
 # 0 是不启用舰种分类, 直接全部解装
 # 1 是黑名单模式, 解装指定的舰种
 # 2 是白名单模式, 保留指定的舰种
-destroy_ship_workmode: 0
+destroy_ship_work_mode: 0
 # 指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文
 destroy_ship_types:
   # - 航母

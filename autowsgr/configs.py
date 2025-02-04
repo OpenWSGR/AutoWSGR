@@ -196,9 +196,9 @@ class UserConfig(BaseConfig):
     """默认舰船名文件。"""
     ship_name_file: str | None = None
     """舰船名文件。不填写则使用default_ship_name_file"""
-    destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.disable
+    destroy_ship_work_mode: DestroyShipWorkMode = DestroyShipWorkMode.disable
     """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
-    destroy_ship_types: list[ShipType] | None = None
+    destroy_ship_types: list[ShipType] = field(default_factory=list)
     """指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文"""
 
     # Log
@@ -234,30 +234,26 @@ class UserConfig(BaseConfig):
     """决战自动化配置"""
 
     def __post_init__(self) -> None:
-        # 自动获取系统类型
-        object.__setattr__(self, 'os_type', OSType.auto())
-
-        # 确保类型ok
-        if not isinstance(self.emulator_type, EmulatorType):
-            object.__setattr__(self, 'emulator_type', EmulatorType(self.emulator_type))
-        if not isinstance(self.game_app, GameAPP):
-            object.__setattr__(self, 'game_app', GameAPP(self.game_app))
-        if not isinstance(self.ocr_backend, OcrBackend):
-            object.__setattr__(self, 'ocr_backend', OcrBackend(self.ocr_backend))
-        for type in self.destroy_ship_types:
-            if not isinstance(type, ShipType):
-                object.__setattr__(
-                    self,
-                    'destroy_ship_types',
-                    [ShipType(t) for t in self.destroy_ship_types],
-                )
-                break
-        if not isinstance(self.destroy_ship_workmode, DestroyShipWorkMode):
+        # 确保类型正确
+        object.__setattr__(self, 'emulator_type', EmulatorType(self.emulator_type))
+        object.__setattr__(self, 'game_app', GameAPP(self.game_app))
+        object.__setattr__(self, 'ocr_backend', OcrBackend(self.ocr_backend))
+        object.__setattr__(
+            self,
+            'destroy_ship_work_mode',
+            DestroyShipWorkMode(self.destroy_ship_work_mode),
+        )
+        if self.destroy_ship_types is None:
+            object.__setattr__(self, 'destroy_ship_types', [])
+        else:
             object.__setattr__(
                 self,
-                'destroy_ship_workmode',
-                DestroyShipWorkMode(self.destroy_ship_workmode),
+                'destroy_ship_types',
+                [ShipType(t) for t in self.destroy_ship_types],
             )
+
+        # 系统
+        object.__setattr__(self, 'os_type', OSType.auto())
 
         # 模拟器
         if self.emulator_name is None:
@@ -348,8 +344,7 @@ class FightConfig(BaseConfig):
                 [RepairMode(self.repair_mode) for _ in range(6)],
             )
 
-        if not isinstance(self.fight_condition, FightCondition):
-            object.__setattr__(self, 'fight_condition', FightCondition(self.fight_condition))
+        object.__setattr__(self, 'fight_condition', FightCondition(self.fight_condition))
 
 
 @dataclass(frozen=True)
@@ -421,12 +416,8 @@ class NodeConfig(BaseConfig):
     """达到指定破损状态时结束。1:中破 2:大破；也可以用列表指定6个位置不同"""
 
     def __post_init__(self) -> None:
-        if not isinstance(self.formation, Formation):
-            object.__setattr__(self, 'formation', Formation(self.formation))
-        if (
-            not isinstance(self.formation_when_spot_enemy_fails, Formation)
-            and self.formation_when_spot_enemy_fails is not None
-        ):
+        object.__setattr__(self, 'formation', Formation(self.formation))
+        if self.formation_when_spot_enemy_fails is not None:
             object.__setattr__(
                 self,
                 'formation_when_spot_enemy_fails',
