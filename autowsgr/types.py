@@ -12,6 +12,10 @@ class BaseEnum(Enum):
         supported_values = ', '.join(cls.__members__.values())
         raise ValueError(f'"{value}" 不是合法的{cls.__name__}取值. 支持的有: [{supported_values}]')
 
+    @classmethod
+    def enum(cls) -> list:
+        return list(cls.__members__.values())
+
 
 class StrEnum(str, BaseEnum):
     pass
@@ -241,10 +245,6 @@ class ShipType(StrEnum):
             ShipType.Other: (0.738, 0.561),
         }
         return dict[self.value]
-
-    @classmethod
-    def enum_all_type(cls) -> list:
-        return list(ShipType.__members__.values())
 
 
 class DestroyShipWorkMode(IntEnum):
