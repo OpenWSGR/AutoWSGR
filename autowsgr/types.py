@@ -186,3 +186,73 @@ class Formation(IntEnum):
 class SearchEnemyAction(StrEnum):
     retreat = 'retreat'
     detour = 'detour'
+
+
+class ShipType(StrEnum):
+    CV = '航母'
+    CVL = '轻母'
+    AV = '装母'
+    BB = '战列'
+    BBV = '航战'
+    BC = '战巡'
+    CA = '重巡'
+    CAV = '航巡'
+    CLT = '雷巡'
+    CL = '轻巡'
+    BM = '重炮'
+    DD = '驱逐'
+    SSV = '潜母'
+    SS = '潜艇'
+    SC = '炮潜'
+    NAP = '补给'
+    ASDG = '导驱'
+    AADG = '防驱'
+    KP = '导巡'
+    CG = '防巡'
+    CBG = '大巡'
+    BG = '导战'
+    Other = '其他'
+
+    @property
+    def relative_position_in_destroy(self) -> tuple[float, float]:
+        dict = {
+            ShipType.CV: (0.555, 0.197),
+            ShipType.CVL: (0.646, 0.197),
+            ShipType.AV: (0.738, 0.197),
+            ShipType.BB: (0.830, 0.197),
+            ShipType.BBV: (0.922, 0.197),
+            ShipType.BC: (0.556, 0.288),
+            ShipType.CA: (0.646, 0.288),
+            ShipType.CAV: (0.738, 0.288),
+            ShipType.CLT: (0.830, 0.288),
+            ShipType.CL: (0.922, 0.288),
+            ShipType.BM: (0.556, 0.379),
+            ShipType.DD: (0.646, 0.379),
+            ShipType.SSV: (0.738, 0.379),
+            ShipType.SS: (0.830, 0.379),
+            ShipType.SC: (0.922, 0.379),
+            ShipType.NAP: (0.555, 0.470),
+            ShipType.ASDG: (0.646, 0.470),
+            ShipType.AADG: (0.738, 0.470),
+            ShipType.KP: (0.830, 0.470),
+            ShipType.CG: (0.922, 0.470),
+            ShipType.CBG: (0.555, 0.561),
+            ShipType.BG: (0.646, 0.561),
+            ShipType.Other: (0.738, 0.561),
+        }
+        return dict[self.value]
+
+    @classmethod
+    def enum_all_type(cls) -> list:
+        return list(ShipType.__members__.values())
+
+
+class DestroyShipWorkMode(IntEnum):
+    """拆解工作模式"""
+
+    disable = 0
+    """不启用舰种分类"""
+    include = 1
+    """拆哪些船"""
+    exclude = 2
+    """不拆哪些船"""

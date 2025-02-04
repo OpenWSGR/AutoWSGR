@@ -346,8 +346,11 @@ class FightPlan(Protocol):
             self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
         return 'OK'
 
-    def run(self):
+    def run(self, retry_times=0, max_try_times=5):
         """主函数，负责一次完整的战斗.
+        Args:
+            retry_times (int): 重试次数
+            max_try_times (int): 最大尝试次数
         Returns:
             str:
                 'dock is full': 船坞已满并且没有设置自动解装
@@ -368,10 +371,11 @@ class FightPlan(Protocol):
             pass
         elif ret == literals.DOCK_FULL_FLAG:
             # 自动解装功能
-            if self.timer.config.dock_full_destroy:
+            if self.timer.config.dock_full_destroy and retry_times < max_try_times:
+                self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
                 self.timer.relative_click(0.38, 0.565)
                 destroy_ship(self.timer)
-                return self.run()
+                return self.run(retry_times + 1)
             return ret
         elif ret == literals.FIGHT_END_FLAG:
             self.timer.set_page(self.info.end_page)

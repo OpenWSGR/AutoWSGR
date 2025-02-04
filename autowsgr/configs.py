@@ -10,6 +10,7 @@ import rich
 
 from autowsgr.constants.data_roots import DATA_ROOT, OCR_ROOT
 from autowsgr.types import (
+    DestroyShipWorkMode,
     EmulatorType,
     FightCondition,
     Formation,
@@ -17,6 +18,7 @@ from autowsgr.types import (
     OcrBackend,
     OSType,
     RepairMode,
+    ShipType,
 )
 
 
@@ -194,6 +196,10 @@ class UserConfig(BaseConfig):
     """默认舰船名文件。"""
     ship_name_file: str | None = None
     """舰船名文件。不填写则使用default_ship_name_file"""
+    destroy_ship_workmode: DestroyShipWorkMode = DestroyShipWorkMode.disable
+    """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
+    destroy_ship_types: list[ShipType] | None = None
+    """指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文"""
 
     # Log
     log_root: str = 'log'
@@ -238,6 +244,20 @@ class UserConfig(BaseConfig):
             object.__setattr__(self, 'game_app', GameAPP(self.game_app))
         if not isinstance(self.ocr_backend, OcrBackend):
             object.__setattr__(self, 'ocr_backend', OcrBackend(self.ocr_backend))
+        for type in self.destroy_ship_types:
+            if not isinstance(type, ShipType):
+                object.__setattr__(
+                    self,
+                    'destroy_ship_types',
+                    [ShipType(t) for t in self.destroy_ship_types],
+                )
+                break
+        if not isinstance(self.destroy_ship_workmode, DestroyShipWorkMode):
+            object.__setattr__(
+                self,
+                'destroy_ship_workmode',
+                DestroyShipWorkMode(self.destroy_ship_workmode),
+            )
 
         # 模拟器
         if self.emulator_name is None:

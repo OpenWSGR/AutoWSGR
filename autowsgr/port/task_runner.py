@@ -18,6 +18,7 @@ from autowsgr.game.game_operation import (
 from autowsgr.port.common import Ship
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer.timer import Timer
+from autowsgr.types import ShipType
 from autowsgr.utils.api_image import crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
 
@@ -464,6 +465,14 @@ class OtherTask(Task):
         self.type = type
         if type == 'destroy':
             self.destroy_ship_types = kwargs['destroy_ship_types']
+            for type in self.destroy_ship_types:
+                if not isinstance(type, ShipType):
+                    object.__setattr__(
+                        self,
+                        'destroy_ship_types',
+                        [ShipType(t) for t in self.destroy_ship_types],
+                    )
+                    break
             timer.logger.info('船舱已满, 添加解装任务中...')
             if timer.port.ship_factory.waiting_destory:
                 timer.logger.info('任务队列中已经有解装任务, 跳过')

@@ -2,10 +2,10 @@ import time
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundErr
 from autowsgr.constants.image_templates import IMG
-from autowsgr.constants.other_constants import SHIP_TYPE_CLICK
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
 from autowsgr.timer import Timer
+from autowsgr.types import DestroyShipWorkMode, ShipType
 from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
@@ -72,8 +72,12 @@ def click_result(timer: Timer, max_times=1):
         timer.click(915, 515, delay=0.25, times=1)
 
 
-def destroy_ship(timer: Timer, ship_types=None):
-    """解装舰船，目前仅支持：全部解装+保留装备"""
+def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
+    """解装舰船，目前仅支持：全部解装+保留装备
+    Args:
+        timer (Timer): _description_
+        ship_types (list[ShipType], optional): Override Config 里面的解装舰船类型. Defaults to None. 若为 None 则使用 Config 中的配置
+    """
 
     timer.go_main_page()
     timer.goto_game_page('destroy_page')
@@ -82,14 +86,21 @@ def destroy_ship(timer: Timer, ship_types=None):
     timer.click(90, 206, delay=1.5)  # 点添加
 
     # 选择舰船类型
-    if ship_types is not None:
-        timer.relative_click(0.912, 0.681)
-        for ship_type in ship_types:
-            timer.relative_click(
-                *absolute_to_relative(SHIP_TYPE_CLICK[ship_type], (1280, 720)),
-                delay=0.8,
-            )
-        timer.relative_click(0.9, 0.85, delay=1.5)
+    if timer.config.destroy_ship_workmode is not DestroyShipWorkMode.disable:
+        destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
+
+        if timer.config.destroy_ship_workmode is DestroyShipWorkMode.exclude:
+            intended_destroy_types = [x for x in ShipType.enum_all_type() if x not in destroy_types]
+        elif timer.config.destroy_ship_workmode is DestroyShipWorkMode.include:
+            intended_destroy_types = destroy_types
+        else:
+            raise ValueError('不支持的解装模式')
+
+        if intended_destroy_types is not None:
+            timer.relative_click(0.912, 0.681)
+            for ship_type in intended_destroy_types:
+                timer.relative_click(*ship_type.relative_position_in_destroy, delay=0.8)
+            timer.relative_click(0.9, 0.85, delay=1.5)
 
     timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
     timer.relative_click(0.915, 0.906, delay=1.5)  # 确定

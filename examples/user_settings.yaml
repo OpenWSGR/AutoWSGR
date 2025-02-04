@@ -8,15 +8,28 @@
 
 # ========= 全局设置 =========
 
+# >> 输出信息设置开始 <<
 # 显示调试信息
 debug: False
-
-# 输出信息等级
-# DEBUG, INFO, WARNING, ERROR, CRITICAL
+# 输出信息等级: DEBUG, INFO, WARNING, ERROR, CRITICAL
 log_level: INFO
+# >> 输出信息设置结束 <<
 
 check_update: False
+
+# >> 解装设置开始 <<
+# 是否在船坞满时自动解装
 dock_full_destroy: True
+# 按舰种分类的解装工作模式
+# 0 是不启用舰种分类, 直接全部解装
+# 1 是黑名单模式, 解装指定的舰种
+# 2 是白名单模式, 保留指定的舰种
+destroy_ship_workmode: 0
+# 指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文
+destroy_ship_types:
+  # - 航母
+  # - 潜艇
+# >> 解装设置结束 <<
 
 # 浴室数(购买的浴室装饰数, 最大为 3) 说明: 未来可能自动获取
 bathroom_feature_count: 1
