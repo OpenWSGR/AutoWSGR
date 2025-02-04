@@ -242,8 +242,8 @@ class ShipType(StrEnum):
         }
         return dict[self.value]
 
-    @property
-    def enum_all_type(self) -> list:
+    @classmethod
+    def enum_all_type(cls) -> list:
         return list(ShipType.__members__.values())
 
 
