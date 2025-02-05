@@ -206,6 +206,7 @@ class SearchEnemyAction(StrEnum):
     no_action = 'no_action'
     retreat = 'retreat'
     detour = 'detour'
+    refresh = 'refresh'
 
 
 class ShipType(StrEnum):
