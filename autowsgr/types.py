@@ -20,7 +20,13 @@ class BaseEnum(Enum):
 
 
 class StrEnum(str, BaseEnum):
-    pass
+    @classmethod
+    def get_all_chars(cls) -> list:
+        char_list = []
+        for name in unzip_element(cls.enum()):
+            for char in name:
+                char_list = list({*char_list, char})
+        return char_list
 
 
 class IntEnum(int, BaseEnum):
@@ -292,11 +298,3 @@ class FormationName(StrEnum):
     circular = '轮型'
     wedge = '梯形'
     single_horizontal = '单横'
-
-    @classmethod
-    def get_all_chars(cls) -> list:
-        char_list = []
-        for name in unzip_element(cls.enum()):
-            for char in name:
-                char_list = list({*char_list, char})
-        return char_list
