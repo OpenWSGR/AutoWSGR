@@ -6,7 +6,7 @@ from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_mar
 from autowsgr.game.game_operation import detect_ship_stats, move_team, quick_repair
 from autowsgr.game.get_game_info import get_enemy_condition, get_exercise_stats
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 
 
@@ -34,15 +34,15 @@ class ExerciseDecisionBlock(DecisionBlock):
             while max_times >= 0:
                 info.enemies = get_enemy_condition(self.timer)
                 act = self._check_rules(info.enemies)
-                if act == 'refresh':
+                if act == SearchEnemyAction.refresh:
                     if max_times > 0:
                         max_times -= 1
                         self.timer.click(665, 400, delay=0.75)
                     else:
                         break
-                elif isinstance(act, int):
+                elif isinstance(act, Formation):
                     self.formation_chosen = act
-                elif act is None:
+                elif act is SearchEnemyAction.no_action:
                     break
 
             self.timer.click(804, 390, delay=0)
