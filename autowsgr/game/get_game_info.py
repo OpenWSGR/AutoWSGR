@@ -33,6 +33,7 @@ from autowsgr.constants.other_constants import (
 )
 from autowsgr.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from autowsgr.timer import Timer
+from autowsgr.types import FormationName
 from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.math_functions import cal_dis, check_color
@@ -228,6 +229,13 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
     count = {k: v for k, v in enemy_type_count.items() if v}
     timer.logger.debug('enemies:' + str(count))
     return count
+
+
+def get_enemy_formation(timer: Timer) -> str:
+    box = [(0.11, 0.11), (0.2, 0)]
+    return timer.recognize(crop_image(timer.screen, *box), allowlist=FormationName.get_all_chars())[
+        1
+    ]
 
 
 def detect_ship_stats(timer: Timer, type='prepare', previous=None):

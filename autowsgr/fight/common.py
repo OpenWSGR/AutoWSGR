@@ -16,7 +16,7 @@ from autowsgr.game.game_operation import (
     get_ship,
     match_night,
 )
-from autowsgr.game.get_game_info import get_enemy_condition
+from autowsgr.game.get_game_info import get_enemy_condition, get_enemy_formation
 from autowsgr.timer import Timer
 from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
 from autowsgr.utils.math_functions import get_nearest
@@ -268,6 +268,7 @@ class FightInfo(Protocol):
         """匹配到状态后执行的操作"""
         if self.state == 'spot_enemy_success':
             self.enemies = get_enemy_condition(self.timer, 'fight')
+            self.enemy_formation = get_enemy_formation(self.timer)
         if self.state == 'result':
             try:
                 result = FightResultInfo(self.timer, self.ship_stats)
@@ -550,6 +551,15 @@ class DecisionBlock:
                 return Formation(act)
         return SearchEnemyAction.no_action
 
+    def _check_formation_rules(self, formation: str) -> SearchEnemyAction | Formation:
+        for rule in self.config.enemy_formation_rules:
+            condition, act = rule
+            if condition == formation:
+                if isinstance(act, str):
+                    return SearchEnemyAction(act)
+                return Formation(act)
+        return SearchEnemyAction.no_action
+
     def make_decision(self, state, last_state, last_action, info: FightInfo):
         # destroy_ship skip: extract-method
         """单个节点的决策"""
@@ -578,7 +588,9 @@ class DecisionBlock:
             detour = can_detour and self.config.detour  # 由 Node 指定是否要迂回
 
             # 功能, 根据敌方阵容进行选择
-            act = self._check_rules(enemies=enemies)
+            act = self._check_formation_rules(info.enemy_formation)
+            if act == SearchEnemyAction.no_action:
+                act = self._check_rules(enemies=enemies)
 
             if act == SearchEnemyAction.retreat:
                 retreat = True

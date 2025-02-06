@@ -3,6 +3,8 @@ import sys
 from enum import Enum
 from typing_extensions import Self
 
+from autowsgr.utils.operator import unzip_element
+
 
 class BaseEnum(Enum):
     """提供更友好的中文报错信息"""
@@ -18,7 +20,13 @@ class BaseEnum(Enum):
 
 
 class StrEnum(str, BaseEnum):
-    pass
+    @classmethod
+    def get_all_chars(cls) -> list:
+        char_list = []
+        for name in unzip_element(cls.enum()):
+            for char in name:
+                char_list = list({*char_list, char})
+        return char_list
 
 
 class IntEnum(int, BaseEnum):
@@ -283,3 +291,11 @@ class ConditionFlag(StrEnum):
     BATTLE_TIMES_EXCEED = 'out of times'
     SKIP_FIGHT = 'skip fight'
     SL = 'SL'
+
+
+class FormationName(StrEnum):
+    single_column = '单纵'
+    double_column = '复纵'
+    circular = '轮型'
+    wedge = '梯形'
+    single_horizontal = '单横'

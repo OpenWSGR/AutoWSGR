@@ -395,6 +395,9 @@ class NodeConfig(BaseConfig):
     如果在这里做了阵型选择决定，则优先级将高过下面的阵型选择。例子：["(SS >= 2)", 5]
     and 的优先级高于 or"""
 
+    enemy_formation_rules: list[str] = field(default_factory=list)
+    """同enemy_rules. overrides enemy_rules. e.g. [单横, retreat]"""
+
     # 阵型选择阶段
     SL_when_spot_enemy_fails: bool = False
     """索敌失败时是否SL"""
