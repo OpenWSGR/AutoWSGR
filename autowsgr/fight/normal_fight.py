@@ -276,8 +276,8 @@ class NormalFightPlan(FightPlan):
         **kwargs,
     ):
         state = self.update_state() if 'skip_update' not in kwargs else self.info.state
-        if state == 'need SL':
-            return 'need SL'
+        if state == ConditionFlag.SL:
+            return ConditionFlag.SL
 
         # 进行 MapLevel 的决策
         if state == 'map_page':
@@ -317,14 +317,14 @@ class NormalFightPlan(FightPlan):
                     {'position': self.info.node},
                     'SL',
                 )
-                return 'need SL'
+                return ConditionFlag.SL
             if state == 'fight_period':
                 self.info.fight_history.add_event(
                     '进入战斗',
                     {'position': self.info.node},
                     'SL',
                 )
-                return 'need SL'
+                return ConditionFlag.SL
 
         elif state == 'proceed':
             is_proceed = self.nodes[self.info.node].config.proceed and check_blood(

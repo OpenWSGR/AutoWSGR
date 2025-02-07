@@ -22,7 +22,7 @@ from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
 from autowsgr.utils.math_functions import get_nearest
 
 
-def start_march(timer: Timer, position=(900, 500)):
+def start_march(timer: Timer, position=(900, 500)) -> ConditionFlag:
     timer.click(*position, 1, delay=0)
     start_time = time.time()
     while timer.identify_page('fight_prepare_page'):
@@ -300,13 +300,13 @@ class FightPlan(Protocol):
         self.logger = timer.logger
         self.fight_logs = []
 
-    def fight(self):
+    def fight(self) -> ConditionFlag:
         self.info.reset()  # 初始化战斗信息
         while True:
             ret = self._make_decision()
             if ret == ConditionFlag.FIGHT_CONTINUE:
                 continue
-            if ret == 'need SL':
+            if ret == ConditionFlag.SL:
                 self._sl()
                 return ConditionFlag.SL
             if ret == ConditionFlag.FIGHT_END:
@@ -314,7 +314,7 @@ class FightPlan(Protocol):
                 self.fight_logs.append(self.info.fight_history)
                 return ConditionFlag.OPERATION_SUCCESS
 
-    def run_for_times(self, times, gap=1800):
+    def run_for_times(self, times, gap=1800) -> ConditionFlag:
         """多次执行同一任务, 自动进行远征操作
         Args:
             times (int): 任务执行总次数
@@ -323,10 +323,7 @@ class FightPlan(Protocol):
         Raise:
             RuntimeError: 战斗进行时出现错误
         Returns:
-            str:
-                "OK": 任务正常结束
-
-                "dock is full" 因为船坞已满并且没有设置解装因此退出任务
+            ConditionFlag
         """
         assert times >= 1
         expedition = Expedition(self.timer)
@@ -338,32 +335,22 @@ class FightPlan(Protocol):
                 expedition.run(False)
                 self.timer.goto_game_page('map_page')
             fight_flag = self.run()
-            if fight_flag not in ['SL', 'success']:
-                if fight_flag == 'dock is full':
-                    return 'dock is full'
+            if fight_flag not in [ConditionFlag.SL, ConditionFlag.OPERATION_SUCCESS]:
+                if fight_flag == ConditionFlag.DOCK_FULL:
+                    return ConditionFlag.DOCK_FULL
                 if fight_flag == ConditionFlag.SKIP_FIGHT:
                     return ConditionFlag.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
             self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
-        return 'OK'
+        return ConditionFlag.OPERATION_SUCCESS
 
-    def run(self, retry_times=0, max_try_times=5):
+    def run(self, retry_times=0, max_try_times=5) -> ConditionFlag:
         """主函数，负责一次完整的战斗.
         Args:
             retry_times (int): 重试次数
             max_try_times (int): 最大尝试次数
         Returns:
-            str:
-                'dock is full': 船坞已满并且没有设置自动解装
-
-                'fight end': 战斗结束标志, 一般不返回这个, 和 success 相同
-
-                'out of times': 战斗超时
-
-                'SL': 进行了 SL 操作
-
-                'success': 战斗流程正常结束(到达了某个结束点或者选择了回港)
-
+            ConditionFlag
         """
         # 战斗前逻辑
         ret = self._enter_fight()
@@ -391,7 +378,13 @@ class FightPlan(Protocol):
         # 战斗中逻辑
         return self.fight()
 
-    def run_for_times_condition(self, times, last_point, result='S', insist_time=900):
+    def run_for_times_condition(
+        self,
+        times,
+        last_point,
+        result='S',
+        insist_time=900,
+    ) -> ConditionFlag:
         """有战果要求的多次运行, 使用前务必检查参数是否有误, 防止死循环
 
         Args:
@@ -404,10 +397,7 @@ class FightPlan(Protocol):
             insist_time: 如果大于这个时间工作量未减少则退出工作
 
         Returns:
-            str:
-                "OK": 任务顺利结束
-
-                "dock is full": 因为船坞已满并且不允许解装所以停止
+            ConditionFlag
         """
         if not isinstance(result, str) or not isinstance(last_point, str):
             raise TypeError(
@@ -425,7 +415,7 @@ class FightPlan(Protocol):
         start_time = time.time()
         while times:
             ret = self.run()
-            if ret == 'dock is full':
+            if ret == ConditionFlag.DOCK_FULL:
                 self.timer.logger.error('船坞已满, 无法继续')
                 return ret
 
@@ -458,7 +448,7 @@ class FightPlan(Protocol):
                 self.timer.logger.info(
                     f'完成了一次满足预设条件的战斗, 剩余战斗次数:{times}',
                 )
-        return 'OK'
+        return ConditionFlag.OPERATION_SUCCESS
 
     def update_state(self, *args, **kwargs):
         try:
@@ -471,7 +461,7 @@ class FightPlan(Protocol):
                 hasattr(self.timer, 'keep_try_update_fight')
                 and self.timer.keep_try_update_fight > 3
             ):
-                return 'need_SL'
+                return ConditionFlag.SL
             if hasattr(self.timer, 'keep_try_update_fight'):
                 self.timer.keep_try_update_fight += 1
             else:
@@ -577,7 +567,7 @@ class DecisionBlock:
                     },
                     'SL',
                 )
-                return None, 'need SL'
+                return None, ConditionFlag.SL
             return None, ConditionFlag.FIGHT_CONTINUE
 
         if state == 'spot_enemy_success':
@@ -690,7 +680,7 @@ class DecisionBlock:
                         },
                         action='SL',
                     )
-                    return None, 'need SL'
+                    return None, ConditionFlag.SL
 
                 if self.set_formation_by_rule:
                     self.logger.debug('set formation by rule:', self.formation_by_rule)
@@ -710,7 +700,7 @@ class DecisionBlock:
                         },
                         action='SL',
                     )
-                    return None, 'need SL'
+                    return None, ConditionFlag.SL
                 if self.config.formation_when_spot_enemy_fails:
                     value = self.config.formation_when_spot_enemy_fails
             info.fight_history.add_event(

@@ -172,7 +172,8 @@ class NormalExercisePlan(FightPlan):
         """
         从任意界面进入战斗.
 
-        :return: 进入战斗状态信息，包括['success', 'dock is full'].
+        Returns:
+            ConditionFlag
         """
         self.timer.goto_game_page('exercise_page')
         self._exercise_times = self.config.exercise_times
@@ -181,8 +182,8 @@ class NormalExercisePlan(FightPlan):
 
     def _make_decision(self, *args, **kwargs):
         state = self.update_state() if 'skip_update' not in kwargs else self.info.state
-        if state == 'need SL':
-            return 'need SL'
+        if state == ConditionFlag.SL:
+            return ConditionFlag.SL
 
         # 进行MapLevel的决策
         if state == 'exercise_page':
