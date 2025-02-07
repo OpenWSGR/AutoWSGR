@@ -207,7 +207,7 @@ class NormalFightPlan(FightPlan):
         self.config = FightConfig.from_dict(plan_args)
 
         # 加载节点配置
-        self.nodes = {}
+        self.nodes: dict[str, DecisionBlock] = {}
         for node_name in self.config.selected_nodes:
             node_args = copy.deepcopy(plan_args.get('node_defaults', {}))
             if (

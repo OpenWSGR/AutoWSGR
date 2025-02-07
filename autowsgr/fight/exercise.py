@@ -150,7 +150,7 @@ class NormalExercisePlan(FightPlan):
         assert 'fleet_id' in plan_args, '未指定作战舰队'
         self.config = ExerciseConfig.from_dict(plan_args)
 
-        self.nodes = {}
+        self.nodes: dict[str, ExerciseDecisionBlock] = {}
         for node_name in self.config.selected_nodes:
             node_args = copy.deepcopy(plan_args.get('node_defaults', {}))
             if node_name in plan_args['node_args']:
