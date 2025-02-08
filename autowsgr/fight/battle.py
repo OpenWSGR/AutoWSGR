@@ -94,7 +94,7 @@ class BattlePlan(FightPlan):
         if now_hard != hard:
             self.timer.click(800, 80, delay=1)
 
-    def _enter_fight(self) -> str:
+    def _enter_fight(self) -> ConditionFlag:
         self._go_fight_prepare_page()
         self.timer.click(180 * ((self.config.map - 1) % 5 + 1), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
@@ -108,10 +108,10 @@ class BattlePlan(FightPlan):
             )
             return ConditionFlag.SKIP_FIGHT
 
-    def _make_decision(self, *args, **kwargs) -> str:
+    def _make_decision(self, *args, **kwargs) -> ConditionFlag:
         state = self.update_state() if 'skip_update' not in kwargs else self.info.state
-        if state == 'need SL':
-            return 'need SL'
+        if state == ConditionFlag.SL:
+            return ConditionFlag.SL
         if self.info.state == 'battle_page':
             return ConditionFlag.FIGHT_END
 

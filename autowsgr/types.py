@@ -285,12 +285,19 @@ class DestroyShipWorkMode(IntEnum):
 
 class ConditionFlag(StrEnum):
     DOCK_FULL = 'dock is full'
+    """船坞已满并且没有设置自动解装"""
     FIGHT_END = 'fight end'
+    """战斗结束标志, 一般不返回这个, 和 success 相同"""
     FIGHT_CONTINUE = 'fight continue'
+    """战斗继续"""
     OPERATION_SUCCESS = 'success'
+    """战斗流程正常结束 (到达了某个结束点或者选择了回港)"""
     BATTLE_TIMES_EXCEED = 'out of times'
+    """战斗超时"""
     SKIP_FIGHT = 'skip fight'
+    """跳过战斗"""
     SL = 'SL'
+    """需要 / 进行了 SL 操作"""
 
 
 class FormationName(StrEnum):
