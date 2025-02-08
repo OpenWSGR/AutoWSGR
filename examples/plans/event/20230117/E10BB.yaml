@@ -1,7 +1,0 @@
-# E10 金白菜战术
-chapter: H
-map: 4
-target: BB # 战术敌人对象,不可缺省
-fleet_id: 3
-node_args:
-  SL_when_enter_fight: True

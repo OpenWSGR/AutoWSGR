@@ -1,9 +1,0 @@
-# E10 D 夜战练级
-# 均速 >=30
-chapter: H
-map: 4
-from_alpha: False
-selected_nodes: [D]
-node_defaults:
-  proceed: False
-  formation: 4
