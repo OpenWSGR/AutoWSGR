@@ -1,3 +1,3 @@
 [submodule "examples"]
 	path = examples
-	url = https://github.com/OpenWSGR/examples.git
+	url = https://github.com/OpenWSGR/AutoWSGR-examples.git
