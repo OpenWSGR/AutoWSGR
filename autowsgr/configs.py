@@ -184,6 +184,8 @@ class UserConfig(BaseConfig):
     """是否在启动时检查游戏页面"""
     dock_full_destroy: bool = True
     """船坞已满时自动清空, 若设置为false则船坞已满后终止所有常规出征任务"""
+    repair_manually: bool = False
+    """是否手动修理, 若设置为True则需要修理时不使用快修, 结束脚本"""
     bathroom_feature_count: int = 1
     """浴室数(购买的浴室装饰数, 最大为 3) TODO: 可自动获取"""
     bathroom_count: int = 2

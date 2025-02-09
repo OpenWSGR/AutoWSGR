@@ -240,6 +240,9 @@ def quick_repair(
         if timer.config.debug:
             timer.logger.debug('ship_stats:', ship_stats)
         if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
+            if timer.config.repair_manually:
+                timer.logger.info('需要手动修理舰船')
+                raise BaseException('需要手动修理舰船')
             timer.click(420, 420, times=2, delay=0.8)  # 进入修理页面
             # 快修已经开始泡澡的船
             pos = timer.get_image_position(IMG.repair_image[1])
