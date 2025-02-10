@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from airtest.core.settings import Settings as ST  # noqa
 
@@ -10,7 +11,7 @@ from autowsgr.utils.logger import Logger
 from autowsgr.utils.update import check_for_updates
 
 
-def start_script(settings_path=None) -> Timer:
+def start_script(settings_path: str | None = None) -> Timer:
     """启动脚本, 返回一个 Timer 记录器.
     :如果模拟器没有运行, 会尝试启动模拟器,
     :如果游戏没有运行, 会自动启动游戏,
@@ -22,7 +23,7 @@ def start_script(settings_path=None) -> Timer:
     ST.CVSTRATEGY = ['tpl']
 
     # config
-    config_dict = {} if settings_path is None else yaml_to_dict(settings_path)
+    config_dict: dict[str, Any] = {} if settings_path is None else yaml_to_dict(settings_path)
     config = UserConfig.from_dict(config_dict)
     config.pprint()
 

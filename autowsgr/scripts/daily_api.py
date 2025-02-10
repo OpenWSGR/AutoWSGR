@@ -14,6 +14,8 @@ from autowsgr.types import ConditionFlag
 class DailyOperation:
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
+        if timer.config.daily_automation is None:
+            raise ValueError('未设置日常任务，请检查配置文件')
         self.config = timer.config.daily_automation
 
         if self.config.auto_expedition:
