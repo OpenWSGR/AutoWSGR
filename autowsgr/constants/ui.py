@@ -85,7 +85,7 @@ class UI:
     """UI树(拓扑学概念)"""
 
     def __init__(self) -> None:
-        self.nodes = {}
+        self.nodes: dict[str, Node] = {}
         self.page_count = 0
         self.is_normal_fight_prepare = False
         self._build_ui_tree()

@@ -302,7 +302,7 @@ class AndroidController:
         confidence=0.85,
         timeout=10,
         gap=0.15,
-        after_get_delay=0,
+        after_get_delay: float = 0,
     ):
         """等待一张图片出现在屏幕中,置信度超过一定阈值(支持多图片)
 
@@ -332,7 +332,7 @@ class AndroidController:
         confidence=0.85,
         gap=0.15,
         after_get_delay=0,
-        timeout=10,
+        timeout: float = 10,
     ):
         """等待一系列图片中的一个在屏幕中出现
 

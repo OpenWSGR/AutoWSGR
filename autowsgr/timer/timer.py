@@ -418,13 +418,13 @@ class Timer(AndroidController):
                 if dst == 1:
                     continue
                 self.logger.debug(
-                    f'Go page: {self.now_page.name}, but arrive: {edge.other_dst.name}',
+                    f'Go page: {self.now_page}, but arrive: {edge.other_dst.name}',
                 )
                 self.now_page = self.ui.get_node_by_name(
                     [self.now_page.name, edge.other_dst.name][dst - 1],
                 )
-                self.logger.debug(f'Now page: {self.now_page.name}')
-                if self.now_page.name == 'expedition_page':
+                self.logger.debug(f'Now page: {self.now_page}')
+                if isinstance(self.now_page, Node) and self.now_page.name == 'expedition_page':
                     try_to_get_expedition(self)
                 self.operate(end)
                 return
