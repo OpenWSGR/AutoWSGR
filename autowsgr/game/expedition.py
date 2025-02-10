@@ -1,5 +1,6 @@
 import time
 
+from autowsgr.constants.ui import Node
 from autowsgr.timer.timer import Timer, try_to_get_expedition
 
 
@@ -11,18 +12,20 @@ class Expedition:
 
     def update(self, force=False):
         self.timer.update_screen()
-        if (
-            isinstance(self.timer.now_page, str) and 'unknown' in self.timer.now_page
-        ) or self.timer.now_page.name not in [
-            'expedition_page',
-            'map_page',
-            'battle_page',
-            'exercise_page',
-            'decisive_battle_entrance',
-        ]:
+        if (isinstance(self.timer.now_page, str) and 'unknown' in self.timer.now_page) or (
+            isinstance(self.timer.now_page, Node)
+            and self.timer.now_page.name
+            not in [
+                'expedition_page',
+                'map_page',
+                'battle_page',
+                'exercise_page',
+                'decisive_battle_entrance',
+            ]
+        ):
             if force or time.time() - self.last_check > 1800:
                 self.timer.go_main_page()
-            if self.timer.now_page.name == 'main_page':
+            if isinstance(self.timer.now_page, Node) and self.timer.now_page.name == 'main_page':
                 self.is_ready = self.timer.check_pixel(
                     (933, 454),
                     bgr_color=(45, 89, 255),

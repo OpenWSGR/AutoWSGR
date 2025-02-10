@@ -1,5 +1,6 @@
 import time
 
+from autowsgr.game.build import BuildManager
 from autowsgr.utils.logger import Logger
 
 
@@ -120,6 +121,8 @@ class Factory(WorkShop):
 
 
 class Port:
+    factory: BuildManager
+
     def __init__(self, logger: Logger) -> None:
         self.logger = logger
         self.oil = 0
@@ -132,8 +135,8 @@ class Port:
         self.ship_factory = Factory()
         self.ships = []
         self.fleet = [[]] * 5
-        self.map = 0
-        self.chapter = 0
+        self.map: int | None = 0
+        self.chapter: int | None = 0
 
     def have_ship(self, name):
         return any(name == ship.name for ship in self.ships)
@@ -146,7 +149,7 @@ class Port:
             return ship
         return None
 
-    def get_ship_by_name(self, name) -> Ship:
+    def get_ship_by_name(self, name) -> Ship | None:
         if self.have_ship(name):
             for ship in self.ships:
                 if ship.name == name:
