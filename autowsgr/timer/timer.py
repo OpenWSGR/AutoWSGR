@@ -52,6 +52,8 @@ class Timer(AndroidController):
 
     def initialize_resources(self) -> None:
         # 加载资源
+        if self.config.plan_root is None:
+            raise ValueError('plan_root is not defined')
         self.ui = WSGR_UI
         self.plan_tree = recursive_dict_update(
             create_nested_dict(self.config.default_plan_root),
@@ -147,7 +149,12 @@ class Timer(AndroidController):
         # ========== 检查游戏页面状态 ============
         try:
             self.set_page()
-            self.logger.info(f'启动成功, 当前位置: {self.now_page.name}')
+            success_note = '启动成功, 当前位置:'
+            if isinstance(self.now_page, Node):
+                success_note += self.now_page.name
+            elif isinstance(self.now_page, str):
+                success_note += self.now_page
+            self.logger.info(success_note)
         except:
             if 'check_page' in self.config.__dict__ and self.config.check_page:
                 self.logger.warning('无法确定当前页面, 尝试重启游戏')
@@ -229,7 +236,7 @@ class Timer(AndroidController):
                     self.click(30, 30)
                 if self.wait_image(IMG.start_image[7], timeout=7):  # 每日签到
                     self.click(474, 357)
-                    self.confirm_operation(must_confirm=1, timeout=2)
+                    self.confirm_operation(must_confirm=True, timeout=2)
                 self.everyday_check = False
             self.go_main_page()
             self.logger.info('游戏启动成功!')
@@ -340,7 +347,7 @@ class Timer(AndroidController):
         if need_screen_shot:
             self.update_screen()
 
-        if (name == 'main_page') and (self.identify_page('options_page', 0)):
+        if (name == 'main_page') and (self.identify_page('options_page', False)):
             return False
         if (name == 'map_page') and (
             self._integrative_page_identify() != 1 or self.check_pixel((35, 297), (47, 253, 226))
@@ -359,7 +366,7 @@ class Timer(AndroidController):
         while True:
             self.update_screen()
             for i, name in enumerate(names):
-                if self.identify_page(name, 0):
+                if self.identify_page(name, False):
                     time.sleep(after_wait)
                     return i + 1
 
@@ -383,12 +390,20 @@ class Timer(AndroidController):
         return 'unknown_page'
 
     def check_now_page(self):
-        return self.identify_page(name=self.now_page.name)
+        return isinstance(self.now_page, Node) and self.identify_page(name=self.now_page.name)
 
     def operate(self, end: Node):
+        if not isinstance(self.now_page, Node):
+            self.logger.error('now_page is not a Node object')
+            raise TypeError('now_page is not a Node object')
         ui_list = self.ui.find_path(self.now_page, end)
         for next in ui_list[1:]:
             edge = self.now_page.find_edge(next)
+            if edge is None:
+                self.logger.error(
+                    f'no edge found between {self.now_page.name} and {next.name}',
+                )
+                raise ValueError('no edge found')
             opers = edge.operate()
             self.now_page = next
             for oper in opers:
@@ -403,13 +418,13 @@ class Timer(AndroidController):
                 if dst == 1:
                     continue
                 self.logger.debug(
-                    f'Go page: {self.now_page.name}, but arrive: {edge.other_dst.name}',
+                    f'Go page: {self.now_page}, but arrive: {edge.other_dst.name}',
                 )
                 self.now_page = self.ui.get_node_by_name(
                     [self.now_page.name, edge.other_dst.name][dst - 1],
                 )
-                self.logger.debug(f'Now page: {self.now_page.name}')
-                if self.now_page.name == 'expedition_page':
+                self.logger.debug(f'Now page: {self.now_page}')
+                if isinstance(self.now_page, Node) and self.now_page.name == 'expedition_page':
                     try_to_get_expedition(self)
                 self.operate(end)
                 return

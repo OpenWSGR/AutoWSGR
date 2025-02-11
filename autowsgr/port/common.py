@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 from autowsgr.utils.logger import Logger
 
@@ -68,7 +69,7 @@ class WorkShop:
     def is_available(self):
         return self.get_waiting_time() == 0
 
-    def add_work(self, time_cost: str) -> bool:
+    def add_work(self, time_cost: str) -> tuple[bool, float]:
         """增加一项工作
 
         Args:
@@ -78,7 +79,7 @@ class WorkShop:
             (bool, float): bool 值表示是否成功添加, float 表示结束时间
 
         """
-        if self.is_available():
+        if self.is_available() and self.available_time is not None:
             for id, bath in enumerate(self.available_time):
                 if time.time() > bath:
                     end_time = time.time() + self._time_to_seconds(time_cost)
@@ -91,7 +92,7 @@ class BathRoom(WorkShop):
     def __init__(self) -> None:
         super().__init__()
 
-    def add_repair(self, time_cost: str) -> bool:
+    def add_repair(self, time_cost: str) -> None:
         super().add_work(time_cost)
 
 
@@ -100,7 +101,7 @@ class Factory(WorkShop):
         self.capacity = None
         self.waiting_destory = False
 
-    def update_capacity(self, capacity, occupation, blueprint=None):
+    def update_capacity(self, capacity, occupation, blueprint: int | None = None):
         """更新仓库容量状态
 
         Args:
@@ -120,6 +121,8 @@ class Factory(WorkShop):
 
 
 class Port:
+    factory: Any
+
     def __init__(self, logger: Logger) -> None:
         self.logger = logger
         self.oil = 0
@@ -132,8 +135,8 @@ class Port:
         self.ship_factory = Factory()
         self.ships = []
         self.fleet = [[]] * 5
-        self.map = 0
-        self.chapter = 0
+        self.map: int | None = 0
+        self.chapter: int | None = 0
 
     def have_ship(self, name):
         return any(name == ship.name for ship in self.ships)
@@ -146,7 +149,7 @@ class Port:
             return ship
         return None
 
-    def get_ship_by_name(self, name) -> Ship:
+    def get_ship_by_name(self, name) -> Ship | None:
         if self.have_ship(name):
             for ship in self.ships:
                 if ship.name == name:

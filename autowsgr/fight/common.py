@@ -19,19 +19,20 @@ from autowsgr.game.game_operation import (
 from autowsgr.game.get_game_info import get_enemy_condition, get_enemy_formation
 from autowsgr.timer import Timer
 from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
+from autowsgr.utils.logger import Logger
 from autowsgr.utils.math_functions import get_nearest
 
 
-def start_march(timer: Timer, position=(900, 500)) -> ConditionFlag:
+def start_march(timer: Timer, position: tuple[int, int] = (900, 500)) -> ConditionFlag:
     timer.click(*position, 1, delay=0)
     start_time = time.time()
     while timer.identify_page('fight_prepare_page'):
         if time.time() - start_time > 3:
             timer.click(*position, 1, delay=0)
             time.sleep(1)
-        if timer.image_exist(IMG.symbol_image[3], need_screen_shot=0):
+        if timer.image_exist(IMG.symbol_image[3], need_screen_shot=False):
             return ConditionFlag.DOCK_FULL
-        if timer.image_exist(IMG.symbol_image[9], need_screen_shot=0, confidence=0.8):
+        if timer.image_exist(IMG.symbol_image[9], need_screen_shot=False, confidence=0.8):
             time.sleep(1)
             return ConditionFlag.BATTLE_TIMES_EXCEED
         if time.time() - start_time > 15:
@@ -167,6 +168,15 @@ class FightHistory:
 class FightInfo(Protocol):
     """存储战斗中需要用到的所有状态信息, 以及更新逻辑"""
 
+    timer: Timer
+    logger: Logger
+    oil: int
+    ammo: int
+    enemies: dict
+    ship_stats: list
+    fight_history: FightHistory
+    enemy_formation: str
+
     # =============== 静态属性 ===============
     end_page: str
     """结束战斗后的页面，用于判断是否已经返回战斗外界面"""
@@ -293,6 +303,9 @@ class FightInfo(Protocol):
 
 class FightPlan(Protocol):
     info: FightInfo
+    timer: Timer
+    logger: Logger
+    fight_logs: list[FightHistory]
 
     def __init__(self, timer: Timer) -> None:
         # 把 timer 引用作为内置对象，减少函数调用的时候所需传入的参数
@@ -384,7 +397,7 @@ class FightPlan(Protocol):
         last_point,
         result='S',
         insist_time=900,
-    ) -> ConditionFlag:
+    ) -> ConditionFlag | bool:
         """有战果要求的多次运行, 使用前务必检查参数是否有误, 防止死循环
 
         Args:
@@ -398,6 +411,7 @@ class FightPlan(Protocol):
 
         Returns:
             ConditionFlag
+            False: 不满足预设条件, 此次战斗不计入次数
         """
         if not isinstance(result, str) or not isinstance(last_point, str):
             raise TypeError(
