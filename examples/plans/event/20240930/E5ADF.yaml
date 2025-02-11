@@ -1,8 +1,0 @@
-# E5 ADF 夜战练级
-# 最低航速小于27
-chapter: E
-map: 5
-selected_nodes: [A,D,F]
-node_defaults:
-  proceed: True
-  formation: 4

@@ -1,7 +1,0 @@
-# E7A 炸鱼 驱逐数量大于等于3
-chapter: H
-map: 1
-selected_nodes: [A]
-node_defaults:
-  proceed: False
-  formation: 5

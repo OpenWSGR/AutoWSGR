@@ -1,9 +1,0 @@
-# E10 DE 双连夜战练级
-# 均速 >=30 BB >= 1
-chapter: H
-map: 4
-selected_nodes: [D, E]
-from_alpha: False
-node_defaults:
-  proceed: True
-  formation: 4
