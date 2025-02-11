@@ -152,16 +152,18 @@ class Timer(AndroidController):
             success_note = '启动成功, 当前位置:'
             if isinstance(self.now_page, Node):
                 success_note += self.now_page.name
-            elif isinstance(self.now_page, str):
-                success_note += self.now_page
-            self.logger.info(success_note)
-        except:
-            if 'check_page' in self.config.__dict__ and self.config.check_page:
-                self.logger.warning('无法确定当前页面, 尝试重启游戏')
-                self.restart()
-                self.set_page()
+                self.logger.info(success_note)
             else:
-                self.logger.warning('在无法确定页面的情况下继续.')
+                if self.config.check_page:
+                    self.logger.warning('无法确定当前页面, 尝试重启游戏')
+                    self.restart()
+                    self.set_page()
+                else:
+                    self.logger.warning('在无法确定页面的情况下继续.')
+        except Exception as ex:
+            self.logger.warning(f'出现未知错误, 尝试重启游戏:{ex}')
+            self.restart()
+            self.set_page()
 
     def log_in(self, account, password):
         pass
