@@ -18,13 +18,13 @@ class Node:
     保存 UI 树的节点
     """
 
-    def __init__(self, name, id) -> None:
-        self.id = id
-        self.name = name
-        self.father_edge = None
-        self.father = None
-        self.depth = 0
-        self.edges = []
+    def __init__(self, name: str, id: int) -> None:
+        self.id: int = id
+        self.name: str = name
+        self.father_edge: Edge | None = None
+        self.father: Node | None = None
+        self.depth: int = 0
+        self.edges: list[Edge] = []
 
     def set_father(self, father):
         self.father = father
@@ -64,7 +64,7 @@ class Edge:
         u: Node,
         v: Node,
         other_dst=None,
-        extra_op: SwitchMethod = None,
+        extra_op: SwitchMethod | None = None,
     ) -> None:
         self.operate_fun = operate_fun
         self.u = u
@@ -107,7 +107,7 @@ class UI:
             path2.append(end)
             end = end.father
         path2.reverse()
-        path = [*path1, lca, *path2]
+        path: list[Node] = [*path1, lca, *path2]
         result, i = [], 0
         while i < len(path):
             node = path[i]
@@ -339,7 +339,7 @@ class UI:
         for node in path:
             print(node, end='->')
 
-    def _construct_node(self, name: str, father):
+    def _construct_node(self, name: str, father: Node | None):
         self.page_count += 1
         node = Node(name, self.page_count)
         node.set_father(father)
