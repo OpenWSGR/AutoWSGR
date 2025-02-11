@@ -149,10 +149,8 @@ class Timer(AndroidController):
         # ========== 检查游戏页面状态 ============
         try:
             self.set_page()
-            success_note = '启动成功, 当前位置:'
             if isinstance(self.now_page, Node):
-                success_note += self.now_page.name
-                self.logger.info(success_note)
+                self.logger.info(f'启动成功, 当前位置: {self.now_page.name}')
             else:
                 if self.config.check_page:
                     self.logger.warning('无法确定当前页面, 尝试重启游戏')
