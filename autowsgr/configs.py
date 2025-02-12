@@ -429,7 +429,7 @@ class NodeConfig(BaseConfig):
                 Formation(self.formation_when_spot_enemy_fails),
             )
         if isinstance(self.proceed_stop, list):
-            object.__setattr__(self, 'proceed_stop', [RepairMode[r] for r in self.proceed_stop])
+            object.__setattr__(self, 'proceed_stop', [RepairMode(r) for r in self.proceed_stop])
         else:
             object.__setattr__(
                 self,
