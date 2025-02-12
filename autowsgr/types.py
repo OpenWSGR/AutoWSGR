@@ -269,7 +269,7 @@ class ShipType(StrEnum):
             ShipType.BG: (0.646, 0.561),
             ShipType.Other: (0.738, 0.561),
         }
-        return dict[self.value]
+        return dict[self]
 
 
 class DestroyShipWorkMode(IntEnum):

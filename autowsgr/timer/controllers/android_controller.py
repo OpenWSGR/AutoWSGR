@@ -96,7 +96,14 @@ class AndroidController:
         self.logger.debug(f'正在输入: {t}')
         self.dev.text(t)
 
-    def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False) -> th.Thread | None:
+    def relative_click(
+        self,
+        x: float,
+        y: float,
+        times: int = 1,
+        delay: float = 0.5,
+        enable_subprocess: bool = False,
+    ) -> th.Thread | None:
         """点击模拟器相对坐标 (x,y).
         Args:
             x,y:相对坐标
@@ -310,7 +317,7 @@ class AndroidController:
         self,
         image: MyTemplate,
         confidence=0.85,
-        timeout=10,
+        timeout: float = 10,
         gap=0.15,
         after_get_delay: float = 0,
     ):

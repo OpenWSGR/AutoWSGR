@@ -90,7 +90,9 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
         destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
 
         if timer.config.destroy_ship_work_mode is DestroyShipWorkMode.exclude:
-            intended_destroy_types = [x for x in ShipType.enum() if x not in destroy_types]
+            intended_destroy_types: list[ShipType] = [
+                x for x in ShipType.enum() if x not in destroy_types
+            ]
         elif timer.config.destroy_ship_work_mode is DestroyShipWorkMode.include:
             intended_destroy_types = destroy_types
         else:
@@ -99,7 +101,7 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
         if intended_destroy_types is not None:
             timer.relative_click(0.912, 0.681)
             for ship_type in intended_destroy_types:
-                timer.relative_click(*ship_type.relative_position_in_destroy, delay=0.8)
+                timer.relative_click(*ship_type.relative_position_in_destroy, times=1, delay=0.8)
             timer.relative_click(0.9, 0.85, delay=1.5)
 
     timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
