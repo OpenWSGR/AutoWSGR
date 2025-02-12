@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import distance
 
 
-def cal_dis(p1: int, p2: int):
+def cal_dis(p1: list[int] | tuple[int, ...], p2: list[int] | tuple[int, ...]):
     """计算两个点的欧几里得距离的平方
     Args:
         p1 : 第一个点的坐标

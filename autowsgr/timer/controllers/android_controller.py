@@ -7,6 +7,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 import cv2
 from airtest.core.android import Android
+from numpy import uint8
+from numpy.typing import NDArray
 
 from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
@@ -34,15 +36,13 @@ class AndroidController:
     ) -> None:
         self._pool = ProcessPoolExecutor()
 
-        self.screen = None
-        self.dev = dev
-        self.show_android_input = config.show_android_input
-        self.delay = config.delay
-        self.logger = logger
-        self.screen = None
-        self.update_screen()
-        self.resolution = self.screen.shape[:2]
-        self.resolution = self.resolution[::-1]
+        self.dev: Android = dev
+        self.show_android_input: bool = config.show_android_input
+        self.delay: float = config.delay
+        self.logger: Logger = logger
+        self.screen: NDArray = self.get_raw_screen()
+        self.resolution = self.screen.shape[:2][::-1]
+        # (height, width, dimension) -> (width, height)
         self.logger.info(f'resolution:{self.resolution}')
 
     # ========= 基础命令 =========
@@ -201,13 +201,17 @@ class AndroidController:
         self.relative_long_tap(x, y, duration, delay)
 
     # ======== 屏幕相关 ========
-    def update_screen(self):
+    def get_raw_screen(self) -> NDArray[uint8]:
+        """返回一个未裁剪的屏幕"""
         start_time = time.time()
         while (screen := self.dev.snapshot(quality=99)) is None:
             if time.time() - start_time > 10:
-                raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
+                raise CriticalErr('截图持续返回 None, 模拟器可能已经失去响应')
             time.sleep(0.1)
-        self.screen = screen
+        return screen
+
+    def update_screen(self):
+        self.screen = self.get_raw_screen()
 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
         """获取屏幕图片
@@ -218,7 +222,7 @@ class AndroidController:
             self.update_screen()
         return cv2.resize(self.screen, resolution)
 
-    def get_pixel(self, x, y, screen_shot=False) -> list:
+    def get_pixel(self, x, y, screen_shot=False) -> list[int]:
         """获取当前屏幕相对坐标 (x,y) 处的像素值
         Args:
             x (int): [0, 960)
@@ -232,7 +236,13 @@ class AndroidController:
             self.screen = cv2.resize(self.screen, (960, 540))
         return [self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0]]
 
-    def check_pixel(self, position, bgr_color, distance=30, screen_shot=False) -> bool:
+    def check_pixel(
+        self,
+        position: tuple[int, int],
+        bgr_color,
+        distance=30,
+        screen_shot=False,
+    ) -> bool:
         r"""检查像素点是否满足要求
         Args:
             position (_type_): (x, y) 坐标, x 是长, 相对 960x540 的值, x \in [0, 960)
@@ -346,7 +356,9 @@ class AndroidController:
 
         Returns:
             None: 未找到任何图片
-            a number of int: 第一个出现的图片的下标(0-based) if images is a list
+
+            int: 第一个出现的图片的下标(0-based) if images is a list
+
             the key of the value: if images is a dict
         """
         if timeout < 0:
@@ -383,7 +395,7 @@ class AndroidController:
 
     def wait_images_position(
         self,
-        images=None,
+        images: list | None = None,
         confidence=0.85,
         gap=0.15,
         after_get_delay=0,
