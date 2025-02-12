@@ -4,6 +4,7 @@ import threading as th
 import time
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
+from typing import Any
 
 import cv2
 from airtest.core.android import Android
@@ -67,7 +68,7 @@ class AndroidController:
     def stop_app(self, package_name):
         self.dev.stop_app(package_name)
 
-    def list_apps(self):
+    def list_apps(self) -> bytes | str | Any:
         """列出所有正在运行的应用"""
         return self.dev.shell('ps')
 
@@ -80,7 +81,11 @@ class AndroidController:
         Returns:
             bool:
         """
-        return app in self.list_apps()
+        try:
+            return app in self.list_apps()  # type: ignore
+        except Exception as e:
+            self.logger.error(f'检查游戏是否在运行失败: {e}')
+            return False
 
     # ========= 输入控制信号 =========
     def text(self, t):

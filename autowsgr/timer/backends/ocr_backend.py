@@ -219,7 +219,7 @@ class OCRBackend(Protocol):
                     ),
                 )
         if self.config.show_ocr_info:
-            self.logger.debug(f'修正OCR结果：{results}')
+            self.logger.debug(f'修正OCR结果: {results}')
 
         if allow_nan and not results:
             return None
