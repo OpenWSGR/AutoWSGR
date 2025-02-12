@@ -102,9 +102,13 @@ class UI:
 
         while start != lca:
             path1.append(start)
+            # 因为 lca 存在，所以 start 在不是 lca 的时候一定存在 father
+            assert start.father is not None
             start = start.father
         while end != lca:
             path2.append(end)
+            # 因为 lca 存在，所以 end 在不是 lca 的时候一定存在 father
+            assert end.father is not None
             end = end.father
         path2.reverse()
         path: list[Node] = [*path1, lca, *path2]
@@ -319,9 +323,13 @@ class UI:
     def _lca(self, u: Node, v: Node) -> Node:
         if v.depth > u.depth:
             return self._lca(v, u)
+        # 因为 u 的 depth 大于等于 v 的 depth，所以 u.father 一定存在
+        assert u.father is not None
         if u == v:
             return v
         if u.depth == v.depth:
+            # 因为 u.depth == v.depth 并且 u != v 即 u 和 v 不是根节点，所以 v.father 一定存在
+            assert v.father is not None
             return self._lca(u.father, v.father)
         return self._lca(u.father, v)
 
