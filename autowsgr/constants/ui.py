@@ -323,10 +323,10 @@ class UI:
     def _lca(self, u: Node, v: Node) -> Node:
         if v.depth > u.depth:
             return self._lca(v, u)
-        # 因为 u 的 depth 大于等于 v 的 depth，所以 u.father 一定存在
-        assert u.father is not None
         if u == v:
             return v
+        # 因为 u 的 depth 大于 v 的 depth，所以 u.father 一定存在
+        assert u.father is not None
         if u.depth == v.depth:
             # 因为 u.depth == v.depth 并且 u != v 即 u 和 v 不是根节点，所以 v.father 一定存在
             assert v.father is not None

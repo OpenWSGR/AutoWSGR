@@ -7,7 +7,6 @@ from autowsgr.timer import Timer
 
 
 NODE_POSITION = (
-    None,
     (0.583, 0.206),
     (0.439, 0.472),
     (0.663, 0.672),
@@ -51,12 +50,13 @@ class EventFightPlan20250123(Event, NormalFightPlan):
         self.timer.click_image(self.event_image[3], timeout=10)
 
     def _go_fight_prepare_page(self) -> None:
-        if not self.timer.image_exist(self.info.event_image[1]):
-            self.timer.relative_click(*NODE_POSITION[self.config.map])
+        assert isinstance(self.config.map, int)
+        if not self.timer.image_exist(self.event_image[1]):
+            self.timer.relative_click(*NODE_POSITION[self.config.map - 1])
 
         if not self.timer.click_image(self.event_image[1], timeout=10):
             self.timer.logger.warning('进入战斗准备页面失败,重新尝试进入战斗准备页面')
-            self.timer.relative_click(*NODE_POSITION[self.config.map])
+            self.timer.relative_click(*NODE_POSITION[self.config.map - 1])
             self.timer.click_image(self.event_image[1], timeout=10)
 
         try:

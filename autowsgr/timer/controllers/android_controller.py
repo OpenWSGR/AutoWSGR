@@ -424,6 +424,7 @@ class AndroidController:
         rank = self.wait_images(images, confidence, gap, after_get_delay, timeout)
         if rank is None:
             return None
+        assert isinstance(rank, int)
         return self.get_image_position(images[rank], False, confidence)
 
     def click_image(self, image, must_click=False, timeout=0, delay=0.5):
