@@ -270,6 +270,7 @@ class UserConfig(BaseConfig):
                 'emulator_start_cmd',
                 self.emulator_type.auto_emulator_path(self.os_type),
             )
+        assert self.emulator_start_cmd is not None
         if self.emulator_process_name is None:
             object.__setattr__(
                 self,

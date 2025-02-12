@@ -28,6 +28,7 @@ def recognize(image, char_list=None, min_size=7, text_threshold=0.55, low_text=0
         load_ch_reader()
     if isinstance(image, str):
         image = cv_imread(image)
+    assert ch_reader is not None
     return ch_reader.readtext(
         image,
         allowlist=char_list,

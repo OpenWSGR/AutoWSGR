@@ -22,6 +22,7 @@ def check_for_updates():
     print('Checking for updates...')
     # 获取本地autowsgr版本号
     local_version = get_local_version()
+    assert local_version is not None, 'Failed to get the local version'
 
     # 发送 GET 请求获取库的元数据信息
     response = requests.get('https://mirrors.pku.edu.cn/pypi/web/json/autowsgr', timeout=5)
@@ -64,6 +65,7 @@ def get_local_version():
 
 def get_user_choice(questions):
     answers = inquirer.prompt(questions)
+    assert answers is not None, 'User did not make a choice'
     return answers['source']
 
 
