@@ -273,7 +273,7 @@ class AndroidController:
 
     def get_image_position(
         self,
-        image,
+        images: MyTemplate | list[MyTemplate],
         need_screen_shot=True,
         confidence=0.85,
     ):
@@ -285,7 +285,6 @@ class AndroidController:
 
             否则返回 None
         """
-        images = image
         if not isinstance(images, Iterable):
             images = [images]
         if need_screen_shot:
@@ -320,7 +319,7 @@ class AndroidController:
 
     def wait_image(
         self,
-        image: MyTemplate,
+        image: MyTemplate | list[MyTemplate],
         confidence=0.85,
         timeout: float = 10,
         gap=0.15,
@@ -353,7 +352,7 @@ class AndroidController:
         images=None,
         confidence=0.85,
         gap=0.15,
-        after_get_delay=0,
+        after_get_delay: float = 0,
         timeout: float = 10,
     ):
         """等待一系列图片中的一个在屏幕中出现
@@ -410,8 +409,8 @@ class AndroidController:
         images: list | None = None,
         confidence=0.85,
         gap=0.15,
-        after_get_delay=0,
-        timeout=10,
+        after_get_delay: float = 0,
+        timeout: float = 10,
     ):
         """等待一些图片,并返回第一个匹配结果的位置
 
@@ -427,7 +426,7 @@ class AndroidController:
         assert isinstance(rank, int)
         return self.get_image_position(images[rank], False, confidence)
 
-    def click_image(self, image, must_click=False, timeout=0, delay=0.5):
+    def click_image(self, image, must_click=False, timeout: float = 0, delay=0.5):
         """点击一张图片的中心位置
 
         Args:
