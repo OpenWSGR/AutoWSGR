@@ -167,6 +167,8 @@ class RepairMode(IntEnum):
     """中破就修"""
     severe_damage = 2
     """大破才修"""
+    repairing = 3
+    """正在修理中的"""
 
 
 class FightCondition(IntEnum):

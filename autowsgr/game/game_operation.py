@@ -5,7 +5,7 @@ from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
 from autowsgr.timer import Timer
-from autowsgr.types import DestroyShipWorkMode, ShipType
+from autowsgr.types import DestroyShipWorkMode, RepairMode, ShipType
 from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
@@ -205,7 +205,7 @@ def set_support(timer: Timer, target, try_times=0):
 
 def quick_repair(
     timer: Timer,
-    repair_mode: int | list | tuple = 2,
+    repair_mode: int | RepairMode | list[RepairMode] = RepairMode.severe_damage,
     ship_stats=None,
     switch_back=False,
     *args,
@@ -219,7 +219,10 @@ def quick_repair(
             2: 快修, 修大破
             3: 快修, 修复所有正在修理中的船
     """
-    repair_mode_list: list[int] = []
+    repair_mode_list: list[RepairMode] = []
+    if isinstance(repair_mode, int) and repair_mode in [1, 2, 3]:
+        repair_mode = RepairMode(repair_mode)
+    assert not isinstance(repair_mode, int)
     try:
         if ship_stats is None:
             ship_stats = detect_ship_stats(timer)
@@ -230,17 +233,22 @@ def quick_repair(
             timer.logger.warning('执行修理操作时没有成功检测到舰船')
             raise ValueError('没有成功检测到舰船，请检查是否正确编队')
 
-        assert isinstance(repair_mode, int)
-        repair_mode_list = [repair_mode for _ in range(6)]
+        if isinstance(repair_mode, RepairMode):
+            repair_mode_list = [repair_mode for _ in range(6)]
+        else:
+            repair_mode_list = repair_mode
         assert len(repair_mode_list) == 6
 
         need_repair = [False for _ in range(6)]
         for i, x in enumerate(repair_mode_list):
-            assert x in [1, 2, 3]
-            if x == 1:
-                need_repair[i] = ship_stats[i + 1] not in [-1, 0]
-            elif x == 2:
-                need_repair[i] = ship_stats[i + 1] not in [-1, 0, 1]
+            assert x in [RepairMode.moderate_damage, RepairMode.severe_damage, RepairMode.repairing]
+            if x is RepairMode.moderate_damage:
+                need_repair[i] = ship_stats[i + 1] in [1, 2, 3]
+            elif x is RepairMode.severe_damage:
+                need_repair[i] = ship_stats[i + 1] in [2, 3]
+            # 好像修理中的是直接修, 无需通过这个逻辑
+            # elif x is RepairMode.repairing:
+            #     need_repair[i] = ship_stats[i + 1] in [3]
             else:
                 need_repair[i] = False
 
@@ -250,7 +258,7 @@ def quick_repair(
             if timer.config.repair_manually:
                 timer.logger.info('需要手动修理舰船')
                 raise BaseException('需要手动修理舰船')
-            timer.click(420, 420, times=2, delay=0.8)  # 进入修理页面
+            timer.click(420, 420, times=2, delay=0.8)
             # 快修已经开始泡澡的船
             pos = timer.get_image_position(IMG.repair_image[1])
             while pos is not None:
