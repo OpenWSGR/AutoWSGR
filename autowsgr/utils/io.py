@@ -1,5 +1,5 @@
 import os
-from functools import cmp_to_key
+from functools import cmp_to_key, partial
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -188,7 +188,7 @@ def namespace_to_dict(namespace):
     return {key: namespace_to_dict(value) for key, value in namespace.__dict__.items()}
 
 
-def create_namespace(directory, template):
+def create_namespace(directory: str, template: partial) -> MyNamespace:
     """
     根据文件夹层次结构创建 SimpleNamespace 对象.
 

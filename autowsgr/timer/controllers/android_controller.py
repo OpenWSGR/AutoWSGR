@@ -4,9 +4,12 @@ import threading as th
 import time
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
+from typing import Any
 
 import cv2
 from airtest.core.android import Android
+from numpy import uint8
+from numpy.typing import NDArray
 
 from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
@@ -34,15 +37,13 @@ class AndroidController:
     ) -> None:
         self._pool = ProcessPoolExecutor()
 
-        self.screen = None
-        self.dev = dev
-        self.show_android_input = config.show_android_input
-        self.delay = config.delay
-        self.logger = logger
-        self.screen = None
-        self.update_screen()
-        self.resolution = self.screen.shape[:2]
-        self.resolution = self.resolution[::-1]
+        self.dev: Android = dev
+        self.show_android_input: bool = config.show_android_input
+        self.delay: float = config.delay
+        self.logger: Logger = logger
+        self.screen: NDArray = self.get_raw_screen()
+        self.resolution = self.screen.shape[:2][::-1]
+        # (height, width, dimension) -> (width, height)
         self.logger.info(f'resolution:{self.resolution}')
 
     # ========= 基础命令 =========
@@ -67,7 +68,7 @@ class AndroidController:
     def stop_app(self, package_name):
         self.dev.stop_app(package_name)
 
-    def list_apps(self):
+    def list_apps(self) -> bytes | str | Any:
         """列出所有正在运行的应用"""
         return self.dev.shell('ps')
 
@@ -80,7 +81,11 @@ class AndroidController:
         Returns:
             bool:
         """
-        return app in self.list_apps()
+        try:
+            return app in self.list_apps()  # type: ignore
+        except Exception as e:
+            self.logger.error(f'检查游戏是否在运行失败: {e}')
+            return False
 
     # ========= 输入控制信号 =========
     def text(self, t):
@@ -96,7 +101,14 @@ class AndroidController:
         self.logger.debug(f'正在输入: {t}')
         self.dev.text(t)
 
-    def relative_click(self, x, y, times=1, delay=0.5, enable_subprocess=False) -> th.Thread | None:
+    def relative_click(
+        self,
+        x: float,
+        y: float,
+        times: int = 1,
+        delay: float = 0.5,
+        enable_subprocess: bool = False,
+    ) -> th.Thread | None:
         """点击模拟器相对坐标 (x,y).
         Args:
             x,y:相对坐标
@@ -201,13 +213,17 @@ class AndroidController:
         self.relative_long_tap(x, y, duration, delay)
 
     # ======== 屏幕相关 ========
-    def update_screen(self):
+    def get_raw_screen(self) -> NDArray[uint8]:
+        """返回一个未裁剪的屏幕"""
         start_time = time.time()
         while (screen := self.dev.snapshot(quality=99)) is None:
             if time.time() - start_time > 10:
-                raise CriticalErr('截图持续返回 None，模拟器可能已经失去响应')
+                raise CriticalErr('截图持续返回 None, 模拟器可能已经失去响应')
             time.sleep(0.1)
-        self.screen = screen
+        return screen
+
+    def update_screen(self):
+        self.screen = self.get_raw_screen()
 
     def get_screen(self, resolution=(1280, 720), need_screen_shot=True):
         """获取屏幕图片
@@ -218,7 +234,7 @@ class AndroidController:
             self.update_screen()
         return cv2.resize(self.screen, resolution)
 
-    def get_pixel(self, x, y, screen_shot=False) -> list:
+    def get_pixel(self, x, y, screen_shot=False) -> list[int]:
         """获取当前屏幕相对坐标 (x,y) 处的像素值
         Args:
             x (int): [0, 960)
@@ -232,7 +248,13 @@ class AndroidController:
             self.screen = cv2.resize(self.screen, (960, 540))
         return [self.screen[y][x][2], self.screen[y][x][1], self.screen[y][x][0]]
 
-    def check_pixel(self, position, bgr_color, distance=30, screen_shot=False) -> bool:
+    def check_pixel(
+        self,
+        position: tuple[int, int],
+        bgr_color,
+        distance=30,
+        screen_shot=False,
+    ) -> bool:
         r"""检查像素点是否满足要求
         Args:
             position (_type_): (x, y) 坐标, x 是长, 相对 960x540 的值, x \in [0, 960)
@@ -251,7 +273,7 @@ class AndroidController:
 
     def get_image_position(
         self,
-        image,
+        images: MyTemplate | list[MyTemplate],
         need_screen_shot=True,
         confidence=0.85,
     ):
@@ -263,7 +285,6 @@ class AndroidController:
 
             否则返回 None
         """
-        images = image
         if not isinstance(images, Iterable):
             images = [images]
         if need_screen_shot:
@@ -298,9 +319,9 @@ class AndroidController:
 
     def wait_image(
         self,
-        image: MyTemplate,
+        image: MyTemplate | list[MyTemplate],
         confidence=0.85,
-        timeout=10,
+        timeout: float = 10,
         gap=0.15,
         after_get_delay: float = 0,
     ):
@@ -331,7 +352,7 @@ class AndroidController:
         images=None,
         confidence=0.85,
         gap=0.15,
-        after_get_delay=0,
+        after_get_delay: float = 0,
         timeout: float = 10,
     ):
         """等待一系列图片中的一个在屏幕中出现
@@ -346,7 +367,9 @@ class AndroidController:
 
         Returns:
             None: 未找到任何图片
-            a number of int: 第一个出现的图片的下标(0-based) if images is a list
+
+            int: 第一个出现的图片的下标(0-based) if images is a list
+
             the key of the value: if images is a dict
         """
         if timeout < 0:
@@ -383,11 +406,11 @@ class AndroidController:
 
     def wait_images_position(
         self,
-        images=None,
+        images: list | None = None,
         confidence=0.85,
         gap=0.15,
-        after_get_delay=0,
-        timeout=10,
+        after_get_delay: float = 0,
+        timeout: float = 10,
     ):
         """等待一些图片,并返回第一个匹配结果的位置
 
@@ -400,9 +423,10 @@ class AndroidController:
         rank = self.wait_images(images, confidence, gap, after_get_delay, timeout)
         if rank is None:
             return None
+        assert isinstance(rank, int)
         return self.get_image_position(images[rank], False, confidence)
 
-    def click_image(self, image, must_click=False, timeout=0, delay=0.5):
+    def click_image(self, image, must_click=False, timeout: float = 0, delay=0.5):
         """点击一张图片的中心位置
 
         Args:

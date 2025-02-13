@@ -7,7 +7,7 @@ from autowsgr.timer import Timer
 
 
 NODE_POSITION = (
-    None,
+    (0, 0),
     (0.583, 0.206),
     (0.439, 0.472),
     (0.663, 0.672),
@@ -51,7 +51,8 @@ class EventFightPlan20250123(Event, NormalFightPlan):
         self.timer.click_image(self.event_image[3], timeout=10)
 
     def _go_fight_prepare_page(self) -> None:
-        if not self.timer.image_exist(self.info.event_image[1]):
+        assert isinstance(self.config.map, int)
+        if not self.timer.image_exist(self.event_image[1]):
             self.timer.relative_click(*NODE_POSITION[self.config.map])
 
         if not self.timer.click_image(self.event_image[1], timeout=10):

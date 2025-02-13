@@ -1,7 +1,6 @@
 import os
 import sys
 from enum import Enum
-from typing_extensions import Self
 
 from autowsgr.utils.operator import unzip_element
 
@@ -11,7 +10,9 @@ class BaseEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: str) -> None:
-        supported_values = ', '.join(cls.__members__.values())
+        supported_values = ', '.join(
+            [enum_object.value.__str__() for enum_object in cls.__members__.values()],
+        )
         raise ValueError(f'"{value}" 不是合法的{cls.__name__}取值. 支持的有: [{supported_values}]')
 
     @classmethod
@@ -49,7 +50,7 @@ class OSType(StrEnum):
     macos = 'macOS'
 
     @classmethod
-    def auto(cls) -> Self:
+    def auto(cls) -> 'OSType':
         if sys.platform.startswith('win'):
             return OSType.windows
         if sys.platform == 'darwin':
@@ -67,7 +68,7 @@ class EmulatorType(StrEnum):
     def default_emulator_name(self, os: OSType) -> str:
         """自动获取默认模拟器连接名称"""
         if os == OSType.windows:
-            match self.value:
+            match self:
                 case EmulatorType.leidian:
                     return 'emulator-5554'
                 case EmulatorType.mumu:
@@ -75,7 +76,7 @@ class EmulatorType(StrEnum):
                 case _:
                     raise ValueError(f'没有为 {self.value} 模拟器设置默认emulator_name，请手动指定')
         elif os == OSType.macos:
-            match self.value:
+            match self:
                 case EmulatorType.bluestacks:
                     return '127.0.0.1:5555'
                 case EmulatorType.mumu:
@@ -100,7 +101,7 @@ class EmulatorType(StrEnum):
         import winreg
 
         try:
-            match self.value:
+            match self:
                 case EmulatorType.leidian:
                     with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\leidian') as key:
                         sub_key = winreg.EnumKey(key, 0)
@@ -128,7 +129,7 @@ class EmulatorType(StrEnum):
 
     def macos_auto_emulator_path(self) -> str:
         """macOS自动识别模拟器路径"""
-        match self.value:
+        match self:
             case EmulatorType.mumu:
                 path = '/Applications/MuMuPlayer.app'
             case EmulatorType.bluestacks:
@@ -151,7 +152,7 @@ class GameAPP(StrEnum):
 
     @property
     def app_name(self) -> str:
-        match self.value:
+        match self:
             case GameAPP.official:
                 return 'com.huanmeng.zhanjian2'
             case GameAPP.xiaomi:
@@ -159,7 +160,7 @@ class GameAPP(StrEnum):
             case GameAPP.tencent:
                 return 'com.tencent.tmgp.zhanjian2'
             case _:
-                raise ValueError(f'没有为 {self.value} 设置包名，请手动指定')
+                raise ValueError(f'没有为 {self} 设置包名，请手动指定')
 
 
 class RepairMode(IntEnum):
@@ -167,6 +168,8 @@ class RepairMode(IntEnum):
     """中破就修"""
     severe_damage = 2
     """大破才修"""
+    repairing = 3
+    """正在修理中的"""
 
 
 class FightCondition(IntEnum):
@@ -269,7 +272,7 @@ class ShipType(StrEnum):
             ShipType.BG: (0.646, 0.561),
             ShipType.Other: (0.738, 0.561),
         }
-        return dict[self.value]
+        return dict[self]
 
 
 class DestroyShipWorkMode(IntEnum):

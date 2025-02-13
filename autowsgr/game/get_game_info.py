@@ -299,7 +299,7 @@ def get_exercise_stats(timer: Timer, robot=None) -> list[None] | None:
     down = timer.check_pixel((933, 489), (177, 171, 176), distance=60)
     assert not (up and down)
 
-    result = [
+    result: list = [
         None,
     ]
     if not up and not down:

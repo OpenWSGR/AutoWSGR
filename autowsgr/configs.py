@@ -270,6 +270,7 @@ class UserConfig(BaseConfig):
                 'emulator_start_cmd',
                 self.emulator_type.auto_emulator_path(self.os_type),
             )
+        assert self.emulator_start_cmd is not None
         if self.emulator_process_name is None:
             object.__setattr__(
                 self,
@@ -429,7 +430,7 @@ class NodeConfig(BaseConfig):
                 Formation(self.formation_when_spot_enemy_fails),
             )
         if isinstance(self.proceed_stop, list):
-            object.__setattr__(self, 'proceed_stop', [RepairMode[r] for r in self.proceed_stop])
+            object.__setattr__(self, 'proceed_stop', [RepairMode(r) for r in self.proceed_stop])
         else:
             object.__setattr__(
                 self,

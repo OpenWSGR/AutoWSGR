@@ -149,19 +149,19 @@ class Timer(AndroidController):
         # ========== 检查游戏页面状态 ============
         try:
             self.set_page()
-            success_note = '启动成功, 当前位置:'
             if isinstance(self.now_page, Node):
-                success_note += self.now_page.name
-            elif isinstance(self.now_page, str):
-                success_note += self.now_page
-            self.logger.info(success_note)
-        except:
-            if 'check_page' in self.config.__dict__ and self.config.check_page:
-                self.logger.warning('无法确定当前页面, 尝试重启游戏')
-                self.restart()
-                self.set_page()
+                self.logger.info(f'启动成功, 当前位置: {self.now_page.name}')
             else:
-                self.logger.warning('在无法确定页面的情况下继续.')
+                if self.config.check_page:
+                    self.logger.warning('无法确定当前页面, 尝试重启游戏')
+                    self.restart()
+                    self.set_page()
+                else:
+                    self.logger.warning('在无法确定页面的情况下继续.')
+        except Exception as ex:
+            self.logger.warning(f'出现未知错误, 尝试重启游戏:{ex}')
+            self.restart()
+            self.set_page()
 
     def log_in(self, account, password):
         pass
@@ -513,10 +513,8 @@ class Timer(AndroidController):
         Raises:
             ValueError: _description_
         """
-        if list1 is None:
-            list1 = []
-        if list2 is None:
-            list2 = []
+        list1 = [] if list1 is None else list1
+        list2 = [] if list2 is None else list2
 
         if quit_operation_time > 200:
             if self.is_other_device_login():
@@ -533,6 +531,8 @@ class Timer(AndroidController):
         self.now_page = self.ui.get_node_by_name('main_page')
         if len(list1) == 0:
             list1 = IMG.back_buttons[1:] + list2
+        if list1 is None:
+            raise ValueError('list1 is None')
         type = self.wait_images([*list1, IMG.game_ui[3]], 0.8, timeout=0)
 
         if type is None:
@@ -545,6 +545,8 @@ class Timer(AndroidController):
                 return
 
         pos = self.get_image_position(list1[type], False, 0.8)
+        if pos is None:
+            raise ImageNotFoundErr('no image found, pos is None')
         self.click(pos[0], pos[1])
 
         new_list = list1[1:] + [list1[0]]
@@ -558,6 +560,9 @@ class Timer(AndroidController):
         """
         self.walk_to(target)
         if extra_check:
+            if not isinstance(self.now_page, Node):
+                self.logger.error(f'now_page: {self.now_page} is not Node')
+                raise TypeError('now_page is not a Node object')
             self.wait_pages(names=[self.now_page.name])
 
     def confirm_operation(
@@ -593,15 +598,18 @@ class Timer(AndroidController):
             confidence=confidence,
             need_screen_shot=False,
         )
+        if res is None:
+            return False
         self.click(res[0], res[1], delay=delay)
         return True
 
 
 def process_error(timer: Timer):
+    """这个方法目前没有用到, ControllerAdapter也没有定义过, 暂时保留"""
     print('processing errors')
-    if not timer.ControllerAdapter.is_android_online() or not timer.is_game_running():
-        timer.ControllerAdapter.restart_android()
-        timer.ControllerAdapter.connect_android()
+    if not timer.ControllerAdapter.is_android_online() or not timer.is_game_running():  # type: ignore
+        timer.ControllerAdapter.restart_android()  # type: ignore
+        timer.ControllerAdapter.connect_android()  # type: ignore
 
         return 'Android Restarted'
 
@@ -615,6 +623,6 @@ def try_to_get_expedition(timer: Timer):
         timer.click(pos[0], pos[1], delay=1)
         timer.wait_image(IMG.fight_image[3], after_get_delay=0.25)
         timer.click(900, 500, delay=1)
-        timer.confirm_operation(must_confirm=1, delay=0.5, confidence=0.9)
+        timer.confirm_operation(must_confirm=True, delay=0.5, confidence=0.9)
         pos, get = timer.wait_image(IMG.game_ui[6], timeout=2), True
     return get

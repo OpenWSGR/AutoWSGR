@@ -44,7 +44,7 @@ def edit_distance(word1, word2) -> int:
 def find_lcseque(s1, s2):
     """求两个字符串的LCS"""
     m = [[0 for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
-    d = [[None for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
+    d: list[list[str | None]] = [[None for x in range(len(s2) + 1)] for y in range(len(s1) + 1)]
     for p1 in range(len(s1)):
         for p2 in range(len(s2)):
             if s1[p1] == s2[p2]:
@@ -87,7 +87,7 @@ class OCRBackend(Protocol):
     def read_text(
         self,
         img,
-        allowlist: list[str] | None = None,
+        allowlist: list[str] | None | str = None,
         sort: str = 'left-to-right',
         **kwargs,
     ):
@@ -122,7 +122,7 @@ class OCRBackend(Protocol):
     def recognize(
         self,
         img,
-        allowlist: list[str] | None = None,
+        allowlist: list[str] | None | str = None,
         candidates: list[str] | None = None,
         multiple=False,
         allow_nan=False,
@@ -219,7 +219,7 @@ class OCRBackend(Protocol):
                     ),
                 )
         if self.config.show_ocr_info:
-            self.logger.debug(f'修正OCR结果：{results}')
+            self.logger.debug(f'修正OCR结果: {results}')
 
         if allow_nan and not results:
             return None
@@ -299,6 +299,10 @@ class OCRBackend(Protocol):
                 candidates=candidates,
                 **kwargs,
             )
+            # 因为 recognize 的参数 allow_nan 为 False，所以 res 不会为 None
+            assert res is not None
+            # 因为 recognize 的参数 multiple 为 True，所以 res 不会为 str
+            assert not isinstance(res, str)
             for j in range(len(res)):
                 res[j][0][1] = res[j][0][1] + location[i][0] - 1
             ret += res
@@ -326,7 +330,7 @@ class EasyocrBackend(OCRBackend):
     def read_text(
         self,
         img,
-        allowlist: list[str] | None = None,
+        allowlist: list[str] | None | str = None,
         sort='left-to-right',
         # TODO：以下参数可能需要调整，以获得最好OCR性能
         min_size=7,

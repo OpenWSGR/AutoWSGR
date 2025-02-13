@@ -1,11 +1,11 @@
 import time
 
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundErr
-from autowsgr.constants.image_templates import IMG
+from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
 from autowsgr.timer import Timer
-from autowsgr.types import DestroyShipWorkMode, ShipType
+from autowsgr.types import DestroyShipWorkMode, RepairMode, ShipType
 from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
@@ -15,13 +15,18 @@ def get_ship(timer: Timer):
     def recognize_get_ship(timer: Timer):
         """识别获取 舰船/装备 页面斜着的文字，对原始图片进行旋转裁切"""
         NAME_POSITION = [(0.754, 0.268), (0.983, 0.009), 25]
-        ship_name = timer.recognize(
+        ship_name_recognize_result = timer.recognize(
             crop_image(timer.screen, *NAME_POSITION),
             candidates=timer.ship_names,
-        )[1]
+        )
+        assert ship_name_recognize_result is not None
+        ship_name = ship_name_recognize_result[1]
 
         TYPE_POSITION = [(0.804, 0.27), (0.881, 0.167), 25]
-        ship_type = timer.recognize(crop_image(timer.screen, *TYPE_POSITION))[1]
+        ship_type_recognize_result = timer.recognize(crop_image(timer.screen, *TYPE_POSITION))
+        # 因为 allow_nan 为 False, 所以肯定不是 None
+        assert ship_type_recognize_result is not None
+        ship_type = ship_type_recognize_result[1]
 
         return ship_name, ship_type
 
@@ -33,7 +38,8 @@ def get_ship(timer: Timer):
             f'当前船坞容量 {timer.port.ship_factory.occupation}/{timer.port.ship_factory.capacity}',
         )
         timer.port.ship_factory.occupation += 1
-    while timer.wait_image([IMG.symbol_image[8], IMG.symbol_image[13]], timeout=1):
+    symbol_images: list[MyTemplate] = [IMG.symbol_image[8], IMG.symbol_image[13]]
+    while timer.wait_image(symbol_images, timeout=1):
         try:
             ship_name, ship_type = recognize_get_ship(timer)
         except Exception as e:
@@ -90,7 +96,9 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
         destroy_types = ship_types if ship_types is not None else timer.config.destroy_ship_types
 
         if timer.config.destroy_ship_work_mode is DestroyShipWorkMode.exclude:
-            intended_destroy_types = [x for x in ShipType.enum() if x not in destroy_types]
+            intended_destroy_types: list[ShipType] = [
+                x for x in ShipType.enum() if x not in destroy_types
+            ]
         elif timer.config.destroy_ship_work_mode is DestroyShipWorkMode.include:
             intended_destroy_types = destroy_types
         else:
@@ -99,7 +107,7 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
         if intended_destroy_types is not None:
             timer.relative_click(0.912, 0.681)
             for ship_type in intended_destroy_types:
-                timer.relative_click(*ship_type.relative_position_in_destroy, delay=0.8)
+                timer.relative_click(*ship_type.relative_position_in_destroy, times=1, delay=0.8)
             timer.relative_click(0.9, 0.85, delay=1.5)
 
     timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
@@ -197,7 +205,7 @@ def set_support(timer: Timer, target, try_times=0):
 
 def quick_repair(
     timer: Timer,
-    repair_mode=2,
+    repair_mode: int | RepairMode | list[RepairMode] = RepairMode.severe_damage,
     ship_stats=None,
     switch_back=False,
     *args,
@@ -206,12 +214,15 @@ def quick_repair(
     """战斗界面的快速修理
     Args:
         timer (Timer): _description_
-        repair_mode:
+        repair_mode: int
             1: 快修, 修中破
             2: 快修, 修大破
             3: 快修, 修复所有正在修理中的船
     """
-    arg = repair_mode
+    repair_mode_list: list[RepairMode] = []
+    if isinstance(repair_mode, int) and repair_mode in [1, 2, 3]:
+        repair_mode = RepairMode(repair_mode)
+    assert not isinstance(repair_mode, int)
     try:
         if ship_stats is None:
             ship_stats = detect_ship_stats(timer)
@@ -222,18 +233,22 @@ def quick_repair(
             timer.logger.warning('执行修理操作时没有成功检测到舰船')
             raise ValueError('没有成功检测到舰船，请检查是否正确编队')
 
-        assert type(repair_mode) in [int, list, tuple]
-        if type(repair_mode) is int:  # 指定所有统一修理方案
-            repair_mode = [repair_mode for _ in range(6)]
+        if isinstance(repair_mode, RepairMode):
+            repair_mode_list = [repair_mode for _ in range(6)]
+        else:
+            repair_mode_list = repair_mode
+        assert len(repair_mode_list) == 6
 
-        assert len(repair_mode) == 6
         need_repair = [False for _ in range(6)]
-        for i, x in enumerate(repair_mode):
-            assert x in [1, 2, 3]
-            if x == 1:
-                need_repair[i] = ship_stats[i + 1] not in [-1, 0]
-            elif x == 2:
-                need_repair[i] = ship_stats[i + 1] not in [-1, 0, 1]
+        for i, x in enumerate(repair_mode_list):
+            assert x in [RepairMode.moderate_damage, RepairMode.severe_damage, RepairMode.repairing]
+            if x is RepairMode.moderate_damage:
+                need_repair[i] = ship_stats[i + 1] in [1, 2, 3]
+            elif x is RepairMode.severe_damage:
+                need_repair[i] = ship_stats[i + 1] in [2, 3]
+            # 好像修理中的是直接修, 无需通过这个逻辑
+            # elif x is RepairMode.repairing:
+            #     need_repair[i] = ship_stats[i + 1] in [3]
             else:
                 need_repair[i] = False
 
@@ -243,7 +258,7 @@ def quick_repair(
             if timer.config.repair_manually:
                 timer.logger.info('需要手动修理舰船')
                 raise BaseException('需要手动修理舰船')
-            timer.click(420, 420, times=2, delay=0.8)  # 进入修理页面
+            timer.click(420, 420, times=2, delay=0.8)
             # 快修已经开始泡澡的船
             pos = timer.get_image_position(IMG.repair_image[1])
             while pos is not None:
@@ -264,7 +279,7 @@ def quick_repair(
             if switch_back:
                 timer.click(200, 420, times=2, delay=1.5)  # 返回正常切换页面
     except AssertionError:
-        raise ValueError(f'修理舰船的参数不合法, 请检查你的参数:{arg}')
+        raise ValueError(f'修理舰船的参数不合法, 请检查你的参数:{repair_mode}')
 
 
 def get_rewards(timer: Timer):
@@ -275,10 +290,10 @@ def get_rewards(timer: Timer):
     timer.goto_game_page('mission_page')
     if timer.click_image(IMG.game_ui[15]):
         timer.relative_click(0.5, 0.5)
-        timer.confirm_operation(must_confirm=1, timeout=5)
+        timer.confirm_operation(must_confirm=True, timeout=5)
         return 'ok'
     if timer.click_image(IMG.game_ui[12]):
-        timer.confirm_operation(must_confirm=1)
+        timer.confirm_operation(must_confirm=True)
         return 'ok'
     return 'no'
     # timer.click(774, 502)
@@ -343,7 +358,7 @@ def supply(timer: Timer, ship_ids=None, try_times=0):
 def change_ship(
     timer: Timer,
     fleet_id,
-    ship_id=None,
+    ship_id: int,
     name=None,
     pre=None,
     ship_stats=None,

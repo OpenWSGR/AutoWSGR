@@ -316,8 +316,8 @@ class DecisiveBattle:
     def next(self) -> Literal['quit', 'next', 'continue']:
         res = self.stats.next()
         if res in ['next', 'quit']:
-            self.timer.confirm_operation(timeout=5, must_confirm=1)  # 确认通关
-            self.timer.confirm_operation(timeout=5, must_confirm=1)  # 确认领取奖励
+            self.timer.confirm_operation(timeout=5, must_confirm=True)  # 确认通关
+            self.timer.confirm_operation(timeout=5, must_confirm=True)  # 确认领取奖励
             get_ship(self.timer)
         return res
 
