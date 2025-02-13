@@ -124,7 +124,13 @@ def image_rotate_without_crop(mat, angle):
     return cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
 
 
-def crop_rectangle_relative(image, x_ratio, y_ratio, width_ratio, height_ratio):
+def crop_rectangle_relative(
+    image,
+    x_ratio: float,
+    y_ratio: float,
+    width_ratio: float,
+    height_ratio: float,
+):
     """
     根据相对坐标和尺寸裁剪图像。
 
@@ -236,6 +242,8 @@ def crop_image(image, pos1, pos2, rotation=0, debug=False):
         ret = crop_rotated_rectangle(image, rect)
 
     if debug:
+        if ret is None:
+            return None
         cv2.imwrite('crop_image.png', ret)
 
     return ret
