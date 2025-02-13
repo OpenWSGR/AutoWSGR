@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 
 from autowsgr.constants.image_templates import MyTemplate
 
@@ -24,7 +25,7 @@ def cv_show_image(img):
     cv2.destroyAllWindows()
 
 
-def absolute_to_relative(absolute_pos, resolution=(960, 540)):
+def absolute_to_relative(absolute_pos, resolution=(960, 540)) -> tuple[float, float]:
     """将绝对坐标转换为相对坐标"""
     abs_x, abs_y = absolute_pos
     _w, _h = resolution
@@ -213,15 +214,21 @@ def crop_rotated_rectangle(image, rect):
     ]
 
 
-def crop_image(image, pos1, pos2, rotation=0, debug=False):
+def crop_image(
+    image: NDArray,
+    pos1: tuple[float, float],
+    pos2: tuple[float, float],
+    rotation: int = 0,
+    debug: bool = False,
+):
     """裁剪出矩形, pos1 左下角相对位置, pos2 右上角相对位置。如果指定旋转角度，则返回剪裁+旋转后的图片
 
     Args:
         image (np.ndarray): 图片
         pos1 (Tuple[float, float]): 左下角相对位置
         pos2 (Tuple[float, float]): 右上角相对位置
-        rotation (int, optional): 旋转角度[-180, 180]. 正值逆时针旋转. Defaults to 0.
-        debug (bool, optional): 是否保存调试图片. Defaults to False.
+        rotation (int): 旋转角度[-180, 180]. 正值逆时针旋转. Defaults to 0.
+        debug (bool): 是否保存调试图片. Defaults to False.
     """
     resolution = (image.shape[1], image.shape[0])
     x1, y2 = map(int, relative_to_absolute(pos1, resolution))
@@ -250,7 +257,7 @@ def crop_image(image, pos1, pos2, rotation=0, debug=False):
 
 
 def locate_image_center(
-    image: np.ndarray,
+    image: NDArray,
     query: MyTemplate,
     confidence=0.85,
 ):

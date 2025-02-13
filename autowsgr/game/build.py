@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 
 from autowsgr.constants.image_templates import IMG
 from autowsgr.game.game_operation import get_ship
@@ -57,7 +58,7 @@ class BuildManager:
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
         # -1代表空位. None代表未开通
-        self.slot_eta = {
+        self.slot_eta: dict[str, list[Any]] = {
             'ship': [None] * 4,
             'equipment': [None] * 4,
         }
@@ -141,7 +142,7 @@ class BuildManager:
         if allow_fast_build:
             while self.timer.image_exist(IMG.build_image[type].fast):
                 self.timer.click_image(IMG.build_image[type].fast)
-                self.timer.confirm_operation(must_confirm=1, timeout=3)
+                self.timer.confirm_operation(must_confirm=True, timeout=3)
 
         # 收完成
         while self.timer.image_exist(IMG.build_image[type].complete):
@@ -202,10 +203,12 @@ class BuildManager:
                     list: 拆分为3位数的资源
                 """
                 screen = self.timer.get_screen()
-                value = self.timer.recognize_number(
+                recognize_result = self.timer.recognize_number(
                     crop_image(screen, *RESOURCE_AREAS[resource_id]),
                     rgb_select=(255, 155, 81),
-                )[1]
+                )
+                assert recognize_result is not None
+                value = recognize_result[1]
                 return value_to_digits(value)
 
             resource_digits = [value_to_digits(res) for res in resources]

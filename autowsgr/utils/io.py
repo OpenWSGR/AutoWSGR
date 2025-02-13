@@ -40,7 +40,7 @@ def dict_to_yaml(dict_data, yaml_file):
         yaml.dump(dict_data, f)
 
 
-def recursive_dict_update(d, u, skip=None):
+def recursive_dict_update(d: dict, u: dict, skip=None):
     if skip is None:
         skip = []
     for k, v in u.items():

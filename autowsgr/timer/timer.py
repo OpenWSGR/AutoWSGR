@@ -593,6 +593,7 @@ class Timer(AndroidController):
             if must_confirm:
                 raise ImageNotFoundErr('no confirm image found')
             return False
+        assert isinstance(pos, int)
         res = self.get_image_position(
             IMG.confirm_image[pos + 1],
             confidence=confidence,
