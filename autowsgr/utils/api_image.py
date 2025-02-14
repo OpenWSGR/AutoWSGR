@@ -256,6 +256,39 @@ def crop_image(
     return ret
 
 
+def crop(
+    image: NDArray,
+    center: tuple[float, float] = (0.5, 0.5),
+    left_top: tuple[float, float] = (0, 0),
+    right_buttom: tuple[float, float] = (0, 0),
+    rotation_ccw: float = 0,
+    debug: bool = False,
+) -> NDArray:
+    """旋转并裁剪图像
+
+    Args:
+        image (NDArray): 图片
+        center (tuple[float, float], optional): 旋转中心相对位置. Defaults to (0.5, 0.5).
+        left_top (tuple[float, float], optional): 旋转后左上角相对位置. Defaults to (0, 0).
+        right_buttom (tuple[float, float], optional): 旋转后右下角相对位置. Defaults to (0, 0).
+        rotation_ccw (float, optional): 逆时针旋转角度. Defaults to 0.
+        debug (bool, optional): 是否保存调试图片. Defaults to False.
+    """
+    resolution = (image.shape[1], image.shape[0])
+    center_x, center_y = map(int, relative_to_absolute(center, resolution))
+    left_top_x, left_top_y = map(int, relative_to_absolute(left_top, resolution))
+    right_buttom_x, right_buttom_y = map(int, relative_to_absolute(right_buttom, resolution))
+    if rotation_ccw == 0:
+        ret = image[left_top_y:right_buttom_y, left_top_x:right_buttom_x]
+    else:
+        rot_mat = cv2.getRotationMatrix2D((center_x, center_y), -rotation_ccw, 1)
+        rotated_image = cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
+        ret = rotated_image[left_top_y:right_buttom_y, left_top_x:right_buttom_x]
+    if debug:
+        cv2.imwrite('crop_image.png', ret)
+    return ret
+
+
 def locate_image_center(
     image: NDArray,
     query: MyTemplate,
