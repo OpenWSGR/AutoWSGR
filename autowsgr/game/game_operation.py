@@ -222,7 +222,6 @@ def quick_repair(
     repair_mode_list: list[RepairMode] = []
     if isinstance(repair_mode, int) and repair_mode in [1, 2, 3]:
         repair_mode = RepairMode(repair_mode)
-    assert not isinstance(repair_mode, int)
     try:
         if ship_stats is None:
             ship_stats = detect_ship_stats(timer)
