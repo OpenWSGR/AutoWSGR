@@ -22,7 +22,7 @@ def get_ship(timer: Timer):
         assert ship_name_recognize_result is not None
         ship_name = ship_name_recognize_result[1]
 
-        TYPE_POSITION = [(0.804, 0.167), (0.881, 0.27), 25]
+        TYPE_POSITION = [(0.774, 0.163), (0.925, 0.27), 25]
         ship_type_recognize_result = timer.recognize(crop(timer.screen, *TYPE_POSITION, debug=True))
         # 因为 allow_nan 为 False, 所以肯定不是 None
         assert ship_type_recognize_result is not None
