@@ -6,7 +6,7 @@ from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
 from autowsgr.timer import Timer
 from autowsgr.types import DestroyShipWorkMode, RepairMode, ShipType
-from autowsgr.utils.api_image import absolute_to_relative, crop, crop_image
+from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
 def get_ship(timer: Timer):
@@ -22,8 +22,8 @@ def get_ship(timer: Timer):
         assert ship_name_recognize_result is not None
         ship_name = ship_name_recognize_result[1]
 
-        TYPE_POSITION = [(0.774, 0.163), (0.925, 0.27), 25]
-        ship_type_recognize_result = timer.recognize(crop(timer.screen, *TYPE_POSITION, debug=True))
+        TYPE_POSITION = [(0.774, 0.27), (0.925, 0.163), 25]
+        ship_type_recognize_result = timer.recognize(crop_image(timer.screen, *TYPE_POSITION))
         # 因为 allow_nan 为 False, 所以肯定不是 None
         assert ship_type_recognize_result is not None
         ship_type = ship_type_recognize_result[1]
