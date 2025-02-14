@@ -1,3 +1,5 @@
+import math
+
 import cv2
 import numpy as np
 from numpy.typing import NDArray
@@ -258,35 +260,60 @@ def crop_image(
 
 def crop(
     image: NDArray,
-    center: tuple[float, float] = (0.5, 0.5),
-    left_top: tuple[float, float] = (0, 0),
-    right_buttom: tuple[float, float] = (1, 1),
-    rotation_ccw: float = 0,
+    point_a: tuple[float, float] = (0, 0),
+    point_b: tuple[float, float] = (1, 1),
+    rotation_cw: float = 0,
     debug: bool = False,
 ) -> NDArray:
     """旋转并裁剪图像
 
     Args:
         image (NDArray): 图片
-        center (tuple[float, float], optional): 旋转中心相对位置. Defaults to (0.5, 0.5).
-        left_top (tuple[float, float], optional): 旋转后左上角相对位置. Defaults to (0, 0).
-        right_buttom (tuple[float, float], optional): 旋转后右下角相对位置. Defaults to (1, 1).
-        rotation_ccw (float, optional): 逆时针旋转角度. Defaults to 0.
+        point_a/b (tuple[float, float], optional): 旋转矩形的一条对角线的两个顶点相对坐标.
+        rotation_ccw (float, optional): 顺时针旋转角度. Defaults to 0.
         debug (bool, optional): 是否保存调试图片. Defaults to False.
     """
+    center = ((point_a[0] + point_b[0]) / 2, (point_a[1] + point_b[1]) / 2)
+    if rotation_cw != 0:
+        point_a = rotate_point(center, point_a, math.radians(-rotation_cw))
+        point_b = rotate_point(center, point_b, math.radians(-rotation_cw))
     resolution = (image.shape[1], image.shape[0])
     center_x, center_y = map(int, relative_to_absolute(center, resolution))
-    left_top_x, left_top_y = map(int, relative_to_absolute(left_top, resolution))
-    right_buttom_x, right_buttom_y = map(int, relative_to_absolute(right_buttom, resolution))
-    if rotation_ccw == 0:
-        ret = image[left_top_y:right_buttom_y, left_top_x:right_buttom_x]
+    a_x, a_y = map(int, relative_to_absolute(point_a, resolution))
+    b_x, b_y = map(int, relative_to_absolute(point_b, resolution))
+    small_x = min(a_x, b_x)
+    big_x = max(a_x, b_x)
+    small_y = min(a_y, b_y)
+    big_y = max(a_y, b_y)
+    if rotation_cw == 0:
+        ret = image[small_y:big_y, small_x:big_x]
     else:
-        rot_mat = cv2.getRotationMatrix2D((center_x, center_y), -rotation_ccw, 1)
+        rot_mat = cv2.getRotationMatrix2D((center_x, center_y), -rotation_cw, 1)
         rotated_image = cv2.warpAffine(image, rot_mat, (image.shape[1], image.shape[0]))
-        ret = rotated_image[left_top_y:right_buttom_y, left_top_x:right_buttom_x]
+        ret = rotated_image[small_y:big_y, small_x:big_x]
     if debug:
         cv2.imwrite('crop_image.png', ret)
     return ret
+
+
+def rotate_point(center, point, theta):
+    """
+    计算点 (x, y) 绕点 (cx, cy) 旋转 theta 弧度后的新坐标。
+
+    :param cx: 旋转中心的 x 坐标
+    :param cy: 旋转中心的 y 坐标
+    :param x: 要旋转的点的 x 坐标
+    :param y: 要旋转的点的 y 坐标
+    :param theta: 旋转角度（弧度）
+    :return: 旋转后的新坐标 (x', y')
+    """
+    cx, cy = center
+    x, y = point
+    dx = x - cx
+    dy = y - cy
+    x_new = cx + dx * math.cos(theta) - dy * math.sin(theta)
+    y_new = cy + dx * math.sin(theta) + dy * math.cos(theta)
+    return x_new, y_new
 
 
 def locate_image_center(
