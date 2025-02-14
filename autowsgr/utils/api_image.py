@@ -260,7 +260,7 @@ def crop(
     image: NDArray,
     center: tuple[float, float] = (0.5, 0.5),
     left_top: tuple[float, float] = (0, 0),
-    right_buttom: tuple[float, float] = (0, 0),
+    right_buttom: tuple[float, float] = (1, 1),
     rotation_ccw: float = 0,
     debug: bool = False,
 ) -> NDArray:
@@ -270,7 +270,7 @@ def crop(
         image (NDArray): 图片
         center (tuple[float, float], optional): 旋转中心相对位置. Defaults to (0.5, 0.5).
         left_top (tuple[float, float], optional): 旋转后左上角相对位置. Defaults to (0, 0).
-        right_buttom (tuple[float, float], optional): 旋转后右下角相对位置. Defaults to (0, 0).
+        right_buttom (tuple[float, float], optional): 旋转后右下角相对位置. Defaults to (1, 1).
         rotation_ccw (float, optional): 逆时针旋转角度. Defaults to 0.
         debug (bool, optional): 是否保存调试图片. Defaults to False.
     """
