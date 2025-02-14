@@ -108,7 +108,7 @@ class Fleet:
             img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
             recognize_result = self.timer.ocr_backend.recognize_number(img, min_size=3)
-            assert recognize_result is list
+            assert recognize_result is not None
             self.levels[i] = int(recognize_result[1])
             # print(levels)
         self.timer.logger.info(f'等级识别结果: {self.levels}')

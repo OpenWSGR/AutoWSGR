@@ -612,14 +612,12 @@ class DecisiveFightTask(Task):
             raise ValueError('未配置决战任务')
         self.times = times
 
-        if timer.config.decisive_battle.level1 is None:
-            if timer.config.decisive_battle.level2 is None:
-                raise ValueError('未配置决战任务舰队')
-            self.ships = timer.config.decisive_battle.level2
-        elif timer.config.decisive_battle.level2 is None:
-            self.ships = timer.config.decisive_battle.level1
-        else:
-            self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
+        if (
+            timer.config.decisive_battle.level1 is None
+            and timer.config.decisive_battle.level2 is None
+        ):
+            raise ValueError('未配置决战任务舰队')
+        self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
 
         self.db = DecisiveFight(self.timer)
         self.db.rships = self.ships

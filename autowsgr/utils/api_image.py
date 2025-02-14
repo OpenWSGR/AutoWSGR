@@ -224,11 +224,11 @@ def crop_image(
     """裁剪出矩形, pos1 左下角相对位置, pos2 右上角相对位置。如果指定旋转角度，则返回剪裁+旋转后的图片
 
     Args:
-        image (np.ndarray): 图片
+        image (NDArray): 图片
         pos1 (Tuple[float, float]): 左下角相对位置
         pos2 (Tuple[float, float]): 右上角相对位置
-        rotation (int): 旋转角度[-180, 180]. 正值逆时针旋转. Defaults to 0.
-        debug (bool): 是否保存调试图片. Defaults to False.
+        rotation (int, optional): 旋转角度[-180, 180]. 正值逆时针旋转. Defaults to 0.
+        debug (bool, optional): 是否保存调试图片. Defaults to False.
     """
     resolution = (image.shape[1], image.shape[0])
     x1, y2 = map(int, relative_to_absolute(pos1, resolution))
