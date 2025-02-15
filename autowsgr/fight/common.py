@@ -536,21 +536,26 @@ class DecisionBlock:
     def _check_rules(self, enemies: dict) -> SearchEnemyAction | Formation:
         for rule in self.config.enemy_rules:
             condition, act = rule
-            rcondition = ''
+            eval_condition = ''
             last = 0
             for i, ch in enumerate(condition):
                 if ord(ch) > ord('Z') or ord(ch) < ord('A'):
                     if last != i:
                         if condition[last:i] in ALL_SHIP_TYPES:
-                            rcondition += str(enemies.get(condition[last:i], 0))
+                            eval_condition += str(enemies.get(condition[last:i], 0))
                         else:
-                            rcondition += condition[last:i]
-                    rcondition += ch
+                            eval_condition += condition[last:i]
+                    eval_condition += ch
                     last = i + 1
 
+            condition_result = eval(eval_condition)
             if self.timer.config.show_enemy_rules:
-                self.logger.info(rcondition)
-            if eval(rcondition):
+                act_info = f'判断敌舰规则: {condition}, 结果: {condition_result}'
+                if condition_result:
+                    act_info += ', 执行: '
+                    act_info += act if isinstance(act, str) else f'选择阵型: {act}'
+                self.logger.info(act_info)
+            if condition_result:
                 if isinstance(act, str):
                     return SearchEnemyAction(act)
                 return Formation(act)
