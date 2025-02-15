@@ -31,6 +31,8 @@ def get_formation(fleet: Fleet, enemy: list) -> Literal[4, 2]:
 
 
 class DecisiveStats:
+    map: int
+
     def __init__(self, timer: Timer, chapter: int = 6) -> None:
         # 选择战备舰队的点击位置
         self.timer = timer
@@ -170,7 +172,7 @@ class Logic:
 
     def _retreat(self) -> bool:
         if type(self) is not Logic:
-            return count_ship(self._get_best_fleet()) < 2
+            return count_ship(self.get_best_fleet()) < 2
         return count_ship(self.get_best_fleet()) < 2
 
     def _leave(self) -> Literal[False]:
@@ -196,7 +198,8 @@ class DecisiveBattle:
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
         self.config = timer.config.decisive_battle
-
+        if self.config is None:
+            raise ValueError('决战配置为空')
         self.repair_strategy = self.config.repair_level
         self.full_destroy = self.config.full_destroy
         self.stats = DecisiveStats(timer, self.config.chapter)

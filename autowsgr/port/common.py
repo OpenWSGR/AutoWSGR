@@ -133,7 +133,7 @@ class Port:
         self.quick_build = 0
         self.bathroom = BathRoom()
         self.ship_factory = Factory()
-        self.ships = []
+        self.ships: list[Ship] = []
         self.fleet = [[]] * 5
         self.map: int | None = 0
         self.chapter: int | None = 0

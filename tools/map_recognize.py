@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import cv2
 import keyboard
+from numpy.typing import NDArray
 
 from autowsgr.scripts.main import start_script
 from autowsgr.timer import Timer
@@ -30,7 +31,7 @@ def log_image(event: keyboard.KeyboardEvent):
     timer.log_screen()
 
 
-def set_points(windowname, img):
+def set_points(windowname, img: NDArray):
     """
     输入图片，打开该图片进行标记点，返回的是标记的几个点的字符串和相对坐标
     """
@@ -45,7 +46,7 @@ def set_points(windowname, img):
         if event == cv2.EVENT_LBUTTONDOWN:
             cv2.circle(temp_img, (x, y), 10, (102, 217, 239), -1)
             points[point] = (x, y)
-            relative_points[point] = (x / 960, y / 540)
+            relative_points[point] = (x / img.shape[1], y / img.shape[0])
             point = chr(ord(point) + 1)
             cv2.imshow(windowname, temp_img)
 

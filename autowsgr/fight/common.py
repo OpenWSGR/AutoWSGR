@@ -176,6 +176,7 @@ class FightInfo(Protocol):
     ship_stats: list
     fight_history: FightHistory
     enemy_formation: str
+    node: str
 
     # =============== 静态属性 ===============
     end_page: str

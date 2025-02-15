@@ -38,10 +38,12 @@ def quick_register(timer: Timer, ships):
     th.join(10)
     if not q.empty() and q.get():
         for ship in ships:
-            if not timer.port.have_ship(ship):
-                tmp = timer.port.register_ship(ship)
-                tmp.level = 1
-                tmp.status = 0
+            register_result = timer.port.register_ship(ship)
+            if register_result is not None:
+                register_result.level = 1
+                register_result.status = 0
+            else:
+                timer.logger.error(f'注册舰船 {ship} 失败')
         return True
     timer.logger.info('放弃快速注册')
     return False
@@ -61,9 +63,16 @@ def register(timer: Timer, ships, fleet_id):
 
         for i, ship in enumerate(fleet.ships):
             if ship in ships and not timer.port.have_ship(ship):
-                tmp = timer.port.register_ship(ship)
-                tmp.level = fleet.levels[i]
-                tmp.status = detect_ship_stats(timer)[i]
+                register_result = timer.port.register_ship(ship)
+                if register_result is not None:
+                    level = fleet.levels[i]
+                    if level is not None:
+                        register_result.level = level
+                        register_result.status = detect_ship_stats(timer)[i]
+                    else:
+                        timer.logger.error(f'未找到舰船 {ship} 的等级信息')
+                else:
+                    timer.logger.error(f'注册舰船 {ship} 失败')
 
         # 逐个初始化舰船, 效率较低, 待优化
         for ship in ships:
@@ -77,10 +86,16 @@ def register(timer: Timer, ships, fleet_id):
                     timer.logger.warning(f'舰船 {ship} 注册失败, 放弃注册')
                     continue
                     # raise BaseException(f"未找到 {ship} 舰船")
-                tmp = timer.port.register_ship(ship)
-                tmp.status = detect_ship_stats(timer)[1]
+                register_result = timer.port.register_ship(ship)
+                if register_result is None:
+                    timer.logger.error(f'注册舰船 {ship} 失败')
+                    continue
+                register_result.status = detect_ship_stats(timer)[1]
                 fleet.detect()
-                tmp.level = fleet.levels[1]
+                if fleet.levels[1] is None:
+                    timer.logger.error(f'未找到舰船 {ship} 的等级信息')
+                    continue
+                register_result.level = fleet.levels[1]
         timer.port.show_fleet()
 
 
@@ -223,6 +238,9 @@ class FightTask(Task):
         tasks = []
         for name in self.all_ships:
             ship = self.port.get_ship_by_name(name)
+            if ship is None:
+                self.timer.logger.warning(f'未找到舰船 {name}')
+                continue
             if ship.status != 3 and ship.status >= self.repair_mode.get(
                 ship,
                 self.default_repair_mode,
@@ -270,6 +288,9 @@ class FightTask(Task):
                 if name is None:
                     continue
                 ship = self.port.get_ship_by_name(name)
+                if ship is None:
+                    self.timer.logger.warning(f'未找到舰船 {name}')
+                    continue
                 if ship.status >= self.repair_mode.get(name, self.default_repair_mode):
                     self.timer.logger.info(f'舰船 {name} 的状态已经标记为修复')
                     plan.repair_mode[i] = ship.status
@@ -301,8 +322,9 @@ class FightTask(Task):
             if name is None:
                 continue
             ship = self.port.get_ship_by_name(name)
-            if ship is not None:
-                ship.level = fleet.levels[i]
+            level = fleet.levels[i]
+            if ship is not None and level is not None:
+                ship.level = level
                 ship.status = ship_stats[i]
 
         return True, [*self.check_repair(), self]
@@ -439,7 +461,14 @@ class RepairTask(Task):
                 raise BaseException('未找到目标舰船')
             last_result = time_costs
 
-    def recognize_screen_relative(self, left, top, right, bottom, update=False):
+    def recognize_screen_relative(
+        self,
+        left: float,
+        top: float,
+        right: float,
+        bottom: float,
+        update: bool = False,
+    ):
         if update:
             self.timer.update_screen()
         return self.timer.recognize(
@@ -513,12 +542,14 @@ class DecisiveLogic(Logic):
         return super().get_best_fleet()
 
     def get_best_fleet(self):
-        def ship_available(ship):
+        def ship_available(ship) -> bool:
             # return ship in ships and self.timer.port.have_ship(ship) and self.timer.port.get_ship_by_name(ship).status < 2 # 大破修
+            ship = self.timer.port.get_ship_by_name(ship)
             return (
                 ship in ships
                 and self.timer.port.have_ship(ship)
-                and self.timer.port.get_ship_by_name(ship).status < 1
+                and ship is not None
+                and ship.status < 1
             )  # 中破修
 
         ships = self.stats.ships
@@ -552,8 +583,11 @@ class DecisiveLogic(Logic):
 
 
 class DecisiveFight(DecisiveBattle):
+    rships: list
+
     def __init__(self, timer) -> None:
         super().__init__(timer)
+        assert self.config is not None
         self.logic = DecisiveLogic(
             self.timer,
             self.stats,
@@ -567,15 +601,24 @@ class DecisiveFight(DecisiveBattle):
 
 
 class DecisiveFightTask(Task):
-    def __init__(self, timer, times, enable_quick_register=True, fleet_id=4) -> None:
+    def __init__(self, timer: Timer, times, enable_quick_register=True, fleet_id=4) -> None:
         """
         Args:
             enable_quick_register (bool, optional): 是否启用快速注册. Defaults to False.
             fleet_id (int, optional): 注册舰队时占用的舰队编号. Defaults to 4.
         """
         super().__init__(timer)
+        if timer.config.decisive_battle is None:
+            raise ValueError('未配置决战任务')
         self.times = times
+
+        if (
+            timer.config.decisive_battle.level1 is None
+            and timer.config.decisive_battle.level2 is None
+        ):
+            raise ValueError('未配置决战任务舰队')
         self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
+
         self.db = DecisiveFight(self.timer)
         self.db.rships = self.ships
         if all(self.timer.port.have_ship(ship) for ship in self.ships):

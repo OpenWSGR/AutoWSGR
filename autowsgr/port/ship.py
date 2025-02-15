@@ -25,6 +25,8 @@ def have_ship(ship):
 
 
 class Fleet:
+    levels: list[int | None]
+
     def __init__(self, timer: Timer, fleet_id=None) -> None:
         self.timer = timer
         self.fleet_id = fleet_id
@@ -105,7 +107,9 @@ class Fleet:
             )
             img = cv2.resize(img, (img.shape[1] * 4, img.shape[0] * 4))
             # cv_show_image(img)
-            self.levels[i] = int(self.timer.ocr_backend.recognize_number(img, min_size=3)[1])
+            recognize_result = self.timer.ocr_backend.recognize_number(img, min_size=3)
+            assert recognize_result is not None
+            self.levels[i] = int(recognize_result[1])
             # print(levels)
         self.timer.logger.info(f'等级识别结果: {self.levels}')
 
