@@ -233,8 +233,12 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
 
 def get_enemy_formation(timer: Timer) -> str:
     """识别敌方队型, 识别失败返回空字符串"""
-    box = [(0.11, 0.11), (0.2, 0)]
-    res = timer.recognize(crop_image(timer.screen, *box), allowlist=FormationName.get_all_chars())
+    left_bottom = (0.11, 0.15)
+    right_top = (0.2, 0.05)
+    res = timer.recognize(
+        crop_image(timer.screen, left_bottom, right_top),
+        allowlist=FormationName.get_all_chars(),
+    )
     return res[1] if res is not None else ''
 
 
