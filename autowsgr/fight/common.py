@@ -554,6 +554,8 @@ class DecisionBlock:
                 if condition_result:
                     act_info += ', 执行: '
                     act_info += act if isinstance(act, str) else f'选择阵型: {act}'
+                else:
+                    act_info += ', 进入战斗'
                 self.logger.info(act_info)
             if condition_result:
                 if isinstance(act, str):
