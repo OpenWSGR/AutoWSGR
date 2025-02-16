@@ -554,6 +554,8 @@ class DecisionBlock:
                 if condition_result:
                     act_info += ', 执行: '
                     act_info += act if isinstance(act, str) else f'选择阵型: {act}'
+                else:
+                    act_info += ', 不执行特殊操作进入战斗'
                 self.logger.info(act_info)
             if condition_result:
                 if isinstance(act, str):
@@ -564,10 +566,14 @@ class DecisionBlock:
     def _check_formation_rules(self, formation: str) -> SearchEnemyAction | Formation:
         for rule in self.config.enemy_formation_rules:
             condition, act = rule
-            if condition == formation:
+            condition_result = condition == formation
+            act_info = f'判断敌舰阵容规则: {condition}, 结果: {condition_result}'
+            if condition_result:
+                act_info += f', 执行: {act}'
                 if isinstance(act, str):
                     return SearchEnemyAction(act)
                 return Formation(act)
+            act_info += ', 不执行特殊操作进入战斗'
         return SearchEnemyAction.no_action
 
     def make_decision(self, state, last_state, last_action, info: FightInfo):
