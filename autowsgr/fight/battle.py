@@ -103,7 +103,7 @@ class BattlePlan(FightPlan):
         try:
             return start_march(self.timer)
         except TimeoutError:
-            self.logger.warning(
+            self.timer.logger.warning(
                 '由于进入战斗超时跳过了一次战役, 请检查战役队伍中是否有舰船正在远征',
             )
             return ConditionFlag.SKIP_FIGHT

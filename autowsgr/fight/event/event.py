@@ -10,7 +10,6 @@ from autowsgr.utils.math_functions import cal_dis
 class Event:
     def __init__(self, timer: Timer, event_name: str) -> None:
         self.timer = timer
-        self.logger = timer.logger
 
         self.event_image = IMG.event[event_name]
         self.common_image = IMG.event['common']
@@ -34,9 +33,9 @@ class Event:
         """
         res = self.timer.wait_images(self.common_image.hard + self.common_image.easy)
         if res is None:
-            self.logger.warning('ImageNotFoundErr: difficulty image not found')
+            self.timer.logger.warning('ImageNotFoundErr: difficulty image not found')
             if self.timer.wait_image(self.event_image[2]):
-                self.logger.info(
+                self.timer.logger.info(
                     '成功进入活动页面，未检测到切换难度图标，请检查是否通关简单难度',
                 )
                 return 0
@@ -55,7 +54,7 @@ class Event:
             time.sleep(0.2)
             if int(chapter in 'Hh'):
                 if not self.timer.click_image(self.common_image.hard):
-                    self.logger.error('请检查是否通关简单难度')
+                    self.timer.logger.error('请检查是否通关简单难度')
                     raise ImageNotFoundErr
             else:
                 self.timer.click_image(self.common_image.easy)
