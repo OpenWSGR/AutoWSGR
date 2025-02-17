@@ -8,7 +8,7 @@ from typing import Protocol
 import airtest.core.android
 import requests
 from airtest.core.api import connect_device
-from airtest.core.error import AdbError
+from airtest.core.error import AdbError, DeviceConnectionError
 
 from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr
@@ -61,7 +61,7 @@ class OSController(Protocol):
                 dev.snapshot()
                 self.logger.info('Android Connected!')
                 return dev
-            except AdbError:
+            except (AdbError, DeviceConnectionError):
                 self.logger.error('Adb 连接模拟器失败, 正在清除原有连接并重试')
                 from airtest.core.android.adb import ADB
 
