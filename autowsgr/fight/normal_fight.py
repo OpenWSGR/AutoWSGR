@@ -484,12 +484,12 @@ class NormalFightPlan(FightPlan):
 
         raise TimeoutError("can't verify map")
 
-    def _move_map(self, target_map, chapter):
+    def _move_map(self, target_map, chapter, retry_times=2):
         """改变地图节点,不检查是否有该节点
         含网络错误检查
         Args:
             target_map (_type_): 目标节点
-
+            retry_times (int): 重试次数
         """
         if not self.timer.identify_page('map_page'):
             raise ImageNotFoundErr("not on page 'map_page' now")
@@ -500,7 +500,8 @@ class NormalFightPlan(FightPlan):
                 self.timer.logger.debug('now_map:', now_map)
             if target_map > now_map:
                 for i in range(target_map - now_map):
-                    self.timer.swipe(715, 147, 552, 147, duration=0.25)
+                    self.timer.click(937, 277)
+                    # self.timer.swipe(715, 147, 552, 147, duration=0.25)
                     if not self._verify_map(now_map + (i + 1), chapter, timeout=4):
                         raise ImageNotFoundErr(
                             "after 'move map' operation but the chapter do not move",
@@ -508,17 +509,25 @@ class NormalFightPlan(FightPlan):
                     time.sleep(0.15)
             else:
                 for i in range(now_map - target_map):
-                    self.timer.swipe(552, 147, 715, 147, duration=0.25)
+                    self.timer.click(247, 277)
+                    # self.timer.swipe(552, 147, 715, 147, duration=0.25)
                     if not self._verify_map(now_map - (i + 1), chapter, timeout=4):
                         raise ImageNotFoundErr(
                             "after 'move map' operation but the chapter do not move",
                         )
                     time.sleep(0.15)
         except:
-            self.logger.error(f'切换地图失败 target_map: {target_map}   now: {now_map}')
             if self.timer.process_bad_network():
                 self._move_map(target_map, chapter)
+            elif retry_times > 0:
+                self.timer.logger.warning(
+                    f'切换地图失败, 目标: {target_map}, 当前: {now_map}, 进行重试',
+                )
+                self._move_map(target_map, chapter, retry_times - 1)
             else:
+                self.timer.logger.error(
+                    f'切换地图失败, 目标: {target_map}, 当前: {now_map}, 重试失败',
+                )
                 raise ImageNotFoundErr(
                     "unknown reason can't find number image" + str(target_map),
                 )
