@@ -237,7 +237,7 @@ def get_enemy_formation(timer: Timer) -> str:
     right_top = (0.2, 0.05)
     res = timer.recognize(
         crop_image(timer.screen, left_bottom, right_top),
-        allowlist=FormationName.get_all_chars(),
+        allowlist=[*FormationName.get_all_chars(), '阵'],
     )
     return res[1] if res is not None else ''
 
