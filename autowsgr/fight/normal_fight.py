@@ -443,7 +443,7 @@ class NormalFightPlan(FightPlan):
             self._move_chapter(target_chapter, now_chapter)
         except:
 
-            self.logger.warning(
+            self.timer.logger.warning(
                 f'切换章节失败 target_chapter: {target_chapter}   now: {now_chapter}',
             )
             if self.timer.process_bad_network('move_chapter'):
@@ -515,7 +515,7 @@ class NormalFightPlan(FightPlan):
                         )
                     time.sleep(0.15)
         except:
-            self.logger.error(f'切换地图失败 target_map: {target_map}   now: {now_map}')
+            self.timer.logger.error(f'切换地图失败 target_map: {target_map}   now: {now_map}')
             if self.timer.process_bad_network():
                 self._move_map(target_map, chapter)
             else:
