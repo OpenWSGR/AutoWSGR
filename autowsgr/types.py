@@ -71,6 +71,8 @@ class EmulatorType(StrEnum):
             match self:
                 case EmulatorType.leidian:
                     return 'emulator-5554'
+                case EmulatorType.bluestacks:
+                    return '127.0.0.1:5555'
                 case EmulatorType.mumu:
                     return '127.0.0.1:16384'
                 case _:
