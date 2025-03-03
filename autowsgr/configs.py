@@ -132,6 +132,8 @@ class DecisiveBattleConfig(BaseConfig):
     """维修策略, 1 为中破修, 2 为大破修"""
     full_destroy: bool = False
     """是否船舱满了解装舰船（仅限决战）"""
+    useful_skill: bool = False
+    """充分利用技能, 开启时要求地图1必须为Lv1+Lv2中的船; 其余地图至少一半的船为Lv1中的船"""
 
     def __post_init__(self) -> None:
         assert 1 <= self.chapter <= 6, '决战章节必须为 [1, 6] 中的整数'

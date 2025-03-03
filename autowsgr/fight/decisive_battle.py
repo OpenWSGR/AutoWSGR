@@ -107,7 +107,7 @@ class Logic:
         self.flag_ships = list(flagship_priority)
         self.stats = stats
 
-    def _choose_ship(self, must=False) -> list:
+    def _choose_ship(self, first_node=False) -> list:
         lim = 6
         score = self.stats.score
         if self.stats.fleet.count() <= 1:
@@ -124,8 +124,14 @@ class Logic:
                 if score >= cost and cost <= lim:
                     score -= cost
                     result.append(target)
-        if not result and must:
-            result.append(next(iter(self.stats.selections.keys())))
+        if first_node and result is not None:
+            # 第一个节点, 没有选中lv1则撤退, 否则尝试选择lv2
+            for target in set(self.level2) - set(self.level1):
+                if target in self.stats.selections:
+                    cost = self.stats.selections[target][0]
+                    if score >= cost and cost <= lim:
+                        score -= cost
+                        result.append(target)
         return result
 
     def _use_skill(self) -> Literal[3, 0]:
@@ -321,10 +327,10 @@ class DecisiveBattle:
         if res in ['next', 'quit']:
             self.timer.confirm_operation(timeout=5, must_confirm=True)  # 确认通关
             self.timer.confirm_operation(timeout=5, must_confirm=True)  # 确认领取奖励
-            get_ship(self.timer)
+            get_ship(self.timer, multi=True)
         return res
 
-    def choose(self, refreshed: bool = False, rec_only: bool = False):
+    def choose(self, refreshed: bool = False, rec_only: bool = False) -> bool:
         # ===================获取备选项信息======================
         # 右上角资源位置
         RESOURCE_AREA = ((0.911, 0.082), (0.974, 0.037))
@@ -387,37 +393,41 @@ class DecisiveBattle:
             ships[i]: (costs[i], (CHOOSE_X[real_position[i]], CHOOSE_Y)) for i in range(len(costs))
         }
         if rec_only:
-            return None
+            return True
         # ==================做出决策===================
+        choose_success = True
         self.stats.selections = selections
         self.timer.logger.debug('可购买舰船：', selections)
-        choose = self.logic._choose_ship(
-            must=(self.stats.map == 1 and self.stats.node == 'A' and refreshed),
-        )
-        if len(choose) == 0 and not refreshed:
-            self.timer.click(380, 500)  # 刷新备选舰船
-            self.timer.wait_image(
-                [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]],
-                timeout=2,
-            )
-            self.timer.logger.info('刷新备选舰船')
-            return self.choose(True)
-
+        is_first_node = self.stats.map == 1 and self.stats.node == 'A'
+        choose = self.logic._choose_ship(is_first_node)
+        if len(choose) == 0:
+            if not refreshed:
+                self.timer.click(380, 500)  # 刷新备选舰船
+                self.timer.wait_image(
+                    [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]],
+                    timeout=2,
+                )
+                self.timer.logger.info('刷新备选舰船')
+                return self.choose(True)
+            if is_first_node:
+                self.timer.logger.info('没有合适购买的舰船, 准备撤退')
+                choose_success = False
+                choose = [next(iter(selections.keys()))]
         for target in choose:
             cost, p = selections[target]
             self.stats.score -= cost
-            self.timer.logger.debug(f'选择购买：{target}，花费：{cost}，点击位置：{p}')
+            self.timer.logger.info(f'选择购买：{target}，花费：{cost}，点击位置：{p}')
             self.timer.relative_click(*p)
             if is_ship(target):
                 self.stats.ships.add(target)
         self.timer.click(580, 500)  # 关闭/确定
-        return None
+        return choose_success
 
     def up_level_assistant(self) -> None:
         self.timer.click(75, 667 * 0.75)
         self.stats.score -= 5
 
-    def use_skill(self, type: int = 3) -> None:
+    def use_skill(self, type: int = 3) -> bool:
         SKILL_POS = (0.2143, 0.894)
         SHIP_AREA = ((0.26, 0.715), (0.74, 0.685))
 
@@ -430,9 +440,20 @@ class DecisiveBattle:
             )
             ships = [ship[1] for ship in ship_results]
             self.timer.logger.info(f'使用技能获得: {ships}')
+            if self.config.useful_skill and not self.check_skill(ships):
+                self.timer.logger.info('技能效果不佳, 撤退重试')
+                self.timer.relative_click(*SKILL_POS, times=2, delay=0.3)
+                return False
             for ship in ships:
                 self.stats.ships.add(ship)
         self.timer.relative_click(*SKILL_POS, times=2, delay=0.3)
+        return True
+
+    def check_skill(self, ships: list[str]) -> bool:
+        if len(ships) == 1:
+            return ships[0] in self.logic.level2
+        useful_ships = set(ships) & set(self.config.level1)
+        return len(useful_ships) >= len(ships) / 2
 
     def _get_chapter(self) -> int:
         CHAPTER_AREA = ((0.818, 0.867), (0.875, 0.81))
@@ -533,18 +554,20 @@ class DecisiveBattle:
             return False
         return False
 
-    def retreat(self) -> None:
+    def retreat(self) -> 'retreat':
         self._go_map_page()
         self.timer.click(36, 33)
         self.timer.click(600, 300)
+        return 'retreat'
 
-    def leave(self) -> None:
+    def leave(self) -> 'leave':
         self._go_map_page()
         self.timer.click(36, 33)
         self.timer.relative_click(0.372, 0.584)
         self.detect()
         self.timer.relative_click(0.03, 0.08)
         self.timer.go_main_page()
+        return 'leave'
 
     def _get_exp(self, retry: int = 0) -> None:
         EXP_AREA = ((0.018, 0.854), (0.092, 0.822))
@@ -584,7 +607,9 @@ class DecisiveBattle:
             [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]],
             timeout=2,
         ):
-            self.choose()  # 获取战备舰队
+            choose_success = self.choose()  # 获取战备舰队
+            if not choose_success:
+                return self.retreat()
         # 升级副官坏了,经验检测也停用
         # self._get_exp()
         self.timer.wait_image(IMG.decisive_battle_image[9])
@@ -593,8 +618,8 @@ class DecisiveBattle:
         # while self.logic._up_level():
         #     self.up_level_assistant()
         #     self._get_exp()
-        if self.logic._use_skill():
-            self.use_skill(self.logic._use_skill())
+        if self.logic._use_skill() and not self.use_skill(self.logic._use_skill()):
+            return self.retreat()
 
         if self.stats.fleet.empty() and not self.stats.is_begin():
             self._check_fleet()
@@ -607,11 +632,9 @@ class DecisiveBattle:
             type(self) is not DecisiveBattle
             and any(self.timer.port.get_ship_by_name(ship).status in [1, 2] for ship in self.rships)
         ):  # 中破修
-            self.leave()
-            return 'leave'
+            return self.leave()
         if self.logic._retreat():
-            self.retreat()
-            return 'retreat'
+            return self.retreat()
         if self.stats.fleet != self.fleet:
             self._change_fleet(self.fleet)
             self.stats.ship_stats = detect_ship_stats(self.timer)
@@ -620,7 +643,7 @@ class DecisiveBattle:
         return None
 
     def _after_fight(self) -> None:
-        self.timer.logger.info(self.stats.ship_stats)
+        self.timer.logger.info(f'舰船状态: {self.stats.ship_stats}')
 
     def _check_fleet(self) -> None:
         self.stats.ships.clear()
