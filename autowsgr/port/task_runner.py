@@ -681,8 +681,8 @@ class TaskRunner:
                 self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]
                 id += 1
             if len(self.tasks) == 0:
-                self.timer.logger('本次全部任务已经执行完毕')
+                self.timer.logger.info('本次全部任务已经执行完毕')
                 return
-            print('当轮任务已完成, 正在检查远征')
+            self.timer.logger.info('当轮任务已完成, 正在检查远征')
             time.sleep(30)
             Expedition(self.timer).run(True)

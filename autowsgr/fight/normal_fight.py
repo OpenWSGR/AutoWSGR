@@ -203,7 +203,7 @@ class NormalFightPlan(FightPlan):
             plan_args['fleet_id'] = fleet_id  # 舰队编号
         if fleet != -1:
             plan_args['fleet'] = fleet
-        assert 'fleet_id' in plan_args, '未指定作战舰队'
+
         self.config = FightConfig.from_dict(plan_args)
 
         # 加载节点配置
