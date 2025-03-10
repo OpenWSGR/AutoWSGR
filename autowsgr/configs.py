@@ -285,9 +285,17 @@ class UserConfig(BaseConfig):
         object.__setattr__(self, 'default_plan_root', os.path.join(DATA_ROOT, 'plans'))
         if self.plan_root is None:
             local_plan_root = os.path.join(os.getcwd(), 'plans')
+            example_plan_root = os.path.join(
+                os.path.dirname(os.path.dirname(DATA_ROOT)),
+                'examples',
+                'plans',
+            )
             if os.path.exists(local_plan_root):
                 object.__setattr__(self, 'plan_root', local_plan_root)
                 print(f'使用脚本运行目录的plans: {local_plan_root}')
+            elif os.path.exists(example_plan_root):
+                object.__setattr__(self, 'plan_root', example_plan_root)
+                print(f'使用examples目录的plans: {example_plan_root}')
             else:
                 object.__setattr__(self, 'plan_root', self.default_plan_root)
                 print(f'使用默认plans: {self.default_plan_root}')
