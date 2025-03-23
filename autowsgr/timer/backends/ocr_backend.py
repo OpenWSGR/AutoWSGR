@@ -261,6 +261,9 @@ class OCRBackend(Protocol):
             if t.endswith('M'):
                 return eval(t[:-1]) * 1000000
 
+            # 未识别到数字, 返回-1
+            if t == '':
+                return -1
             return eval(t)
 
         results = self.recognize(
