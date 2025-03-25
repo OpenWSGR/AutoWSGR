@@ -235,7 +235,7 @@ class ShipType(StrEnum):
     CL = '轻巡'
     BM = '重炮'
     DD = '驱逐'
-    SSV = '潜母'
+    SSG = '导潜'
     SS = '潜艇'
     SC = '炮潜'
     NAP = '补给'
@@ -262,7 +262,7 @@ class ShipType(StrEnum):
             ShipType.CL: (0.922, 0.288),
             ShipType.BM: (0.556, 0.379),
             ShipType.DD: (0.646, 0.379),
-            ShipType.SSV: (0.738, 0.379),
+            ShipType.SSG: (0.738, 0.379),
             ShipType.SS: (0.830, 0.379),
             ShipType.SC: (0.922, 0.379),
             ShipType.NAP: (0.555, 0.470),
