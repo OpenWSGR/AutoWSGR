@@ -546,9 +546,9 @@ class DecisiveLogic(Logic):
             # return ship in ships and self.timer.port.have_ship(ship) and self.timer.port.get_ship_by_name(ship).status < 2 # 大破修
             ship = self.timer.port.get_ship_by_name(ship)
             return (
-                ship in ships
-                and self.timer.port.have_ship(ship)
-                and ship is not None
+                ship is not None
+                and ship.name in ships
+                and self.timer.port.have_ship(ship.name)
                 and ship.status < 1
             )  # 中破修
 
