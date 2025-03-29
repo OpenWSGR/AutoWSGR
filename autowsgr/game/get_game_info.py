@@ -136,7 +136,8 @@ def get_loot_and_ship(timer: Timer):
         else:
             timer.logger.warning(f'读取{key}数量失败')
     try:
-        timer.got_ship_num = ret.get('ship')
+        ship_num = ret.get('ship')
+        timer.got_ship_num = ship_num if ship_num is not None else 0
     except:
         timer.logger.warning('赋值给got_ship_num失败')
         timer.got_ship_num = 0
