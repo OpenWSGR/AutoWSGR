@@ -33,7 +33,7 @@ from autowsgr.constants.other_constants import (
 )
 from autowsgr.constants.positions import BLOOD_BAR_POSITION, TYPE_SCAN_AREA
 from autowsgr.timer import Timer
-from autowsgr.types import FormationName
+from autowsgr.types import FormationName, LogSource
 from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.math_functions import cal_dis, check_color
@@ -105,8 +105,8 @@ def get_resources(timer: Timer):
             ret[key] = timer.recognize_number(image_crop, 'KM.')[1]
         except:
             # 容错处理，如果监测出来不是数字则出错了
-            timer.logger.warning(f'读取{key}资源失败')
-    timer.logger.info(ret)
+            timer.logger.warning(LogSource.no_source, f'读取{key}资源失败')
+    timer.logger.info(LogSource.no_source, ret)
     return ret
 
 
@@ -132,14 +132,14 @@ def get_loot_and_ship(timer: Timer):
                         ret[key] = int(str(result[1])[:-4])
                         ret[key + '_max'] = 500
                 except:
-                    timer.logger.warning(f'读取{key}数量失败')
+                    timer.logger.warning(LogSource.no_source, f'读取{key}数量失败')
         else:
-            timer.logger.warning(f'读取{key}数量失败')
+            timer.logger.warning(LogSource.no_source, f'读取{key}数量失败')
     try:
         ship_num = ret.get('ship')
         timer.got_ship_num = ship_num if ship_num is not None else 0
     except:
-        timer.logger.warning('赋值给got_ship_num失败')
+        timer.logger.warning(LogSource.no_source, '赋值给got_ship_num失败')
         timer.got_ship_num = 0
 
     try:
@@ -149,14 +149,14 @@ def get_loot_and_ship(timer: Timer):
         else:
             timer.can_get_loot = True
     except:
-        timer.logger.warning('赋值给got_loot_num失败')
+        timer.logger.warning(LogSource.no_source, '赋值给got_loot_num失败')
         timer.got_loot_num = 0
 
-    timer.logger.info(f'已掉落舰船:{timer.got_ship_num}')
+    timer.logger.info(LogSource.no_source, f'已掉落舰船:{timer.got_ship_num}')
     if timer.can_get_loot:
-        timer.logger.info(f'已掉落胖次:{timer.got_loot_num}')
+        timer.logger.info(LogSource.no_source, f'已掉落胖次:{timer.got_loot_num}')
     else:
-        timer.logger.info('胖次活动未开启, 无法捞胖次')
+        timer.logger.info(LogSource.no_source, '胖次活动未开启, 无法捞胖次')
     return ret
 
 
@@ -228,7 +228,7 @@ def get_enemy_condition(timer: Timer, type='exercise', *args, **kwargs):
             enemy_type_count['ALL'] += 1
     enemy_type_count[NAP] = enemy_type_count['AP'] - enemy_type_count[SAP]
     count = {k: v for k, v in enemy_type_count.items() if v}
-    timer.logger.debug('enemies:' + str(count))
+    timer.logger.debug(LogSource.no_source, 'enemies:' + str(count))
     return count
 
 
@@ -373,6 +373,6 @@ def check_support_stats(timer: Timer):
     d2 = cal_dis(pixel, COLORS.SUPPORT_DISABLE)  # 支援禁用的蓝色
     d3 = cal_dis(pixel, COLORS.SUPPORT_ENLESS)  # 支援次数用尽的灰色
     if d1 > d3 and d2 > d3:
-        timer.logger.info('战役支援次数已用尽')
+        timer.logger.info(LogSource.no_source, '战役支援次数已用尽')
         return True
     return d1 < d2
