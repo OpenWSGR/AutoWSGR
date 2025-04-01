@@ -4,7 +4,7 @@ from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_mar
 from autowsgr.game.game_operation import get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, LogSource
 from autowsgr.utils.io import yaml_to_dict
 
 
@@ -104,6 +104,7 @@ class BattlePlan(FightPlan):
             return start_march(self.timer)
         except TimeoutError:
             self.logger.warning(
+                LogSource.no_source,
                 '由于进入战斗超时跳过了一次战役, 请检查战役队伍中是否有舰船正在远征',
             )
             return ConditionFlag.SKIP_FIGHT

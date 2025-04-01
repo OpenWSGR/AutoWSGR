@@ -311,3 +311,37 @@ class FormationName(StrEnum):
     circular = '轮型'
     wedge = '梯形'
     single_horizontal = '单横'
+
+
+class LogSource(BaseEnum):
+    """日志来源"""
+
+    no_source = 0
+    """无来源"""
+    map_node = 1
+    """地图节点信息"""
+    android_input = 2
+    """Android 输入的信息"""
+    enemy_rules = 3
+    """敌人规则"""
+    fight_stage = 4
+    """战斗阶段"""
+    chapter_info = 5
+    """章节信息"""
+    match_fight_stage = 6
+    """匹配战斗阶段"""
+    decisive_battle_info = 7
+    """决战信息"""
+    ocr_info = 8
+    """OCR信息"""
+
+
+class LogLevel(StrEnum):
+    debug = 'DEBUG'
+    info = 'INFO'
+    warning = 'WARNING'
+    error = 'ERROR'
+    critical = 'CRITICAL'
+
+    def __str__(self) -> str:
+        return self.value.upper()
