@@ -424,6 +424,8 @@ class NodeConfig(BaseConfig):
     """达到指定破损状态时结束。1:中破 2:大破；也可以用列表指定6个位置不同"""
 
     def __post_init__(self) -> None:
+        if self.enemy_rules is None:
+            object.__setattr__(self, 'enemy_rules', [])
         object.__setattr__(self, 'formation', Formation(self.formation))
         if self.formation_when_spot_enemy_fails is not None:
             object.__setattr__(
