@@ -632,7 +632,7 @@ class DecisiveFightTask(Task):
         for ship in self.ships:
             ship = self.timer.port.get_ship_by_name(ship)
             # if ship.status > 1 and ship.status < 3: # 大破修
-            if ship.status > 0 and ship.status < 2:  # 中破修
+            if ship.status > 0 and ship.status < 3:  # 中破修
                 self.timer.logger.info(f'{ship.name} 需要修复')
                 tasks.append(RepairTask(self.timer, ship))
         return tasks
