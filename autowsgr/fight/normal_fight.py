@@ -443,7 +443,7 @@ class NormalFightPlan(FightPlan):
             self._move_chapter(target_chapter, now_chapter)
         except:
 
-            self.logger.warning(
+            self.timer.logger.warning(
                 f'切换章节失败 target_chapter: {target_chapter}   now: {now_chapter}',
             )
             if self.timer.process_bad_network('move_chapter'):

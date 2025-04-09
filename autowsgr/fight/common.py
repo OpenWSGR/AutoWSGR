@@ -19,7 +19,6 @@ from autowsgr.game.game_operation import (
 from autowsgr.game.get_game_info import get_enemy_condition, get_enemy_formation
 from autowsgr.timer import Timer
 from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
-from autowsgr.utils.logger import Logger
 from autowsgr.utils.math_functions import get_nearest
 
 
@@ -169,7 +168,6 @@ class FightInfo(Protocol):
     """存储战斗中需要用到的所有状态信息, 以及更新逻辑"""
 
     timer: Timer
-    logger: Logger
     oil: int
     ammo: int
     enemies: dict
@@ -201,7 +199,6 @@ class FightInfo(Protocol):
 
     def __init__(self, timer: Timer) -> None:
         self.timer = timer
-        self.logger = timer.logger
 
         self.last_state = ''
         self.last_action = ''
@@ -227,7 +224,7 @@ class FightInfo(Protocol):
                 possible_states[i] = state
                 modified_timeout[i] = timeout
         if self.timer.config.show_match_fight_stage:
-            self.logger.debug('waiting:', possible_states, '  ')
+            self.timer.logger.debug('waiting:', possible_states, '  ')
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
         confidence = min(
@@ -258,18 +255,18 @@ class FightInfo(Protocol):
                     time.sleep(delay)
 
                 if self.timer.config.show_match_fight_stage:
-                    self.logger.info(f'matched: {self.state}')
+                    self.timer.logger.info(f'matched: {self.state}')
                 self._after_match()
 
                 return self.state
 
         # 匹配不到时报错
-        self.logger.warning(
+        self.timer.logger.warning(
             f'匹配状态失败! state: {self.state}  last_action: {self.last_action}',
         )
         self.timer.log_screen(True)
         for image in images:
-            self.logger.log_image(image, f'match_{time.time()!s}.PNG')
+            self.timer.logger.log_image(image, f'match_{time.time()!s}.PNG')
         raise ImageNotFoundErr
 
     def _before_match(self):
@@ -296,7 +293,7 @@ class FightInfo(Protocol):
                     result=result,
                 )
             except Exception as e:
-                self.logger.warning(f'战果结算记录失败：{e}')
+                self.timer.logger.warning(f'战果结算记录失败：{e}')
 
     def reset(self):
         """需要记录与初始化的战斗信息"""
@@ -305,13 +302,11 @@ class FightInfo(Protocol):
 class FightPlan(Protocol):
     info: FightInfo
     timer: Timer
-    logger: Logger
     fight_logs: list[FightHistory]
 
     def __init__(self, timer: Timer) -> None:
         # 把 timer 引用作为内置对象，减少函数调用的时候所需传入的参数
         self.timer = timer
-        self.logger = timer.logger
         self.fight_logs = []
 
     def fight(self) -> ConditionFlag:
@@ -374,7 +369,7 @@ class FightPlan(Protocol):
         elif ret == ConditionFlag.DOCK_FULL:
             # 自动解装功能
             if self.timer.config.dock_full_destroy and retry_times < max_try_times:
-                self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
+                self.timer.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
                 self.timer.relative_click(0.38, 0.565)
                 destroy_ship(self.timer)
                 return self.run(retry_times + 1)
@@ -385,7 +380,7 @@ class FightPlan(Protocol):
         elif ret == ConditionFlag.BATTLE_TIMES_EXCEED or ret == ConditionFlag.SKIP_FIGHT:
             return ret
         else:
-            self.logger.error('无法进入战斗, 原因未知! 屏幕状态已记录')
+            self.timer.logger.error('无法进入战斗, 原因未知! 屏幕状态已记录')
             self.timer.log_screen()
             raise BaseException(str(time.time()) + 'enter fight error')
 
@@ -434,7 +429,7 @@ class FightPlan(Protocol):
                 self.timer.logger.error('船坞已满, 无法继续')
                 return ret
 
-            self.logger.info('战斗信息:\n' + str(self.info.fight_history))
+            self.timer.logger.info('战斗信息:\n' + str(self.info.fight_history))
             fight_results = sorted(self.info.fight_history.get_fight_results().items())
             # 根据情况截取战果，并在result_list查找索引
             if len(fight_results):
@@ -481,7 +476,7 @@ class FightPlan(Protocol):
                 self.timer.keep_try_update_fight += 1
             else:
                 self.timer.keep_try_update_fight = 1
-            self.logger.warning('Image Match Failed, Trying to Process')
+            self.timer.logger.warning('Image Match Failed, Trying to Process')
             if self.timer.is_other_device_login():
                 self.timer.process_other_device_login()  # TODO: 处理其他设备登录
             if self.timer.is_bad_network(timeout=5):
@@ -526,7 +521,6 @@ class DecisionBlock:
 
     def __init__(self, timer: Timer, args) -> None:
         self.timer = timer
-        self.logger = timer.logger
         self.config = NodeConfig.from_dict(args)
 
         # 用于根据规则设置阵型
@@ -556,7 +550,7 @@ class DecisionBlock:
                     act_info += act if isinstance(act, str) else f'选择阵型: {act}'
                 else:
                     act_info += ', 不执行特殊操作进入战斗'
-                self.logger.info(act_info)
+                self.timer.logger.info(act_info)
             if condition_result:
                 if isinstance(act, str):
                     return SearchEnemyAction(act)
@@ -709,7 +703,7 @@ class DecisionBlock:
                     return None, ConditionFlag.SL
 
                 if self.set_formation_by_rule:
-                    self.logger.debug('set formation by rule:', self.formation_by_rule)
+                    self.timer.logger.debug('set formation by rule:', self.formation_by_rule)
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
             else:
@@ -772,5 +766,5 @@ class DecisionBlock:
         if state == 'get_ship':
             get_ship(self.timer)
             return None, ConditionFlag.FIGHT_CONTINUE
-        self.logger.error('Unknown State')
+        self.timer.logger.error('Unknown State')
         raise BaseException
