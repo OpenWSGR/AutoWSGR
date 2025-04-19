@@ -1,3 +1,6 @@
 # MapLevel
 map: 2 # 简单1-5 困难6-10
 repair_mode: [1, 1, 1, 2, 2, 2]
+
+node_args:
+  night: True # 进夜战
