@@ -4,3 +4,4 @@ map: 8 # 简单1-5 困难6-10
 # NodeLevel
 node_args:
   formation: 5 # 正常情况阵型选择，1-5
+  night: True # 进夜战
