@@ -102,7 +102,7 @@ class EventFightPlan2025_0424(Event, BattlePlan):
             return ConditionFlag.SL
         if self.info.state == 'goon_page':  # 估计是打完了
             time.sleep(3)
-            for i in range(8):
+            for _ in range(8):
                 time.sleep(0.5)
                 self.timer.relative_click(*NODE_POSITION['fight_to_event'])
                 value = self.timer.confirm_operation(False)
