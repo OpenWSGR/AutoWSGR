@@ -618,7 +618,7 @@ def process_error(timer: Timer):
 
 
 def try_to_get_expedition(timer: Timer):
-    timer.logger.info('Getting Expedition Rewards....')
+    timer.logger.info('开始收取远征奖励...')
     get, pos = False, timer.wait_image(IMG.game_ui[6], timeout=2)
     while pos:
         timer.click(pos[0], pos[1], delay=1)
