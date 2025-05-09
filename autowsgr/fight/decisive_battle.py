@@ -98,7 +98,6 @@ class Logic:
     ) -> None:
         self.timer = timer
         self.config = timer.config
-        self.logger = timer.logger
 
         self.level1 = list(set(level1))
         self.level2 = list(
@@ -151,7 +150,7 @@ class Logic:
 
     def get_best_fleet(self) -> list[str]:
         ships = self.stats.ships
-        self.logger.debug(f'拥有舰船: {ships}')
+        self.timer.logger.debug(f'拥有舰船: {ships}')
         best_ships = [
             '',
         ]
@@ -173,7 +172,7 @@ class Logic:
 
         for _ in range(len(best_ships), 7):
             best_ships.append('')  # noqa: PERF401
-        self.logger.debug(f'(不考虑破损情况) 当前最优：{best_ships}')
+        self.timer.logger.debug(f'(不考虑破损情况) 当前最优：{best_ships}')
         return best_ships
 
     def _retreat(self, fleet: list[str]) -> bool:
