@@ -10,17 +10,6 @@ UPDATE = True
 URL = 'https://www.zjsnrwiki.com/wiki/%E8%88%B0%E5%A8%98%E5%9B%BE%E9%89%B4#searchInput'
 HTML_PATH = './ship_name.html'
 YAML_PATH = './ship_name_example.yaml'
-REPLACE = {
-    1097: '长春',
-    1125: '埃罗芒什',
-    1068: '信赖',
-    1456: '塔林',
-    1169: '丹阳',
-    1054: '重庆',
-    1058: '奥希金斯',
-    1185: '机灵',
-    1408: '鲃鱼',
-}
 
 
 def get_source():
@@ -36,8 +25,10 @@ def get_source():
 
 
 def extract(str):
-    re_rk_wsrwiki = r'<td width="162"><center><b>.{0,1000}</b></center></td>'
-    re_name_wsrwiki = r'<td width="162" height="56"><center><b><a href="/wiki/.{0,1000} title=.{0,1000}</a></b></center></td>'
+    re_rk_wsrwiki = r'<td width="162px"><center><b>(.*?)</b></center></td>'
+    re_name_wsrwiki = (
+        r'<td width="162px" height="56px"><center><b><a [^>]*>(.*?)</a></b></center></td>'
+    )
     res = ''
     rks = re.findall(re_rk_wsrwiki, str)
     names = re.findall(re_name_wsrwiki, str)
@@ -46,19 +37,9 @@ def extract(str):
     print(len(rks), len(names))
 
     for rk, name in zip(rks, names, strict=False):
-        rk = rk[30 : rk.find('</b>')].strip()  # 添加.strip()以去除可能的空格和换行符
-        _title_idx = name.find('title') + 7
-        name = name[_title_idx:]
-        # 获取改后名字
-        start_index = name.find('>') + 1
-        end_index = name.find('<', start_index)
-        substring = name[start_index:end_index]
-        # 获取改前名字
-        name = name[: name.index('"')]
-        if substring != name:
-            print(f'{name} : {substring}')
-        if int(rk) in REPLACE:
-            name = REPLACE[int(rk)]
+        rk = rk[3:].strip()  # 添加.strip()以去除可能的空格和换行符
+        # 获取舰船名字
+        name = name.strip()
         _name = name[: name.find('(')] if name.find('(') != -1 else name
         res += f'No.{rk}: # {name}\n'
         res += f'  - "{_name}"\n'
