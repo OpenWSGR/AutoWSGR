@@ -8,7 +8,7 @@ from typing import Protocol
 import airtest.core.android
 import requests
 from airtest.core.api import connect_device
-from airtest.core.error import AdbError, DeviceConnectionError
+from airtest.core.error import AdbError
 
 from autowsgr.configs import EmulatorConfig
 from autowsgr.constants.custom_exceptions import CriticalErr
