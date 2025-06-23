@@ -1,6 +1,7 @@
 import time
 from typing import Any
 
+from autowsgr.types import LogSource
 from autowsgr.utils.logger import Logger
 
 
@@ -145,7 +146,7 @@ class Port:
         if not self.have_ship(name):
             ship = Ship(name)
             self.ships.append(ship)
-            self.logger.info(f'舰船 {name} 已注册')
+            self.logger.info(LogSource.no_source, f'舰船 {name} 已注册')
             return ship
         return None
 
@@ -155,10 +156,10 @@ class Port:
                 if ship.name == name:
                     return ship
         self.show_fleet()
-        self.logger.info(f'需要查找的舰船 {name} 未找到')
+        self.logger.info(LogSource.no_source, f'需要查找的舰船 {name} 未找到')
         return None
 
     def show_fleet(self):
-        self.logger.info('当前已经注册的舰船如下:')
+        self.logger.info(LogSource.no_source, '当前已经注册的舰船如下:')
         for ship in self.ships:
             print(ship)

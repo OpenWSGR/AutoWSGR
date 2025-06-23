@@ -8,11 +8,11 @@ from typing import Protocol
 import airtest.core.android
 import requests
 from airtest.core.api import connect_device
-from airtest.core.error import AdbError, DeviceConnectionError
+from airtest.core.error import AdbError
 
-from autowsgr.configs import UserConfig
+from autowsgr.configs import EmulatorConfig
 from autowsgr.constants.custom_exceptions import CriticalErr
-from autowsgr.types import EmulatorType
+from autowsgr.types import EmulatorType, LogSource
 from autowsgr.utils.logger import Logger
 
 
@@ -59,16 +59,19 @@ class OSController(Protocol):
             try:
                 dev = connect_device(self.dev_name)
                 dev.snapshot()
-                self.logger.info('Android Connected!')
+                self.logger.info(LogSource.no_source, 'Android Connected!')
                 return dev
-            except (AdbError, DeviceConnectionError):
-                self.logger.error('Adb 连接模拟器失败, 正在清除原有连接并重试')
+            except AdbError:
+                self.logger.error(
+                    LogSource.no_source,
+                    'Adb 连接模拟器失败, 正在清除原有连接并重试',
+                )
                 from airtest.core.android.adb import ADB
 
                 adb = ADB().get_adb_path()
                 subprocess.run([adb, 'kill-server'])
 
-        self.logger.error('连接模拟器失败！')
+        self.logger.error(LogSource.no_source, '连接模拟器失败！')
         raise CriticalErr('连接模拟器失败！')
 
     def kill_android(self) -> None: ...
@@ -83,7 +86,7 @@ class OSController(Protocol):
 class WindowsController(OSController):
     def __init__(
         self,
-        config: UserConfig,
+        config: EmulatorConfig,
         logger: Logger,
     ) -> None:
         self.logger = logger
@@ -102,7 +105,10 @@ class WindowsController(OSController):
         match self.emulator_type:
             case EmulatorType.leidian:
                 raw_res = self.__ldconsole('isrunning')
-                self.logger.debug('EmulatorType status: ' + raw_res)
+                self.logger.debug(
+                    LogSource.no_source,
+                    'EmulatorType status: ' + raw_res,
+                )
                 return raw_res == 'running'
             case EmulatorType.yunshouji:
                 return True
@@ -119,7 +125,7 @@ class WindowsController(OSController):
                 case EmulatorType.leidian:
                     self.__ldconsole('quit')
                 case EmulatorType.yunshouji:
-                    self.logger.info('云手机无需关闭')
+                    self.logger.info(LogSource.no_source, '云手机无需关闭')
                 case _:
                     subprocess.run(['taskkill', '-f', '-im', self.emulator_process_name])
         except Exception as e:
@@ -131,7 +137,7 @@ class WindowsController(OSController):
                 case EmulatorType.leidian:
                     self.__ldconsole('launch')
                 case EmulatorType.yunshouji:
-                    self.logger.info('云手机无需启动')
+                    self.logger.info(LogSource.no_source, '云手机无需启动')
                 case _:
                     os.popen(self.emulator_start_cmd)
 
@@ -189,7 +195,7 @@ class WindowsController(OSController):
 
 
 class MacController(OSController):
-    def __init__(self, config: UserConfig, logger: Logger) -> None:
+    def __init__(self, config: EmulatorConfig, logger: Logger) -> None:
         self.logger = logger
 
         self.emulator_type = config.emulator_type
@@ -244,5 +250,5 @@ class MacController(OSController):
         try:
             return json.loads(tempStr)
         except Exception as e:
-            self.logger.error(f'{cmd} {e}')
+            self.logger.error(LogSource.no_source, f'{cmd} {e}')
         return {}
