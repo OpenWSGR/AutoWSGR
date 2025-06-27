@@ -134,6 +134,8 @@ class DecisiveBattleConfig(BaseConfig):
     """是否船舱满了解装舰船（仅限决战）"""
     useful_skill: bool = False
     """充分利用技能, 开启时要求地图1必须为Lv1+Lv2中的船; 其余地图至少一半的船为Lv1中的船"""
+    useful_skill_strict: bool = False
+    """严格利用技能, 开启时要求地图1技能不能获取+1的船; useful_skill为True时本设置才生效"""
 
     def __post_init__(self) -> None:
         assert 1 <= self.chapter <= 6, '决战章节必须为 [1, 6] 中的整数'

@@ -473,7 +473,13 @@ class DecisiveBattle:
 
     def check_skill(self, ships: list[str]) -> bool:
         if len(ships) == 1:
-            return ships[0] in self.logic.level2
+            ship = ships[0]
+            if self.config.useful_skill_strict and (ship in self.stats.ships):
+                self.timer.logger.info(
+                    f'处于严格模式, 获取到重复舰船: {ship}, 舰队{self.stats.ships}',
+                )
+                return False
+            return ship in self.logic.level2
         useful_ships = set(ships) & set(self.config.level1)
         return len(useful_ships) >= len(ships) / 2
 
