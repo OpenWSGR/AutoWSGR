@@ -173,7 +173,7 @@ class Timer(AndroidController):
         """启动游戏"""
         self.start_app(self.config.app_name)
         res = self.wait_images(
-            [IMG.start_image[2]] + IMG.confirm_image[1:],
+            [IMG.start_image[2], *IMG.confirm_image[1:]],
             0.85,
             gap=1,
             timeout=70 * delay,
@@ -533,23 +533,26 @@ class Timer(AndroidController):
             list1 = IMG.back_buttons[1:] + list2
         if list1 is None:
             raise ValueError('list1 is None')
-        type = self.wait_images([*list1, IMG.game_ui[3]], 0.8, timeout=0)
 
-        if type is None:
-            self.go_main_page(quit_operation_time + 1, list1)
-            return
-
-        if type >= len(list1):
-            type = self.wait_images(list1, timeout=0)
-            if type is None:
+        if self.wait_image(IMG.game_ui[3], 0.8, timeout=0) is not False:  # 识别到了出征按钮
+            # 又有出征按钮又有返回按钮的情况下，应该只有返回按钮1
+            pos = self.wait_image(IMG.back_buttons[1], 0.8, timeout=0)
+            if pos is False:
                 return
 
-        pos = self.get_image_position(list1[type], False, 0.8)
-        if pos is None:
-            raise ImageNotFoundErr('no image found, pos is None')
-        self.click(pos[0], pos[1])
+            self.click(pos[0], pos[1])
+        else:  # 没识别到出征按钮
+            type = self.wait_images(list1, 0.8, timeout=0)
+            if type is None:
+                self.go_main_page(quit_operation_time + 1, list1)
+                return
+            pos = self.get_image_position(list1[type], False, 0.8)
+            if pos is None:
+                raise ImageNotFoundErr('no image found, pos is None')
 
-        new_list = list1[1:] + [list1[0]]
+            self.click(pos[0], pos[1])
+
+        new_list = [*list1[1:], list1[0]]
         self.go_main_page(quit_operation_time + 1, new_list)
 
     def goto_game_page(self, target='main', extra_check=False):
