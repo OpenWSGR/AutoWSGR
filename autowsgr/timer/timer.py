@@ -537,20 +537,20 @@ class Timer(AndroidController):
         if self.wait_image(IMG.game_ui[3], 0.8, timeout=0) is not False:  # 识别到了出征按钮
             # 又有出征按钮又有返回按钮的情况下，应该只有返回按钮1和6
             list = [IMG.back_buttons[1], IMG.back_buttons[6]]
-            pos = self.wait_images(list, 0.8, timeout=0)
-            if pos is None:
+            type = self.wait_images(list, 0.8, timeout=0)
+            if type is None:
                 return
-            pos = self.get_image_position(list[pos], False, 0.8)
+            pos = self.get_image_position(list[type], False, 0.8)
             if pos is None:
                 raise ImageNotFoundErr('no image found, pos is None')
 
             self.click(pos[0], pos[1])
         else:  # 没识别到出征按钮
-            pos = self.wait_images(list1, 0.8, timeout=0)
-            if pos is None:
+            type = self.wait_images(list1, 0.8, timeout=0)
+            if type is None:
                 self.go_main_page(quit_operation_time + 1, list1)
                 return
-            pos = self.get_image_position(list1[pos], False, 0.8)
+            pos = self.get_image_position(list1[type], False, 0.8)
             if pos is None:
                 raise ImageNotFoundErr('no image found, pos is None')
 
