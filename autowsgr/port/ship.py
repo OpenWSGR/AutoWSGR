@@ -117,7 +117,7 @@ class Fleet:
         self.ships[position] = ship_name
         self.timer.click(*FLEET_POSITION[position], delay=0)
         res = self.timer.wait_images(
-            IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]],
+            [*IMG.choose_ship_image[1:3], IMG.choose_ship_image[4]],
             after_get_delay=0.4,
             gap=0,
             timeout=16,
