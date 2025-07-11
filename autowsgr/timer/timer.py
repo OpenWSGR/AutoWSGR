@@ -173,7 +173,7 @@ class Timer(AndroidController):
         """启动游戏"""
         self.start_app(self.config.app_name)
         res = self.wait_images(
-            [IMG.start_image[2]] + IMG.confirm_image[1:],
+            [IMG.start_image[2], *IMG.confirm_image[1:]],
             0.85,
             gap=1,
             timeout=70 * delay,
@@ -549,7 +549,7 @@ class Timer(AndroidController):
             raise ImageNotFoundErr('no image found, pos is None')
         self.click(pos[0], pos[1])
 
-        new_list = list1[1:] + [list1[0]]
+        new_list = [*list1[1:], list1[0]]
         self.go_main_page(quit_operation_time + 1, new_list)
 
     def goto_game_page(self, target='main', extra_check=False):

@@ -696,7 +696,7 @@ class DecisiveBattle:
 
         self.timer.relative_click(0.1, 0.5)
         res = self.timer.wait_images(
-            IMG.choose_ship_image[1:3] + [IMG.choose_ship_image[4]],
+            [*IMG.choose_ship_image[1:3], IMG.choose_ship_image[4]],
             after_get_delay=0.4,
             gap=0,
             timeout=16,
