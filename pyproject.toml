@@ -39,7 +39,6 @@ Documentation = "https://autowsgr.readthedocs.io/"
 Repository = "https://github.com/yourusername/autowsgr.git"
 
 [tool.setuptools]
-packages = ["autowsgr"]
 package-dir = {"" = "."}
 include-package-data = true
 
