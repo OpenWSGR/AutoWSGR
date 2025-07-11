@@ -15,6 +15,8 @@ from autowsgr.types import (
     FightCondition,
     Formation,
     GameAPP,
+    LogLevel,
+    LogSource,
     OcrBackend,
     OSType,
     RepairMode,
@@ -454,3 +456,219 @@ ATTRIBUTE_IGNORE = {
     'node_defaults',
     'node_args',
 }
+
+
+@dataclass(frozen=True)
+class EmulatorConfig:
+    # 系统
+    os_type: OSType = field(init=False)
+    """操作系统类型。自动设置"""
+    # 模拟器
+    emulator_type: EmulatorType = EmulatorType.leidian
+    """模拟器类型。mumu模拟器现在截图效率较低，后续会进行优化"""
+    emulator_name: str | None = None
+    """模拟器链接地址。不填则自动设置"""
+    emulator_start_cmd: str | None = None
+    """模拟器exe地址。如果留空则自动从注册表中查询。示例: C:/leidian/LDPlayer9/dnplayer.exe"""
+    emulator_process_name: str | None = None
+    """模拟器进程名。不填则自动设置"""
+    delay: float = 1.5
+    """延迟时间基本单位，单位为秒。如果模拟器卡顿可调高"""
+
+    def __post_init__(self) -> None:
+        # 系统
+        object.__setattr__(self, 'os_type', OSType.auto())
+
+        # 模拟器
+        if self.emulator_name is None:
+            object.__setattr__(
+                self,
+                'emulator_name',
+                self.emulator_type.default_emulator_name(self.os_type),
+            )
+        if self.emulator_start_cmd is None:
+            object.__setattr__(
+                self,
+                'emulator_start_cmd',
+                self.emulator_type.auto_emulator_path(self.os_type),
+            )
+        assert self.emulator_start_cmd is not None
+        if self.emulator_process_name is None:
+            object.__setattr__(
+                self,
+                'emulator_process_name',
+                os.path.basename(self.emulator_start_cmd),
+            )
+
+    @staticmethod
+    def from_user_config(config: UserConfig) -> Self:
+        return EmulatorConfig(
+            config.emulator_type,
+            config.emulator_name,
+            config.emulator_start_cmd,
+            config.emulator_process_name,
+            config.delay,
+        )
+
+
+@dataclass(frozen=True)
+class OCRConfig:
+    ocr_backend: OcrBackend
+
+    @staticmethod
+    def from_user_config(config: UserConfig) -> Self:
+        return OCRConfig(
+            config.ocr_backend,
+        )
+
+
+@dataclass(frozen=True)
+class LoggerConfig:
+    log_root: str | None = 'log'
+    """日志保存根目录,设置为None时不会保存到本地。"""
+    log_dir: str | None = None
+    """日志保存路径。自动创建日期文件夹。"""
+    log_level: LogLevel = LogLevel.info
+    """调试模式log_level应该设置为DEBUG"""
+    log_source: list[LogSource] = field(default_factory=list)
+    """日志源"""
+
+    def __post_init__(self) -> None:
+        # 日志
+        if self.log_root is not None:
+            object.__setattr__(
+                self,
+                'log_dir',
+                os.path.join(self.log_root, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')),
+            )
+        else:
+            object.__setattr__(self, 'log_dir', None)
+
+    @staticmethod
+    def from_user_config(config: UserConfig) -> Self:
+        log_source = []
+        if config.show_map_node:
+            log_source.append(LogSource.map_node)
+        if config.show_android_input:
+            log_source.append(LogSource.android_input)
+        if config.show_enemy_rules:
+            log_source.append(LogSource.enemy_rules)
+        if config.show_fight_stage:
+            log_source.append(LogSource.fight_stage)
+        if config.show_chapter_info:
+            log_source.append(LogSource.chapter_info)
+        if config.show_match_fight_stage:
+            log_source.append(LogSource.match_fight_stage)
+        if config.show_decisive_battle_info:
+            log_source.append(LogSource.decisive_battle_info)
+        if config.show_ocr_info:
+            log_source.append(LogSource.ocr_info)
+        return LoggerConfig(config.log_root, config.log_dir, LogLevel(config.log_level), log_source)
+
+
+@dataclass(frozen=True)
+class ResourceConfig:
+    default_plan_root: str = field(init=False)
+    """默认计划文件根目录。"""
+    plan_root: str | None = None
+    """计划文件根目录。可部分覆盖default_plan_root中的文件"""
+    default_ship_name_file: str = field(init=False)
+    """默认舰船名文件。"""
+    ship_name_file: str | None = None
+    """舰船名文件。不填写则使用default_ship_name_file"""
+
+    def __post_init__(self) -> None:
+        # 设置plan_root
+        object.__setattr__(self, 'default_plan_root', os.path.join(DATA_ROOT, 'plans'))
+        if self.plan_root is None:
+            local_plan_root = os.path.join(os.getcwd(), 'plans')
+            if os.path.exists(local_plan_root):
+                object.__setattr__(self, 'plan_root', local_plan_root)
+                print(f'使用脚本运行目录的plans: {local_plan_root}')
+            else:
+                object.__setattr__(self, 'plan_root', self.default_plan_root)
+                print(f'使用默认plans: {self.default_plan_root}')
+
+        # 加载舰船名文件
+        object.__setattr__(self, 'default_ship_name_file', os.path.join(OCR_ROOT, 'ship_name.yaml'))
+        if self.ship_name_file is None:
+            local_ship_name_file = os.path.join(os.getcwd(), 'ship_name.yaml')
+            if os.path.exists(local_ship_name_file):
+                object.__setattr__(self, 'ship_name_file', local_ship_name_file)
+                print(f'使用本地ship_name: {local_ship_name_file}')
+            else:
+                object.__setattr__(self, 'ship_name_file', self.default_ship_name_file)
+                print(f'使用默认ship_name: {self.default_ship_name_file}')
+
+    @staticmethod
+    def from_user_config(config: UserConfig) -> Self:
+        return ResourceConfig(
+            config.plan_root,
+            config.ship_name_file,
+        )
+
+
+@dataclass(frozen=True)
+class GameConfig:
+    game_app: GameAPP = GameAPP.official
+    """游戏版本。"""
+    app_name: str = field(init=False)
+    """游戏应用名。自动设置"""
+    account: str | None = None
+    """游戏账号"""
+    password: str | None = None
+    """游戏密码"""
+    check_page: bool = True
+    """是否在启动时检查游戏页面"""
+    dock_full_destroy: bool = True
+    """船坞已满时自动清空, 若设置为false则船坞已满后终止所有常规出征任务"""
+    repair_manually: bool = False
+    """是否手动修理, 若设置为True则需要修理时不使用快修, 结束脚本"""
+    bathroom_feature_count: int = 1
+    """浴室数(购买的浴室装饰数, 最大为 3) TODO: 可自动获取"""
+    bathroom_count: int = 2
+    """修理位置总数(最大为 12) TODO: 可自动获取"""
+    destroy_ship_work_mode: DestroyShipWorkMode = DestroyShipWorkMode.disable
+    """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
+    destroy_ship_types: list[ShipType] = field(default_factory=list)
+    """指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文"""
+
+    def __post_init__(self) -> None:
+        # 游戏
+        object.__setattr__(self, 'app_name', self.game_app.app_name)
+
+        if self.destroy_ship_types is None:
+            object.__setattr__(self, 'destroy_ship_types', [])
+
+    @staticmethod
+    def from_user_config(config: UserConfig) -> Self:
+        return GameConfig(
+            config.game_app,
+            config.account,
+            config.password,
+            config.check_page,
+            config.dock_full_destroy,
+            config.repair_manually,
+            config.bathroom_feature_count,
+            config.bathroom_count,
+            config.destroy_ship_work_mode,
+            config.destroy_ship_types,
+        )
+
+
+@dataclass(frozen=True)
+class TimerConfig:
+    emulator_config: EmulatorConfig
+    """模拟器配置"""
+    resource_config: ResourceConfig
+    """资源配置"""
+    game_config: GameConfig
+    """游戏配置"""
+
+    @staticmethod
+    def from_user_config(config: UserConfig) -> Self:
+        return TimerConfig(
+            EmulatorConfig.from_user_config(config),
+            ResourceConfig.from_user_config(config),
+            GameConfig.from_user_config(config),
+        )

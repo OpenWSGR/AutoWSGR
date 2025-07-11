@@ -8,6 +8,7 @@ from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.fight.event.event import Event
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 
 
 NODE_POSITION = (
@@ -55,7 +56,10 @@ class EventFightPlan20240930(Event, NormalFightPlan):
             self.timer.relative_click(*NODE_POSITION[self.map])
 
         if not self.timer.click_image(self.event_image[1], timeout=10):
-            self.timer.logger.warning('进入战斗准备页面失败,重新尝试进入战斗准备页面')
+            self.timer.logger.warning(
+                LogSource.no_source,
+                '进入战斗准备页面失败,重新尝试进入战斗准备页面',
+            )
             self.timer.relative_click(*NODE_POSITION[self.map])
             self.timer.click_image(self.event_image[1], timeout=10)
 
@@ -63,6 +67,7 @@ class EventFightPlan20240930(Event, NormalFightPlan):
             self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         except Exception as e:
             self.timer.logger.warning(
+                LogSource.no_source,
                 f'匹配fight_prepare_page失败，尝试重新匹配, error: {e}',
             )
             self.timer.go_main_page()

@@ -4,6 +4,7 @@ from typing import Any
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 from autowsgr.utils.math_functions import cal_dis
 
 
@@ -34,9 +35,13 @@ class Event:
         """
         res = self.timer.wait_images(self.common_image.hard + self.common_image.easy)
         if res is None:
-            self.logger.warning('ImageNotFoundErr: difficulty image not found')
+            self.logger.warning(
+                LogSource.no_source,
+                'ImageNotFoundErr: difficulty image not found',
+            )
             if self.timer.wait_image(self.event_image[2]):
                 self.logger.info(
+                    LogSource.no_source,
                     '成功进入活动页面，未检测到切换难度图标，请检查是否通关简单难度',
                 )
                 return 0
@@ -55,7 +60,7 @@ class Event:
             time.sleep(0.2)
             if int(chapter in 'Hh'):
                 if not self.timer.click_image(self.common_image.hard):
-                    self.logger.error('请检查是否通关简单难度')
+                    self.logger.error(LogSource.no_source, '请检查是否通关简单难度')
                     raise ImageNotFoundErr
             else:
                 self.timer.click_image(self.common_image.easy)
