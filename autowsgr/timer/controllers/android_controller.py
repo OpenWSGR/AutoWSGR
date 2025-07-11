@@ -11,8 +11,9 @@ from airtest.core.android import Android
 from numpy import uint8
 from numpy.typing import NDArray
 
-from autowsgr.configs import UserConfig
+from autowsgr.configs import EmulatorConfig
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr
+from autowsgr.types import LogSource
 from autowsgr.utils.api_image import (
     MyTemplate,
     absolute_to_relative,
@@ -32,19 +33,18 @@ class AndroidController:
     def __init__(
         self,
         dev: Android,
-        config: UserConfig,
+        config: EmulatorConfig,
         logger: Logger,
     ) -> None:
         self._pool = ProcessPoolExecutor()
 
         self.dev: Android = dev
-        self.show_android_input: bool = config.show_android_input
         self.delay: float = config.delay
         self.logger: Logger = logger
         self.screen: NDArray = self.get_raw_screen()
         self.resolution = self.screen.shape[:2][::-1]
         # (height, width, dimension) -> (width, height)
-        self.logger.info(f'resolution:{self.resolution}')
+        self.logger.info(LogSource.no_source, f'resolution:{self.resolution}')
 
     # ========= 基础命令 =========
     def shell(self, cmd):
@@ -84,7 +84,7 @@ class AndroidController:
         try:
             return app in self.list_apps()  # type: ignore
         except Exception as e:
-            self.logger.error(f'检查游戏是否在运行失败: {e}')
+            self.logger.error(LogSource.no_source, f'检查游戏是否在运行失败: {e}')
             return False
 
     # ========= 输入控制信号 =========
@@ -93,12 +93,12 @@ class AndroidController:
         需要焦点在输入框时才能输入
         """
         if hasattr(self, 'first_type') and self.first_type:
-            self.logger.debug('第一次尝试输入, 测试中...')
+            self.logger.debug(LogSource.no_source, '第一次尝试输入, 测试中...')
             self.dev.text('T')
             time.sleep(0.5)
             self.dev.shell('input keyevent 67')
             self.first_type = False
-        self.logger.debug(f'正在输入: {t}')
+        self.logger.debug(LogSource.no_source, f'正在输入: {t}')
         self.dev.text(t)
 
     def relative_click(
@@ -120,8 +120,7 @@ class AndroidController:
             enable_subprocess == False:None
             enable_subprocess == True:A class threading.Thread refers to this click subprocess
         """
-        if self.show_android_input:
-            self.logger.debug(f'click ({x:.3f} {y:.3f})')
+        self.logger.debug(LogSource.android_input, f'click ({x:.3f} {y:.3f})')
         x, y = relative_to_absolute((x, y), self.resolution)
 
         if times < 1:
@@ -170,8 +169,7 @@ class AndroidController:
         x2, y2 = relative_to_absolute((x2, y2), self.resolution)
         duration = int(duration * 1000)
         input_str = f'input swipe {x1!s} {y1!s} {x2!s} {y2!s} {duration}'
-        if self.show_android_input:
-            self.logger.debug(input_str)
+        self.logger.debug(LogSource.android_input, input_str)
         self.shell(input_str)
         time.sleep(delay)
 

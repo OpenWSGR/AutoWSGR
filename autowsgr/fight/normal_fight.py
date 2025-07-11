@@ -9,8 +9,9 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
 from autowsgr.game.game_operation import change_ships, move_team, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats, get_enemy_condition
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, LogSource
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
 from autowsgr.utils.math_functions import cal_dis
 
@@ -128,9 +129,8 @@ class NormalFightInfo(FightInfo):
             pos = self.timer.get_image_position(IMG.fight_image[8], False, 0.8)
         if pos is None:
             return
-        self.ship_position = pos
-        if self.timer.config.show_map_node:
-            self.timer.logger.debug(self.ship_position)
+        self.ship_position: tuple[float, float] = pos
+        self.timer.logger.debug(LogSource.map_node, self.ship_position)
 
     def _update_ship_point(self):
         """更新黄色小船(战斗地图上那个)所在的点位 (1-1A 这种,'A' 就是点位)"""
@@ -146,8 +146,7 @@ class NormalFightInfo(FightInfo):
             ):
                 self.node = ch
 
-        if self.timer.config.show_map_node:
-            self.timer.logger.debug(self.node)
+        self.timer.logger.debug(LogSource.map_node, self.node)
 
     def load_point_positions(self, map_path):
         """地图文件命名格式: [chapter]-[map].yaml"""
@@ -178,7 +177,7 @@ class NormalFightPlan(FightPlan):
 
     """ 多点战斗基本模板 """
 
-    def __init__(self, timer: Timer, plan_path, fleet_id=None, fleet=-1) -> None:
+    def __init__(self, timer: Timer | Launcher, plan_path, fleet_id=None, fleet=-1) -> None:
         """初始化决策模块,可以重新指定默认参数,优先级更高
 
         Args:
@@ -191,6 +190,8 @@ class NormalFightPlan(FightPlan):
         Raises:
             BaseException: _description_
         """
+        if isinstance(timer, Launcher):
+            timer = timer.timer
         super().__init__(timer)
         # 从配置文件加载计划
         plan_path = (
@@ -406,8 +407,12 @@ class NormalFightPlan(FightPlan):
         try:
             if now_chapter is None:
                 now_chapter = self._get_chapter()
-            if self.timer.config.show_chapter_info:
-                self.timer.logger.debug('NowChapter:', now_chapter)
+
+            self.timer.logger.debug(
+                LogSource.chapter_info,
+                'NowChapter:',
+                now_chapter,
+            )
             if now_chapter > target_chapter:
                 if now_chapter - target_chapter >= 3:
                     now_chapter -= 3
@@ -444,6 +449,7 @@ class NormalFightPlan(FightPlan):
         except:
 
             self.logger.warning(
+                LogSource.no_source,
                 f'切换章节失败 target_chapter: {target_chapter}   now: {now_chapter}',
             )
             if self.timer.process_bad_network('move_chapter'):
@@ -496,8 +502,7 @@ class NormalFightPlan(FightPlan):
 
         now_map = self._get_map(chapter)
         try:
-            if self.timer.config.show_chapter_info:
-                self.timer.logger.debug('now_map:', now_map)
+            self.timer.logger.debug(LogSource.chapter_info, 'now_map:', now_map)
             if target_map > now_map:
                 for i in range(target_map - now_map):
                     self.timer.click(937, 277)
@@ -521,11 +526,13 @@ class NormalFightPlan(FightPlan):
                 self._move_map(target_map, chapter)
             elif retry_times > 0:
                 self.timer.logger.warning(
+                    LogSource.no_source,
                     f'切换地图失败, 目标: {target_map}, 当前: {now_map}, 进行重试',
                 )
                 self._move_map(target_map, chapter, retry_times - 1)
             else:
                 self.timer.logger.error(
+                    LogSource.no_source,
                     f'切换地图失败, 目标: {target_map}, 当前: {now_map}, 重试失败',
                 )
                 raise ImageNotFoundErr(

@@ -76,7 +76,7 @@ def set_points(windowname, img: NDArray):
 
 def get_image() -> None:
     global timer
-    timer = start_script('../examples/user_settings.yaml')
+    timer = start_script('../examples/user_settings.yaml').timer
     import time
 
     keyboard.hook(log_image)

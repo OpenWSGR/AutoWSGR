@@ -18,7 +18,7 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.game.get_game_info import get_enemy_condition, get_enemy_formation
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
+from autowsgr.types import ConditionFlag, Formation, LogSource, SearchEnemyAction
 from autowsgr.utils.logger import Logger
 from autowsgr.utils.math_functions import get_nearest
 
@@ -52,7 +52,10 @@ class FightResultInfo:
             self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
         except Exception as e:
             timer.log_screen(name='mvp_image')
-            timer.logger.warning(f"can't identify mvp, error: {e}")
+            timer.logger.warning(
+                LogSource.no_source,
+                f"can't identify mvp, error: {e}",
+            )
         self.ship_stats = detect_ship_stats(timer, 'sumup', ship_stats)
 
         self.result = timer.wait_images(IMG.fight_result, timeout=5)
@@ -60,7 +63,10 @@ class FightResultInfo:
             self.result = 'SS'
         if self.result is None:
             timer.log_screen()
-            timer.logger.warning("can't identify fight result, screen logged")
+            timer.logger.warning(
+                LogSource.no_source,
+                "can't identify fight result, screen logged",
+            )
 
     def __str__(self) -> str:
         return f'MVP 为 {self.mvp} 号位, 战果为 {self.result}'
@@ -226,8 +232,13 @@ class FightInfo(Protocol):
                 state, timeout = state
                 possible_states[i] = state
                 modified_timeout[i] = timeout
-        if self.timer.config.show_match_fight_stage:
-            self.logger.debug('waiting:', possible_states, '  ')
+
+        self.logger.debug(
+            LogSource.match_fight_stage,
+            'waiting:',
+            possible_states,
+            '  ',
+        )
         images = [self.state2image[state][0] for state in possible_states]
         timeout = [self.state2image[state][1] for state in possible_states]
         confidence = min(
@@ -257,14 +268,17 @@ class FightInfo(Protocol):
                     delay = self.after_match_delay[self.state]
                     time.sleep(delay)
 
-                if self.timer.config.show_match_fight_stage:
-                    self.logger.info(f'matched: {self.state}')
+                self.logger.info(
+                    LogSource.match_fight_stage,
+                    f'matched: {self.state}',
+                )
                 self._after_match()
 
                 return self.state
 
         # 匹配不到时报错
         self.logger.warning(
+            LogSource.no_source,
             f'匹配状态失败! state: {self.state}  last_action: {self.last_action}',
         )
         self.timer.log_screen(True)
@@ -296,7 +310,7 @@ class FightInfo(Protocol):
                     result=result,
                 )
             except Exception as e:
-                self.logger.warning(f'战果结算记录失败：{e}')
+                self.logger.warning(LogSource.no_source, f'战果结算记录失败：{e}')
 
     def reset(self):
         """需要记录与初始化的战斗信息"""
@@ -355,7 +369,10 @@ class FightPlan(Protocol):
                 if fight_flag == ConditionFlag.SKIP_FIGHT:
                     return ConditionFlag.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
-            self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
+            self.timer.logger.info(
+                LogSource.no_source,
+                f'已出击次数:{i+1}，目标次数{times}',
+            )
         return ConditionFlag.OPERATION_SUCCESS
 
     def run(self, retry_times=0, max_try_times=5) -> ConditionFlag:
@@ -374,7 +391,10 @@ class FightPlan(Protocol):
         elif ret == ConditionFlag.DOCK_FULL:
             # 自动解装功能
             if self.timer.config.dock_full_destroy and retry_times < max_try_times:
-                self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
+                self.logger.debug(
+                    LogSource.no_source,
+                    f'船坞已满, 正在解装, 尝试次数:{retry_times+1}',
+                )
                 self.timer.relative_click(0.38, 0.565)
                 destroy_ship(self.timer)
                 return self.run(retry_times + 1)
@@ -385,7 +405,10 @@ class FightPlan(Protocol):
         elif ret == ConditionFlag.BATTLE_TIMES_EXCEED or ret == ConditionFlag.SKIP_FIGHT:
             return ret
         else:
-            self.logger.error('无法进入战斗, 原因未知! 屏幕状态已记录')
+            self.logger.error(
+                LogSource.no_source,
+                '无法进入战斗, 原因未知! 屏幕状态已记录',
+            )
             self.timer.log_screen()
             raise BaseException(str(time.time()) + 'enter fight error')
 
@@ -431,10 +454,13 @@ class FightPlan(Protocol):
         while times:
             ret = self.run()
             if ret == ConditionFlag.DOCK_FULL:
-                self.timer.logger.error('船坞已满, 无法继续')
+                self.timer.logger.error(LogSource.no_source, '船坞已满, 无法继续')
                 return ret
 
-            self.logger.info('战斗信息:\n' + str(self.info.fight_history))
+            self.logger.info(
+                LogSource.no_source,
+                '战斗信息:\n' + str(self.info.fight_history),
+            )
             fight_results = sorted(self.info.fight_history.get_fight_results().items())
             # 根据情况截取战果，并在result_list查找索引
             if len(fight_results):
@@ -454,6 +480,7 @@ class FightPlan(Protocol):
             )
             if not finish:
                 self.timer.logger.info(
+                    LogSource.no_source,
                     f'不满足预设条件, 此次战斗不计入次数, 剩余战斗次数:{times}',
                 )
                 if time.time() - start_time > insist_time:
@@ -461,6 +488,7 @@ class FightPlan(Protocol):
             else:
                 start_time, times = time.time(), times - 1
                 self.timer.logger.info(
+                    LogSource.no_source,
                     f'完成了一次满足预设条件的战斗, 剩余战斗次数:{times}',
                 )
         return ConditionFlag.OPERATION_SUCCESS
@@ -481,7 +509,10 @@ class FightPlan(Protocol):
                 self.timer.keep_try_update_fight += 1
             else:
                 self.timer.keep_try_update_fight = 1
-            self.logger.warning('Image Match Failed, Trying to Process')
+            self.logger.warning(
+                LogSource.no_source,
+                'Image Match Failed, Trying to Process',
+            )
             if self.timer.is_other_device_login():
                 self.timer.process_other_device_login()  # TODO: 处理其他设备登录
             if self.timer.is_bad_network(timeout=5):
@@ -512,7 +543,7 @@ class FightPlan(Protocol):
 
     # =============== 战斗中通用的操作 ===============
     def _sl(self):
-        self.timer.logger.debug('正在执行SL操作')
+        self.timer.logger.debug(LogSource.no_source, '正在执行SL操作')
         # 重置地图节点信息
         self.timer.reset_chapter_map()
 
@@ -549,14 +580,14 @@ class DecisionBlock:
                     last = i + 1
 
             condition_result = eval(eval_condition)
-            if self.timer.config.show_enemy_rules:
-                act_info = f'判断敌舰规则: {condition}, 结果: {condition_result}'
-                if condition_result:
-                    act_info += ', 执行: '
-                    act_info += act if isinstance(act, str) else f'选择阵型: {act}'
-                else:
-                    act_info += ', 不执行特殊操作进入战斗'
-                self.logger.info(act_info)
+
+            act_info = f'判断敌舰规则: {condition}, 结果: {condition_result}'
+            if condition_result:
+                act_info += ', 执行: '
+                act_info += act if isinstance(act, str) else f'选择阵型: {act}'
+            else:
+                act_info += ', 不执行特殊操作进入战斗'
+            self.logger.info(LogSource.enemy_rules, act_info)
             if condition_result:
                 if isinstance(act, str):
                     return SearchEnemyAction(act)
@@ -637,9 +668,9 @@ class DecisionBlock:
             if detour:
                 image_detour = IMG.fight_image[13]
                 if self.timer.click_image(image=image_detour, timeout=2.5):
-                    self.timer.logger.info('成功执行迂回操作')
+                    self.timer.logger.info(LogSource.no_source, '成功执行迂回操作')
                 else:
-                    self.timer.logger.error('未找到迂回按钮')
+                    self.timer.logger.error(LogSource.no_source, '未找到迂回按钮')
                     self.timer.log_screen(True)
                     raise ImageNotFoundErr("can't found image")
 
@@ -671,9 +702,12 @@ class DecisionBlock:
             if self.config.long_missile_support:
                 image_missile_support = IMG.fight_image[17]
                 if self.timer.click_image(image=image_missile_support, timeout=2.5):
-                    self.timer.logger.info('成功开启远程导弹支援')
+                    self.timer.logger.info(
+                        LogSource.no_source,
+                        '成功开启远程导弹支援',
+                    )
                 else:
-                    self.timer.logger.error('未找到远程支援按钮')
+                    self.timer.logger.error(LogSource.no_source, '未找到远程支援按钮')
                     raise ImageNotFoundErr("can't found image of long_missile_support")
             self.timer.click(855, 501, delay=0.2)
             # self.timer.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
@@ -709,7 +743,11 @@ class DecisionBlock:
                     return None, ConditionFlag.SL
 
                 if self.set_formation_by_rule:
-                    self.logger.debug('set formation by rule:', self.formation_by_rule)
+                    self.logger.debug(
+                        LogSource.no_source,
+                        'set formation by rule:',
+                        self.formation_by_rule,
+                    )
                     value = self.formation_by_rule
                     self.set_formation_by_rule = False
             else:
@@ -772,5 +810,5 @@ class DecisionBlock:
         if state == 'get_ship':
             get_ship(self.timer)
             return None, ConditionFlag.FIGHT_CONTINUE
-        self.logger.error('Unknown State')
+        self.logger.error(LogSource.no_source, 'Unknown State')
         raise BaseException

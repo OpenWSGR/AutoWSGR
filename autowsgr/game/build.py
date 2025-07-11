@@ -3,7 +3,9 @@ from typing import Any
 
 from autowsgr.constants.image_templates import IMG
 from autowsgr.game.game_operation import get_ship
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 from autowsgr.utils.api_image import absolute_to_relative, crop_image, match_nearest_index
 from autowsgr.utils.time import get_eta, str2time
 
@@ -55,7 +57,9 @@ RESOURCE_OPERATE_DELTA = 0.09
 
 class BuildManager:
     # TODO: 获取建造舰船名称; 正确处理异常情况; 使用内部记忆代替查询
-    def __init__(self, timer: Timer) -> None:
+    def __init__(self, timer: Timer | Launcher) -> None:
+        if isinstance(timer, Launcher):
+            timer = timer.timer
         self.timer = timer
         # -1代表空位. None代表未开通
         self.slot_eta: dict[str, list[Any]] = {
@@ -98,7 +102,7 @@ class BuildManager:
             datetime.timedelta: 剩余时间
         """
         valid_times = [eta for eta in self.slot_eta[type] if eta not in (-1, None)]
-        self.timer.logger.debug(valid_times)
+        self.timer.logger.debug(LogSource.no_source, valid_times)
         return min(valid_times) - datetime.datetime.now() if valid_times else datetime.timedelta()
 
     def get_min_eta(self, type='ship'):
@@ -153,18 +157,27 @@ class BuildManager:
                     must_click=True,
                 )
                 if self.timer.image_exist(IMG.build_image[type].full_depot):
-                    self.timer.logger.warning(f'{type} 仓库已满')
+                    self.timer.logger.warning(LogSource.no_source, f'{type} 仓库已满')
                     self.timer.go_main_page()
                     return False
             except Exception as e:
-                self.timer.logger.warning(f'收取 {type} 失败: {e}')
+                self.timer.logger.warning(
+                    LogSource.no_source,
+                    f'收取 {type} 失败: {e}',
+                )
                 return False
 
             try:
                 ship_name, ship_type = get_ship(self.timer)
-                self.timer.logger.info(f'获取 {type}: {ship_name} {ship_type}')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    f'获取 {type}: {ship_name} {ship_type}',
+                )
             except Exception as e:
-                self.timer.logger.warning(f'识别获取{type}内容失败: {e}')
+                self.timer.logger.warning(
+                    LogSource.no_source,
+                    f'识别获取{type}内容失败: {e}',
+                )
 
             slot = match_nearest_index(
                 absolute_to_relative(pos, self.timer.resolution),
@@ -233,6 +246,7 @@ class BuildManager:
             maxv = 999
             if min(resources) < minv or max(resources) > maxv:
                 self.timer.logger.warning(
+                    LogSource.no_source,
                     f'用于 {type} 的资源 {resources} 越界, 已自动取消操作',
                 )
                 return False
@@ -241,7 +255,7 @@ class BuildManager:
         if not self.get_build(type, allow_fast_build):
             return False
         if not self.slot_eta[type].count(-1):
-            self.timer.logger.warning(f'{type} 建造队列已满')
+            self.timer.logger.warning(LogSource.no_source, f'{type} 建造队列已满')
             return False
 
         # 点击建造

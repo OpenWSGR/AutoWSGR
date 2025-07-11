@@ -3,6 +3,7 @@ import queue
 import threading
 import time
 
+from autowsgr.configs import DecisiveBattleConfig
 from autowsgr.constants.custom_exceptions import ShipNotFoundErr
 from autowsgr.fight.decisive_battle import DecisiveBattle, Logic
 from autowsgr.game.build import BuildManager  # noqa: TC001
@@ -16,8 +17,9 @@ from autowsgr.game.game_operation import (
 )
 from autowsgr.port.common import Ship
 from autowsgr.port.ship import Fleet, count_ship
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer.timer import Timer
-from autowsgr.types import ConditionFlag, ShipType
+from autowsgr.types import ConditionFlag, LogSource, ShipType
 from autowsgr.utils.api_image import crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
 
@@ -43,22 +45,25 @@ def quick_register(timer: Timer, ships):
                 register_result.level = 1
                 register_result.status = 0
             else:
-                timer.logger.error(f'注册舰船 {ship} 失败')
+                timer.logger.error(LogSource.no_source, f'注册舰船 {ship} 失败')
         return True
-    timer.logger.info('放弃快速注册')
+    timer.logger.info(LogSource.no_source, '放弃快速注册')
     return False
 
 
 def register(timer: Timer, ships, fleet_id):
     if any(not timer.port.have_ship(ship) for ship in ships):
-        timer.logger.info('含有未注册的舰船, 正在注册中...')
+        timer.logger.info(LogSource.no_source, '含有未注册的舰船, 正在注册中...')
 
         # 检查当前舰队中是否含有未初始化的舰船并将其初始化
         timer.goto_game_page('fight_prepare_page')
         fleet = Fleet(timer, fleet_id)
         fleet.detect()
         if any(ship in ships for ship in fleet.ships):
-            timer.logger.info('该舰队中处于修复状态的舰船正在被快速修复')
+            timer.logger.info(
+                LogSource.no_source,
+                '该舰队中处于修复状态的舰船正在被快速修复',
+            )
             quick_repair(timer, 3, switch_back=True)
 
         for i, ship in enumerate(fleet.ships):
@@ -70,30 +75,39 @@ def register(timer: Timer, ships, fleet_id):
                         register_result.level = level
                         register_result.status = detect_ship_stats(timer)[i]
                     else:
-                        timer.logger.error(f'未找到舰船 {ship} 的等级信息')
+                        timer.logger.error(
+                            LogSource.no_source,
+                            f'未找到舰船 {ship} 的等级信息',
+                        )
                 else:
-                    timer.logger.error(f'注册舰船 {ship} 失败')
+                    timer.logger.error(LogSource.no_source, f'注册舰船 {ship} 失败')
 
         # 逐个初始化舰船, 效率较低, 待优化
         for ship in ships:
             if not timer.port.have_ship(ship):  #
-                timer.logger.info(f'正在尝试注册 {ship}')
+                timer.logger.info(LogSource.no_source, f'正在尝试注册 {ship}')
                 try:
                     change_ship(timer, fleet_id, 1, ship)
                     quick_repair(timer, 3, switch_back=True)
                 except ShipNotFoundErr:
                     timer.relative_click(0.05, 0.05)
-                    timer.logger.warning(f'舰船 {ship} 注册失败, 放弃注册')
+                    timer.logger.warning(
+                        LogSource.no_source,
+                        f'舰船 {ship} 注册失败, 放弃注册',
+                    )
                     continue
                     # raise BaseException(f"未找到 {ship} 舰船")
                 register_result = timer.port.register_ship(ship)
                 if register_result is None:
-                    timer.logger.error(f'注册舰船 {ship} 失败')
+                    timer.logger.error(LogSource.no_source, f'注册舰船 {ship} 失败')
                     continue
                 register_result.status = detect_ship_stats(timer)[1]
                 fleet.detect()
                 if fleet.levels[1] is None:
-                    timer.logger.error(f'未找到舰船 {ship} 的等级信息')
+                    timer.logger.error(
+                        LogSource.no_source,
+                        f'未找到舰船 {ship} 的等级信息',
+                    )
                     continue
                 register_result.level = fleet.levels[1]
         timer.port.show_fleet()
@@ -113,7 +127,7 @@ class Task:
 
 
 class FightTask(Task):
-    def __init__(self, timer: Timer, file_path='', plan=None, *args, **kwargs) -> None:
+    def __init__(self, timer: Launcher, file_path='', plan=None, *args, **kwargs) -> None:
         """
         Args:
             plan(FightPlan): 使用哪个战斗方案模板, 默认为 None.
@@ -142,6 +156,7 @@ class FightTask(Task):
 
             all_ships: 所有参与轮换的舰船
         """
+        timer: Timer = timer.timer
         super().__init__(timer)
         self.quick_register = False
         self.last_exec = time.time()
@@ -209,7 +224,10 @@ class FightTask(Task):
         ]
         fleet = _build_fleet(self.all_ships)
         if fleet is None:
-            self.timer.logger.info('由于等级超限无法组织舰队, 任务终止.')
+            self.timer.logger.info(
+                LogSource.no_source,
+                '由于等级超限无法组织舰队, 任务终止.',
+            )
             return 1, None
 
         # 清除不满足出征条件的舰船并检查
@@ -229,6 +247,7 @@ class FightTask(Task):
         )
         if fleet is None:
             self.timer.logger.info(
+                LogSource.no_source,
                 '由于部分舰船不满足出征条件而无法组织舰队, 任务暂停中...',
             )
             return 2, None
@@ -239,7 +258,7 @@ class FightTask(Task):
         for name in self.all_ships:
             ship = self.port.get_ship_by_name(name)
             if ship is None:
-                self.timer.logger.warning(f'未找到舰船 {name}')
+                self.timer.logger.warning(LogSource.no_source, f'未找到舰船 {name}')
                 continue
             if ship.status != 3 and ship.status >= self.repair_mode.get(
                 ship,
@@ -248,11 +267,15 @@ class FightTask(Task):
                 # 满足修理条件
                 if ship.waiting_repair:
                     self.timer.logger.debug(
+                        LogSource.no_source,
                         f'舰船 {name} 已在修理队列中, 不再重复添加.',
                     )
                 else:
                     ship.waiting_repair = True
-                    self.timer.logger.info(f'添加舰船 {name} 到修理队列.')
+                    self.timer.logger.info(
+                        LogSource.no_source,
+                        f'添加舰船 {name} 到修理队列.',
+                    )
                     tasks.append(RepairTask(self.timer, ship))
         return tasks
 
@@ -289,10 +312,16 @@ class FightTask(Task):
                     continue
                 ship = self.port.get_ship_by_name(name)
                 if ship is None:
-                    self.timer.logger.warning(f'未找到舰船 {name}')
+                    self.timer.logger.warning(
+                        LogSource.no_source,
+                        f'未找到舰船 {name}',
+                    )
                     continue
                 if ship.status >= self.repair_mode.get(name, self.default_repair_mode):
-                    self.timer.logger.info(f'舰船 {name} 的状态已经标记为修复')
+                    self.timer.logger.info(
+                        LogSource.no_source,
+                        f'舰船 {name} 的状态已经标记为修复',
+                    )
                     plan.repair_mode[i] = ship.status
                     ship.set_repair(0)
         # 执行战斗
@@ -372,7 +401,7 @@ class RepairTask(Task):
                     timer.relative_click(*repair_position[j])
                     time.sleep(0.5)
                     timer.update_screen()
-                    timer.logger.info(f'检查中:{(i, j)}')
+                    timer.logger.info(LogSource.no_source, f'检查中:{(i, j)}')
                     if '快速修理' in [
                         result[1]
                         for result in self.recognize_screen_relative(
@@ -382,11 +411,14 @@ class RepairTask(Task):
                             0.373,
                         )
                     ]:
-                        timer.logger.info('此位置有舰船修理中')
+                        timer.logger.info(LogSource.no_source, '此位置有舰船修理中')
                         seconds = self.port.bathroom._time_to_seconds(
                             self.recognize_screen_relative(0.413, 0.544, 0.506, 0.596)[0][1],
                         )
-                        timer.logger.info(f'预期用时: {seconds} 秒')
+                        timer.logger.info(
+                            LogSource.no_source,
+                            f'预期用时: {seconds} 秒',
+                        )
                         available_time.append(time.time() + seconds)
                         timer.relative_click(
                             797 / 1280,
@@ -405,7 +437,7 @@ class RepairTask(Task):
                 ],
             )
             self.port.bathroom.update_available_time(available_time)
-            timer.logger.info(f'浴室信息检查完毕:{info}')
+            timer.logger.info(LogSource.no_source, f'浴室信息检查完毕:{info}')
 
         # 扫描等待修理列表
         last_result = None
@@ -435,7 +467,10 @@ class RepairTask(Task):
                     if name == self.ship.name:
                         if self.max_repiar_time <= seconds:
                             # 快速修复
-                            self.timer.logger.info('满足快速修复条件, 使用快速修复工具')
+                            self.timer.logger.info(
+                                LogSource.no_source,
+                                '满足快速修复条件, 使用快速修复工具',
+                            )
                             self.ship.set_repair(0)
                             switch_quick_repair(True)
                             self.timer.relative_click(x, y)
@@ -443,6 +478,7 @@ class RepairTask(Task):
 
                         if not self.port.bathroom.is_available():
                             self.timer.logger.info(
+                                LogSource.no_source,
                                 '当前浴场已满, 不允许快速修复, 此任务延后',
                             )
                             return False, []
@@ -453,7 +489,10 @@ class RepairTask(Task):
                         self.ship.set_repair(seconds)
                         return True, []
 
-                    self.timer.logger.debug(f'识别到舰船: {name}')
+                    self.timer.logger.debug(
+                        LogSource.no_source,
+                        f'识别到舰船: {name}',
+                    )
 
             self.timer.relative_swipe(0.33, 0.5, 0.66, 0.5, delay=1)
             time.sleep(0.5)
@@ -501,9 +540,12 @@ class OtherTask(Task):
                         [ShipType(t) for t in self.destroy_ship_types],
                     )
                     break
-            timer.logger.info('船舱已满, 添加解装任务中...')
+            timer.logger.info(LogSource.no_source, '船舱已满, 添加解装任务中...')
             if timer.port.ship_factory.waiting_destory:
-                timer.logger.info('任务队列中已经有解装任务, 跳过')
+                timer.logger.info(
+                    LogSource.no_source,
+                    '任务队列中已经有解装任务, 跳过',
+                )
                 self.run = lambda self: None
 
         if type == 'build' or type == 'develop':
@@ -512,7 +554,10 @@ class OtherTask(Task):
                 if 'use_quick_build' in kwargs:
                     self.use_quick_build = kwargs['use_quick_build']
                 else:
-                    timer.logger.warning('未指定是否使用快修, 默认不使用')
+                    timer.logger.warning(
+                        LogSource.no_source,
+                        '未指定是否使用快修, 默认不使用',
+                    )
                     self.use_quick_build = False
             except:
                 raise ValueError('未指定油弹钢铝数量')
@@ -553,7 +598,7 @@ class DecisiveLogic(Logic):
             )  # 中破修
 
         ships = self.stats.ships
-        self.logger.debug(f'拥有舰船: {ships}')
+        self.logger.debug(LogSource.no_source, f'拥有舰船: {ships}')
         best_ships = [
             '',
         ]
@@ -575,7 +620,10 @@ class DecisiveLogic(Logic):
 
         for _ in range(len(best_ships), 7):
             best_ships.append('')  # noqa: PERF401
-        self.logger.debug(f'(考虑破损情况)当前最优：{best_ships}')
+        self.logger.debug(
+            LogSource.no_source,
+            f'(考虑破损情况)当前最优：{best_ships}',
+        )
         return best_ships
 
     def _leave(self):
@@ -601,23 +649,27 @@ class DecisiveFight(DecisiveBattle):
 
 
 class DecisiveFightTask(Task):
-    def __init__(self, timer: Timer, times, enable_quick_register=True, fleet_id=4) -> None:
+    def __init__(
+        self,
+        timer: Timer,
+        times,
+        config: DecisiveBattleConfig,
+        enable_quick_register=True,
+        fleet_id=4,
+    ) -> None:
         """
         Args:
             enable_quick_register (bool, optional): 是否启用快速注册. Defaults to False.
             fleet_id (int, optional): 注册舰队时占用的舰队编号. Defaults to 4.
         """
         super().__init__(timer)
-        if timer.config.decisive_battle is None:
+        if config is None:
             raise ValueError('未配置决战任务')
         self.times = times
 
-        if (
-            timer.config.decisive_battle.level1 is None
-            and timer.config.decisive_battle.level2 is None
-        ):
+        if config.level1 is None and config.level2 is None:
             raise ValueError('未配置决战任务舰队')
-        self.ships = timer.config.decisive_battle.level1 + timer.config.decisive_battle.level2
+        self.ships = config.level1 + config.level2
 
         self.db = DecisiveFight(self.timer)
         self.db.rships = self.ships
@@ -633,20 +685,26 @@ class DecisiveFightTask(Task):
             ship = self.timer.port.get_ship_by_name(ship)
             # if ship.status > 1 and ship.status < 3: # 大破修
             if ship.status > 0 and ship.status < 3:  # 中破修
-                self.timer.logger.info(f'{ship.name} 需要修复')
+                self.timer.logger.info(LogSource.no_source, f'{ship.name} 需要修复')
                 tasks.append(RepairTask(self.timer, ship))
         return tasks
 
     def run(self):
         while self.times > 0:
             if not self.db.can_fight():
-                self.timer.logger.info('无法组合出足量的战斗舰船, 任务暂停中')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    '无法组合出足量的战斗舰船, 任务暂停中',
+                )
                 return False, []
 
             res = self.db.run()
 
             if res == 'leave':
-                self.timer.logger.info('战斗舰船发生破损, 暂离修复中....')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    '战斗舰船发生破损, 暂离修复中....',
+                )
                 return False, self.check_repair()
             self.times -= 1
             self.db = DecisiveFight(self.timer)
@@ -655,14 +713,15 @@ class DecisiveFightTask(Task):
 
 
 class TaskRunner:
-    def __init__(self, timer: Timer) -> None:
+    def __init__(self, timer: Launcher) -> None:
+        self.decisive_config = timer.decisive_battle
         self.tasks = []
-        self.timer = timer
+        self.timer = timer.timer
 
     def add_decisive_task(self, times=1):
         if any(isinstance(task, DecisiveFightTask) for task in self.tasks):
             raise ValueError('已经存在决战任务, 不允许再次添加')
-        self.tasks.append(DecisiveFightTask(self.timer, times))
+        self.tasks.append(DecisiveFightTask(self.timer, times, self.decisive_config))
 
     def run(self):
         while True:
@@ -671,9 +730,15 @@ class TaskRunner:
             id = 0
             while id < len(self.tasks):
                 task = self.tasks[id]
-                self.timer.logger.info(f'当前任务类型: {type(task)}')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    f'当前任务类型: {type(task)}',
+                )
                 if 'times' in task.__dict__:
-                    self.timer.logger.info(f'当前任务剩余次数: {task.times}')
+                    self.timer.logger.info(
+                        LogSource.no_source,
+                        f'当前任务剩余次数: {task.times}',
+                    )
                 status, new_tasks = task.run()
                 if status:
                     self.tasks = self.tasks[0:id] + new_tasks + self.tasks[id + 1 :]
@@ -681,8 +746,14 @@ class TaskRunner:
                 self.tasks = self.tasks[0 : id + 1] + new_tasks + self.tasks[id + 1 :]
                 id += 1
             if len(self.tasks) == 0:
-                self.timer.logger.info('本次全部任务已经执行完毕')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    '本次全部任务已经执行完毕',
+                )
                 return
-            self.timer.logger.info('当轮任务已完成, 正在检查远征')
+            self.timer.logger.info(
+                LogSource.no_source,
+                '当轮任务已完成, 正在检查远征',
+            )
             time.sleep(30)
             Expedition(self.timer).run(True)

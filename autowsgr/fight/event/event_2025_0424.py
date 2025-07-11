@@ -7,6 +7,7 @@ from autowsgr.fight.event.event import Event
 from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import detect_ship_stats, quick_repair
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 from autowsgr.utils.io import yaml_to_dict
 
 
@@ -67,13 +68,17 @@ class EventFightPlan2025_0424(Event, BattlePlan):
 
         change_fight_map(self.config.map)
         if not self.timer.click_image(self.event_image[1], timeout=10):
-            self.timer.logger.warning('进入战斗准备页面失败,重新尝试进入战斗准备页面')
+            self.timer.logger.warning(
+                LogSource.no_source,
+                '进入战斗准备页面失败,重新尝试进入战斗准备页面',
+            )
             self.timer.click_image(self.event_image[1], timeout=10)
         self.timer.relative_click(*NODE_POSITION['not_handle'])
         try:
             self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         except Exception as e:
             self.timer.logger.warning(
+                LogSource.no_source,
                 f'匹配 fight_prepare_page 失败，尝试重新匹配, error: {e}',
             )
             self._go_fight_prepare_page()
@@ -145,7 +150,7 @@ class EventFightPlan2025_0424(Event, BattlePlan):
                 if fight_flag == ConditionFlag.SKIP_FIGHT:
                     return ConditionFlag.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
-            self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
+            self.timer.logger.info(LogSource.no_source, f'已出击次数:{i+1}，目标次数{times}')
         return ConditionFlag.OPERATION_SUCCESS
 
 

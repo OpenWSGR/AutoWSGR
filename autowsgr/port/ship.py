@@ -8,6 +8,7 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.positions import FLEET_POSITION
 from autowsgr.game.game_operation import move_team
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 from autowsgr.utils.api_image import absolute_to_relative, crop_rectangle_relative
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.operator import unorder_equal
@@ -76,12 +77,12 @@ class Fleet:
             if reg and not self.timer.port.have_ship():
                 self.timer.port.register_ship(ship[1])
             self.ships[rk + 1] = ship[1]
-        self.timer.logger.info(f'舰船识别结果为: {self.ships}')
+        self.timer.logger.info(LogSource.no_source, f'舰船识别结果为: {self.ships}')
 
         try:
             self.check_level()
         except IndexError as e:
-            self.timer.logger.info('检查等级失败')
+            self.timer.logger.info(LogSource.no_source, '检查等级失败')
             if check_level:
                 raise e
 
@@ -111,7 +112,7 @@ class Fleet:
             assert recognize_result is not None
             self.levels[i] = int(recognize_result[1])
             # print(levels)
-        self.timer.logger.info(f'等级识别结果: {self.levels}')
+        self.timer.logger.info(LogSource.no_source, f'等级识别结果: {self.levels}')
 
     def _change_ship(self, position, ship_name, search_method='word'):
         self.ships[position] = ship_name
@@ -143,7 +144,10 @@ class Fleet:
                 self.timer.get_screen()[:, :1048],
                 self.timer.ship_names,
             )
-            self.timer.logger.info(f'更改编队可用舰船：{[item[1] for item in ships]}')
+            self.timer.logger.info(
+                LogSource.no_source,
+                f'更改编队可用舰船：{[item[1] for item in ships]}',
+            )
             for ship in ships:
                 if ship[1] == ship_name:
                     rel_center = absolute_to_relative(ship[0], (1280, 720))
@@ -173,7 +177,10 @@ class Fleet:
             if ship in self.ships or not have_ship(ship):
                 continue
             position = ok.index(False)
-            self.timer.logger.debug(f'更改{position}号位舰船为 {ship}')
+            self.timer.logger.debug(
+                LogSource.no_source,
+                f'更改{position}号位舰船为 {ship}',
+            )
             self._change_ship(position, ship, search_method=search_method)
             ok[position] = True
 
@@ -232,7 +239,7 @@ class Fleet:
         """
         assert self.legal(ships)
         assert flag_ship is None or flag_ship in ships
-        self.timer.logger.debug(f'编队更改为：{ships}')
+        self.timer.logger.debug(LogSource.no_source, f'编队更改为：{ships}')
         self.detect()
         self._set_ships(ships, search_method=search_method)
         if order:

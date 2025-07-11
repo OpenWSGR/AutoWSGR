@@ -4,8 +4,9 @@ from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundE
 from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer import Timer
-from autowsgr.types import DestroyShipWorkMode, RepairMode, ShipType
+from autowsgr.types import DestroyShipWorkMode, LogSource, RepairMode, ShipType
 from autowsgr.utils.api_image import absolute_to_relative, crop_image
 
 
@@ -35,6 +36,7 @@ def get_ship(timer: Timer):
     timer.got_ship_num += 1
     if timer.port.ship_factory.capacity is not None:
         timer.logger.info(
+            LogSource.no_source,
             f'当前船坞容量 {timer.port.ship_factory.occupation}/{timer.port.ship_factory.capacity}',
         )
         timer.port.ship_factory.occupation += 1
@@ -42,7 +44,10 @@ def get_ship(timer: Timer):
     while timer.wait_image(symbol_images, timeout=1):
         try:
             ship_name, ship_type = recognize_get_ship(timer)
-            timer.logger.info(f'获取舰船: {ship_name} {ship_type}')
+            timer.logger.info(
+                LogSource.no_source,
+                f'获取舰船: {ship_name} {ship_type}',
+            )
         except Exception as e:
             print(e)
         timer.click(915, 515, delay=0.5, times=1)
@@ -68,10 +73,13 @@ def click_result(timer: Timer, max_times=1):
         if timer.can_get_loot and not looted:
             if timer.image_exist(IMG.fight_result['LOOT'], need_screen_shot=True):
                 timer.got_loot_num += 1
-                timer.logger.info(f'捞到胖次! 当前胖次数:{timer.got_loot_num}')
+                timer.logger.info(
+                    LogSource.no_source,
+                    f'捞到胖次! 当前胖次数:{timer.got_loot_num}',
+                )
                 looted = True
             else:
-                timer.logger.debug('没有识别到胖次')
+                timer.logger.debug(LogSource.no_source, '没有识别到胖次')
         timer.click(915, 515, delay=0.25, times=1)
 
 
@@ -170,7 +178,7 @@ def move_team(timer: Timer, target, try_times=0):
 
     if verify_team(timer) == target:
         return
-    timer.logger.info('正在切换队伍到:' + str(target))
+    timer.logger.info(LogSource.no_source, '正在切换队伍到:' + str(target))
     timer.click(110 * target, 81)
     if verify_team(timer) != target:
         move_team(timer, target, try_times + 1)
@@ -191,7 +199,7 @@ def set_support(timer: Timer, target, try_times=0):
         timer.click(628, 82, delay=1)
         timer.click(760, 273, delay=1)
         timer.click(480, 270, delay=1)
-        timer.logger.info('开启支援状态成功')
+        timer.logger.info(LogSource.no_source, '开启支援状态成功')
 
     if timer.is_bad_network(0) or check_support_stats(timer) != target:
         if timer.process_bad_network('set_support'):
@@ -226,7 +234,10 @@ def quick_repair(
             time.sleep(1)
             ship_stats = detect_ship_stats(timer)
         if not any(x in ship_stats for x in [0, 1, 2]):
-            timer.logger.warning('执行修理操作时没有成功检测到舰船')
+            timer.logger.warning(
+                LogSource.no_source,
+                '执行修理操作时没有成功检测到舰船',
+            )
             raise ValueError('没有成功检测到舰船，请检查是否正确编队')
 
         if isinstance(repair_mode, RepairMode):
@@ -248,11 +259,10 @@ def quick_repair(
             else:
                 need_repair[i] = False
 
-        if timer.config.debug:
-            timer.logger.debug('ship_stats:', ship_stats)
+        timer.logger.debug(LogSource.no_source, 'ship_stats:', ship_stats)
         if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
             if timer.config.repair_manually:
-                timer.logger.info('需要手动修理舰船')
+                timer.logger.info(LogSource.no_source, '需要手动修理舰船')
                 raise BaseException('需要手动修理舰船')
             timer.click(420, 420, times=2, delay=0.8)
             # 快修已经开始泡澡的船
@@ -264,8 +274,8 @@ def quick_repair(
             # 按逻辑修理
             for i in range(1, 7):
                 if need_repair[i - 1]:
-                    timer.logger.info('WorkInfo:' + str(kwargs))
-                    timer.logger.info(str(i) + ' Repaired')
+                    timer.logger.info(LogSource.no_source, 'WorkInfo:' + str(kwargs))
+                    timer.logger.info(LogSource.no_source, str(i) + ' Repaired')
                     timer.quick_repaired_cost += 1
                     timer.click(
                         BLOOD_BAR_POSITION[0][i][0],
@@ -395,7 +405,7 @@ def change_ship(
         if time.time() - start_time > 10:
             timer.log_screen(True)
             raise TimeoutError('等待输入框出现时超时')
-    timer.logger.debug('输入框已经出现')
+    timer.logger.debug(LogSource.no_source, '输入框已经出现')
     # 输入名字检索
     timer.text(name)
     # 输入后随便点击获得检索结果
@@ -410,11 +420,17 @@ def change_ship(
     found_ship = next((ship for ship in ship_info if ship[1] == name), None)
     # 点击舰船
     if found_ship is None:
-        timer.logger.error(f"Can't find ship {name}, ocr result:{ship_info}")
+        timer.logger.error(
+            LogSource.no_source,
+            f"Can't find ship {name}, ocr result:{ship_info}",
+        )
         if len(ship_info) == 0:
-            timer.logger.warning('无法查找到任何舰船, 请检查舰船名是否有错误')
+            timer.logger.warning(
+                LogSource.no_source,
+                '无法查找到任何舰船, 请检查舰船名是否有错误',
+            )
             raise ShipNotFoundErr
-        timer.logger.debug('Try to click the first ship')
+        timer.logger.debug(LogSource.no_source, 'Try to click the first ship')
         if ship_stats[ship_id] == -1:
             timer.click(83, 167, delay=0)
         else:
@@ -439,7 +455,7 @@ def change_ships(timer: Timer, fleet_id, ship_names):
         change_ships(timer, 2, [None, "萤火虫", "伏尔塔", "吹雪", "明斯克", None, None])
 
     """
-    timer.logger.info(f'Change Fleet {fleet_id} to {ship_names}')
+    timer.logger.info(LogSource.no_source, f'Change Fleet {fleet_id} to {ship_names}')
     if fleet_id is not None and not timer.identify_page('fight_prepare_page'):
         timer.goto_game_page('fight_prepare_page')
         move_team(timer, fleet_id)
@@ -464,12 +480,14 @@ def get_new_things(timer: Timer, lock=0):
 
 
 # 是否强制点击
-def cook(timer: Timer, position: int, force_click=False):
+def cook(timer: Timer | Launcher, position: int, force_click=False):
     """食堂做菜
     Args:
         position (int): 第几个菜谱
         force_click (bool, optional): 当有菜正在生效时是否继续做菜. Defaults to False.
     """
+    if isinstance(timer, Launcher):
+        timer = timer.timer
     if position < 1 or position > 3:
         raise ValueError(f'不支持的菜谱编号:{position}')
     POSITION = [None, (318, 276), (420, 140), (556, 217)]
@@ -478,22 +496,23 @@ def cook(timer: Timer, position: int, force_click=False):
     try:
         timer.click_image(IMG.restaurant_image.cook, timeout=7.5, must_click=True)
         if timer.image_exist(IMG.restaurant_image.have_cook):
-            timer.logger.info('当前菜的效果正在生效')
+            timer.logger.info(LogSource.no_source, '当前菜的效果正在生效')
             if force_click:
                 timer.relative_click(0.414, 0.628)
                 if timer.image_exist(IMG.restaurant_image.no_times):
-                    timer.logger.info('今日用餐次数已经用尽')
+                    timer.logger.info(LogSource.no_source, '今日用餐次数已经用尽')
                     timer.relative_click(0.788, 0.207)
                     return False
-                timer.logger.info('做菜成功')
+                timer.logger.info(LogSource.no_source, '做菜成功')
             else:
                 timer.relative_click(0.65, 0.628)
-                timer.logger.info('取消做菜')
+                timer.logger.info(LogSource.no_source, '取消做菜')
                 timer.relative_click(0.788, 0.207)
         return True
 
     except:
         timer.logger.warning(
+            LogSource.no_source,
             f'不支持的菜谱编号:{position}, 请检查该菜谱是否有效, 或者检查今日用餐次数是否已经用尽',
         )
         return False

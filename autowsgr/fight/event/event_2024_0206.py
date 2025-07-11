@@ -6,6 +6,7 @@ from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.fight.event.event import Event
 from autowsgr.fight.normal_fight import NormalFightInfo, NormalFightPlan
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 
 
 NODE_POSITION = (
@@ -92,7 +93,10 @@ class EventFightPlan20240206(Event, NormalFightPlan):
         try:
             self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         except:
-            self.timer.logger.warning('匹配战斗页面失败，尝试重新匹配')
+            self.timer.logger.warning(
+                LogSource.no_source,
+                '匹配战斗准备页面失败，尝试重新匹配',
+            )
             self.timer.go_main_page()
             self._go_map_page()
             self._go_fight_prepare_page()

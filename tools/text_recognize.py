@@ -28,7 +28,7 @@ def on_mouse(event, x, y, flags, param):
     last_point = None
 
 
-timer = start_script('tests/user_settings.yaml')
+timer = start_script('tests/user_settings.yaml').timer
 while True:
     cv2.waitKey(0)
     screen = timer.get_screen()
