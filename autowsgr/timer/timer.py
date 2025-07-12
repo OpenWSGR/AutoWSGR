@@ -1,20 +1,19 @@
 import threading as th
 import time
 
-from autowsgr.configs import UserConfig
+from autowsgr.configs import EmulatorConfig, ResourceConfig, TimerConfig
 from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG
 from autowsgr.constants.other_constants import ALL_PAGES
 from autowsgr.constants.ui import WSGR_UI, Node
 from autowsgr.port.common import Port
-from autowsgr.timer.backends import EasyocrBackend, PaddleOCRBackend
 from autowsgr.timer.controllers import (
     AndroidController,
     MacController,
     OSController,
     WindowsController,
 )
-from autowsgr.types import OcrBackend, OSType
+from autowsgr.types import LogSource, OcrBackend, OSType
 from autowsgr.utils.io import create_nested_dict, recursive_dict_update, yaml_to_dict
 from autowsgr.utils.logger import Logger
 from autowsgr.utils.operator import unzip_element
@@ -23,13 +22,12 @@ from autowsgr.utils.operator import unzip_element
 class Timer(AndroidController):
     """程序运行记录器, 用于记录和传递部分数据, 同时用于区分多开, WSGR 专用"""
 
-    def __init__(self, config: UserConfig, logger: Logger) -> None:
-        self.config = config
+    def __init__(self, config: TimerConfig, logger: Logger, ocr_backend: OcrBackend) -> None:
         self.logger = logger
-
-        self.initialize_resources()
-        self.initialize_controllers()
-        self.initialize_ocr()
+        self.config = config.game_config
+        self.initialize_resources(config.resource_config)
+        self.initialize_controllers(config.emulator_config)
+        self.ocr_backend = ocr_backend
 
         # 初始化状态变量
         self.everyday_check = True
@@ -50,46 +48,37 @@ class Timer(AndroidController):
         self.port = Port(logger)
         self.init()
 
-    def initialize_resources(self) -> None:
+    def initialize_resources(self, config: ResourceConfig) -> None:
         # 加载资源
-        if self.config.plan_root is None:
+        if config.plan_root is None:
             raise ValueError('plan_root is not defined')
         self.ui = WSGR_UI
         self.plan_tree = recursive_dict_update(
-            create_nested_dict(self.config.default_plan_root),
-            create_nested_dict(self.config.plan_root),
+            create_nested_dict(config.default_plan_root),
+            create_nested_dict(config.plan_root),
         )
         self.ship_names = unzip_element(
             recursive_dict_update(
-                yaml_to_dict(self.config.default_ship_name_file),
-                yaml_to_dict(self.config.ship_name_file),
+                yaml_to_dict(config.default_ship_name_file),
+                yaml_to_dict(config.ship_name_file),
             ).values(),
         )
-        self.logger.info('资源加载成功')
+        self.logger.info(LogSource.no_source, '资源加载成功')
 
-    def initialize_controllers(self) -> None:
+    def initialize_controllers(self, config: EmulatorConfig) -> None:
         # 初始化操作系统控制器
         adapter_fun = {
             OSType.windows: WindowsController,
             OSType.macos: MacController,
         }
-        self.os_controller: OSController = adapter_fun[self.config.os_type](
-            self.config,
+        self.os_controller: OSController = adapter_fun[config.os_type](
+            config,
             self.logger,
         )
         # 初始化android控制器
         dev = self.os_controller.connect_android()
-        AndroidController.__init__(self, dev, self.config, self.logger)
-        self.logger.info('控制器初始化成功')
-
-    def initialize_ocr(self) -> None:
-        # 初始化 OCR 后端
-        match self.config.ocr_backend:
-            case OcrBackend.easyocr:
-                self.ocr_backend = EasyocrBackend(self.config, self.logger)
-            case OcrBackend.paddleocr:
-                self.ocr_backend = PaddleOCRBackend(self.config, self.logger)
-        self.logger.info('OCR 后端初始化成功')
+        AndroidController.__init__(self, dev, config, self.logger)
+        self.logger.info(LogSource.no_source, '控制器初始化成功')
 
     # ========================= OCR 功能穿透 =========================
     def recognize(
@@ -150,16 +139,28 @@ class Timer(AndroidController):
         try:
             self.set_page()
             if isinstance(self.now_page, Node):
-                self.logger.info(f'启动成功, 当前位置: {self.now_page.name}')
+                self.logger.info(
+                    LogSource.no_source,
+                    f'启动成功, 当前位置: {self.now_page.name}',
+                )
             else:
                 if self.config.check_page:
-                    self.logger.warning('无法确定当前页面, 尝试重启游戏')
+                    self.logger.warning(
+                        LogSource.no_source,
+                        '无法确定当前页面, 尝试重启游戏',
+                    )
                     self.restart()
                     self.set_page()
                 else:
-                    self.logger.warning('在无法确定页面的情况下继续.')
+                    self.logger.warning(
+                        LogSource.no_source,
+                        '在无法确定页面的情况下继续.',
+                    )
         except Exception as ex:
-            self.logger.warning(f'出现未知错误, 尝试重启游戏:{ex}')
+            self.logger.warning(
+                LogSource.no_source,
+                f'出现未知错误, 尝试重启游戏:{ex}',
+            )
             self.restart()
             self.set_page()
 
@@ -229,7 +230,7 @@ class Timer(AndroidController):
 
         try:
             if self.everyday_check:
-                self.logger.info('正在尝试关闭新闻, 领取奖励')
+                self.logger.info(LogSource.no_source, '正在尝试关闭新闻, 领取奖励')
                 if self.wait_image(IMG.start_image[6], timeout=2):  # 新闻与公告,设为今日不再显示
                     if not self.check_pixel((70, 485), (201, 129, 54)):
                         self.click(70, 485)
@@ -239,7 +240,7 @@ class Timer(AndroidController):
                     self.confirm_operation(must_confirm=True, timeout=2)
                 self.everyday_check = False
             self.go_main_page()
-            self.logger.info('游戏启动成功!')
+            self.logger.info(LogSource.no_source, '游戏启动成功!')
         except:
             raise CriticalErr('fail to start game')
 
@@ -279,7 +280,7 @@ class Timer(AndroidController):
         """
         if self.is_other_device_login(timeout):
             self.log_screen(need_screen_shot=True, name='other device login.PNG')
-            self.logger.error('other device login')
+            self.logger.error(LogSource.no_source, 'other device login')
             raise CriticalErr('other device login')
 
     def is_bad_network(self, timeout=10):
@@ -306,7 +307,7 @@ class Timer(AndroidController):
         start_time = time.time()
         while self.is_bad_network(timeout):
             self.log_screen(need_screen_shot=True, name='bad_network.PNG')
-            self.logger.warning(f'bad network: {extra_info}')
+            self.logger.warning(LogSource.no_source, f'bad network: {extra_info}')
 
             # 等待网络恢复
 
@@ -327,7 +328,10 @@ class Timer(AndroidController):
                     [IMG.symbol_image[10]] + IMG.error_image['bad_network'],
                     timeout=5,
                 ):
-                    self.logger.debug('ok network problem solved')
+                    self.logger.debug(
+                        LogSource.no_source,
+                        'ok network problem solved',
+                    )
                     self.reset_chapter_map()
                     return True
 
@@ -394,13 +398,14 @@ class Timer(AndroidController):
 
     def operate(self, end: Node):
         if not isinstance(self.now_page, Node):
-            self.logger.error('now_page is not a Node object')
+            self.logger.error(LogSource.no_source, 'now_page is not a Node object')
             raise TypeError('now_page is not a Node object')
         ui_list = self.ui.find_path(self.now_page, end)
         for next in ui_list[1:]:
             edge = self.now_page.find_edge(next)
             if edge is None:
                 self.logger.error(
+                    LogSource.no_source,
                     f'no edge found between {self.now_page.name} and {next.name}',
                 )
                 raise ValueError('no edge found')
@@ -418,12 +423,13 @@ class Timer(AndroidController):
                 if dst == 1:
                     continue
                 self.logger.debug(
+                    LogSource.no_source,
                     f'Go page: {self.now_page}, but arrive: {edge.other_dst.name}',
                 )
                 self.now_page = self.ui.get_node_by_name(
                     [self.now_page.name, edge.other_dst.name][dst - 1],
                 )
-                self.logger.debug(f'Now page: {self.now_page}')
+                self.logger.debug(LogSource.no_source, f'Now page: {self.now_page}')
                 if isinstance(self.now_page, Node) and self.now_page.name == 'expedition_page':
                     try_to_get_expedition(self)
                 self.operate(end)
@@ -443,7 +449,10 @@ class Timer(AndroidController):
                 self.now_page = now_page
         elif page is not None:
             if not isinstance(page, Node):
-                self.logger.error('arg:page must be an controller.ui.Node object')
+                self.logger.error(
+                    LogSource.no_source,
+                    'arg:page must be an controller.ui.Node object',
+                )
                 raise ValueError
 
             self.now_page = page if (self.ui.page_exist(page)) else 'unknown_page'
@@ -465,7 +474,10 @@ class Timer(AndroidController):
             if isinstance(end, str):
                 end = self.ui.get_node_by_name(end)
                 if end is None:
-                    self.logger.error('unacceptable value of end: {end}')
+                    self.logger.error(
+                        LogSource.no_source,
+                        'unacceptable value of end: {end}',
+                    )
                     raise ValueError('illegal value:end, in Timer.walk_to')
                 self.walk_to(end)
 
@@ -476,9 +488,10 @@ class Timer(AndroidController):
                 self.process_other_device_login()
             if not self.is_bad_network(timeout=2):
                 self.logger.debug(
+                    LogSource.no_source,
                     'wrong path is operated,anyway we find a way to solve,processing',
                 )
-                self.logger.debug('wrong info is:', exception)
+                self.logger.debug(LogSource.no_source, 'wrong info is:', exception)
                 self.go_main_page()
                 self.walk_to(end, try_times + 1)
             else:
@@ -525,7 +538,10 @@ class Timer(AndroidController):
                     self.go_main_page(0, list1)
                     return
             else:
-                self.logger.error("Unknown error,can't go main page")
+                self.logger.error(
+                    LogSource.no_source,
+                    "Unknown error,can't go main page",
+                )
                 raise ValueError("Error,Couldn't go main page")
         self.reset_chapter_map()
         self.now_page = self.ui.get_node_by_name('main_page')
@@ -561,7 +577,10 @@ class Timer(AndroidController):
         self.walk_to(target)
         if extra_check:
             if not isinstance(self.now_page, Node):
-                self.logger.error(f'now_page: {self.now_page} is not Node')
+                self.logger.error(
+                    LogSource.no_source,
+                    f'now_page: {self.now_page} is not Node',
+                )
                 raise TypeError('now_page is not a Node object')
             self.wait_pages(names=[self.now_page.name])
 
@@ -618,7 +637,7 @@ def process_error(timer: Timer):
 
 
 def try_to_get_expedition(timer: Timer):
-    timer.logger.info('开始收取远征奖励...')
+    timer.logger.info(LogSource.no_source, '开始收取远征奖励...')
     get, pos = False, timer.wait_image(IMG.game_ui[6], timeout=2)
     while pos:
         timer.click(pos[0], pos[1], delay=1)

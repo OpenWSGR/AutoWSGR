@@ -1,6 +1,7 @@
 import os
 from typing import Literal
 
+from autowsgr.configs import DecisiveBattleConfig
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
@@ -10,6 +11,7 @@ from autowsgr.game.game_operation import destroy_ship, get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.port.ship import Fleet, count_ship
 from autowsgr.timer import Timer
+from autowsgr.types import LogSource
 from autowsgr.utils.api_image import crop_image, crop_rectangle_relative
 from autowsgr.utils.io import count, yaml_to_dict
 
@@ -97,7 +99,6 @@ class Logic:
         flagship_priority: list,
     ) -> None:
         self.timer = timer
-        self.config = timer.config
         self.logger = timer.logger
 
         self.level1 = list(set(level1))
@@ -151,7 +152,7 @@ class Logic:
 
     def get_best_fleet(self) -> list[str]:
         ships = self.stats.ships
-        self.logger.debug(f'拥有舰船: {ships}')
+        self.logger.debug(LogSource.no_source, f'拥有舰船: {ships}')
         best_ships = [
             '',
         ]
@@ -173,7 +174,10 @@ class Logic:
 
         for _ in range(len(best_ships), 7):
             best_ships.append('')  # noqa: PERF401
-        self.logger.debug(f'(不考虑破损情况) 当前最优：{best_ships}')
+        self.logger.debug(
+            LogSource.no_source,
+            f'(不考虑破损情况) 当前最优：{best_ships}',
+        )
         return best_ships
 
     def _retreat(self, fleet: list[str]) -> bool:
@@ -204,9 +208,9 @@ class DecisiveBattle:
     def run(self) -> Literal['leave', 'quit']:
         return self.run_for_times()
 
-    def __init__(self, timer: Timer) -> None:
+    def __init__(self, timer: Timer, config: DecisiveBattleConfig) -> None:
         self.timer = timer
-        self.config = timer.config.decisive_battle
+        self.config = config
         if self.config is None:
             raise ValueError('决战配置为空')
         self.repair_strategy = self.config.repair_level
@@ -241,9 +245,15 @@ class DecisiveBattle:
                 30,
                 True,
             ):
-                self.timer.logger.info(f'识别决战地图参数, 第 {i} 小节正在进行')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    f'识别决战地图参数, 第 {i} 小节正在进行',
+                )
                 return i
-        self.timer.logger.info('识别决战地图参数, 第 3 小节正在进行')
+        self.timer.logger.info(
+            LogSource.no_source,
+            '识别决战地图参数, 第 3 小节正在进行',
+        )
         return 3
 
     def recognize_node(self, retry: int = 0) -> str:
@@ -251,7 +261,10 @@ class DecisiveBattle:
             IMG.fight_image[18:20],
             confidence=0.7,
         )
-        self.timer.logger.debug(f'Ship_ICON position: {position}')
+        self.timer.logger.debug(
+            LogSource.no_source,
+            f'Ship_ICON position: {position}',
+        )
         cropped_image = crop_rectangle_relative(
             self.timer.get_screen(),
             position[0] / 960 - 0.03,
@@ -261,12 +274,19 @@ class DecisiveBattle:
         )
         result = self.timer.ocr_backend.bin.recognize_map(cropped_image)
         if result != '0':
-            self.timer.logger.info(f'识别决战地图参数, 第 {result[0]} 节点正在进行')
+            self.timer.logger.info(
+                LogSource.no_source,
+                f'识别决战地图参数, 第 {result[0]} 节点正在进行',
+            )
             return result[0]
         if retry > 3:
-            self.timer.logger.warning('识别决战地图参数失败, 退出逻辑')
+            self.timer.logger.warning(
+                LogSource.no_source,
+                '识别决战地图参数失败, 退出逻辑',
+            )
             raise BaseException
         self.timer.logger.warning(
+            LogSource.no_source,
             f'识别决战地图参数失败, 正在重试第 {retry + 1} 次',
         )
         return self.recognize_node(retry + 1)
@@ -314,7 +334,10 @@ class DecisiveBattle:
                     after_get_delay=1,
                 )
             except:
-                self.timer.logger.warning('进入出征准备页面失败，正在重试')
+                self.timer.logger.warning(
+                    LogSource.no_source,
+                    '进入出征准备页面失败，正在重试',
+                )
                 self.go_fleet_page()
 
     def repair(self) -> None:
@@ -361,9 +384,12 @@ class DecisiveBattle:
             )[1]
         except:
             # TODO: 提高OCR对单个数字的识别率
-            self.timer.logger.warning('读取当前可用费用失败')
+            self.timer.logger.warning(LogSource.no_source, '读取当前可用费用失败')
             self.stats.score = 0
-        self.timer.logger.debug(f'当前可用费用为：{self.stats.score}')
+        self.timer.logger.debug(
+            LogSource.no_source,
+            f'当前可用费用为：{self.stats.score}',
+        )
         results = self.timer.recognize_number(
             crop_image(screen, *COST_AREA),
             extra_chars='x',
@@ -371,7 +397,7 @@ class DecisiveBattle:
         )
         costs = [t[1] for t in results]
         if not all(x > 1 for x in costs):
-            self.timer.logger.warning('识别费用出错, 跳过异常项')
+            self.timer.logger.warning(LogSource.no_source, '识别费用出错, 跳过异常项')
             costs = [99 if x < 2 else x for x in costs]
         _costs, ships, real_position = [], [], []
         for i, cost in enumerate(costs):
@@ -402,7 +428,7 @@ class DecisiveBattle:
         # ==================做出决策===================
         choose_success = True
         self.stats.selections = selections
-        self.timer.logger.debug('可购买舰船：', selections)
+        self.timer.logger.debug(LogSource.no_source, '可购买舰船：', selections)
         is_first_node = self.stats.map == 1 and self.stats.node == 'A'
         if is_first_node:
             # 判断最后一艘船是否为技能, 如果是技能则不是A节点
@@ -419,7 +445,10 @@ class DecisiveBattle:
                 )[1]
             )
             if last_ship in self.timer.ship_names[-10:]:
-                self.timer.logger.debug(f'最后一艘船为技能:{last_ship}, 判断不是A节点')
+                self.timer.logger.debug(
+                    LogSource.no_source,
+                    f'最后一艘船为技能:{last_ship}, 判断不是A节点',
+                )
                 is_first_node = False
         choose = self.logic._choose_ship(is_first_node)
         if len(choose) == 0:
@@ -429,16 +458,22 @@ class DecisiveBattle:
                     [IMG.decisive_battle_image[2], IMG.decisive_battle_image[8]],
                     timeout=2,
                 )
-                self.timer.logger.info('刷新备选舰船')
+                self.timer.logger.info(LogSource.no_source, '刷新备选舰船')
                 return self.choose(True)
             if is_first_node:
-                self.timer.logger.info('没有合适购买的舰船, 准备撤退')
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    '没有合适购买的舰船, 准备撤退',
+                )
                 choose_success = False
                 choose = [next(iter(selections.keys()))]
         for target in choose:
             cost, p = selections[target]
             self.stats.score -= cost
-            self.timer.logger.info(f'选择购买：{target}，花费：{cost}，点击位置：{p}')
+            self.timer.logger.info(
+                LogSource.no_source,
+                f'选择购买：{target}，花费：{cost}，点击位置：{p}',
+            )
             self.timer.relative_click(*p)
             if is_ship(target):
                 self.stats.ships.add(target)
@@ -461,9 +496,9 @@ class DecisiveBattle:
                 multiple=True,
             )
             ships = [ship[1] for ship in ship_results]
-            self.timer.logger.info(f'使用技能获得: {ships}')
+            self.timer.logger.info(LogSource.no_source, f'使用技能获得: {ships}')
             if self.config.useful_skill and not self.check_skill(ships):
-                self.timer.logger.info('技能效果不佳, 撤退重试')
+                self.timer.logger.info(LogSource.no_source, '技能效果不佳, 撤退重试')
                 self.timer.relative_click(*SKILL_POS, times=2, delay=0.3)
                 return False
             for ship in ships:
@@ -579,7 +614,7 @@ class DecisiveBattle:
                 destroy_ship(self.timer)
                 self.enter_map()
                 return True
-            self.timer.logger.warning('船舱已满, 但不允许解装')
+            self.timer.logger.warning(LogSource.no_source, '船舱已满, 但不允许解装')
             return False
         return False
 
@@ -623,10 +658,11 @@ class DecisiveBattle:
             self.stats.exp = int(src[i1 + 1 : i2])
             self.stats.need = int(src[i2 + 1 :])
             self.timer.logger.debug(
+                LogSource.no_source,
                 f'当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}',
             )
         except:
-            self.timer.logger.warning('识别副官升级经验数值失败')
+            self.timer.logger.warning(LogSource.no_source, '识别副官升级经验数值失败')
 
     def _before_fight(self) -> Literal['retreat', 'leave'] | None:
         if self.timer.wait_image(IMG.confirm_image[1:], timeout=1):
@@ -645,7 +681,10 @@ class DecisiveBattle:
         if not choose_success:
             if self.stats.node == 'A':
                 return self.retreat()
-            self.timer.logger.info('由于不在A节点, 取消撤退, 继续战斗')
+            self.timer.logger.info(
+                LogSource.no_source,
+                '由于不在A节点, 取消撤退, 继续战斗',
+            )
         # 升级副官, 现在这功能坏掉了
         # while self.logic._up_level():
         #     self.up_level_assistant()
@@ -666,7 +705,7 @@ class DecisiveBattle:
         ):  # 中破修
             return self.leave()
         if self.logic._retreat(self.fleet):
-            self.timer.logger.info('舰船组队不合适, 准备撤退')
+            self.timer.logger.info(LogSource.no_source, '舰船组队不合适, 准备撤退')
             return self.retreat()
         if self.stats.fleet != self.fleet:
             self._change_fleet(self.fleet)
@@ -676,7 +715,10 @@ class DecisiveBattle:
         return None
 
     def _after_fight(self) -> None:
-        self.timer.logger.info(f'舰船状态: {self.stats.ship_stats}')
+        self.timer.logger.info(
+            LogSource.no_source,
+            f'舰船状态: {self.stats.ship_stats}',
+        )
 
     def _check_fleet(self) -> None:
         self.stats.ships.clear()
@@ -707,7 +749,10 @@ class DecisiveBattle:
             self.timer.get_screen()[:, :1048],
             self.timer.ship_names,
         )
-        self.timer.logger.info(f'其它可用舰船：{[item[1] for item in ships]}')
+        self.timer.logger.info(
+            LogSource.no_source,
+            f'其它可用舰船：{[item[1] for item in ships]}',
+        )
         for ship in ships:
             self.stats.ships.add(ship[1])
         self.timer.relative_click(0.05, 0.05)
