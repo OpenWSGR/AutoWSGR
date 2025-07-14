@@ -12,11 +12,12 @@ from autowsgr.types import ConditionFlag
 
 
 class DailyOperation:
-    def __init__(self, timer: Timer) -> None:
+    def __init__(self, timer: Timer, gap=300) -> None:
         self.timer = timer
         if timer.config.daily_automation is None:
             raise ValueError('未设置日常任务，请检查配置文件')
         self.config = timer.config.daily_automation
+        self.gap = gap
 
         if self.config.auto_expedition:
             self.expedition_plan = Expedition(self.timer)
@@ -98,7 +99,7 @@ class DailyOperation:
                     )
                     break
 
-                if time.time() - self.last_time >= 5 * 60:
+                if time.time() - self.last_time >= self.gap:
                     self._expedition()
                     self._gain_bonus()
                     if self.config.auto_exercise:
@@ -112,7 +113,7 @@ class DailyOperation:
             self._bath_repair()
             self._expedition()
             self._gain_bonus()
-            time.sleep(360)
+            time.sleep(self.gap)
 
     def _has_unfinished(self) -> bool:
         return any(times[0] < times[1] for times in self.fight_complete_times)
