@@ -3,7 +3,6 @@ from typing import Any
 
 from airtest.core.settings import Settings as ST  # noqa
 
-from autowsgr import timer
 from autowsgr.configs import (
     DailyAutomationConfig,
     DecisiveBattleConfig,
