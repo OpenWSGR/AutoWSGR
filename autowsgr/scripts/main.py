@@ -3,7 +3,6 @@ from typing import Any
 
 from airtest.core.settings import Settings as ST  # noqa
 
-from autowsgr import timer
 from autowsgr.configs import (
     DailyAutomationConfig,
     DecisiveBattleConfig,
@@ -12,9 +11,6 @@ from autowsgr.configs import (
     TimerConfig,
     UserConfig,
 )
-from autowsgr.fight.decisive_battle import DecisiveBattle
-from autowsgr.game.build import BuildManager
-from autowsgr.scripts.daily_api import DailyOperation
 from autowsgr.timer import Timer
 from autowsgr.timer.backends.ocr_backend import EasyocrBackend, PaddleOCRBackend
 from autowsgr.types import LogSource, OcrBackend
@@ -72,6 +68,8 @@ class Launcher:
         Returns:
             Timer: 该模拟器的记录器
         """
+        from autowsgr.game.build import BuildManager
+
         self.daily_automation = config.daily_automation
         self.decisive_battle = config.decisive_battle
 
@@ -93,6 +91,8 @@ class Launcher:
 
     def run_daily_automation(self) -> None:
         """运行日常自动化脚本"""
+        from autowsgr.scripts.daily_api import DailyOperation
+
         if self.daily_automation is not None:
             daily_operation = DailyOperation(self.timer, self.daily_automation)
             daily_operation.run()
@@ -101,6 +101,8 @@ class Launcher:
 
     def run_decisive_battle(self, times: int = 1) -> None:
         """运行决战脚本"""
+        from autowsgr.fight.decisive_battle import DecisiveBattle
+
         if self.decisive_battle is not None:
             decisive_battle = DecisiveBattle(self.timer, self.decisive_battle)
             decisive_battle.run_for_times(times)
