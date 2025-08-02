@@ -675,7 +675,8 @@ class DecisionBlock:
                 else:
                     self.timer.logger.error('未找到远程支援按钮')
                     raise ImageNotFoundErr("can't found image of long_missile_support")
-            self.timer.click(855, 501, delay=0.2)
+            time.sleep(0.5)
+            self.timer.click(855, 501, delay=0.2)  # 0.891 0.928
             # self.timer.click(380, 520, times=2, delay=0.2) # TODO: 跳过可能的开幕支援动画，实现有问题
             return 'fight', ConditionFlag.FIGHT_CONTINUE
         if state == 'formation':
