@@ -216,7 +216,7 @@ class BuildManager:
                 src = detect_build_resources(resource_id)
                 for digit in range(3):
                     while src[digit] != dst[digit]:
-                        print(f'资源 {resource_id} 目前 {src} 目标 {dst}')
+                        self.timer.logger.info(f'资源 {resource_id} 目前 {src} 目标 {dst}')
                         way = -1 if src[digit] < dst[digit] else 1
                         self.timer.relative_swipe(
                             *RESOURCE_OPERATE_POSITIONS[resource_id][digit],

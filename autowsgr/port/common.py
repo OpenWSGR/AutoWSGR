@@ -161,4 +161,4 @@ class Port:
     def show_fleet(self):
         self.logger.info('当前已经注册的舰船如下:')
         for ship in self.ships:
-            print(ship)
+            self.logger.info(str(ship))
