@@ -607,7 +607,7 @@ class Timer(AndroidController):
 
 def process_error(timer: Timer):
     """这个方法目前没有用到, ControllerAdapter也没有定义过, 暂时保留"""
-    print('processing errors')
+    timer.logger.debug('processing errors')
     if not timer.ControllerAdapter.is_android_online() or not timer.is_game_running():  # type: ignore
         timer.ControllerAdapter.restart_android()  # type: ignore
         timer.ControllerAdapter.connect_android()  # type: ignore

@@ -88,7 +88,7 @@ class DailyOperation:
                 if ret == ConditionFlag.OPERATION_SUCCESS or ret == ConditionFlag.SL:
                     self.fight_complete_times[task_id][0] += 1
                 elif ret == ConditionFlag.DOCK_FULL:
-                    miao_alert.miao_alert(0)
+                    miao_alert.miao_alert(0, self.timer.logger)
                     break  # 不解装则结束出征
 
                 if self.config.quick_repair_limit and self.timer.quick_repaired_cost >= int(
