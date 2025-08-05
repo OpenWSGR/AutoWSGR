@@ -1,4 +1,5 @@
 import os
+import time
 from collections.abc import Iterable
 
 import cv2
@@ -229,18 +230,83 @@ class Fleet:
             flag_ship: 如果不为 None, 则代表旗舰名称
             order (bool): 是否按照 ships 给定的顺序 (优先级高于旗舰指定)
             search_method: 检索方式 "word"/None 表示输入舰船名检索与不进行额外检索直接 OCR 切换
+
+        Returns:
+            bool: 舰队设置是否成功
         """
         assert self.legal(ships)
         assert flag_ship is None or flag_ship in ships
         self.timer.logger.debug(f'编队更改为：{ships}')
         self.detect()
-        self._set_ships(ships, search_method=search_method)
+        if self._validate_fleet_setup(ships, flag_ship, order):
+            return True
+
+        max_retries = 2
+        for attempt in range(max_retries + 1):  # 总共尝试3次（初始+2次重试）
+            self._set_ships(ships, search_method=search_method)
+            if order:
+                self.reorder(ships)
+            elif flag_ship is not None:
+                position = self.ships.index(flag_ship)
+                if position != 1:
+                    self.circular_move(position, 1)
+
+            # 重新检测舰队状态并验证是否符合输入要求
+            self.detect()
+            is_valid = self._validate_fleet_setup(ships, flag_ship, order)
+
+            if is_valid:
+                # 如果验证成功，跳出重试循环
+                return True
+
+            if attempt < max_retries:
+                self.timer.logger.warning(
+                    f'舰队设置验证失败（第 {attempt + 1} 次尝试），正在重试...',
+                )
+                # 等待一小段时间再重试
+                time.sleep(0.5)
+            else:
+                self.timer.logger.error(f'舰队设置在 {max_retries + 1} 次尝试后仍然失败')
+                return False
+
+        return False  # 如果所有尝试都失败，返回False
+
+    def _validate_fleet_setup(self, expected_ships, flag_ship=None, order=False):
+        """验证舰队设置是否符合输入要求
+        Args:
+            expected_ships (list(str)): 期望的舰船配置
+            flag_ship (str): 期望的旗舰
+            order (bool): 是否需要按顺序验证
+
+        Returns:
+            bool: 是否验证成功
+        """
+        # 标准化期望的舰船列表（确保长度为7）
+        normalized_expected = expected_ships.copy()
+        while len(normalized_expected) < 7:
+            normalized_expected.append('')
+
         if order:
-            self.reorder(ships)
-        elif flag_ship is not None:
-            position = self.ships.index(flag_ship)
-            if position != 1:
-                self.circular_move(position, 1)
+            # 严格按顺序检查
+            for i in range(1, 7):
+                expected_ship = normalized_expected[i] if normalized_expected[i] else None
+                actual_ship = self.ships[i] if have_ship(self.ships[i]) else None
+
+                if expected_ship != actual_ship:
+                    return False
+        else:
+            # 检查是否包含所有期望的舰船（不考虑顺序）
+            expected_set = {ship for ship in normalized_expected[1:7] if have_ship(ship)}
+            actual_set = {ship for ship in self.ships[1:7] if have_ship(ship)}
+
+            if expected_set != actual_set:
+                return False
+
+        # 验证旗舰位置（只有在非严格顺序模式下才需要单独验证旗舰）
+        if not order and flag_ship is not None:
+            return have_ship(self.ships[1]) and self.ships[1] == flag_ship
+
+        return True
 
     def reset(self):
         self.__init__(self.timer, self.fleet_id)
