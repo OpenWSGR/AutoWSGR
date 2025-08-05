@@ -33,7 +33,7 @@ def quick_register(timer: Timer, ships):
     print('确认吗(y/n)')
 
     q = queue.Queue()
-    th = threading.Thread(target=get_input)
+    th = threading.Thread(target=get_input, daemon=True)
     th.start()
     th.join(10)
     if not q.empty() and q.get():
