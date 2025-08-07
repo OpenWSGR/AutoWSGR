@@ -268,12 +268,16 @@ class Fleet:
 
             if attempt < max_retries:
                 self.timer.logger.warning(
+                    LogSource.no_source,
                     f'舰队设置验证失败（第 {attempt + 1} 次尝试），正在重试...',
                 )
                 # 等待一小段时间再重试
                 time.sleep(0.5)
             else:
-                self.timer.logger.error(f'舰队设置在 {max_retries + 1} 次尝试后仍然失败')
+                self.timer.logger.error(
+                    LogSource.no_source,
+                    f'舰队设置在 {max_retries + 1} 次尝试后仍然失败',
+                )
                 return False
 
         return False  # 如果所有尝试都失败，返回False
