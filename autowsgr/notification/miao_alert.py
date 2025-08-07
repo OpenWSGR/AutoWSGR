@@ -2,13 +2,15 @@ from urllib import parse, request
 
 import yaml
 
+from autowsgr.utils.logger import Logger
+
 
 def load_config():
     with open('miao_alert.yaml', encoding='utf-8') as file:
         return yaml.safe_load(file)
 
 
-def miao_alert(index):
+def miao_alert(index, logger: Logger):
     try:
         config = load_config()
         miao_code = config['miao_code']
@@ -22,9 +24,11 @@ def miao_alert(index):
                 + parse.urlencode({'id': miao_code, 'text': text}),
             )
         else:
-            print('指定的索引超出了 texts 列表的范围。')
+            logger.error(f'miao_alert 函数指定的索引: {index} 超出了 texts 列表的范围。')
     except Exception as e:
-        print(f'执行 miao_alert 函数时发生错误：{e}')
+        logger.warning(
+            f'执行 miao_alert 函数时发生错误：{e}, 如果没有配置 miao_alert.yaml 则忽略此错误',
+        )
         # 可以选择记录日志或执行其他错误处理操作
 
 

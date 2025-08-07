@@ -49,7 +49,7 @@ def get_ship(timer: Timer):
                 f'获取舰船: {ship_name} {ship_type}',
             )
         except Exception as e:
-            print(e)
+            timer.logger.warning(f'识别获取舰船内容失败: {e}')
         timer.click(915, 515, delay=0.5, times=1)
         timer.confirm_operation()
     return ship_name, ship_type

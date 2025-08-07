@@ -18,7 +18,7 @@ class Ship:
 
     def __str__(self) -> str:
         table = ['绿血', '中破', '大破', '修理中']
-        return f'舰船名:{self.name}\n舰船状态:{table[self.status]}\n舰船等级:{self.level}\n\n'
+        return f'舰船状态:{table[self.status]} 舰船等级:{self.level} 舰船名:{self.name}'
 
     @property
     def status(self):
@@ -162,4 +162,4 @@ class Port:
     def show_fleet(self):
         self.logger.info(LogSource.no_source, '当前已经注册的舰船如下:')
         for ship in self.ships:
-            print(ship)
+            self.logger.info(str(ship))
