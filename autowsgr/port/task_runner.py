@@ -633,8 +633,8 @@ class DecisiveLogic(Logic):
 class DecisiveFight(DecisiveBattle):
     rships: list
 
-    def __init__(self, timer) -> None:
-        super().__init__(timer)
+    def __init__(self, timer, config) -> None:
+        super().__init__(timer, config)
         assert self.config is not None
         self.logic = DecisiveLogic(
             self.timer,
@@ -671,7 +671,7 @@ class DecisiveFightTask(Task):
             raise ValueError('未配置决战任务舰队')
         self.ships = config.level1 + config.level2
 
-        self.db = DecisiveFight(self.timer)
+        self.db = DecisiveFight(self.timer, config)
         self.db.rships = self.ships
         if all(self.timer.port.have_ship(ship) for ship in self.ships):
             return
@@ -707,7 +707,7 @@ class DecisiveFightTask(Task):
                 )
                 return False, self.check_repair()
             self.times -= 1
-            self.db = DecisiveFight(self.timer)
+            self.db = DecisiveFight(self.timer, self.db.config)
             self.db.rships = self.ships
         return True, []
 
@@ -719,6 +719,7 @@ class TaskRunner:
         self.timer = timer.timer
 
     def add_decisive_task(self, times=1):
+        self.timer.logger.debug(self.decisive_config)
         if any(isinstance(task, DecisiveFightTask) for task in self.tasks):
             raise ValueError('已经存在决战任务, 不允许再次添加')
         self.tasks.append(DecisiveFightTask(self.timer, times, self.decisive_config))
