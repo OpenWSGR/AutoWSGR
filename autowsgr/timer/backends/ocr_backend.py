@@ -4,9 +4,10 @@ from typing import Protocol
 import cv2
 import numpy as np
 
-from autowsgr.configs import UserConfig
+from autowsgr.configs import OCRConfig
 from autowsgr.constants.data_roots import BIN_ROOT
 from autowsgr.timer.backends.api_dll import ApiDll
+from autowsgr.types import LogSource
 from autowsgr.utils.io import cv_imread
 from autowsgr.utils.logger import Logger
 
@@ -73,7 +74,7 @@ def find_lcseque(s1, s2):
 
 
 class OCRBackend(Protocol):
-    config: UserConfig
+    config: OCRConfig
     logger: Logger
     WORD_REPLACE: dict[
         str,
@@ -218,8 +219,8 @@ class OCRBackend(Protocol):
                         result[2],
                     ),
                 )
-        if self.config.show_ocr_info:
-            self.logger.debug(f'修正OCR结果: {results}')
+
+        self.logger.debug(LogSource.ocr_info, f'修正OCR结果: {results}')
 
         if allow_nan and not results:
             return None
@@ -273,8 +274,7 @@ class OCRBackend(Protocol):
             **kwargs,
         )
         results = [(t[0], process_number(t[1]), t[2]) for t in results]
-        if self.config.show_ocr_info:
-            self.logger.debug(f'数字解析结果：{results}')
+        self.logger.debug(LogSource.ocr_info, f'数字解析结果：{results}')
 
         if allow_nan and not results:
             return None
@@ -282,7 +282,7 @@ class OCRBackend(Protocol):
         if multiple:
             return results
         if len(results) != 1:
-            self.logger.warning(f'OCR识别数字失败: {results}')
+            self.logger.warning(LogSource.no_source, f'OCR识别数字失败: {results}')
             results = []
         return results[0]
 
@@ -319,7 +319,7 @@ class OCRBackend(Protocol):
 
 
 class EasyocrBackend(OCRBackend):
-    def __init__(self, config: UserConfig, logger: Logger) -> None:
+    def __init__(self, config: OCRConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
         self.WORD_REPLACE = {
@@ -365,14 +365,13 @@ class EasyocrBackend(OCRBackend):
         else:
             raise ValueError(f'Invalid sort method: {sort}')
 
-        if self.config.show_ocr_info:
-            self.logger.debug(f'原始OCR结果: {results}')
+        self.logger.debug(LogSource.ocr_info, f'原始OCR结果: {results}')
         return results
 
 
 class PaddleOCRBackend(OCRBackend):
 
-    def __init__(self, config: UserConfig, logger: Logger) -> None:
+    def __init__(self, config: OCRConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
         self.WORD_REPLACE = {
@@ -399,6 +398,5 @@ class PaddleOCRBackend(OCRBackend):
         results = self.reader.ocr(img, cls=False, **kwargs)
         results = [] if results == [None] else results[0]
         results = [(get_center(r[0][1], r[0][3]), r[1][0], r[1][1]) for r in results]
-        if self.config.show_ocr_info:
-            self.logger.debug(f'原始OCR结果: {results}')
+        self.logger.debug(LogSource.ocr_info, f'原始OCR结果: {results}')
         return results

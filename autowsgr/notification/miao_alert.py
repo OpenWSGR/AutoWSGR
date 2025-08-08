@@ -2,6 +2,7 @@ from urllib import parse, request
 
 import yaml
 
+from autowsgr.types import LogSource
 from autowsgr.utils.logger import Logger
 
 
@@ -24,9 +25,13 @@ def miao_alert(index, logger: Logger):
                 + parse.urlencode({'id': miao_code, 'text': text}),
             )
         else:
-            logger.error(f'miao_alert 函数指定的索引: {index} 超出了 texts 列表的范围。')
+            logger.error(
+                LogSource.no_source,
+                f'miao_alert 函数指定的索引: {index} 超出了 texts 列表的范围。',
+            )
     except Exception as e:
         logger.warning(
+            LogSource.no_source,
             f'执行 miao_alert 函数时发生错误：{e}, 如果没有配置 miao_alert.yaml 则忽略此错误',
         )
         # 可以选择记录日志或执行其他错误处理操作

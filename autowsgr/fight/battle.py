@@ -3,8 +3,9 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
 from autowsgr.game.game_operation import get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, LogSource
 from autowsgr.utils.io import yaml_to_dict
 
 
@@ -73,6 +74,8 @@ class BattleInfo(FightInfo):
 
 class BattlePlan(FightPlan):
     def __init__(self, timer, plan_path: str | None = None, plan_args: dict | None = None) -> None:
+        if isinstance(timer, Launcher):
+            timer = timer.timer
         super().__init__(timer)
         # 加载计划配置
         file_plan_args = (
@@ -104,6 +107,7 @@ class BattlePlan(FightPlan):
             return start_march(self.timer)
         except TimeoutError:
             self.logger.warning(
+                LogSource.no_source,
                 '由于进入战斗超时跳过了一次战役, 请检查战役队伍中是否有舰船正在远征',
             )
             return ConditionFlag.SKIP_FIGHT

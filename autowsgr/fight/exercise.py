@@ -5,6 +5,7 @@ from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.common import DecisionBlock, FightInfo, FightPlan, start_march
 from autowsgr.game.game_operation import detect_ship_stats, move_team, quick_repair
 from autowsgr.game.get_game_info import get_enemy_condition, get_exercise_stats
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer import Timer
 from autowsgr.types import ConditionFlag, Formation, SearchEnemyAction
 from autowsgr.utils.io import recursive_dict_update, yaml_to_dict
@@ -140,7 +141,9 @@ class NormalExercisePlan(FightPlan):
 
     """
 
-    def __init__(self, timer: Timer, plan_path: str, fleet_id: int | None) -> None:
+    def __init__(self, timer: Timer | Launcher, plan_path: str, fleet_id: int | None) -> None:
+        if isinstance(timer, Launcher):
+            timer = timer.timer
         super().__init__(timer)
 
         # 加载计划配置

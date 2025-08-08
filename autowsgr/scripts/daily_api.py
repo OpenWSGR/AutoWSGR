@@ -1,5 +1,6 @@
 import time
 
+from autowsgr.configs import DailyAutomationConfig
 from autowsgr.fight.battle import BattlePlan
 from autowsgr.fight.exercise import NormalExercisePlan
 from autowsgr.fight.normal_fight import NormalFightPlan
@@ -7,16 +8,26 @@ from autowsgr.game.expedition import Expedition
 from autowsgr.game.game_operation import get_rewards, repair_by_bath, set_support
 from autowsgr.game.get_game_info import get_loot_and_ship, get_resources
 from autowsgr.notification import miao_alert
+from autowsgr.scripts.main import Launcher
 from autowsgr.timer import Timer
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, LogSource
 
 
 class DailyOperation:
-    def __init__(self, timer: Timer, gap=300) -> None:
-        self.timer = timer
-        if timer.config.daily_automation is None:
+    def __init__(
+        self,
+        timer: Timer | Launcher,
+        config: DailyAutomationConfig = None,
+        gap=300,
+    ) -> None:
+        if isinstance(timer, Launcher):
+            self.timer = timer.timer
+            self.config = timer.daily_automation
+        elif isinstance(timer, Timer):
+            self.timer = timer
+            self.config = config
+        if self.config is None:
             raise ValueError('未设置日常任务，请检查配置文件')
-        self.config = timer.config.daily_automation
         self.gap = gap
 
         if self.config.auto_expedition:
@@ -63,7 +74,10 @@ class DailyOperation:
                 ret = self.battle_plan.run()
                 cnt += 1
                 if cnt > 13:
-                    self.timer.logger.warning('战役没能正常执行完毕, 请检查日志排查原因')
+                    self.timer.logger.warning(
+                        LogSource.no_source,
+                        '战役没能正常执行完毕, 请检查日志排查原因',
+                    )
                     break
 
         # 自动开启战役支援
@@ -95,6 +109,7 @@ class DailyOperation:
                     self.config.quick_repair_limit,
                 ):
                     self.timer.logger.info(
+                        LogSource.no_source,
                         f'快修消耗达到上限:{self.config.quick_repair_limit}，结束出征',
                     )
                     break
@@ -131,7 +146,10 @@ class DailyOperation:
     def _get_unfinished(self) -> int:
         for i, times in enumerate(self.fight_complete_times):
             if times[0] < times[1]:
-                self.timer.logger.info(self._get_unfinished_plan_description(i))
+                self.timer.logger.info(
+                    LogSource.no_source,
+                    self._get_unfinished_plan_description(i),
+                )
                 return i
         raise ValueError('没有未完成的任务')
 
@@ -153,7 +171,7 @@ class DailyOperation:
             return True
         if self.timer.got_ship_num < 500:
             return True
-        self.timer.logger.info('船只数量已达到上限，结束出征')
+        self.timer.logger.info(LogSource.no_source, '船只数量已达到上限，结束出征')
         return False
 
     def _loot_max(self) -> bool:
@@ -161,7 +179,7 @@ class DailyOperation:
             return True
         if self.timer.got_loot_num < 50:
             return True
-        self.timer.logger.info('胖次数量已达到上限，结束出征')
+        self.timer.logger.info(LogSource.no_source, '胖次数量已达到上限，结束出征')
         return False
 
     def check_exercise(self) -> None:
@@ -176,8 +194,8 @@ class DailyOperation:
             self.new_time_period = '18:00-23:59'
 
         if self.new_time_period != self.complete_time:
-            self.timer.logger.info('即将执行演习任务')
+            self.timer.logger.info(LogSource.no_source, '即将执行演习任务')
             self.exercise_plan.run()
             self.complete_time = self.new_time_period
         else:
-            self.timer.logger.debug('当前时间段演习已完成')
+            self.timer.logger.debug(LogSource.no_source, '当前时间段演习已完成')

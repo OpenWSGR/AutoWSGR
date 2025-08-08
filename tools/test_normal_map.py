@@ -3,7 +3,7 @@ from autowsgr.fight import NormalFightPlan
 from autowsgr.scripts.main import start_script
 
 
-timer = start_script()
+timer = start_script().timer
 plan = NormalFightPlan(timer, 'normal_fight/7-46SS-all.yaml')
 for i, nodes in enumerate(CHAPTER_NODE_COUNT):
     if i <= 0:

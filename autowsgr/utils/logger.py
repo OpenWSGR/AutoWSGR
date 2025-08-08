@@ -4,15 +4,16 @@ from datetime import datetime
 
 from loguru import logger
 
-from autowsgr.configs import UserConfig
+from autowsgr.configs import LoggerConfig, UserConfig
+from autowsgr.types import LogSource
 from autowsgr.utils.io import save_image
 
 
 class Logger:
-    def __init__(self, log_dir: str, log_level: str) -> None:
-        self.log_dir = log_dir
-        self.log_level = log_level
-        os.makedirs(self.log_dir, exist_ok=True)
+    def __init__(self, config: LoggerConfig) -> None:
+        self.log_dir = config.log_dir
+        self.log_level = config.log_level
+        self.log_source = config.log_source
         self.reset_level()
 
     def _configure_logger(self, log_level: str | int) -> None:
@@ -33,14 +34,16 @@ class Logger:
             return '\x1b[32m{time:HH:mm:ss} \x1b[36mautowsgr \x1b[31m{level:^7}| {message}\n'
 
         # 添加文件日志记录器
-        logger.add(
-            os.path.join(self.log_dir, 'log_{time}.log'),
-            level=log_level,
-            colorize=True,
-            format='{time:HH:mm:ss} autowsgr {level:^7}| {message}',
-            catch=True,
-            retention='1 week',
-        )
+        if self.log_dir is not None:
+            os.makedirs(self.log_dir, exist_ok=True)
+            logger.add(
+                os.path.join(self.log_dir, 'log_{time}.log'),
+                level=log_level,
+                colorize=True,
+                format='{time:HH:mm:ss} autowsgr {level:^7}| {message}',
+                catch=True,
+                retention='1 week',
+            )
 
         # 添加控制台日志记录器
         # logger.add(
@@ -61,6 +64,8 @@ class Logger:
         )
 
     def save_config(self, config: UserConfig):
+        if self.log_dir is None:
+            return
         with open(os.path.join(self.log_dir, 'config.json'), 'w', encoding='utf-8') as f:
             json.dump(
                 config.asdict(),
@@ -75,23 +80,31 @@ class Logger:
         logger.remove()
         self._configure_logger(self.log_level)
 
-    def debug(self, *args):
-        logger.debug(str(args))
+    def is_allowed_source(self, source: LogSource) -> bool:
+        """判断是否允许该源的日志记录"""
+        return bool(source in self.log_source or source is LogSource.no_source)
 
-    def info(self, string: str) -> None:
-        logger.info(string)
+    def debug(self, source: LogSource, *args):
+        if self.is_allowed_source(source):
+            logger.debug(str(args))
+
+    def info(self, source: LogSource, string: str) -> None:
+        if self.is_allowed_source(source):
+            logger.info(string)
         # st.write(string)
 
-    def warning(self, string: str) -> None:
-        logger.warning('===================WARNING===================')
-        logger.warning(string)
-        logger.warning('====================END====================')
+    def warning(self, source: LogSource, string: str) -> None:
+        if self.is_allowed_source(source):
+            logger.warning('===================WARNING===================')
+            logger.warning(string)
+            logger.warning('====================END====================')
         # st.write(string)
 
-    def error(self, string: str) -> None:
-        logger.error('===================ERROR===================')
-        logger.error(string)
-        logger.error('====================END====================')
+    def error(self, source: LogSource, string: str) -> None:
+        if self.is_allowed_source(source):
+            logger.error('===================ERROR===================')
+            logger.error(string)
+            logger.error('====================END====================')
 
     def log_image(
         self,
@@ -116,4 +129,4 @@ class Logger:
             image=image,
             ignore_existed_image=ignore_existed_image,
         )
-        self.info(f'图片已保存至{path}')
+        self.info(LogSource.no_source, f'图片已保存至{path}')
