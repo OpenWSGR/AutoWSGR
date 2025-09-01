@@ -34,9 +34,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/autowsgr"
+Homepage = "https://github.com/OpenWSGR/AutoWSGR"
 Documentation = "https://autowsgr.readthedocs.io/"
-Repository = "https://github.com/yourusername/autowsgr.git"
+Repository = "https://github.com/OpenWSGR/AutoWSGR.git"
 
 [tool.setuptools]
 package-dir = {"" = "."}
