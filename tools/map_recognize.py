@@ -92,7 +92,6 @@ def make_map(image_path: str, dict_dir: str) -> None:
     """
     files = listdir(image_path)
     for file in files:
-
         f = pathlib.Path(file)
         if f.suffix != '.PNG':
             continue

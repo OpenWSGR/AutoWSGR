@@ -1,6 +1,6 @@
 import copy
 import time
-from typing_extensions import Protocol
+from typing import Protocol
 
 from autowsgr.configs import NodeConfig
 from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
@@ -355,7 +355,7 @@ class FightPlan(Protocol):
                 if fight_flag == ConditionFlag.SKIP_FIGHT:
                     return ConditionFlag.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
-            self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
+            self.timer.logger.info(f'已出击次数:{i + 1}，目标次数{times}')
         return ConditionFlag.OPERATION_SUCCESS
 
     def run(self, retry_times=0, max_try_times=5) -> ConditionFlag:
@@ -374,7 +374,7 @@ class FightPlan(Protocol):
         elif ret == ConditionFlag.DOCK_FULL:
             # 自动解装功能
             if self.timer.config.dock_full_destroy and retry_times < max_try_times:
-                self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times+1}')
+                self.logger.debug(f'船坞已满, 正在解装, 尝试次数:{retry_times + 1}')
                 self.timer.relative_click(0.38, 0.565)
                 destroy_ship(self.timer)
                 return self.run(retry_times + 1)

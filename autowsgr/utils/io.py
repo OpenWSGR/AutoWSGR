@@ -31,7 +31,7 @@ def yaml_to_dict(yaml_file):
     with open(yaml_file, encoding='utf-8') as f:
         content = f.read()
     content = content.replace('\\', '\\\\')
-    return yaml.load(content, Loader=yaml.FullLoader)  # noqa: S506
+    return yaml.load(content, Loader=yaml.FullLoader)
 
 
 def dict_to_yaml(dict_data, yaml_file):

@@ -3,8 +3,7 @@ import datetime
 import os
 import warnings
 from dataclasses import KW_ONLY, asdict, dataclass, field, fields
-from typing import Any, Literal, TextIO
-from typing_extensions import Self
+from typing import Any, Literal, Self, TextIO
 
 import rich
 

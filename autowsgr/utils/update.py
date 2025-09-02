@@ -100,7 +100,6 @@ def update_library(choice='PyPI'):
 
 
 def get_recent_updates_from_pypi(latest_version):
-
     url = f'https://pypi.org/project/autowsgr/{latest_version}/#description'
     response = requests.get(url, timeout=5)
 
