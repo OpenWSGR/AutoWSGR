@@ -442,7 +442,6 @@ class NormalFightPlan(FightPlan):
             time.sleep(0.15)
             self._move_chapter(target_chapter, now_chapter)
         except:
-
             self.logger.warning(
                 f'切换章节失败 target_chapter: {target_chapter}   now: {now_chapter}',
             )

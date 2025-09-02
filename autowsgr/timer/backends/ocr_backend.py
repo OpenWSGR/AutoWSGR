@@ -371,7 +371,6 @@ class EasyocrBackend(OCRBackend):
 
 
 class PaddleOCRBackend(OCRBackend):
-
     def __init__(self, config: UserConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
@@ -390,7 +389,6 @@ class PaddleOCRBackend(OCRBackend):
         )  # need to run only once to download and load model into memory
 
     def read_text(self, img, allowlist, **kwargs):
-
         def get_center(pos1, pos2):
             x1, y1 = pos1
             x2, y2 = pos2

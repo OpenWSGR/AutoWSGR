@@ -16,7 +16,6 @@ class Logger:
         self.reset_level()
 
     def _configure_logger(self, log_level: str | int) -> None:
-
         # 自定义格式化器
         def custom_format(record):
             level = record['level'].name

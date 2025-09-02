@@ -145,7 +145,7 @@ class EventFightPlan2025_0424(Event, BattlePlan):
                 if fight_flag == ConditionFlag.SKIP_FIGHT:
                     return ConditionFlag.SKIP_FIGHT
                 raise RuntimeError(f'战斗进行时出现异常, 信息为 {fight_flag}')
-            self.timer.logger.info(f'已出击次数:{i+1}，目标次数{times}')
+            self.timer.logger.info(f'已出击次数:{i + 1}，目标次数{times}')
         return ConditionFlag.OPERATION_SUCCESS
 
 
