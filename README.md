@@ -2,6 +2,8 @@
 <img src="https://raw.githubusercontent.com/OpenWSGR/AutoWSGR/main/docs/logo.png">
 </div>
 
+# QQ 群炸了，新群 1062450071，入群口令本项目最新 commid hash 前六位。
+
 ## 项目简介
 
 ![Repo Size](https://img.shields.io/github/repo-size/OpenWSGR/AutoWSGR) ![Pypi Version](https://img.shields.io/pypi/v/autowsgr) ![Pypi Downloads](https://img.shields.io/pypi/dm/autowsgr) ![Github Issues](https://img.shields.io/github/issues/OpenWSGR/AutoWSGR) ![Github Last Commit](https://img.shields.io/github/last-commit/OpenWSGR/AutoWSGR) ![MIT licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg)
