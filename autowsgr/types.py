@@ -118,12 +118,23 @@ class EmulatorType(StrEnum):
                         path, _ = winreg.QueryValueEx(key, 'InstallDir')
                         return os.path.join(path, 'HD-Player.exe')
                 case EmulatorType.mumu:
-                    with winreg.OpenKey(
-                        winreg.HKEY_LOCAL_MACHINE,
-                        r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0',
-                    ) as key:
-                        path, _ = winreg.QueryValueEx(key, 'UninstallString')
-                        return os.path.join(os.path.dirname(path), 'shell', 'MuMuPlayer.exe')
+                    try:
+                        with winreg.OpenKey(
+                            winreg.HKEY_LOCAL_MACHINE,
+                            r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0',
+                        ) as key:
+                            path, _ = winreg.QueryValueEx(key, 'UninstallString')
+                            return os.path.join(os.path.dirname(path), 'sheel', 'MuMuPlayer.exe')
+                    except:
+                        with winreg.OpenKey(
+                            winreg.HKEY_LOCAL_MACHINE,
+                            r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer',
+                        ) as key:
+                            path, _ = winreg.QueryValueEx(key, 'UninstallString')
+                            return (
+                                os.path.join(os.path.dirname(path), 'nx_main', 'MuMuManager.exe')
+                            ).strip('"')
+
                 case _:
                     raise ValueError(f'没有为 {self.value} 设置安装路径查找方法，请手动指定')
         except FileNotFoundError:
@@ -311,3 +322,6 @@ class FormationName(StrEnum):
     circular = '轮型'
     wedge = '梯形'
     single_horizontal = '单横'
+
+
+# type: ignore
