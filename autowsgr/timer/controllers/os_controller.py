@@ -104,6 +104,11 @@ class WindowsController(OSController):
                 raw_res = self.__ldconsole('isrunning')
                 self.logger.debug('EmulatorType status: ' + raw_res)
                 return raw_res == 'running'
+            case EmulatorType.mumu:
+                raw_res = self.__mumuconsole('is_android_started')
+                raw_res = json.loads(raw_res)['is_android_started']
+                self.logger.debug('EmulatorType status: ' + f'{raw_res}')
+                return raw_res
             case EmulatorType.yunshouji:
                 return True
             case _:
@@ -118,6 +123,8 @@ class WindowsController(OSController):
             match self.emulator_type:
                 case EmulatorType.leidian:
                     self.__ldconsole('quit')
+                case EmulatorType.mumu:
+                    self.__mumuconsole('shutdown')
                 case EmulatorType.yunshouji:
                     self.logger.info('云手机无需关闭')
                 case _:
@@ -130,6 +137,8 @@ class WindowsController(OSController):
             match self.emulator_type:
                 case EmulatorType.leidian:
                     self.__ldconsole('launch')
+                case EmulatorType.mumu:
+                    self.__mumuconsole('launch')
                 case EmulatorType.yunshouji:
                     self.logger.info('云手机无需启动')
                 case _:
@@ -168,6 +177,51 @@ class WindowsController(OSController):
                 command,
                 '--index',
                 str(emulator_index),
+                command_arg,
+            ]
+        else:
+            cmd = [console_dir, command_arg]
+
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+        )
+        output, error = process.communicate()
+
+        return (
+            output.decode('utf-8', errors='replace')
+            if output
+            else error.decode('utf-8', errors='replace')
+        )
+
+    def __mumuconsole(self, command, command_arg='', global_command=False) -> str:
+        # 使用mumu命令行控制模拟器。
+
+        # :param command: 要执行的mumuconsole命令。
+        # :type command: str
+
+        # :param command_arg: 命令的附加参数（可选）。
+        # :type command_arg: str, 可选
+
+        # :param global_command: 指示命令是否是全局的（不特定于模拟器实例）。
+        # :type global_command: bool, 可选
+
+        # :return: mumu命令行执行的输出。
+        # :rtype: str
+        console_dir = os.path.join(os.path.dirname(self.emulator_start_cmd), 'MuMuManager.exe')
+        num = int(re.search(r'[:-]\s*(\d+)', self.emulator_name).group(1))
+        emulator_index = (num - 16384) / 2 if num >= 16384 else (num - 5554) / 2
+        order = 'info' if command == 'is_android_started' else 'control'
+
+        if not global_command:
+            cmd = [
+                console_dir,
+                order,
+                '-v',
+                str(emulator_index),
+                command,
                 command_arg,
             ]
         else:
