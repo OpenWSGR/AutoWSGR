@@ -124,7 +124,9 @@ class EmulatorType(StrEnum):
                             r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0',
                         ) as key:
                             path, _ = winreg.QueryValueEx(key, 'UninstallString')
-                            return os.path.join(os.path.dirname(path), 'sheel', 'MuMuPlayer.exe')
+                            return os.path.join(
+                                os.path.dirname(path), 'shell', 'MuMuPlayer.exe'
+                            ).strip('"')
                     except:
                         with winreg.OpenKey(
                             winreg.HKEY_LOCAL_MACHINE,
