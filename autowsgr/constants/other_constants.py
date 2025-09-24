@@ -155,5 +155,5 @@ PORT_FACILITIES = {'ship_limit', 'ship_amount', 'equipment_limit', 'equipment_am
 
 # 维修船坞, 建造位, 开发位
 
-CHAPTER_NODE_COUNT = [0, 5, 6, 4, 4, 5, 4, 5, 5, 4]
+CHAPTER_NODE_COUNT = [0, 5, 6, 4, 4, 5, 4, 5, 5, 5]
 # 常规图节点数
