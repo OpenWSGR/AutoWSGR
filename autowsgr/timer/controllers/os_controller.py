@@ -212,7 +212,7 @@ class WindowsController(OSController):
         # :rtype: str
         console_dir = os.path.join(os.path.dirname(self.emulator_start_cmd), 'MuMuManager.exe')
         num = int(re.search(r'[:-]\s*(\d+)', self.emulator_name).group(1))
-        emulator_index = (num - 16384) / 2 if num >= 16384 else (num - 5554) / 2
+        emulator_index = (num - 16384) / 32 if num >= 16384 else (num - 5554) / 2
         order = 'info' if command == 'is_android_started' else 'control'
 
         if not global_command:
