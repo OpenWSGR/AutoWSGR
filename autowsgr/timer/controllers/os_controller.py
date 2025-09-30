@@ -293,7 +293,7 @@ class MacController(OSController):
             stderr=subprocess.PIPE,
             shell=True,
         )
-        output, error = process.communicate()
+        output, _error = process.communicate()
         tempStr = output.decode()
         try:
             return json.loads(tempStr)
