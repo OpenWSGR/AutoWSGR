@@ -16,6 +16,7 @@
 ## 安装使用
 
 **访问用户文档：**[https://docs-autowsgr.notion.site](https://docs-autowsgr.notion.site)
+**注意事项：**本项目现在只支持Python3.12以上，如果要使用最新版请升级Python版本。
 
 
 ## 参与开发
