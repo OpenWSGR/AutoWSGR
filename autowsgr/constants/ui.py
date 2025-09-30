@@ -133,10 +133,10 @@ class UI:
         main_page = self._construct_node('main_page', None)
         (
             map_page,
-            exercise_page,
+            _exercise_page,
             expedition_page,
-            battle_page,
-            decisive_battle_entrance,
+            _battle_page,
+            _decisive_battle_entrance,
         ) = self._construct_integrative_pages(
             main_page,
             names=[
@@ -153,9 +153,9 @@ class UI:
         options_page = self._construct_node('options_page', main_page)
         (
             build_page,
-            destroy_page,
+            _destroy_page,
             develop_page,
-            discard_page,
+            _discard_page,
         ) = self._construct_integrative_pages(
             options_page,
             names=[
@@ -167,7 +167,7 @@ class UI:
             click_positions=[(163, 25), (287, 25), (417, 25), (544, 25)],
             common_edges=[{'pos': (30, 30), 'dst': options_page}],
         )
-        intensify_page, remake_page, skill_page = self._construct_integrative_pages(
+        _intensify_page, remake_page, _skill_page = self._construct_integrative_pages(
             options_page,
             names=[
                 'intensify_page',
