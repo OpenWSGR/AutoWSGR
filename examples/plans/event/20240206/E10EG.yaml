@@ -1,0 +1,12 @@
+# E10 EG 两点六雷巡, 用于水下大角度规避
+
+chapter: H
+map: 6
+from_which_entrance: 2
+selected_nodes: ['E', 'G']
+repair_mode: 1
+
+node_defaults:
+  formation: 4
+  proceed: False
+  SL_when_enter_fight: True

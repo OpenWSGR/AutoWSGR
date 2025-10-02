@@ -1,0 +1,6 @@
+chapter: H
+map: 4
+selected_nodes: [A, E]
+node_defaults:
+  proceed: True
+  formation: 4
