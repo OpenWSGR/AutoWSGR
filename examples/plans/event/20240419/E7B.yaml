@@ -1,0 +1,9 @@
+# E7炸鱼点炸鱼，3SS + 1DD
+# α入口：不带CV+最低速≤27
+chapter: H
+map: 1
+from_alpha: True
+selected_nodes: [B]
+node_defaults:
+  proceed: False
+  formation: 5

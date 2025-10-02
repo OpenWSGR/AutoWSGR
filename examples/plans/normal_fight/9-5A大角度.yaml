@@ -1,0 +1,14 @@
+# 功能：带1SS练大角度
+# 带路条件：潜艇>=1
+#
+# MapLevel
+chapter: 9
+map: 5
+selected_nodes: [A]
+repair_mode: 2 # 1中破修，2大破修
+
+# NodeLevel
+node_defaults:
+  night: False
+  proceed: False
+  SL_when_enter_fight: True

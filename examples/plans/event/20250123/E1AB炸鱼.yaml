@@ -1,0 +1,7 @@
+# E1AB 炸鱼 敌方1DD+3SS SS没有开幕
+chapter: E
+map: 1
+selected_nodes: [A,B]
+node_defaults:
+  proceed: False
+  formation: 5
