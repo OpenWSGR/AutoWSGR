@@ -1,0 +1,6 @@
+chapter: 1 # 固定为 1
+map: 2 # E2 则固定为 2
+node_args:
+  formation: 4  # 梯形
+  night: False  # 不进夜战
+repair_mode: 1  # 中破修理

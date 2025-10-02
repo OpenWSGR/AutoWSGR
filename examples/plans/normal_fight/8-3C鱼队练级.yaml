@@ -1,0 +1,19 @@
+# 功能：8-3鱼队练级
+# 带路条件：6鱼sl中路
+# 练6潜艇
+# 需要270的索敌才能稳定索敌，轻巡阵容需要148索敌，推荐牺牲格子保证索敌272以上或者索不到敌直接大退，否则丢索敌导致的航向劣势非常影响体验
+# https://bbs.nga.cn/read.php?tid=19335436
+
+# MapLevel
+chapter: 8 # 章节
+map: 3 # 地图
+selected_nodes: [C] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
+repair_mode: 1 # 维修策略：1为中破就修，2为大破就修
+
+# NodeLevel
+node_args:
+  C:
+    SL_when_spot_enemy_fails: True # 索敌失败时是否SL
+    formation: 2 # 阵型选择，1-5
+    night: False # 是否夜战
+    proceed: False # 结束后是否继续
