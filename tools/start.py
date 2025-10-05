@@ -37,6 +37,7 @@ from ruamel.yaml.comments import CommentedSeq
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 
+# gui早期版本
 # 全局变量和常量
 CONFIG_FILE = 'user_settings.yaml'
 PLANS_DIR = './plans/normal_fight/'
