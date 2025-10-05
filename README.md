@@ -18,6 +18,7 @@
 **访问用户文档：**[https://docs-autowsgr.notion.site](https://docs-autowsgr.notion.site)
 
 - 注意事项：本项目现在只支持Python3.12以上，如果要使用最新版请升级Python版本。
+- 现在有大佬做了本项目的GUI-->[传送门](https://github.com/ilevalser/AutoWSGR_GUI)
 
 ## 参与开发
 
