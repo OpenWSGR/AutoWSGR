@@ -8,7 +8,6 @@ from autowsgr.game.build import BuildManager
 from autowsgr.timer import Timer
 from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.logger import Logger
-from autowsgr.utils.update import check_for_updates
 
 
 def start_script(settings_path: str | None = None) -> Timer:
@@ -26,9 +25,6 @@ def start_script(settings_path: str | None = None) -> Timer:
     config_dict: dict[str, Any] = {} if settings_path is None else yaml_to_dict(settings_path)
     config = UserConfig.from_dict(config_dict)
     config.pprint()
-
-    if config.check_update:
-        check_for_updates()
 
     # logger
     logging.getLogger('airtest').setLevel(logging.ERROR)
