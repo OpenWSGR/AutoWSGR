@@ -1,0 +1,24 @@
+
+# MapLevel
+chapter: 4 # 章节
+map: 4 # 地图
+selected_nodes: [A, D, C, K, I, F, L] # 选择要打的节点，白名单模式，一旦到达不要的节点就SL
+repair_mode: 1
+fleet_id: 2
+fleet: ["", "U-1405", "U-1206", "狼群47", "射水鱼", "U-96", "鲃鱼"]
+
+node_defaults:
+  formation: 2 # 正常情况阵型选择，1-5
+  # 夜战选择阶段
+  night: False # 是否夜战
+  enemy_rules:
+    - [DD + CL <= 1 and ((CVL == 1 and CV == 0) or CVL == 0), 4]
+  # 前进选择阶段
+  proceed: True # 结束后是否继续
+  proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回
+
+node_args:
+  L:
+    night: True
+    formation: 4
+    enemy_rules: []

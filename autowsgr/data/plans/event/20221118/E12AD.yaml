@@ -1,0 +1,8 @@
+# E12 AD 夜战练级
+# 最低速≤27 或 战巡≥1 即可进入A点，轻巡≥1可以直接进D点
+chapter: H
+map: 6
+selected_nodes: [A, D]
+node_defaults:
+  proceed: True
+  formation: 4

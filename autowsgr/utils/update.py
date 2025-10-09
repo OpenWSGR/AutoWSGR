@@ -1,10 +1,10 @@
+import importlib.metadata
 import os
 import re
 import subprocess
 import time
 
 import inquirer
-import pkg_resources
 import requests
 from packaging.version import parse
 
@@ -55,11 +55,10 @@ def check_for_updates():
 
 
 def get_local_version():
-    # 使用pkg_resources获取本地库的版本号
     try:
-        return pkg_resources.get_distribution('autowsgr').version
-    except Exception as e:
-        print(f'Failed to get the local version.Error: {e}')
+        return importlib.metadata.version('autowsgr')
+    except importlib.metadata.PackageNotFoundError:
+        print('Package autowsgr not found')
         return None
 
 

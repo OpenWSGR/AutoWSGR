@@ -1,0 +1,5 @@
+chapter: 1 # 固定为 1
+map: 1 # E1 则固定为 1
+node_args:
+  formation: 5  # 单横
+repair_mode: 1  # 中破修理

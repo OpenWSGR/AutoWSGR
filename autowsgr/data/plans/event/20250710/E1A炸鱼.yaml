@@ -1,0 +1,8 @@
+#E1 炸鱼
+#带路：1轻巡
+chapter: E
+map: 1
+selected_nodes: [A]
+node_defaults:
+  proceed: False
+  formation: 5

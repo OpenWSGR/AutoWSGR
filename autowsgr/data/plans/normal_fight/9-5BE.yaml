@@ -1,0 +1,19 @@
+# 功能：炸鱼
+# 带路条件：驱逐>=3
+#
+# MapLevel
+chapter: 9
+map: 5
+selected_nodes: [B, E]
+repair_mode: 1 # 1中破修，2大破修
+
+# NodeLevel
+node_defaults:
+  formation: 5
+  night: False
+
+node_args:
+  B:
+    proceed: True
+  E:
+    proceed: False
