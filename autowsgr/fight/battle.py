@@ -87,15 +87,16 @@ class BattlePlan(FightPlan):
         self.node = DecisionBlock(timer, node_args)
         self.info = BattleInfo(timer)
 
-    def _go_fight_prepare_page(self):
+    def _enter_fight(self) -> ConditionFlag:
         self.timer.goto_game_page('battle_page')
+        if self.timer.image_exist(IMG.symbol_image[15], confidence=0.87):
+            self.logger.warning('战役次数耗尽')
+            return ConditionFlag.BATTLE_TIMES_EXCEED
         now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
         hard = self.config.map > 5
         if now_hard != hard:
             self.timer.click(800, 80, delay=1)
 
-    def _enter_fight(self) -> ConditionFlag:
-        self._go_fight_prepare_page()
         self.timer.click(180 * ((self.config.map - 1) % 5 + 1), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         self.info.ship_stats = detect_ship_stats(self.timer)
