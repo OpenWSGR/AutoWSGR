@@ -5,8 +5,9 @@ from autowsgr.game.game_operation import get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.timer import Timer
 from autowsgr.types import ConditionFlag
-from autowsgr.utils.io import yaml_to_dict
 from autowsgr.utils.api_image import crop_image
+from autowsgr.utils.io import yaml_to_dict
+
 
 """
 战役模块/单点战斗模板
@@ -89,13 +90,9 @@ class BattlePlan(FightPlan):
 
     def _enter_fight(self) -> ConditionFlag:
         self.timer.goto_game_page('battle_page')
-        cropped = crop_image(
-            self.timer.get_raw_screen(),
-            pos1=(0.336, 0.9),
-            pos2=(0.41, 0.79)
-        )
+        cropped = crop_image(self.timer.get_raw_screen(), pos1=(0.336, 0.9), pos2=(0.41, 0.79))
         raw_result = self.timer.ocr_backend.read_text(cropped)[0]
-        if raw_result[1] == "0/8" or raw_result[1] == "0/12":
+        if raw_result[1] == '0/8' or raw_result[1] == '0/12':
             self.logger.warning('战役次数耗尽')
             return ConditionFlag.BATTLE_TIMES_EXCEED
         now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
