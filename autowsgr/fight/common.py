@@ -54,10 +54,10 @@ class FightResultInfo:
             timer.log_screen(name='mvp_image')
             timer.logger.warning(f"can't identify mvp, error: {e}")
         self.ship_stats = detect_ship_stats(timer, 'sumup', ship_stats)
-        
+
         if from_missile_animation:
             self.result = 'SS'
-            timer.logger.info('导弹支援直接获得 SS 胜')   # 从导弹动画直接进入，强制设置为 SS
+            timer.logger.info('导弹支援直接获得 SS 胜')  # 从导弹动画直接进入，强制设置为 SS
         else:
             self.result = timer.wait_images(IMG.fight_result, timeout=5)
             if timer.image_exist(IMG.fight_result['SS'], need_screen_shot=False):
@@ -286,8 +286,12 @@ class FightInfo(Protocol):
             self.enemy_formation = get_enemy_formation(self.timer)
         if self.state == 'result':
             try:
-                from_missile_animation = (self.last_state == 'missile_animation') # 从导弹支援直接进入战斗结算
-                result = FightResultInfo(self.timer, self.ship_stats, from_missile_animation=from_missile_animation)
+                from_missile_animation = (
+                    self.last_state == 'missile_animation'
+                )  # 从导弹支援直接进入战斗结算
+                result = FightResultInfo(
+                    self.timer, self.ship_stats, from_missile_animation=from_missile_animation
+                )
                 self.ship_stats = result.ship_stats
                 self.fight_history.add_event(
                     '战果结算',

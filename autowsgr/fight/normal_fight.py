@@ -57,7 +57,7 @@ class NormalFightInfo(FightInfo):
                 'retreat': ['map_page'],
                 'fight': ['formation', 'fight_period', 'missile_animation'],  # 新增导弹动画状态
             },
-            'formation': ['fight_period', 'missile_animation'],    # 新增导弹动画状态
+            'formation': ['fight_period', 'missile_animation'],  # 新增导弹动画状态
             'missile_animation': ['fight_period', 'result'],  # 新增导弹动画状态
             'fight_period': ['night', 'result'],
             'night': {
