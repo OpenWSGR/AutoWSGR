@@ -5,6 +5,7 @@ from autowsgr.game.game_operation import get_ship, quick_repair
 from autowsgr.game.get_game_info import detect_ship_stats
 from autowsgr.timer import Timer
 from autowsgr.types import ConditionFlag
+from autowsgr.utils.api_image import crop_image
 from autowsgr.utils.io import yaml_to_dict
 
 
@@ -87,15 +88,17 @@ class BattlePlan(FightPlan):
         self.node = DecisionBlock(timer, node_args)
         self.info = BattleInfo(timer)
 
-    def _go_fight_prepare_page(self):
+    def _enter_fight(self) -> ConditionFlag:
         self.timer.goto_game_page('battle_page')
+        cropped = crop_image(self.timer.get_raw_screen(), pos1=(0.336, 0.9), pos2=(0.41, 0.79))
+        raw_result = self.timer.ocr_backend.read_text(cropped)[0]
+        if raw_result[1] == '0/8' or raw_result[1] == '0/12':
+            self.logger.warning('战役次数耗尽')
+            return ConditionFlag.BATTLE_TIMES_EXCEED
         now_hard = self.timer.wait_images([IMG.fight_image[9], IMG.fight_image[15]])
         hard = self.config.map > 5
         if now_hard != hard:
             self.timer.click(800, 80, delay=1)
-
-    def _enter_fight(self) -> ConditionFlag:
-        self._go_fight_prepare_page()
         self.timer.click(180 * ((self.config.map - 1) % 5 + 1), 200)
         self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
         self.info.ship_stats = detect_ship_stats(self.timer)
