@@ -55,9 +55,10 @@ class NormalFightInfo(FightInfo):
                     'fight_period',
                 ],
                 'retreat': ['map_page'],
-                'fight': ['formation', 'fight_period'],
+                'fight': ['formation', 'fight_period', 'missile_animation'],  # 新增导弹动画状态
             },
-            'formation': ['fight_period'],
+            'formation': ['fight_period', 'missile_animation'],  # 新增导弹动画状态
+            'missile_animation': ['fight_period', 'result'],  # 新增导弹动画状态
             'fight_period': ['night', 'result'],
             'night': {
                 'yes': ['result'],
@@ -78,6 +79,7 @@ class NormalFightInfo(FightInfo):
             'fight_condition': [IMG.fight_image[10], 22.5],
             'spot_enemy_success': [IMG.fight_image[2], 22.5],
             'formation': [IMG.fight_image[1], 22.5],
+            'missile_animation': [IMG.fight_image[20], 3],  # 新增模板图像
             'fight_period': [IMG.symbol_image[4], 30],
             'night': [IMG.fight_image[6], 150],
             'result': [IMG.fight_image[3], 90],
