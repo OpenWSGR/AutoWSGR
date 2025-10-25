@@ -46,7 +46,7 @@ def start_march(timer: Timer, position: tuple[int, int] = (900, 500)) -> Conditi
 
 
 class FightResultInfo:
-    def __init__(self, timer: Timer, ship_stats) -> None:
+    def __init__(self, timer: Timer, ship_stats, from_missile_animation=False) -> None:
         try:
             mvp_pos = timer.wait_image(IMG.fight_image[14])
             self.mvp = get_nearest((mvp_pos[0], mvp_pos[1] + 20), BLOOD_BAR_POSITION[1])
