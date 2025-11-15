@@ -96,6 +96,7 @@ class NormalFightInfo(FightInfo):
 
     def reset(self):
         self.fight_history.reset()
+        self.node = '0'
         self.last_state = 'proceed'
         self.last_action = 'yes'
         self.state = 'proceed'  # 初始状态等同于 proceed 选择 yes
@@ -154,7 +155,6 @@ class NormalFightInfo(FightInfo):
         current_data = self.point_positions.get(self.node)
         if isinstance(current_data, dict) and 'next' in current_data:
             next_nodes = current_data['next']
-
             # 获取当前点位坐标
             current_pos = current_data.get('position', (0, 0))
 
@@ -204,7 +204,6 @@ class NormalFightInfo(FightInfo):
                 if direction_diff < min_direction_diff:
                     min_direction_diff = direction_diff
                     best_node = next_node
-
             self.node = best_node
         else:
             # 如果当前节点没有 next 信息，则为旧格式，默认为A点，使用距离判断
