@@ -207,7 +207,8 @@ class NormalFightInfo(FightInfo):
 
             self.node = best_node
         else:
-            # 如果当前节点没有 next 信息，回退到距离判断（兼容旧格式）
+            # 如果当前节点没有 next 信息，则为旧格式，默认为A点，使用距离判断
+            self.node = 'A'
             for i in range(26):
                 ch = chr(ord('A') + i)
                 if ch not in self.point_positions:
