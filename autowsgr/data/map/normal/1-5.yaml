@@ -1,3 +1,11 @@
-A: !!python/tuple
-- 589
-- 248
+'0':
+  position:
+  - 353
+  - 365
+  next:
+  - A
+A:
+  position:
+  - 589
+  - 248
+  next: []

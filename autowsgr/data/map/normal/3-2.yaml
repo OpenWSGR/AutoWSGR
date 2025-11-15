@@ -1,21 +1,49 @@
-A: !!python/tuple
-- 787
-- 217
-B: !!python/tuple
-- 622
-- 277
-C: !!python/tuple
-- 600
-- 195
-D: !!python/tuple
-- 708
-- 322
-E: !!python/tuple
-- 465
-- 307
-F: !!python/tuple
-- 682
-- 450
-G: !!python/tuple
-- 442
-- 457
+'0':
+  position:
+  - 727
+  - 120
+  next:
+  - A
+  - B
+  - C
+A:
+  position:
+  - 787
+  - 217
+  next:
+  - D
+B:
+  position:
+  - 622
+  - 277
+  next:
+  - D
+  - E
+C:
+  position:
+  - 600
+  - 195
+  next:
+  - E
+D:
+  position:
+  - 708
+  - 322
+  next:
+  - F
+E:
+  position:
+  - 465
+  - 307
+  next:
+  - G
+F:
+  position:
+  - 682
+  - 450
+  next: []
+G:
+  position:
+  - 442
+  - 457
+  next: []
