@@ -10,8 +10,6 @@ debug: False
 log_level: INFO
 # >> 输出信息设置结束 <<
 
-check_update: False
-
 # >> 解装设置开始 <<
 # 是否在船坞满时自动解装
 dock_full_destroy: True

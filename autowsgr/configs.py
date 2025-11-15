@@ -181,8 +181,6 @@ class UserConfig(BaseConfig):
     """文字识别后端。TODO: 暂时仅easyocr没问题"""
     delay: float = 1.5
     """延迟时间基本单位，单位为秒。如果模拟器卡顿可调高"""
-    check_update: bool = True
-    """脚本自动检查更新"""
     check_page: bool = True
     """是否在启动时检查游戏页面"""
     dock_full_destroy: bool = True
