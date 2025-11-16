@@ -32,6 +32,7 @@ class NormalFightInfo(FightInfo):
         self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map_id  # 节点名
         self.ship_position = (0, 0)
+        self.last_ship_position = self.ship_position
         self.node = '0'  # 常规地图战斗中,当前战斗点位的编号
         # 实现通用 FightInfo 接口
         self.end_page = 'map_page'
@@ -119,9 +120,10 @@ class NormalFightInfo(FightInfo):
         # 在某些State下可以记录额外信息
         if self.state == 'spot_enemy_success':
             get_enemy_condition(self.timer, 'fight')
-        # 在确认状态后更新当前点位
-        if self.last_state == 'proceed' or self.last_action == 'detour':
+        # 在移动后更新当前点位
+        if self.ship_position != self.last_ship_position:
             self._update_ship_point()
+        self.last_ship_position = self.ship_position
         super()._after_match()
 
     # ======================== Functions ========================
