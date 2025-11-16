@@ -1,0 +1,27 @@
+# 功能：9-2支援速刷胖次
+# 索敌条件：
+# 配置：85基阿特不惧鞍山长春济南 攻略参考https://nga.178.com/read.php?tid=36009898
+
+# MapLevel
+chapter: 9
+map: 2
+selected_nodes: [A, E, D, G, H, M]
+repair_mode: 2   #1中破修，2大破修
+# NodeLevel
+node_defaults:
+  enemy_rules:
+    - [SAP != 1, detour]
+  formation: 4 # 正常情况阵型选择, 1-5
+  night: False # 是否夜战
+  SL_when_detour_fails: True # 是否迂回失败后退出
+  SL_when_spot_enemy_fails: True
+  proceed: True # 结束后是否继续
+
+node_args:
+  M:
+    enemy_rules:
+    - [SAP != 1, retreat]
+    proceed: False # 结束后是否继续
+  E:
+    enemy_rules:
+    - [SAP != 1, retreat]

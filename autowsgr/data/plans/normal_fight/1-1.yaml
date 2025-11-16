@@ -1,0 +1,13 @@
+# 1-1捞鱼雷
+
+# MapLevel
+chapter: 1
+map: 1
+selected_nodes: [A]
+repair_mode: 1 #维修策略：1为中破就修，2为大破就修
+
+# NodeLevel
+node_args:
+  A:
+    night: False
+    proceed: False

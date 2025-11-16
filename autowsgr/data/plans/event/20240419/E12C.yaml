@@ -1,0 +1,13 @@
+# E12 C点金白菜, 削弱前用于水下大角度规避训练，削弱后用于穿甲航弹, 效力射, 水面大角度规避
+# 请注意是否削弱，并按是否削弱配队
+
+chapter: H
+map: 6
+from_alpha: False
+selected_nodes: [C]
+repair_mode: 1
+
+node_defaults:
+  formation: 4
+  proceed: False
+  SL_when_enter_fight: True

@@ -1,0 +1,12 @@
+# E10 AB 两点六战巡, 我也不知道可以干啥
+
+chapter: H
+map: 5
+from_which_entrance: 1
+selected_nodes: ['A', 'B']
+repair_mode: 1
+
+node_defaults:
+  formation: 4
+  proceed: False
+  SL_when_enter_fight: True

@@ -1,0 +1,9 @@
+# C点带路需求为不带装母、均速≥26，且携带2战列, J点带路为轻巡和重巡携带任意1艘
+# E11CJ 夜战点练级
+chapter: H
+map: 5
+selected_nodes: [C, J]
+fleet_id: 2
+node_defaults:
+  proceed: True
+  formation: 1

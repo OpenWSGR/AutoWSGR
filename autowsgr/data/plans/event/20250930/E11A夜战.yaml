@@ -1,0 +1,9 @@
+#E5 夜战
+#带路：1战列
+chapter: H
+map: 5
+selected_nodes: [A]
+node_defaults:
+  night: True
+  proceed: False
+  formation: 4
