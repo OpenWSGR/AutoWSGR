@@ -32,7 +32,8 @@ class NormalFightInfo(FightInfo):
         self.chapter = chapter_id  # 章节名,战役为 'battle', 演习为 'exercise'
         self.map = map_id  # 节点名
         self.ship_position = (0, 0)
-        self.node = 'A'  # 常规地图战斗中,当前战斗点位的编号
+        self.last_ship_position = self.ship_position
+        self.node = '0'  # 常规地图战斗中,当前战斗点位的编号
         # 实现通用 FightInfo 接口
         self.end_page = 'map_page'
         self.successor_states = {
@@ -96,6 +97,8 @@ class NormalFightInfo(FightInfo):
 
     def reset(self):
         self.fight_history.reset()
+        self.node = '0'
+        self.last_ship_position = (0, 0)
         self.last_state = 'proceed'
         self.last_action = 'yes'
         self.state = 'proceed'  # 初始状态等同于 proceed 选择 yes
@@ -110,7 +113,6 @@ class NormalFightInfo(FightInfo):
         # 在地图上走的过程中获取舰船位置
         if self.last_state == 'proceed' or self.last_action == 'detour':
             self._update_ship_position()
-            self._update_ship_point()
             pos = self.timer.get_image_position(IMG.confirm_image[3], False, 0.8)
             if pos:
                 self.timer.confirm_operation(delay=0.25, must_confirm=1, confidence=0.8)
@@ -119,6 +121,10 @@ class NormalFightInfo(FightInfo):
         # 在某些State下可以记录额外信息
         if self.state == 'spot_enemy_success':
             get_enemy_condition(self.timer, 'fight')
+        # 在移动后更新当前点位
+        if self.ship_position != self.last_ship_position:
+            self._update_ship_point()
+        self.last_ship_position = self.ship_position
         super()._after_match()
 
     # ======================== Functions ========================
@@ -135,18 +141,94 @@ class NormalFightInfo(FightInfo):
             self.timer.logger.debug(self.ship_position)
 
     def _update_ship_point(self):
-        """更新黄色小船(战斗地图上那个)所在的点位 (1-1A 这种,'A' 就是点位)"""
+        """更新黄色小船(战斗地图上那个)所在的点位 (1-1A 这种,'A' 就是点位)
 
-        self.node = 'A'
-        for i in range(26):
-            ch = chr(ord('A') + i)
-            if ch not in self.point_positions:
-                continue
-            if cal_dis(self.point_positions[ch], self.ship_position) < cal_dis(
-                self.point_positions[self.node],
-                self.ship_position,
-            ):
-                self.node = ch
+        根据当前点位的下一个点位的方位来判断当前点位。
+        通过比较舰船相对于当前点的方向和下一个点相对于当前点的方向，选择方向最接近的点位。
+
+        点位文件格式:
+        '0':
+            position: [x, y]  # 起始位置
+            next: ['A', 'B']  # 可能的第一个点位列表
+        A:
+            position: [x, y]
+            next: ['C']  # 可能的下一个点位列表
+        """
+        # 根据下一个点位的方位判断当前点位
+        current_data = self.point_positions.get(self.node)
+        if isinstance(current_data, dict) and 'next' in current_data:
+            next_nodes = current_data['next']
+            # 获取当前点位坐标
+            current_pos = current_data.get('position', (0, 0))
+
+            # 计算舰船相对于当前点的方向 (dy/dx 的比值)
+            ship_dx = self.ship_position[0] - current_pos[0]
+            ship_dy = self.ship_position[1] - current_pos[1]
+
+            min_direction_diff = float('inf')
+            best_node = self.node
+
+            for next_node in next_nodes:
+                if next_node not in self.point_positions:
+                    continue
+                next_data = self.point_positions[next_node]
+                next_pos = (
+                    next_data
+                    if isinstance(next_data, (tuple, list))
+                    else next_data.get('position', (0, 0))
+                )
+
+                # 计算下一个点相对于当前点的方向
+                next_dx = next_pos[0] - current_pos[0]
+                next_dy = next_pos[1] - current_pos[1]
+
+                # 计算方向差异：使用向量夹角的余弦值（越接近1越相似）
+                # 或使用斜率差异：比较 dy/dx 的比值
+                # 这里使用向量点积来计算方向相似度
+                if ship_dx == 0 and ship_dy == 0:
+                    # 舰船还在当前点，使用距离判断
+                    direction_diff = cal_dis(next_pos, self.ship_position)
+                else:
+                    # 计算两个方向向量的夹角差异
+                    # 使用点积除以模长的乘积得到cos(theta)
+                    ship_len = (ship_dx**2 + ship_dy**2) ** 0.5
+                    next_len = (next_dx**2 + next_dy**2) ** 0.5
+
+                    if next_len == 0:
+                        direction_diff = float('inf')
+                    else:
+                        # 点积
+                        dot_product = ship_dx * next_dx + ship_dy * next_dy
+                        # 余弦相似度，值越大方向越接近
+                        cos_similarity = dot_product / (ship_len * next_len)
+                        # 转换为差异值（越小越好）
+                        direction_diff = 1 - cos_similarity
+
+                if direction_diff < min_direction_diff:
+                    min_direction_diff = direction_diff
+                    best_node = next_node
+            self.node = best_node
+        else:
+            # 如果当前节点没有 next 信息，则为旧格式，默认为A点，使用距离判断
+            self.node = 'A'
+            for i in range(26):
+                ch = chr(ord('A') + i)
+                if ch not in self.point_positions:
+                    continue
+                point_data = self.point_positions[ch]
+                point_pos = (
+                    point_data
+                    if isinstance(point_data, (tuple, list))
+                    else point_data.get('position', (0, 0))
+                )
+                ref_pos = (
+                    self.point_positions[self.node]
+                    if isinstance(self.point_positions[self.node], (tuple, list))
+                    else self.point_positions[self.node].get('position', (0, 0))
+                )
+
+                if cal_dis(point_pos, self.ship_position) < cal_dis(ref_pos, self.ship_position):
+                    self.node = ch
 
         if self.timer.config.show_map_node:
             self.timer.logger.debug(self.node)

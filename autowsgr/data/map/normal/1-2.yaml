@@ -1,12 +1,30 @@
-A: !!python/tuple
-- 254
-- 273
-B: !!python/tuple
-- 368
-- 342
-C: !!python/tuple
-- 352
-- 183
-D: !!python/tuple
-- 501
-- 396
+'0':
+  position:
+  - 232
+  - 383
+  next:
+  - A
+  - B
+A:
+  position:
+  - 254
+  - 273
+  next:
+  - C
+B:
+  position:
+  - 368
+  - 342
+  next:
+  - C
+  - D
+C:
+  position:
+  - 352
+  - 183
+  next: []
+D:
+  position:
+  - 501
+  - 396
+  next: []
