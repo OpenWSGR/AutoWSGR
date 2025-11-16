@@ -1,0 +1,17 @@
+# E3AD夜战
+# 带路条件：A：6船；A进D最低速≤30
+# 敌方配置：
+# A：5个70血轻母
+# D：2个84血轻母、3个70血轻母
+chapter: E
+map: 3
+selected_nodes: [A,D]
+node_defaults:
+  formation: 4
+  night: True
+
+node_args:
+  A:
+    proceed: True
+  D:
+    proceed: False

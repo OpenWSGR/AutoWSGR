@@ -1,0 +1,14 @@
+#E9 夜战
+#带路：1轻巡
+chapter: H
+map: 3
+selected_nodes: [A, C]
+node_defaults:
+  night: True
+  formation: 4
+
+node_args:
+  A:
+    proceed: True
+  C:
+    proceed: False

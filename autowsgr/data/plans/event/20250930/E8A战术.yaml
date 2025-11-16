@@ -1,0 +1,10 @@
+# E8A纸BB
+# 敌方配置：6个233低命中低火力BB
+chapter: H
+map: 2
+selected_nodes: [A]
+node_defaults:
+  formation: 2
+  night: False
+  proceed: False
+  SL_when_enter_fight: True
