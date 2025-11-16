@@ -98,6 +98,7 @@ class NormalFightInfo(FightInfo):
     def reset(self):
         self.fight_history.reset()
         self.node = '0'
+        self.last_ship_position = (0, 0)
         self.last_state = 'proceed'
         self.last_action = 'yes'
         self.state = 'proceed'  # 初始状态等同于 proceed 选择 yes
