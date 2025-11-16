@@ -128,14 +128,14 @@ class AndroidController:
             raise ValueError("invalid arg 'times' " + str(times))
         if delay < 0:
             raise ValueError("arg 'delay' should be positive or 0")
-        if enable_subprocess and times != 1:
-            raise ValueError(
-                "subprocess enabled but arg 'times' is not 1 but " + str(times),
-            )
-        if enable_subprocess:
-            p = th.Thread(target=lambda: self.shell(f'input tap {x!s} {y!s}'))
-            p.start()
-            return p
+        # if enable_subprocess and times != 1:
+        #     raise ValueError(
+        #         "subprocess enabled but arg 'times' is not 1 but " + str(times),
+        #     )
+        # if enable_subprocess:
+        #     p = th.Thread(target=lambda: self.shell(f'input tap {x!s} {y!s}'))
+        #     p.start()
+        #     return p
 
         for _ in range(times):
             self.shell(f'input tap {x!s} {y!s}')
