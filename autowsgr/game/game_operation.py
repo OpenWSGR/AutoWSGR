@@ -109,7 +109,9 @@ def destroy_ship(timer: Timer, ship_types: list[ShipType] | None = None):
 
     timer.relative_click(0.91, 0.3, delay=1.5)  # 快速选择
     timer.relative_click(0.915, 0.906, delay=1.5)  # 确定
-    timer.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
+    # 根据配置决定是否卸下装备
+    if timer.config.remove_equipment_mode:  # 直接使用布尔值判断
+        timer.relative_click(0.837, 0.646, delay=1.5)  # 卸下装备
     timer.relative_click(0.9, 0.9, delay=1.5)  # 解装
     timer.relative_click(0.38, 0.567, delay=1.5)  # 四星确认
 
