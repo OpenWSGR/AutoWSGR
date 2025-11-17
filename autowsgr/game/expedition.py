@@ -31,7 +31,11 @@ class Expedition:
                     bgr_color=(45, 89, 255),
                 )
         else:
-            self.is_ready = self.timer.check_pixel((464, 11), bgr_color=(45, 89, 255))
+            self.is_ready = self.timer.check_pixel(
+                (464, 11), bgr_color=(45, 89, 255)
+            ) and not self.timer.check_pixel(  # 确保不是大成功x2图标
+                (514, 11), bgr_color=(45, 89, 255)
+            )
 
     def run(self, force=False):
         """检查远征, 如果有未收获远征, 则全部收获并用原队伍继续
