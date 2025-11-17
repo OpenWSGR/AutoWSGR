@@ -250,6 +250,13 @@ class UserConfig(BaseConfig):
             'destroy_ship_work_mode',
             DestroyShipWorkMode(self.destroy_ship_work_mode),
         )
+        
+        object.__setattr__(
+            self,
+            'remove_equipment_mode',
+            bool(self.remove_equipment_mode),
+        )
+        
         if self.destroy_ship_types is None:
             object.__setattr__(self, 'destroy_ship_types', [])
         else:
@@ -258,7 +265,7 @@ class UserConfig(BaseConfig):
                 'destroy_ship_types',
                 [ShipType(t) for t in self.destroy_ship_types],
             )
-
+      
         # 系统
         object.__setattr__(self, 'os_type', OSType.auto())
 
