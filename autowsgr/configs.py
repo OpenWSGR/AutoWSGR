@@ -205,7 +205,9 @@ class UserConfig(BaseConfig):
     """解装舰船的工作模式. disable 是不启用舰种分类, include 为只解装指定舰种, exclude 为解装除指定舰种外的所有舰种"""
     destroy_ship_types: list[ShipType] = field(default_factory=list)
     """指定舰种, 参照 autowsgr/types.py 中 #191 行的 ShipType, 使用中文"""
-
+    remove_equipment_mode: bool = field(default=True)
+    """默认卸下装备"""
+    
     # Log
     log_root: str = 'log'
     """日志保存根目录"""
