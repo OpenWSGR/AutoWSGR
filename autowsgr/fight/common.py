@@ -579,10 +579,12 @@ class DecisionBlock:
             act_info = f'判断敌舰阵容规则: {condition}, 结果: {condition_result}'
             if condition_result:
                 act_info += f', 执行: {act}'
+                self.logger.debug(act_info)
                 if isinstance(act, str):
                     return SearchEnemyAction(act)
                 return Formation(act)
             act_info += ', 不执行特殊操作进入战斗'
+            self.logger.debug(act_info)
         return SearchEnemyAction.no_action
 
     def make_decision(self, state, last_state, last_action, info: FightInfo):
