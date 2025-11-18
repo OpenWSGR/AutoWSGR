@@ -579,7 +579,7 @@ class DecisionBlock:
             if self.timer.config.show_enemy_rules:
                 act_info = f'判断敌舰阵容规则: {condition}, 结果: {condition_result}'
                 if condition_result:
-                    act_info += ', 执行: {act}'
+                    act_info += f', 执行: {act}'
                 else:
                     act_info += ', 不执行特殊操作进入战斗'
                 self.logger.info(act_info)
