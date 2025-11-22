@@ -113,6 +113,7 @@ class DailyOperation:
             self._bath_repair()
             self._expedition()
             self._gain_bonus()
+            self.timer.go_main_page()
             time.sleep(self.gap)
 
     def _has_unfinished(self) -> bool:
