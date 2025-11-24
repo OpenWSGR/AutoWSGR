@@ -1,23 +1,9 @@
-'0':
-  position:
-  - 171
-  - 312
-  next:
-  - A
-A:
-  position:
-  - 283
-  - 282
-  next:
-  - B
-  - C
-B:
-  position:
-  - 390
-  - 177
-  next: []
-C:
-  position:
-  - 395
-  - 314
-  next: []
+A: !!python/tuple
+- 283
+- 282
+B: !!python/tuple
+- 390
+- 177
+C: !!python/tuple
+- 395
+- 314

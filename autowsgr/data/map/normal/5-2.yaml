@@ -1,68 +1,30 @@
-'0':
-  position:
-  - 817
-  - 442
-  next:
-  - A
-  - B
-  - C
-A:
-  position:
-  - 675
-  - 465
-  next:
-  - D
-B:
-  position:
-  - 652
-  - 296
-  next:
-  - E
-C:
-  position:
-  - 840
-  - 240
-  next:
-  - F
-D:
-  position:
-  - 405
-  - 420
-  next:
-  - G
-  - H
-E:
-  position:
-  - 483
-  - 288
-  next:
-  - H
-F:
-  position:
-  - 585
-  - 112
-  next:
-  - H
-  - I
-G:
-  position:
-  - 180
-  - 483
-  next: []
-H:
-  position:
-  - 266
-  - 270
-  next:
-  - J
-I:
-  position:
-  - 307
-  - 112
-  next:
-  - J
-J:
-  position:
-  - 97
-  - 157
-  next: []
+A: !!python/tuple
+- 675
+- 465
+B: !!python/tuple
+- 652
+- 296
+C: !!python/tuple
+- 840
+- 240
+D: !!python/tuple
+- 405
+- 420
+E: !!python/tuple
+- 483
+- 288
+F: !!python/tuple
+- 585
+- 112
+G: !!python/tuple
+- 180
+- 483
+H: !!python/tuple
+- 266
+- 270
+I: !!python/tuple
+- 307
+- 112
+J: !!python/tuple
+- 97
+- 157
