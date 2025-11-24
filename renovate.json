@@ -3,6 +3,10 @@
   "extends": [
     "config:recommended"
   ],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "internalChecksFilter": "strict",
   "git-submodules": {
     "enabled": true
   },
@@ -12,6 +16,15 @@
         "python-version"
       ],
       "enabled": false
+    },
+    {
+      "description": "Group patch and minor updates together",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "dependencies (minor and patch)",
+      "groupSlug": "dependencies-minor-patch"
     }
   ]
 }
