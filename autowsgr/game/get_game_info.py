@@ -7,6 +7,7 @@ from PIL import Image
 from autowsgr.constants.colors import COLORS
 from autowsgr.constants.data_roots import OCR_ROOT
 from autowsgr.constants.image_templates import IMG
+from autowsgr.constants.marker_points import REPAIRING_PATTERN
 from autowsgr.constants.other_constants import (
     AADG,
     ASDG,
@@ -244,7 +245,7 @@ def get_enemy_formation(timer: Timer) -> str:
 
 
 def detect_ship_stats(timer: Timer, type='prepare', previous=None):
-    """检查我方舰船的血量状况(精确到红血黄血绿血)并返回
+    """检查我方舰船的血量状况(精确到红血黄血绿血维修中)并返回
 
     Args:
         type (str, optional): 描述在哪个界面检查. .
@@ -256,6 +257,8 @@ def detect_ship_stats(timer: Timer, type='prepare', previous=None):
 
         example: [-1, 0, 0, 1, 1, 2, -1] 表示 1-2 号位绿血 3-4 号位中破, 5 号位大破, 6 号位不存在
 
+        0: 绿血, 1: 黄血, 2: 红血, 3: 维修中, -1: 不存在
+
     """
     # Todo: 检测是否满血/触发中保, 精确到数值的检测, 战斗结算时检测不依赖先前信息
 
@@ -263,6 +266,12 @@ def detect_ship_stats(timer: Timer, type='prepare', previous=None):
     result = [-1, 0, 0, 0, 0, 0, 0]
     for i in range(1, 7):
         if type == 'prepare':
+            # 检查该船是否正在维修
+            repairing = all(timer.check_pixel(pos[0], pos[1]) for pos in REPAIRING_PATTERN[i])
+            if repairing:
+                result[i] = 3
+                continue
+
             pixel = timer.get_pixel(*BLOOD_BAR_POSITION[0][i])
             result[i] = check_color(pixel, COLORS.BLOOD_COLORS[0])
             if result[i] in [3, 2]:
