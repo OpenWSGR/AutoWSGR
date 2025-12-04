@@ -9,9 +9,32 @@ import cv2
 import keyboard
 from numpy.typing import NDArray
 
-from autowsgr.scripts.main import start_script
 from autowsgr.timer import Timer
 from autowsgr.utils.io import dict_to_yaml, listdir
+
+
+class LightweightTimer(Timer):
+    """轻量级 Timer，仅用于截图功能，跳过不必要的模块加载"""
+
+    def __init__(self, config, logger) -> None:
+        # 只初始化必要的属性
+        self.config = config
+        self.logger = logger
+
+        # 初始化日志相关的基础属性
+        self.everyday_check = True
+        self.ship_stats = [0, 0, 0, 0, 0, 0, 0]
+        self.enemy_type_count = {}
+        self.now_page = None
+        self.resources = None
+        self.got_ship_num = 0
+        self.got_loot_num = 0
+        self.quick_repaired_cost = 0
+        self.can_get_loot = False
+
+        # 跳过 initialize_resources()、initialize_controllers()、initialize_ocr() 和 init()
+        # 直接调用父类的 AndroidController 初始化以获得截图功能
+        self.initialize_controllers()
 
 
 # en_reader = easyocr.Reader(['en'], gpu=False)
@@ -76,7 +99,16 @@ def set_points(windowname, img: NDArray):
 
 def get_image() -> None:
     global timer
-    timer = start_script('../examples/user_settings.yaml')
+    # 使用轻量级 Timer 而不是完整的 Timer
+    from autowsgr.configs import UserConfig
+    from autowsgr.utils.io import yaml_to_dict
+    from autowsgr.utils.logger import Logger
+
+    config_dict = yaml_to_dict('../examples/user_settings.yaml')
+    config = UserConfig.from_dict(config_dict)
+    logger = Logger(config.log_dir, config.log_level)
+    timer = LightweightTimer(config, logger)
+
     import time
 
     keyboard.hook(log_image)
