@@ -252,7 +252,7 @@ def set_points_with_color(windowname, img: NDArray, color_threshold=COLOR_DISTAN
                     return
 
             # 保存点信息：坐标和颜色
-            points.append([actual_x, actual_y, pixel_color])
+            points.append([[actual_x, actual_y], pixel_color])
 
             # 仅反色中心像素作为标记
             display_img[actual_y, actual_x] = get_inverted_color(display_img, actual_x, actual_y)
