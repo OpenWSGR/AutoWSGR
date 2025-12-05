@@ -224,10 +224,10 @@ def quick_repair(
     try:
         if ship_stats is None:
             ship_stats = detect_ship_stats(timer)
-        if not any(x in ship_stats for x in [0, 1, 2]):
+        if all(stat == -1 for stat in ship_stats):
             time.sleep(1)
             ship_stats = detect_ship_stats(timer)
-        if not any(x in ship_stats for x in [0, 1, 2]):
+        if all(stat == -1 for stat in ship_stats):
             timer.logger.warning('执行修理操作时没有成功检测到舰船')
             raise ValueError('没有成功检测到舰船，请检查是否正确编队')
 
@@ -244,25 +244,18 @@ def quick_repair(
                 need_repair[i] = ship_stats[i + 1] in [1, 2, 3]
             elif x is RepairMode.severe_damage:
                 need_repair[i] = ship_stats[i + 1] in [2, 3]
-            # 好像修理中的是直接修, 无需通过这个逻辑
-            # elif x is RepairMode.repairing:
-            #     need_repair[i] = ship_stats[i + 1] in [3]
+            elif x is RepairMode.repairing:
+                need_repair[i] = ship_stats[i + 1] in [3]
             else:
                 need_repair[i] = False
 
         if timer.config.debug:
             timer.logger.debug('ship_stats:', ship_stats)
-        if any(need_repair) or timer.image_exist(IMG.repair_image[1]):
+        if any(need_repair):
             if timer.config.repair_manually:
                 timer.logger.info('需要手动修理舰船')
                 raise BaseException('需要手动修理舰船')
             timer.click(420, 420, times=2, delay=0.8)
-            # 快修已经开始泡澡的船
-            pos = timer.get_image_position(IMG.repair_image[1])
-            while pos is not None:
-                timer.port.bathroom.available_time = None
-                timer.click(pos[0], pos[1], delay=1)
-                pos = timer.get_image_position(IMG.repair_image[1])
             # 按逻辑修理
             for i in range(1, 7):
                 if need_repair[i - 1]:
