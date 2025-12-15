@@ -116,7 +116,7 @@ class Logic:
             choose = [element for element in self.level2 if is_ship(element)]
         elif not set(self.stats.fleet.ships[1:]).issubset(set(self.level1)):
             choose = self.level1
-            # 如果 fleet 中有 level2 的船, 则优先凑齐level1的船, 而非技能
+            # 如果fleet已满, 且其中有lv2的船, 则优先凑齐lv1的船, 不选择技能
         else:
             lim = score
             choose = self.level1 + [element for element in self.level2 if not is_ship(element)]
