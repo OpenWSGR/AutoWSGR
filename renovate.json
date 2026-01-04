@@ -1,8 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
+  "extends": ["config:recommended"],
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
@@ -13,16 +11,19 @@
   "packageRules": [
     {
       "matchManagers": [
-        "python-version"
+        "python-version",
+        "pep621",
+        "uv",
+        "pip_requirements",
+        "pip_setup",
+        "setup-cfg"
       ],
+      "matchPackageNames": ["python", "python3", "cpython","requires-python"],
       "enabled": false
     },
     {
       "description": "Group patch and minor updates together",
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
+      "matchUpdateTypes": ["minor", "patch"],
       "groupName": "dependencies (minor and patch)",
       "groupSlug": "dependencies-minor-patch"
     }
