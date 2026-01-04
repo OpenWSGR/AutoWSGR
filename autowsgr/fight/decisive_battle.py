@@ -95,6 +95,7 @@ class Logic:
         level1: list,
         level2: list,
         flagship_priority: list,
+        repair_level: int,
     ) -> None:
         self.timer = timer
         self.config = timer.config
@@ -106,6 +107,7 @@ class Logic:
         )  # 包括 level1 和可用增益
         self.flag_ships = list(flagship_priority)
         self.stats = stats
+        self.repair_level = repair_level
 
     def _choose_ship(self, first_node=False) -> list:
         lim = 6
@@ -141,7 +143,7 @@ class Logic:
         return 3 if (self.stats.node == 'A') else 0
 
     def need_repair(self) -> bool:
-        return bool(1 in self.stats.ship_stats or 2 in self.stats.ship_stats)
+        return any(status >= self.repair_level for status in self.stats.ship_stats if status > 0)
 
     def _up_level(self) -> bool:
         return bool(self.stats.need - self.stats.exp <= 5 and self.stats.score >= 5)
@@ -221,6 +223,7 @@ class DecisiveBattle:
             self.config.level1,
             self.config.level2,
             self.config.flagship_priority,
+            self.repair_strategy,
         )
 
     def buy_ticket(self, use: str = 'steel', times: int = 3) -> None:
@@ -659,14 +662,7 @@ class DecisiveBattle:
         if self.stats.fleet.empty() and not self.stats.is_begin():
             self._check_fleet()
         self.fleet = self.logic.get_best_fleet()
-        # if self.logic._leave() or (
-        #     type(self) is not DecisiveBattle
-        #     and any(self.timer.port.get_ship_by_name(ship).status in [2] for ship in self.rships)
-        # ):  # 大破修
-        if self.logic._leave() or (
-            type(self) is not DecisiveBattle
-            and any(self.timer.port.get_ship_by_name(ship).status in [1, 2] for ship in self.rships)
-        ):  # 中破修
+        if self.logic._leave():
             return self.leave()
         if self.logic._retreat(self.fleet):
             self.timer.logger.info('舰船组队不合适, 准备撤退')
@@ -674,8 +670,8 @@ class DecisiveBattle:
         if self.stats.fleet != self.fleet:
             self._change_fleet(self.fleet)
             self.stats.ship_stats = detect_ship_stats(self.timer)
-        if self.logic.need_repair():
-            self.repair()
+        if self.logic.need_repair() and self.repair() == 'leave':
+            return self.leave()
         return None
 
     def _after_fight(self) -> None:

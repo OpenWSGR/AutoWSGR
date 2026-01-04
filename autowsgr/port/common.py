@@ -48,6 +48,7 @@ class WorkShop:
         self.available_time = None
 
     def _time_to_seconds(self, time_str):
+        time_str = time_str.replace('.', ':').replace('：', ':')
         parts = time_str.split(':')
         return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
 
