@@ -1,4 +1,4 @@
-from autowsgr.fight.event.event_20260104 import EventFightPlan20260104
+from autowsgr.fight.event.event_2026_0104 import EventFightPlan20260104
 from autowsgr.scripts.main import start_script
 
 
