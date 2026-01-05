@@ -17,16 +17,12 @@ classifiers = [
 ]
 dependencies = [
     "wheel",
-    "thefuzz",
     "setuptools",
     "rich",
     "pre-commit",
     "opencv-python",
-    "opencv-python-headless",
-    "opencv-contrib-python",
     "loguru",
     "keyboard",
-    "inquirer>=3.2.4",
     "easyocr>=1.7.1",
     "airtest-openwsgr>=1.3.9",
 ]
