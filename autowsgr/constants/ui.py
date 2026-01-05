@@ -6,14 +6,14 @@
 from __future__ import annotations
 
 from random import choice
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Tuple, Union
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 # 类型别名
-ClickPosition = tuple[int, int] | tuple[int, int, int, float]
-EdgeConfig = dict[str, tuple[int, int] | 'Node']
+ClickPosition = Union[Tuple[int, int], Tuple[int, int, int, float]]
+EdgeConfig = Dict[str, Union[Tuple[int, int], 'Node']]
 
 
 class SwitchMethod:
