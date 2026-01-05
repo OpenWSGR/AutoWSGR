@@ -8,6 +8,7 @@ from __future__ import annotations
 from random import choice
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -190,8 +191,8 @@ class UI:
         options_page, build_page, develop_page, remake_page, friend_page = (
             self._create_options_pages(main_page)
         )
-        backyard_page, bath_page, canteen_page, choose_repair_page = (
-            self._create_backyard_pages(main_page)
+        backyard_page, bath_page, canteen_page, choose_repair_page = self._create_backyard_pages(
+            main_page
         )
         fight_prepare_page = self._construct_node('fight_prepare_page', map_page)
         mission_page = self._construct_node('mission_page', main_page)
@@ -199,17 +200,33 @@ class UI:
 
         # 添加页面间的边
         self._add_main_page_edges(
-            main_page, map_page, expedition_page, mission_page,
-            backyard_page, support_set_page, options_page,
+            main_page,
+            map_page,
+            expedition_page,
+            mission_page,
+            backyard_page,
+            support_set_page,
+            options_page,
         )
         self._add_map_page_edges(map_page, fight_prepare_page, bath_page)
         self._add_options_page_edges(
-            options_page, main_page, build_page, develop_page, remake_page, friend_page,
+            options_page,
+            main_page,
+            build_page,
+            develop_page,
+            remake_page,
+            friend_page,
         )
         self._add_backyard_page_edges(
-            backyard_page, main_page, bath_page, canteen_page, choose_repair_page,
+            backyard_page,
+            main_page,
+            bath_page,
+            canteen_page,
+            choose_repair_page,
         )
-        self._add_other_page_edges(mission_page, support_set_page, friend_page, main_page, options_page)
+        self._add_other_page_edges(
+            mission_page, support_set_page, friend_page, main_page, options_page
+        )
 
         return main_page
 
@@ -217,7 +234,13 @@ class UI:
         """创建导航栏页面（出征、演习、远征等）"""
         pages = self._construct_integrative_pages(
             main_page,
-            names=['map_page', 'exercise_page', 'expedition_page', 'battle_page', 'decisive_battle_entrance'],
+            names=[
+                'map_page',
+                'exercise_page',
+                'expedition_page',
+                'battle_page',
+                'decisive_battle_entrance',
+            ],
             click_positions=[(163, 25), (287, 25), (417, 25), (544, 25), (661, 25)],
             common_edges=[{'pos': (30, 30), 'dst': main_page}],
         )
@@ -288,9 +311,15 @@ class UI:
         bath_page: Node,
     ) -> None:
         """添加地图页面相关的边"""
-        self._add_edge(map_page, fight_prepare_page, self._construct_clicks_method([(600, 300, 1, 0)]))
-        self._add_edge(fight_prepare_page, map_page, self._construct_clicks_method([(33, 30, 1, 0)]))
-        self._add_edge(fight_prepare_page, bath_page, self._construct_clicks_method([(840, 20, 1, 0)]))
+        self._add_edge(
+            map_page, fight_prepare_page, self._construct_clicks_method([(600, 300, 1, 0)])
+        )
+        self._add_edge(
+            fight_prepare_page, map_page, self._construct_clicks_method([(33, 30, 1, 0)])
+        )
+        self._add_edge(
+            fight_prepare_page, bath_page, self._construct_clicks_method([(840, 20, 1, 0)])
+        )
 
     def _add_options_page_edges(
         self,
@@ -303,12 +332,14 @@ class UI:
     ) -> None:
         """添加选项页面的边"""
         self._add_edge(
-            options_page, build_page,
+            options_page,
+            build_page,
             self._construct_clicks_method([(150, 200, 1, 1.25), (360, 200, 1, 0)]),
             develop_page,
         )
         self._add_edge(
-            options_page, remake_page,
+            options_page,
+            remake_page,
             self._construct_clicks_method([(150, 270, 1, 1.25), (360, 270, 1, 0)]),
         )
         self._add_edge(options_page, friend_page, self._construct_clicks_method([(150, 410, 1, 0)]))
@@ -324,14 +355,20 @@ class UI:
     ) -> None:
         """添加后院相关页面的边"""
         # 后院页面的边
-        self._add_edge(backyard_page, canteen_page, self._construct_clicks_method([(700, 400, 1, 0)]))
+        self._add_edge(
+            backyard_page, canteen_page, self._construct_clicks_method([(700, 400, 1, 0)])
+        )
         self._add_edge(backyard_page, bath_page, self._construct_clicks_method([(300, 200, 1, 0)]))
         self._add_edge(backyard_page, main_page, self._construct_clicks_method([(50, 30, 1, 0)]))
         # 澡堂页面的边
         self._add_edge(bath_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)]))
-        self._add_edge(bath_page, choose_repair_page, self._construct_clicks_method([(900, 30, 1, 0)]))
+        self._add_edge(
+            bath_page, choose_repair_page, self._construct_clicks_method([(900, 30, 1, 0)])
+        )
         # 选择修理页面的边
-        self._add_edge(choose_repair_page, bath_page, self._construct_clicks_method([(916, 45, 1, 0)]))
+        self._add_edge(
+            choose_repair_page, bath_page, self._construct_clicks_method([(916, 45, 1, 0)])
+        )
         # 食堂页面的边
         self._add_edge(canteen_page, main_page, self._construct_clicks_method([(120, 30, 1, 0)]))
         self._add_edge(canteen_page, backyard_page, self._construct_clicks_method([(50, 30, 1, 0)]))
@@ -347,7 +384,8 @@ class UI:
         """添加其他页面的边"""
         self._add_edge(mission_page, main_page, self._construct_clicks_method([(30, 30, 1, 0)]))
         self._add_edge(
-            support_set_page, main_page,
+            support_set_page,
+            main_page,
             self._construct_clicks_method([(30, 30, 1, 0.5), (50, 30, 1, 0.5)]),
         )
         self._add_edge(friend_page, options_page, self._construct_clicks_method([(30, 30, 1, 0)]))
@@ -422,16 +460,15 @@ class UI:
 
         # 创建节点：第一个节点以 father 为父节点，其余节点以第一个节点为父节点
         first_node = self._construct_node(names[0], father)
-        nodes = [first_node] + [
-            self._construct_node(name, first_node) for name in names[1:]
-        ]
+        nodes = [first_node] + [self._construct_node(name, first_node) for name in names[1:]]
 
         # 添加页面间的互相切换边
         for i, src_node in enumerate(nodes):
             for j, click_pos in enumerate(click_positions):
                 if i != j:
                     self._add_edge(
-                        src_node, nodes[j],
+                        src_node,
+                        nodes[j],
                         self._construct_clicks_method([click_pos]),
                     )
             # 添加公共边（如返回按钮）
