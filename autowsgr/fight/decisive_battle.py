@@ -52,7 +52,7 @@ class DecisiveStats:
             ],
         ]  # [chapter][map][node(str)] (lst["", enemies])
         self.__dict__.update(
-            yaml_to_dict(os.path.join(MAP_ROOT, 'decisive_battle', '3.yaml')),
+            yaml_to_dict(os.path.join(MAP_ROOT, 'decisive_battle', 'enemy_spec.yaml')),
         )
         self.score = 10
         self.level = 1  # 副官等级
