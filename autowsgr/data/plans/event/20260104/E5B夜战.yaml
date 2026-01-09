@@ -2,7 +2,7 @@
 #带路：导驱<=1
 chapter: E
 map: 5
-selected_nodes: [B]
+selected_nodes: [A, B]
 node_defaults:
   night: True
   proceed: False

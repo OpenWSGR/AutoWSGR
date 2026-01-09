@@ -3,6 +3,7 @@
 chapter: H
 map: 4
 selected_nodes: [C]
+from_alpha: False
 node_defaults:
   formation: 2
   night: False
