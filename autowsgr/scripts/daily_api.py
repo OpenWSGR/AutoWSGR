@@ -40,7 +40,7 @@ class DailyOperation:
         if self.config.auto_normal_fight:
             self.fight_plans: list[NormalFightPlan] = []
             self.fight_complete_times = []
-            for plan in self.config.normal_fight_tasks if self.config.normal_fight_tasks else []:
+            for plan in self.config.normal_fight_tasks or []:
                 self.fight_plans.append(
                     NormalFightPlan(
                         self.timer,

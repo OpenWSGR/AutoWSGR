@@ -762,9 +762,9 @@ class MainWindow(QMainWindow):
         self.event_start_button.clicked.connect(self.on_event_toggle)
         self.event_folder_combo.currentTextChanged.connect(self.on_event_folder_changed)
         self.event_task_combo.currentTextChanged.connect(
-            lambda text: self.update_config_value('event_automation.plan_name', text)
-            if text
-            else None
+            lambda text: (
+                self.update_config_value('event_automation.plan_name', text) if text else None
+            )
         )
         self.event_fleet_id_spin.valueChanged.connect(
             lambda val: self.update_config_value('event_automation.fleet_id', val)
