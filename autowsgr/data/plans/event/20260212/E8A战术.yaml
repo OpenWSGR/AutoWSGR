@@ -1,0 +1,9 @@
+# E8A纸BB
+chapter: H
+map: 2
+selected_nodes: [A]
+node_defaults:
+  formation: 2
+  night: False
+  proceed: False
+  SL_when_enter_fight: True

@@ -1,0 +1,13 @@
+#H5 夜战
+#带路：BB>=1 SS<=1 重巡>=1
+chapter: H
+map: 5
+selected_nodes: [A, D, E]
+node_defaults:
+  night: True
+  proceed: True
+  formation: 4
+
+node_args:
+  E:
+    proceed: False
