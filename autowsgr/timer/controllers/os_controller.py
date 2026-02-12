@@ -106,10 +106,7 @@ class WindowsController(OSController):
                 return raw_res == 'running'
             case EmulatorType.mumu:
                 raw_res = self.__mumuconsole('is_android_started')
-                try:
-                    raw_res = json.loads(raw_res)['player_state'] == 'start_finished'
-                except KeyError:
-                    raw_res = False
+                raw_res = json.loads(raw_res)['is_android_started']
                 self.logger.debug('EmulatorType status: ' + f'{raw_res}')
                 return raw_res
             case EmulatorType.yunshouji:
@@ -215,7 +212,7 @@ class WindowsController(OSController):
         # :rtype: str
         console_dir = os.path.join(os.path.dirname(self.emulator_start_cmd), 'MuMuManager.exe')
         num = int(re.search(r'[:-]\s*(\d+)', self.emulator_name).group(1))
-        emulator_index = (num - 16384) // 32 if num >= 16384 else (num - 5555) // 2
+        emulator_index = (num - 16384) / 32 if num >= 16384 else (num - 5554) / 2
         order = 'info' if command == 'is_android_started' else 'control'
 
         if not global_command:
