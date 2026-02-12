@@ -106,10 +106,7 @@ class WindowsController(OSController):
                 return raw_res == 'running'
             case EmulatorType.mumu:
                 raw_res = self.__mumuconsole('is_android_started')
-                try:
-                    raw_res = json.loads(raw_res)['player_state'] == 'start_finished'
-                except KeyError:
-                    raw_res = False
+                raw_res = json.loads(raw_res)['is_android_started']
                 self.logger.debug('EmulatorType status: ' + f'{raw_res}')
                 return raw_res
             case EmulatorType.yunshouji:
