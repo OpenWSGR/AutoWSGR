@@ -114,7 +114,7 @@ class NormalExerciseInfo(FightInfo):
 
     def _before_match(self):
         # 点击加速
-        if self.state in ['fight_prepare_page']:
+        if self.state == 'fight_prepare_page':
             self.timer.click(
                 380,
                 520,
