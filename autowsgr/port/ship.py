@@ -289,7 +289,7 @@ class Fleet:
         if order:
             # 严格按顺序检查
             for i in range(1, 7):
-                expected_ship = normalized_expected[i] if normalized_expected[i] else None
+                expected_ship = normalized_expected[i] or None
                 actual_ship = self.ships[i] if have_ship(self.ships[i]) else None
 
                 if expected_ship != actual_ship:
