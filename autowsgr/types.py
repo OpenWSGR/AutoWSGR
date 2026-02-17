@@ -67,7 +67,7 @@ class OSType(StrEnum):
             return True
         for path in ('/proc/sys/kernel/osrelease', '/proc/version'):
             try:
-                with open(path, 'r', encoding='utf-8', errors='ignore') as handle:
+                with open(path, encoding='utf-8', errors='ignore') as handle:
                     if 'microsoft' in handle.read().lower():
                         return True
             except OSError:
