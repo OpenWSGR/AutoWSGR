@@ -245,7 +245,7 @@ def quick_repair(
             elif x is RepairMode.severe_damage:
                 need_repair[i] = ship_stats[i + 1] in [2, 3]
             elif x is RepairMode.repairing:
-                need_repair[i] = ship_stats[i + 1] in [3]
+                need_repair[i] = ship_stats[i + 1] == 3
             else:
                 need_repair[i] = False
 
