@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from typing import Protocol
@@ -12,7 +13,7 @@ from airtest.core.error import AdbError, DeviceConnectionError
 
 from autowsgr.configs import UserConfig
 from autowsgr.constants.custom_exceptions import CriticalErr
-from autowsgr.types import EmulatorType
+from autowsgr.types import EmulatorType, OSType
 from autowsgr.utils.logger import Logger
 
 
@@ -300,3 +301,112 @@ class MacController(OSController):
         except Exception as e:
             self.logger.error(f'{cmd} {e}')
         return {}
+
+
+class LinuxController(OSController):
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
+        self.logger = logger
+        self.is_wsl = OSType._is_wsl()
+
+        self.emulator_type = config.emulator_type
+        if config.emulator_name is None:
+            raise CriticalErr('WSL 需要显式设置 emulator_name')
+        if config.emulator_start_cmd is None:
+            raise CriticalErr('WSL 需要显式设置 emulator_start_cmd')
+        if config.emulator_process_name is None:
+            raise CriticalErr('WSL 需要显式设置 emulator_process_name')
+        self.emulator_name = config.emulator_name
+        self.emulator_start_cmd = config.emulator_start_cmd
+        self.emulator_process_name = config.emulator_process_name
+        self.dev_name = f'Android:///{self.emulator_name}'
+
+    def is_android_online(self) -> bool:
+        """判断 timer 给定的设备是否在线"""
+        devices = self._adb_devices()
+        if self.emulator_name in devices:
+            return True
+        if self.is_wsl:
+            return self._is_windows_process_running()
+        try:
+            subprocess.run(
+                ['pgrep', '-f', self.emulator_process_name],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    def kill_android(self) -> None:
+        """强制终止模拟器进程"""
+        try:
+            if self.is_wsl:
+                result = subprocess.run(
+                    ['taskkill.exe', '/f', '/im', self.emulator_process_name],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    raise CriticalErr(result.stderr.strip() or result.stdout.strip())
+            else:
+                subprocess.run(
+                    ['pkill', '-9', '-f', self.emulator_process_name],
+                    check=True,
+                )
+            self.logger.info(f'已终止模拟器进程: {self.emulator_process_name}')
+        except Exception as e:
+            raise CriticalErr(f'终止模拟器进程失败: {e}')
+
+    def start_android(self) -> None:
+        """启动模拟器"""
+        try:
+            subprocess.Popen(self._split_command(self.emulator_start_cmd))
+            self.logger.info(f'正在启动模拟器: {self.emulator_start_cmd}')
+            start_time = time.time()
+            while not self.is_android_online():
+                time.sleep(1)
+                if time.time() - start_time > 120:
+                    raise TimeoutError('模拟器启动超时！')
+        except Exception as e:
+            raise CriticalErr(f'启动模拟器失败: {e}')
+
+    def _adb_devices(self) -> list[str]:
+        try:
+            from airtest.core.android.adb import ADB
+
+            adb = ADB().get_adb_path()
+            result = subprocess.run(
+                [adb, 'devices'],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except Exception as e:
+            self.logger.error(f'adb devices 失败: {e}')
+            return []
+
+        devices = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line or line.startswith('List of devices'):
+                continue
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] == 'device':
+                devices.append(parts[0])
+        return devices
+
+    def _is_windows_process_running(self) -> bool:
+        result = subprocess.run(
+            ['tasklist.exe', '/fi', f'IMAGENAME eq {self.emulator_process_name}'],
+            capture_output=True,
+            text=True,
+        )
+        output = (result.stdout or '').lower()
+        if 'no tasks' in output:
+            return False
+        return self.emulator_process_name.lower() in output
+
+    @staticmethod
+    def _split_command(command: str) -> list[str]:
+        return shlex.split(command)
