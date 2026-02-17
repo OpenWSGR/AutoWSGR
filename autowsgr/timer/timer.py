@@ -10,6 +10,7 @@ from autowsgr.port.common import Port
 from autowsgr.timer.backends import EasyocrBackend, PaddleOCRBackend
 from autowsgr.timer.controllers import (
     AndroidController,
+    LinuxController,
     MacController,
     OSController,
     WindowsController,
@@ -72,6 +73,7 @@ class Timer(AndroidController):
         adapter_fun = {
             OSType.windows: WindowsController,
             OSType.macos: MacController,
+            OSType.linux: LinuxController,
         }
         self.os_controller: OSController = adapter_fun[self.config.os_type](
             self.config,

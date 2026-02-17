@@ -300,3 +300,39 @@ class MacController(OSController):
         except Exception as e:
             self.logger.error(f'{cmd} {e}')
         return {}
+
+
+class LinuxController(OSController):
+    def __init__(self, config: UserConfig, logger: Logger) -> None:
+        self.logger = logger
+
+        self.emulator_type = config.emulator_type
+        self.emulator_name = config.emulator_name
+        self.emulator_start_cmd = config.emulator_start_cmd
+        self.emulator_process_name = config.emulator_process_name
+        self.dev_name = f'Android:///{self.emulator_name}'
+
+    def is_android_online(self) -> bool:
+        """判断 timer 给定的设备是否在线"""
+        try:
+            # 使用 pgrep 检查进程是否运行（Linux 通用方法）
+            subprocess.check_output(f'pgrep -f {self.emulator_process_name}', shell=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    def kill_android(self) -> None:
+        """强制终止模拟器进程"""
+        try:
+            subprocess.Popen(f'pkill -9 -f {self.emulator_process_name}', shell=True)
+            self.logger.info(f'已终止模拟器进程: {self.emulator_process_name}')
+        except Exception as e:
+            self.logger.error(f'终止模拟器进程失败: {e}')
+
+    def start_android(self) -> None:
+        """启动模拟器"""
+        try:
+            subprocess.Popen(self.emulator_start_cmd, shell=True)
+            self.logger.info(f'正在启动模拟器: {self.emulator_start_cmd}')
+        except Exception as e:
+            self.logger.error(f'启动模拟器失败: {e}')

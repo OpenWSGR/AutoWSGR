@@ -46,7 +46,7 @@ class OcrBackend(StrEnum):
 
 class OSType(StrEnum):
     windows = 'Windows'
-    linux = 'Linux'
+    linux = 'linux'
     macos = 'macOS'
 
     @classmethod
@@ -55,6 +55,8 @@ class OSType(StrEnum):
             return OSType.windows
         if sys.platform == 'darwin':
             return OSType.macos
+        if sys.platform.startswith('linux'):
+            return OSType.linux
         raise ValueError(f'不支持的操作系统 {sys.platform}')
 
 
