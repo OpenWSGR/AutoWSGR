@@ -56,8 +56,23 @@ class OSType(StrEnum):
         if sys.platform == 'darwin':
             return OSType.macos
         if sys.platform.startswith('linux'):
-            return OSType.linux
+            if cls._is_wsl():
+                return OSType.linux
+            raise ValueError('暂不支持非 WSL 的 Linux 系统')
         raise ValueError(f'不支持的操作系统 {sys.platform}')
+
+    @staticmethod
+    def _is_wsl() -> bool:
+        if os.environ.get('WSL_DISTRO_NAME') or os.environ.get('WSL_INTEROP'):
+            return True
+        for path in ('/proc/sys/kernel/osrelease', '/proc/version'):
+            try:
+                with open(path, 'r', encoding='utf-8', errors='ignore') as handle:
+                    if 'microsoft' in handle.read().lower():
+                        return True
+            except OSError:
+                continue
+        return False
 
 
 class EmulatorType(StrEnum):

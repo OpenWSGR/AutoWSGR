@@ -268,25 +268,37 @@ class UserConfig(BaseConfig):
         object.__setattr__(self, 'os_type', OSType.auto())
 
         # 模拟器
-        if self.emulator_name is None:
-            object.__setattr__(
-                self,
-                'emulator_name',
-                self.emulator_type.default_emulator_name(self.os_type),
-            )
-        if self.emulator_start_cmd is None:
-            object.__setattr__(
-                self,
-                'emulator_start_cmd',
-                self.emulator_type.auto_emulator_path(self.os_type),
-            )
-        assert self.emulator_start_cmd is not None
-        if self.emulator_process_name is None:
-            object.__setattr__(
-                self,
-                'emulator_process_name',
-                os.path.basename(self.emulator_start_cmd),
-            )
+        if self.os_type == OSType.linux:
+            if self.emulator_name is None:
+                raise ValueError('WSL 需要显式设置 emulator_name')
+            if self.emulator_start_cmd is None:
+                raise ValueError('WSL 需要显式设置 emulator_start_cmd')
+            if self.emulator_process_name is None:
+                object.__setattr__(
+                    self,
+                    'emulator_process_name',
+                    os.path.basename(self.emulator_start_cmd),
+                )
+        else:
+            if self.emulator_name is None:
+                object.__setattr__(
+                    self,
+                    'emulator_name',
+                    self.emulator_type.default_emulator_name(self.os_type),
+                )
+            if self.emulator_start_cmd is None:
+                object.__setattr__(
+                    self,
+                    'emulator_start_cmd',
+                    self.emulator_type.auto_emulator_path(self.os_type),
+                )
+            assert self.emulator_start_cmd is not None
+            if self.emulator_process_name is None:
+                object.__setattr__(
+                    self,
+                    'emulator_process_name',
+                    os.path.basename(self.emulator_start_cmd),
+                )
 
         # 游戏
         object.__setattr__(self, 'app_name', self.game_app.app_name)

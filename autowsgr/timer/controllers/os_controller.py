@@ -307,6 +307,12 @@ class LinuxController(OSController):
         self.logger = logger
 
         self.emulator_type = config.emulator_type
+        if config.emulator_name is None:
+            raise CriticalErr('WSL 需要显式设置 emulator_name')
+        if config.emulator_start_cmd is None:
+            raise CriticalErr('WSL 需要显式设置 emulator_start_cmd')
+        if config.emulator_process_name is None:
+            raise CriticalErr('WSL 需要显式设置 emulator_process_name')
         self.emulator_name = config.emulator_name
         self.emulator_start_cmd = config.emulator_start_cmd
         self.emulator_process_name = config.emulator_process_name
@@ -327,12 +333,17 @@ class LinuxController(OSController):
             subprocess.Popen(f'pkill -9 -f {self.emulator_process_name}', shell=True)
             self.logger.info(f'已终止模拟器进程: {self.emulator_process_name}')
         except Exception as e:
-            self.logger.error(f'终止模拟器进程失败: {e}')
+            raise CriticalErr(f'终止模拟器进程失败: {e}')
 
     def start_android(self) -> None:
         """启动模拟器"""
         try:
             subprocess.Popen(self.emulator_start_cmd, shell=True)
             self.logger.info(f'正在启动模拟器: {self.emulator_start_cmd}')
+            start_time = time.time()
+            while not self.is_android_online():
+                time.sleep(1)
+                if time.time() - start_time > 120:
+                    raise TimeoutError('模拟器启动超时！')
         except Exception as e:
-            self.logger.error(f'启动模拟器失败: {e}')
+            raise CriticalErr(f'启动模拟器失败: {e}')
