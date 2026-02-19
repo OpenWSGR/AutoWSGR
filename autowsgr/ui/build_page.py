@@ -46,7 +46,13 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -61,6 +67,57 @@ class BuildTab(enum.Enum):
     DESTROY = "解体"
     DEVELOP = "开发"
     DISCARD = "废弃"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名 — 每个标签各一组
+# ═══════════════════════════════════════════════════════════════════════════════
+
+TAB_SIGNATURES: dict[BuildTab, PixelSignature] = {
+    BuildTab.BUILD: PixelSignature(
+        name="建造页-建造栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.6724, 0.1278, (105, 203, 255), tolerance=30.0),
+            PixelRule.of(0.7792, 0.1417, (220, 86, 87), tolerance=30.0),
+            PixelRule.of(0.2250, 0.0556, (15, 124, 215), tolerance=30.0),
+            PixelRule.of(0.8922, 0.1380, (51, 164, 240), tolerance=30.0),
+        ],
+    ),
+    BuildTab.DESTROY: PixelSignature(
+        name="建造页-解装栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.2714, 0.0519, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.2167, 0.0556, (25, 37, 61), tolerance=30.0),
+            PixelRule.of(0.0464, 0.1361, (162, 193, 126), tolerance=30.0),
+            PixelRule.of(0.1443, 0.1361, (102, 140, 99), tolerance=30.0),
+        ],
+    ),
+    BuildTab.DEVELOP: PixelSignature(
+        name="建造页-开发栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.6656, 0.1278, (115, 205, 255), tolerance=30.0),
+            PixelRule.of(0.7792, 0.1398, (220, 88, 86), tolerance=30.0),
+            PixelRule.of(0.4802, 0.0537, (18, 125, 219), tolerance=30.0),
+            PixelRule.of(0.2203, 0.0491, (20, 32, 56), tolerance=30.0),
+        ],
+    ),
+    BuildTab.DISCARD: PixelSignature(
+        name="建造页-废弃栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.5240, 0.0519, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.3484, 0.0676, (21, 37, 63), tolerance=30.0),
+            PixelRule.of(0.8854, 0.1500, (25, 121, 208), tolerance=30.0),
+            PixelRule.of(0.4526, 0.9741, (25, 120, 210), tolerance=30.0),
+            PixelRule.of(0.7370, 0.9657, (54, 54, 54), tolerance=30.0),
+            PixelRule.of(0.8495, 0.9713, (26, 121, 211), tolerance=30.0),
+        ],
+    ),
+}
+"""建造页面每个标签的像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -106,17 +163,36 @@ class BuildPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为建造页面组 (含全部 4 个标签)。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集建造页面像素签名。
+        任一标签签名匹配即判定为建造页面。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        return any(
+            PixelChecker.check_signature(screen, sig).matched
+            for sig in TAB_SIGNATURES.values()
+        )
+
+    @staticmethod
+    def get_active_tab(screen: np.ndarray) -> BuildTab | None:
+        """获取当前激活的标签。
+
+        Parameters
+        ----------
+        screen:
+            截图 (H×W×3, RGB)。
+
+        Returns
+        -------
+        BuildTab | None
+            当前标签，无法确定时返回 ``None``。
+        """
+        for tab, sig in TAB_SIGNATURES.items():
+            if PixelChecker.check_signature(screen, sig).matched:
+                return tab
+        return None
 
     # ── 标签切换 ──────────────────────────────────────────────────────────
 
@@ -140,14 +216,17 @@ class BuildPage:
         ------
         NavigationError
             超时仍在建造页面。
-
-        .. note::
-            回退验证依赖 ``is_current_page()``，签名未采集时无法验证。
-            当前实现仅执行点击。
         """
+        from autowsgr.ui.sidebar_page import SidebarPage
+
         logger.info("[UI] 建造页面 → 返回侧边栏")
-        self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=SidebarPage.is_current_page,
+            source="建造页面",
+            target="侧边栏",
+        )
         # wait_leave_page(
         #     self._ctrl,
         #     BuildPage.is_current_page,

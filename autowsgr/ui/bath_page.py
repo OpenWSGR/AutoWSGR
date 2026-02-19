@@ -49,7 +49,30 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PAGE_SIGNATURE = PixelSignature(
+    name="浴场页",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.8458, 0.1102, (74, 132, 178), tolerance=30.0),
+        PixelRule.of(0.8604, 0.0889, (253, 254, 255), tolerance=30.0),
+        PixelRule.of(0.8734, 0.0454, (52, 146, 198), tolerance=30.0),
+        PixelRule.of(0.9875, 0.1019, (69, 133, 181), tolerance=30.0),
+    ],
+)
+"""浴室页面像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -96,25 +119,37 @@ class BathPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为浴室页面。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集浴室页面像素签名。
+        通过 4 个特征像素点全部匹配判定。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 
     def go_to_choose_repair(self) -> None:
-        """点击右上角按钮，进入选择修理。"""
+        """点击右上角按钮，进入选择修理。
+
+        Raises
+        ------
+        NavigationError
+            超时仍在浴室页面。
+        """
         logger.info("[UI] 浴室 → 选择修理")
+        # 选择修理页面暂无签名，使用 leave 降级
+        from autowsgr.ui.page import wait_leave_page
+
         self._ctrl.click(*CLICK_CHOOSE_REPAIR)
-        # TODO: 签名采集后启用导航验证
+        wait_leave_page(
+            self._ctrl,
+            BathPage.is_current_page,
+            source="浴室",
+            target="选择修理",
+        )
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 
@@ -125,7 +160,21 @@ class BathPage:
 
         - 从后院进入 → 返回后院
         - 从出征准备跨级进入 → 可能返回主页面
+
+        使用后院签名验证。若返回主页面也能通过 (已离开浴室) 判定。
+
+        Raises
+        ------
+        NavigationError
+            超时仍在浴室页面。
         """
+        from autowsgr.ui.page import wait_leave_page
+
         logger.info("[UI] 浴室 → 返回")
         self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
+        wait_leave_page(
+            self._ctrl,
+            BathPage.is_current_page,
+            source="浴室",
+            target="后院/主页面",
+        )

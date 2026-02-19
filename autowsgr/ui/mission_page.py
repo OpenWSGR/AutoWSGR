@@ -39,7 +39,35 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PAGE_SIGNATURE = PixelSignature(
+    name="任务页",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.1474, 0.0509, (15, 132, 228), tolerance=30.0),
+        PixelRule.of(0.2203, 0.0537, (17, 128, 220), tolerance=30.0),
+        PixelRule.of(0.1818, 0.0593, (21, 129, 227), tolerance=30.0),
+        PixelRule.of(0.1703, 0.0491, (249, 255, 255), tolerance=30.0),
+        PixelRule.of(0.1734, 0.0370, (242, 251, 255), tolerance=30.0),
+        PixelRule.of(0.1984, 0.0370, (252, 250, 251), tolerance=30.0),
+        PixelRule.of(0.1693, 0.0657, (255, 255, 250), tolerance=30.0),
+        PixelRule.of(0.4339, 0.0509, (140, 146, 146), tolerance=30.0),
+        PixelRule.of(0.3021, 0.0537, (123, 126, 141), tolerance=30.0),
+    ],
+)
+"""任务页面像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -73,33 +101,33 @@ class MissionPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为任务页面。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集任务页面像素签名。
+        通过 9 个特征像素点全部匹配判定。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 
     def go_back(self) -> None:
         """点击回退按钮 (◁)，返回主页面。
 
-        .. note::
-            回退验证依赖 ``is_current_page()``，签名未采集时无法验证。
-            当前实现仅执行点击。
+        Raises
+        ------
+        NavigationError
+            超时仍在任务页面。
         """
+        from autowsgr.ui.main_page import MainPage
+
         logger.info("[UI] 任务页面 → 返回主页面")
-        self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
-        # wait_leave_page(
-        #     self._ctrl,
-        #     MissionPage.is_current_page,
-        #     source="任务页面",
-        #     target="主页面",
-        # )
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=MainPage.is_current_page,
+            source="任务页面",
+            target="主页面",
+        )

@@ -48,6 +48,35 @@ def _make_non_main_screen() -> np.ndarray:
     return np.zeros((_H, _W, 3), dtype=np.uint8)
 
 
+def _make_target_screen(target: MainPageTarget) -> np.ndarray:
+    """生成匹配导航目标页面签名的合成截图。
+
+    navigate_to 现在使用 click_and_wait_for_page 进行正向验证，
+    需要截图匹配目标页面的签名。
+    """
+    screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+
+    if target == MainPageTarget.SORTIE:
+        # MapPage: 5个面板探测点中恰好1个为选中蓝色
+        from autowsgr.ui.map_page import PANEL_PROBE, MapPanel
+        sx, sy = PANEL_PROBE[MapPanel.SORTIE]
+        _set_pixel(screen, sx, sy, (15, 128, 220))
+    elif target == MainPageTarget.TASK:
+        from autowsgr.ui.mission_page import PAGE_SIGNATURE as MISSION_SIG
+        for rule in MISSION_SIG.rules:
+            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    elif target == MainPageTarget.SIDEBAR:
+        from autowsgr.ui.sidebar_page import PAGE_SIGNATURE as SIDEBAR_SIG
+        for rule in SIDEBAR_SIG.rules:
+            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    elif target == MainPageTarget.HOME:
+        from autowsgr.ui.backyard_page import PAGE_SIGNATURE as BACKYARD_SIG
+        for rule in BACKYARD_SIG.rules:
+            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+
+    return screen
+
+
 # ─────────────────────────────────────────────
 # 页面识别
 # ─────────────────────────────────────────────
@@ -104,42 +133,42 @@ class TestNavigateTo:
     @pytest.mark.parametrize("target", list(MainPageTarget))
     def test_navigate_calls_click(self, page, target: MainPageTarget):
         pg, ctrl = page
-        # navigate_to 使用 wait_leave_page 验证，截图需返回非主页面
-        ctrl.screenshot.return_value = _make_non_main_screen()
+        # navigate_to 使用 click_and_wait_for_page 正向验证目标页面
+        ctrl.screenshot.return_value = _make_target_screen(target)
         pg.navigate_to(target)
-        ctrl.click.assert_called_once_with(*CLICK_NAV[target])
+        ctrl.click.assert_called_with(*CLICK_NAV[target])
 
     @pytest.mark.parametrize("target", list(MainPageTarget))
     def test_navigate_verifies_screenshot(self, page, target: MainPageTarget):
         """导航后调用 screenshot 进行验证。"""
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_non_main_screen()
+        ctrl.screenshot.return_value = _make_target_screen(target)
         pg.navigate_to(target)
         ctrl.screenshot.assert_called()
 
     def test_go_to_sortie(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_non_main_screen()
+        ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.SORTIE)
         pg.go_to_sortie()
-        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SORTIE])
+        ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.SORTIE])
 
     def test_go_to_task(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_non_main_screen()
+        ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.TASK)
         pg.go_to_task()
-        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.TASK])
+        ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.TASK])
 
     def test_open_sidebar(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_non_main_screen()
+        ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.SIDEBAR)
         pg.open_sidebar()
-        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SIDEBAR])
+        ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.SIDEBAR])
 
     def test_go_home(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_non_main_screen()
+        ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.HOME)
         pg.go_home()
-        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.HOME])
+        ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.HOME])
 
 
 # ─────────────────────────────────────────────
@@ -159,7 +188,7 @@ class TestReturnFrom:
     def test_return_calls_exit(self, page, target: MainPageTarget):
         pg, ctrl = page
         pg.return_from(target)
-        ctrl.click.assert_called_once_with(*CLICK_EXIT[target])
+        ctrl.click.assert_called_with(*CLICK_EXIT[target])
 
     @pytest.mark.parametrize("target", list(MainPageTarget))
     def test_return_verifies_screenshot(self, page, target: MainPageTarget):
@@ -171,22 +200,22 @@ class TestReturnFrom:
     def test_sortie_exits_top_left(self, page):
         pg, ctrl = page
         pg.return_from(MainPageTarget.SORTIE)
-        ctrl.click.assert_called_once_with(*EXIT_TOP_LEFT)
+        ctrl.click.assert_called_with(*EXIT_TOP_LEFT)
 
     def test_task_exits_top_left(self, page):
         pg, ctrl = page
         pg.return_from(MainPageTarget.TASK)
-        ctrl.click.assert_called_once_with(*EXIT_TOP_LEFT)
+        ctrl.click.assert_called_with(*EXIT_TOP_LEFT)
 
     def test_home_exits_top_left(self, page):
         pg, ctrl = page
         pg.return_from(MainPageTarget.HOME)
-        ctrl.click.assert_called_once_with(*EXIT_TOP_LEFT)
+        ctrl.click.assert_called_with(*EXIT_TOP_LEFT)
 
     def test_sidebar_exits_bottom_left(self, page):
         pg, ctrl = page
         pg.return_from(MainPageTarget.SIDEBAR)
-        ctrl.click.assert_called_once_with(*EXIT_SIDEBAR)
+        ctrl.click.assert_called_with(*EXIT_SIDEBAR)
 
 
 # ─────────────────────────────────────────────

@@ -47,7 +47,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_for_page, wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision.matcher import (
     MatchStrategy,
     PixelChecker,
@@ -147,7 +147,7 @@ class SidebarPage:
     def navigate_to(self, target: SidebarTarget) -> None:
         """点击菜单项，进入指定子页面。
 
-        点击后反复截图验证，确认已离开侧边栏。
+        利用目标页面的签名进行正向验证。
 
         Parameters
         ----------
@@ -157,14 +157,22 @@ class SidebarPage:
         Raises
         ------
         NavigationError
-            超时未离开侧边栏。
+            超时未到达目标页面。
         """
-        logger.info("[UI] 侧边栏 → {}", target.value)
-        self._ctrl.click(*CLICK_NAV[target])
+        from autowsgr.ui.build_page import BuildPage
+        from autowsgr.ui.friend_page import FriendPage
+        from autowsgr.ui.intensify_page import IntensifyPage
 
-        wait_leave_page(
+        target_checker = {
+            SidebarTarget.BUILD: BuildPage.is_current_page,
+            SidebarTarget.INTENSIFY: IntensifyPage.is_current_page,
+            SidebarTarget.FRIEND: FriendPage.is_current_page,
+        }
+        logger.info("[UI] 侧边栏 → {}", target.value)
+        click_and_wait_for_page(
             self._ctrl,
-            SidebarPage.is_current_page,
+            click_coord=CLICK_NAV[target],
+            checker=target_checker[target],
             source="侧边栏",
             target=target.value,
         )
@@ -186,19 +194,20 @@ class SidebarPage:
     def close(self) -> None:
         """关闭侧边栏，返回主页面。
 
-        点击后反复截图验证，确认已离开侧边栏。
+        点击后反复截图验证，确认已到达主页面。
 
         Raises
         ------
         NavigationError
             超时未关闭侧边栏。
         """
-        logger.info("[UI] 侧边栏 → 关闭 (返回主页面)")
-        self._ctrl.click(*CLICK_CLOSE)
+        from autowsgr.ui.main_page import MainPage
 
-        wait_leave_page(
+        logger.info("[UI] 侧边栏 → 关闭 (返回主页面)")
+        click_and_wait_for_page(
             self._ctrl,
-            SidebarPage.is_current_page,
+            click_coord=CLICK_CLOSE,
+            checker=MainPage.is_current_page,
             source="侧边栏",
             target="主页面",
         )

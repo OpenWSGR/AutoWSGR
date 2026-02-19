@@ -1,63 +1,110 @@
-"""UI 页面注册中心与导航验证工具。
+"""UI 页面注册中心与导航工具。
 
-提供两类功能:
+提供三大功能:
 
 1. **页面注册** — 每个页面控制器注册自己的识别函数，
-   :func:`get_current_page` 遍历注册表识别当前截图对应的页面。
+   :func:`get_current_page` 遍历注册表识别当前截图。
 
 2. **导航验证** — :func:`wait_for_page` / :func:`wait_leave_page`
-   反复截图检查，确认导航操作确实生效。
+   反复截图检查，内置浮层消除，确认导航生效。
+
+3. **带重试的一步导航** — :func:`click_and_wait_for_page` /
+   :func:`click_and_wait_leave_page`
+   封装「点击 + 验证」，自动重试未响应的点击，保证到达或抛出异常。
 
 典型使用::
 
-    from autowsgr.ui.page import get_current_page, wait_for_page
+    from autowsgr.ui.page import click_and_wait_leave_page, NavigationError
 
-    # 识别当前页面
-    screen = ctrl.screenshot()
-    page_name = get_current_page(screen)
+    # 点击，等待离开当前页 (带重试)
+    click_and_wait_leave_page(
+        ctrl,
+        click_coord=(0.94, 0.90),
+        checker=MainPage.is_current_page,
+        source="主页面",
+        target="地图页面",
+    )
 
-    # 导航后等待到达目标
-    ctrl.click(0.9, 0.9)
-    wait_for_page(ctrl, target_checker, source="主页面", target="出征")
+    # 自定义重试参数
+    from autowsgr.ui.page import NavConfig
+    cfg = NavConfig(max_retries=5, retry_delay=2.0, timeout=15.0)
+    click_and_wait_for_page(ctrl, coord, checker, source="...", target="...", config=cfg)
+
+错误层次::
+
+    NavigationError  — 超时未到达目标，重试耗尽
+    NetworkError     — 游戏进入登录/重连界面，需人工处理
+        (来自 autowsgr.ui.overlay)
 """
 
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
+from autowsgr.ui.overlay import NetworkError, OverlayType, detect_overlay, dismiss_overlay  # noqa: F401
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 # 异常
-# ═══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 
 
 class NavigationError(Exception):
-    """页面导航验证失败 — 超时未到达目标页面。"""
+    """页面导航验证失败 — 超时未到达目标页面，或重试耗尽。"""
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# 导航配置
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class NavConfig:
+    """导航操作参数配置。
+
+    Attributes
+    ----------
+    max_retries:
+        点击重试最大次数 (含首次)。
+    retry_delay:
+        两次点击之间的等待 (秒)。
+    timeout:
+        每轮验证的超时 (秒)。
+    interval:
+        验证循环中两次截图的间隔 (秒)。
+    handle_overlays:
+        是否自动处理游戏浮层 (新闻公告等)。
+    """
+
+    max_retries: int = 3
+    retry_delay: float = 1.0
+    timeout: float = 10.0
+    interval: float = 0.5
+    handle_overlays: bool = True
+
+
+DEFAULT_NAV_CONFIG = NavConfig()
+
+# 向前兼容常量
+DEFAULT_TIMEOUT: float = DEFAULT_NAV_CONFIG.timeout
+DEFAULT_INTERVAL: float = DEFAULT_NAV_CONFIG.interval
+
+
+# ---------------------------------------------------------------------------
 # 页面注册中心
-# ═══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
 
 _PAGE_REGISTRY: dict[str, Callable[[np.ndarray], bool]] = {}
 
 
 def register_page(name: str, checker: Callable[[np.ndarray], bool]) -> None:
-    """注册页面识别函数。
-
-    Parameters
-    ----------
-    name:
-        页面名称 (如 ``"主页面"``、``"地图页面"``)。
-    checker:
-        接收截图 (H×W×3, RGB) 返回 ``bool`` 的识别函数。
-    """
+    """注册页面识别函数。"""
     if name in _PAGE_REGISTRY:
         logger.warning("[UI] 页面 '{}' 已注册，将覆盖", name)
     _PAGE_REGISTRY[name] = checker
@@ -65,32 +112,15 @@ def register_page(name: str, checker: Callable[[np.ndarray], bool]) -> None:
 
 
 def get_current_page(screen: np.ndarray) -> str | None:
-    """识别截图对应的页面名称。
-
-    遍历所有已注册的页面识别函数，返回第一个匹配的页面名称。
-
-    Parameters
-    ----------
-    screen:
-        截图 (H×W×3, RGB)。
-
-    Returns
-    -------
-    str | None
-        页面名称，全部未匹配时返回 ``None``。
-    """
+    """识别截图对应的页面名称，无匹配返回 ``None``。"""
     for name, checker in _PAGE_REGISTRY.items():
         try:
             if checker(screen):
                 logger.debug("[UI] 当前页面: {}", name)
                 return name
         except Exception:
-            logger.opt(exception=True).warning(
-                "[UI] 页面 '{}' 识别器异常", name,
-            )
-    logger.debug(
-        "[UI] 当前页面: 无匹配 (共 {} 个注册页面)", len(_PAGE_REGISTRY),
-    )
+            logger.opt(exception=True).warning("[UI] 页面 '{}' 识别器异常", name)
+    logger.debug("[UI] 当前页面: 无匹配 (共 {} 个注册页面)", len(_PAGE_REGISTRY))
     return None
 
 
@@ -99,85 +129,76 @@ def get_registered_pages() -> list[str]:
     return list(_PAGE_REGISTRY.keys())
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 导航验证
-# ═══════════════════════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------------------
+# 内部工具
+# ---------------------------------------------------------------------------
 
-DEFAULT_TIMEOUT: float = 10.0
-"""默认导航验证超时 (秒)。"""
 
-DEFAULT_INTERVAL: float = 0.5
-"""默认截图间隔 (秒)。"""
+def _handle_overlay_if_present(
+    ctrl: AndroidController,
+    screen: np.ndarray,
+) -> bool:
+    """检测并尝试消除浮层。
+
+    Returns True 表示执行了消除动作（调用方应跳过 sleep 立即重截图）。
+    Raises NetworkError 表示遇到无法自动消除的浮层。
+    """
+    overlay = detect_overlay(screen)
+    if overlay is None:
+        return False
+    dismiss_overlay(ctrl, overlay)   # NetworkError 向上抛
+    return True
+
+
+# ---------------------------------------------------------------------------
+# 底层验证
+# ---------------------------------------------------------------------------
 
 
 def wait_for_page(
     ctrl: AndroidController,
     checker: Callable[[np.ndarray], bool],
     *,
-    timeout: float = DEFAULT_TIMEOUT,
-    interval: float = DEFAULT_INTERVAL,
+    timeout: float = DEFAULT_NAV_CONFIG.timeout,
+    interval: float = DEFAULT_NAV_CONFIG.interval,
+    handle_overlays: bool = True,
     source: str = "",
     target: str = "",
 ) -> np.ndarray:
-    """反复截图验证，直到 ``checker`` 返回 ``True``。
+    """反复截图，直到 ``checker`` 返回 ``True``。
 
-    用于导航后确认已到达目标页面。
-
-    Parameters
-    ----------
-    ctrl:
-        设备控制器。
-    checker:
-        页面识别函数 — 接收截图返回是否到达。
-    timeout:
-        超时 (秒)。
-    interval:
-        两次截图间的等待 (秒)。
-    source:
-        来源页面名称 (仅日志)。
-    target:
-        目标页面名称 (仅日志)。
-
-    Returns
-    -------
-    np.ndarray
-        验证成功时的截图。
+    内置浮层消除。遇到可消除浮层时立即处理并继续轮询（不计入睡眠延迟）。
 
     Raises
     ------
     NavigationError
-        超时未到达目标页面。
+        超时仍未匹配。
+    NetworkError
+        遇到无法自动消除的浮层。
     """
     deadline = time.monotonic() + timeout
     attempt = 0
-    logger.info(
-        "[UI] 导航验证开始: {} → {} (超时 {:.1f}s)",
-        source, target, timeout,
-    )
+    logger.info("[UI] 等待到达: {} → {} (超时 {:.1f}s)", source or "?", target or "?", timeout)
 
     while True:
         attempt += 1
         screen = ctrl.screenshot()
-        result = checker(screen)
 
-        if result:
-            logger.info(
-                "[UI] 导航验证成功: {} → {} (第 {} 次截图)",
-                source, target, attempt,
-            )
+        if handle_overlays and _handle_overlay_if_present(ctrl, screen):
+            logger.debug("[UI] 等待 #{}: 消除浮层，立即重截图", attempt)
+            continue
+
+        if checker(screen):
+            logger.info("[UI] 已到达: {} → {} (第 {} 次截图)", source or "?", target or "?", attempt)
             return screen
 
         current = get_current_page(screen)
-        logger.debug(
-            "[UI] 导航验证 #{}: {} → {}, 当前={}, 结果=✗",
-            attempt, source, target, current or "未知",
-        )
+        logger.debug("[UI] 等待 #{}: {} → {}, 当前={}", attempt, source or "?", target or "?", current or "未知")
 
         if time.monotonic() >= deadline:
             msg = (
-                f"导航验证超时: {source} → {target}, "
-                f"{attempt} 次截图验证后仍未到达, "
-                f"当前页面: {current or '未知'}"
+                f"等待超时: {source or '?'} → {target or '?'}, "
+                f"{attempt} 次截图后仍未到达, 当前: {current or '未知'}"
             )
             logger.error("[UI] {}", msg)
             raise NavigationError(msg)
@@ -189,71 +210,155 @@ def wait_leave_page(
     ctrl: AndroidController,
     checker: Callable[[np.ndarray], bool],
     *,
-    timeout: float = DEFAULT_TIMEOUT,
-    interval: float = DEFAULT_INTERVAL,
+    timeout: float = DEFAULT_NAV_CONFIG.timeout,
+    interval: float = DEFAULT_NAV_CONFIG.interval,
+    handle_overlays: bool = True,
     source: str = "",
     target: str = "",
 ) -> np.ndarray:
-    """反复截图验证，直到 ``checker`` 返回 ``False`` (已离开)。
+    """反复截图，直到 ``checker`` 返回 ``False`` (已离开)。
 
-    用于导航后确认已离开当前页面 (目标页面无签名时的降级方案)。
-
-    Parameters
-    ----------
-    ctrl:
-        设备控制器。
-    checker:
-        当前页面识别函数 — 返回 ``True`` 表示仍在原页面。
-    timeout:
-        超时 (秒)。
-    interval:
-        两次截图间的等待 (秒)。
-    source:
-        来源页面名称 (仅日志)。
-    target:
-        目标页面名称 (仅日志)。
-
-    Returns
-    -------
-    np.ndarray
-        确认离开时的截图。
+    目标页面签名未采集时的降级方案。优先使用 :func:`wait_for_page`。
 
     Raises
     ------
     NavigationError
         超时仍在原页面。
+    NetworkError
+        遇到无法自动消除的浮层。
     """
     deadline = time.monotonic() + timeout
     attempt = 0
-    logger.info(
-        "[UI] 离开验证开始: {} → {} (超时 {:.1f}s)",
-        source, target, timeout,
-    )
+    logger.info("[UI] 等待离开: {} → {} (超时 {:.1f}s)", source or "?", target or "?", timeout)
 
     while True:
         attempt += 1
         screen = ctrl.screenshot()
-        still_here = checker(screen)
 
-        if not still_here:
+        if handle_overlays and _handle_overlay_if_present(ctrl, screen):
+            logger.debug("[UI] 等待离开 #{}: 消除浮层，立即重截图", attempt)
+            continue
+
+        if not checker(screen):
             current = get_current_page(screen)
-            logger.info(
-                "[UI] 离开验证成功: {} → {} (第 {} 次截图, 到达={})",
-                source, target, attempt, current or "未知",
-            )
+            logger.info("[UI] 已离开: {} → {} (第 {} 次截图, 到达={})", source or "?", target or "?", attempt, current or "未知")
             return screen
 
-        logger.debug(
-            "[UI] 离开验证 #{}: {} → {}, 仍在 {}",
-            attempt, source, target, source,
-        )
+        logger.debug("[UI] 等待离开 #{}: 仍在 {}", attempt, source or "?")
 
         if time.monotonic() >= deadline:
             msg = (
-                f"离开验证超时: {source} → {target}, "
-                f"{attempt} 次截图验证后仍在 {source}"
+                f"离开超时: {source or '?'} → {target or '?'}, "
+                f"{attempt} 次截图后仍在 {source or '?'}"
             )
             logger.error("[UI] {}", msg)
             raise NavigationError(msg)
 
         time.sleep(interval)
+
+
+# ---------------------------------------------------------------------------
+# 带重试的一步导航 — 推荐 API
+# ---------------------------------------------------------------------------
+
+
+def click_and_wait_for_page(
+    ctrl: AndroidController,
+    click_coord: tuple[float, float],
+    checker: Callable[[np.ndarray], bool],
+    *,
+    source: str = "",
+    target: str = "",
+    config: NavConfig = DEFAULT_NAV_CONFIG,
+) -> np.ndarray:
+    """点击 + 等待到达目标页面，内置重试。
+
+    执行 ``config.max_retries`` 轮「点击 → wait_for_page」，
+    每轮超时后等待 ``config.retry_delay`` 秒再次点击。
+
+    Raises
+    ------
+    NavigationError
+        所有重试均超时。
+    NetworkError
+        遇到无法自动消除的浮层。
+    """
+    last_err: NavigationError | None = None
+
+    for attempt in range(1, config.max_retries + 1):
+        if attempt > 1:
+            logger.warning(
+                "[UI] 点击重试 {}/{}: {} → {} (等 {:.1f}s)",
+                attempt, config.max_retries, source or "?", target or "?", config.retry_delay,
+            )
+            time.sleep(config.retry_delay)
+
+        ctrl.click(*click_coord)
+
+        try:
+            return wait_for_page(
+                ctrl, checker,
+                timeout=config.timeout,
+                interval=config.interval,
+                handle_overlays=config.handle_overlays,
+                source=source,
+                target=target,
+            )
+        except NavigationError as e:
+            last_err = e
+            logger.warning("[UI] 点击后超时 ({}/{}): {} → {}", attempt, config.max_retries, source or "?", target or "?")
+
+    raise NavigationError(
+        f"导航失败 (已重试 {config.max_retries} 次): {source or '?'} → {target or '?'}"
+    ) from last_err
+
+
+def click_and_wait_leave_page(
+    ctrl: AndroidController,
+    click_coord: tuple[float, float],
+    checker: Callable[[np.ndarray], bool],
+    *,
+    source: str = "",
+    target: str = "",
+    config: NavConfig = DEFAULT_NAV_CONFIG,
+) -> np.ndarray:
+    """点击 + 等待离开当前页面，内置重试。
+
+    目标页面签名未采集时的降级版本。
+    优先使用 :func:`click_and_wait_for_page`。
+
+    Raises
+    ------
+    NavigationError
+        所有重试均超时。
+    NetworkError
+        遇到无法自动消除的浮层。
+    """
+    last_err: NavigationError | None = None
+
+    for attempt in range(1, config.max_retries + 1):
+        if attempt > 1:
+            logger.warning(
+                "[UI] 离开重试 {}/{}: {} → {} (等 {:.1f}s)",
+                attempt, config.max_retries, source or "?", target or "?", config.retry_delay,
+            )
+            time.sleep(config.retry_delay)
+
+        ctrl.click(*click_coord)
+
+        try:
+            return wait_leave_page(
+                ctrl, checker,
+                timeout=config.timeout,
+                interval=config.interval,
+                handle_overlays=config.handle_overlays,
+                source=source,
+                target=target,
+            )
+        except NavigationError as e:
+            last_err = e
+            logger.warning("[UI] 点击后离开超时 ({}/{}): {} → {}", attempt, config.max_retries, source or "?", target or "?")
+
+    raise NavigationError(
+        f"离开失败 (已重试 {config.max_retries} 次): {source or '?'} → {target or '?'}"
+    ) from last_err

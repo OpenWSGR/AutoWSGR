@@ -47,7 +47,13 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -61,6 +67,46 @@ class IntensifyTab(enum.Enum):
     INTENSIFY = "强化"
     REMAKE = "改修"
     SKILL = "技能"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名 — 每个标签各一组
+# ═══════════════════════════════════════════════════════════════════════════════
+
+TAB_SIGNATURES: dict[IntensifyTab, PixelSignature] = {
+    IntensifyTab.INTENSIFY: PixelSignature(
+        name="强化页-强化栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.1437, 0.0491, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.8141, 0.6926, (66, 66, 66), tolerance=30.0),
+            PixelRule.of(0.8161, 0.8241, (33, 142, 245), tolerance=30.0),
+            PixelRule.of(0.5526, 0.0444, (27, 41, 67), tolerance=30.0),
+        ],
+    ),
+    IntensifyTab.REMAKE: PixelSignature(
+        name="强化页-改造栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.8375, 0.8343, (33, 142, 243), tolerance=30.0),
+            PixelRule.of(0.4609, 0.8324, (64, 64, 64), tolerance=30.0),
+            PixelRule.of(0.2698, 0.0537, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.8281, 0.3685, (182, 213, 153), tolerance=30.0),
+        ],
+    ),
+    IntensifyTab.SKILL: PixelSignature(
+        name="强化页-技能栏",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.4052, 0.0472, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.2687, 0.3176, (28, 156, 247), tolerance=30.0),
+            PixelRule.of(0.2745, 0.4204, (29, 157, 244), tolerance=30.0),
+            PixelRule.of(0.2677, 0.5454, (24, 159, 251), tolerance=30.0),
+            PixelRule.of(0.4219, 0.5194, (230, 230, 230), tolerance=30.0),
+        ],
+    ),
+}
+"""强化页面每个标签的像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -105,17 +151,36 @@ class IntensifyPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为强化页面组 (含全部 3 个标签)。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集强化页面像素签名。
+        任一标签签名匹配即判定为强化页面。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        return any(
+            PixelChecker.check_signature(screen, sig).matched
+            for sig in TAB_SIGNATURES.values()
+        )
+
+    @staticmethod
+    def get_active_tab(screen: np.ndarray) -> IntensifyTab | None:
+        """获取当前激活的标签。
+
+        Parameters
+        ----------
+        screen:
+            截图 (H×W×3, RGB)。
+
+        Returns
+        -------
+        IntensifyTab | None
+            当前标签，无法确定时返回 ``None``。
+        """
+        for tab, sig in TAB_SIGNATURES.items():
+            if PixelChecker.check_signature(screen, sig).matched:
+                return tab
+        return None
 
     # ── 标签切换 ──────────────────────────────────────────────────────────
 
@@ -135,16 +200,18 @@ class IntensifyPage:
     def go_back(self) -> None:
         """点击回退按钮 (◁)，返回侧边栏。
 
-        .. note::
-            回退验证依赖 ``is_current_page()``，签名未采集时无法验证。
-            当前实现仅执行点击。
+        Raises
+        ------
+        NavigationError
+            超时仍在强化页面。
         """
+        from autowsgr.ui.sidebar_page import SidebarPage
+
         logger.info("[UI] 强化页面 → 返回侧边栏")
-        self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
-        # wait_leave_page(
-        #     self._ctrl,
-        #     IntensifyPage.is_current_page,
-        #     source="强化页面",
-        #     target="侧边栏",
-        # )
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=SidebarPage.is_current_page,
+            source="强化页面",
+            target="侧边栏",
+        )

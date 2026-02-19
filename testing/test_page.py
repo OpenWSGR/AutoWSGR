@@ -139,6 +139,7 @@ class TestWaitForPage:
                 lambda s: s.mean() > 100,  # 白色屏幕才匹配
                 timeout=10.0,
                 interval=0.1,
+                handle_overlays=False,  # 白屏会误匹配 NEWS 浮层签名
                 source="A",
                 target="B",
             )

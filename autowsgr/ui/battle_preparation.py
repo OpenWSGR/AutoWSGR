@@ -50,7 +50,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision.matcher import Color, PixelChecker
 
 
@@ -259,22 +259,22 @@ class BattlePreparationPage:
     # ── 动作 — 回退 / 出征 ───────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回上一页。
+        """点击回退按钮 (◁)，返回地图页面。
 
-        点击后反复截图验证，确认已离开出征准备页面。
+        点击后反复截图验证，确认已到达地图页面。
 
         Raises
         ------
         NavigationError
             超时仍在出征准备页面。
         """
-        logger.info("[UI] 出征准备 → 回退")
-        self._ctrl.click(*CLICK_BACK)
+        from autowsgr.ui.map_page import MapPage
 
-        # 验证已离开出征准备页面
-        wait_leave_page(
+        logger.info("[UI] 出征准备 → 回退")
+        click_and_wait_for_page(
             self._ctrl,
-            BattlePreparationPage.is_current_page,
+            click_coord=CLICK_BACK,
+            checker=MapPage.is_current_page,
             source="出征准备",
             target="地图页面",
         )

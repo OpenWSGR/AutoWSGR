@@ -38,7 +38,32 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PAGE_SIGNATURE = PixelSignature(
+    name="好友页",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.1953, 0.0444, (255, 255, 255), tolerance=30.0),
+        PixelRule.of(0.1641, 0.0574, (255, 252, 243), tolerance=30.0),
+        PixelRule.of(0.2094, 0.0574, (14, 131, 226), tolerance=30.0),
+        PixelRule.of(0.1521, 0.0361, (15, 132, 228), tolerance=30.0),
+        PixelRule.of(0.1724, 0.0389, (32, 128, 205), tolerance=30.0),
+        PixelRule.of(0.1651, 0.0370, (240, 255, 255), tolerance=30.0),
+    ],
+)
+"""好友页面像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -72,22 +97,33 @@ class FriendPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为好友页面。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集好友页面像素签名。
+        通过 6 个特征像素点全部匹配判定。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回侧边栏。"""
+        """点击回退按钮 (◁)，返回侧边栏。
+
+        Raises
+        ------
+        NavigationError
+            超时仍在好友页面。
+        """
+        from autowsgr.ui.sidebar_page import SidebarPage
+
         logger.info("[UI] 好友 → 返回侧边栏")
-        self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=SidebarPage.is_current_page,
+            source="好友",
+            target="侧边栏",
+        )

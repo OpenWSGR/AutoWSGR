@@ -58,7 +58,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision.matcher import Color, PixelChecker
 from autowsgr.vision.ocr import OCREngine
 
@@ -547,22 +547,22 @@ class MapPage:
     # ── 动作 — 回退 ──────────────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回上一页。
+        """点击回退按钮 (◁)，返回主页面。
 
-        点击后反复截图验证，确认已离开地图页面。
+        点击后反复截图验证，确认已到达主页面。
 
         Raises
         ------
         NavigationError
             超时仍在地图页面。
         """
-        logger.info("[UI] 地图页面 → 回退")
-        self._ctrl.click(*CLICK_BACK)
+        from autowsgr.ui.main_page import MainPage
 
-        # 验证已离开地图页面
-        wait_leave_page(
+        logger.info("[UI] 地图页面 → 回退")
+        click_and_wait_for_page(
             self._ctrl,
-            MapPage.is_current_page,
+            click_coord=CLICK_BACK,
+            checker=MainPage.is_current_page,
             source="地图页面",
             target="主页面",
         )

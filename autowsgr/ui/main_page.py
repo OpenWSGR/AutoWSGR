@@ -50,7 +50,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_for_page, wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
     MatchStrategy,
     PixelChecker,
@@ -166,7 +166,8 @@ class MainPage:
     def navigate_to(self, target: MainPageTarget) -> None:
         """点击导航控件，进入指定子页面。
 
-        点击后反复截图验证，确认已到达目标页面 (或已离开主页面)。
+        点击后反复截图验证，确认已到达目标页面。
+        利用导航图中的目标页面签名进行正向验证。
 
         Parameters
         ----------
@@ -178,13 +179,22 @@ class MainPage:
         NavigationError
             超时未到达目标页面。
         """
-        logger.info("[UI] 主页面 → {}", target.value)
-        self._ctrl.click(*CLICK_NAV[target])
+        from autowsgr.ui.backyard_page import BackyardPage
+        from autowsgr.ui.map_page import MapPage
+        from autowsgr.ui.mission_page import MissionPage
+        from autowsgr.ui.sidebar_page import SidebarPage
 
-        # 验证已离开主页面
-        wait_leave_page(
+        target_checker = {
+            MainPageTarget.SORTIE: MapPage.is_current_page,
+            MainPageTarget.TASK: MissionPage.is_current_page,
+            MainPageTarget.SIDEBAR: SidebarPage.is_current_page,
+            MainPageTarget.HOME: BackyardPage.is_current_page,
+        }
+        logger.info("[UI] 主页面 → {}", target.value)
+        click_and_wait_for_page(
             self._ctrl,
-            MainPage.is_current_page,
+            click_coord=CLICK_NAV[target],
+            checker=target_checker[target],
             source="主页面",
             target=target.value,
         )
@@ -226,12 +236,10 @@ class MainPage:
             超时未返回主页面。
         """
         logger.info("[UI] {} → 返回主页面", target.value)
-        self._ctrl.click(*CLICK_EXIT[target])
-
-        # 验证返回成功
-        wait_for_page(
+        click_and_wait_for_page(
             self._ctrl,
-            MainPage.is_current_page,
+            click_coord=CLICK_EXIT[target],
+            checker=MainPage.is_current_page,
             source=target.value,
             target="主页面",
         )

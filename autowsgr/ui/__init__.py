@@ -11,6 +11,16 @@
 
 导航操作 (``go_back``、``navigate_to`` 等) 内置截图验证，
 点击后反复截图确认页面已切换，超时抛出 :class:`NavigationError`。
+所有导航均使用 **正向验证** (目标页面签名匹配)，不再使用离开判定。
+
+浮层处理:
+    导航过程中自动检测并消除游戏浮层 (新闻公告、每日签到)。
+    浮层模块: :mod:`autowsgr.ui.overlay`
+
+自动导航 / 兜底回主页:
+    ``goto_page()``、``go_main_page()`` 等跨页面路由属于 **游戏层**
+    (GameOps) 的职责，不在 UI 控制层中实现。
+    UI 层只提供：页面识别、导航验证、单步操作。
 
 页面导航树::
 
@@ -57,24 +67,34 @@
         page.start_battle()
 """
 
-# ── 已完成签名采集的控制器 ──────────────────────────────────────────────
-from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
-from autowsgr.ui.main_page import MainPage, MainPageTarget
-from autowsgr.ui.map_page import MAP_DATABASE, MapIdentity, MapPage, MapPanel
-from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
-
-# ── 签名待采集的控制器 (stub) ──────────────────────────────────────────
+# ── 控制器 ─────────────────────────────────────────────────────────────
 from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
 from autowsgr.ui.bath_page import BathPage
+from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
 from autowsgr.ui.build_page import BuildPage, BuildTab
 from autowsgr.ui.canteen_page import CanteenPage
 from autowsgr.ui.friend_page import FriendPage
 from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
+from autowsgr.ui.main_page import MainPage, MainPageTarget
+from autowsgr.ui.map_page import MAP_DATABASE, MapIdentity, MapPage, MapPanel
 from autowsgr.ui.mission_page import MissionPage
+from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
+
+# ── 浮层处理 ───────────────────────────────────────────────────────────
+from autowsgr.ui.overlay import (
+    NetworkError,
+    OverlayType,
+    detect_overlay,
+    dismiss_news,
+    dismiss_overlay,
+    dismiss_sign,
+)
 
 # ── 导航基础设施 ───────────────────────────────────────────────────────
 from autowsgr.ui.page import (
+    NavConfig,
     NavigationError,
+    click_and_wait_for_page,
     get_current_page,
     get_registered_pages,
     register_page,
@@ -83,14 +103,10 @@ from autowsgr.ui.page import (
 )
 
 # ── 注册所有页面识别器 ──
-# 已完成签名采集的页面 — is_current_page() 可用于实际识别
 register_page("主页面", MainPage.is_current_page)
 register_page("地图页面", MapPage.is_current_page)
 register_page("出征准备", BattlePreparationPage.is_current_page)
 register_page("侧边栏", SidebarPage.is_current_page)
-
-# 签名待采集的页面 — is_current_page() 暂时返回 False
-# 注册后可在签名采集完成后自动生效
 register_page("任务页面", MissionPage.is_current_page)
 register_page("后院页面", BackyardPage.is_current_page)
 register_page("浴室页面", BathPage.is_current_page)
@@ -100,29 +116,37 @@ register_page("强化页面", IntensifyPage.is_current_page)
 register_page("好友页面", FriendPage.is_current_page)
 
 __all__ = [
-    # ── 控制器 (已完成签名) ──
-    "BattlePreparationPage",
-    "MainPage",
-    "MainPageTarget",
-    "MapIdentity",
-    "MapPage",
-    "MapPanel",
-    "Panel",
-    "SidebarPage",
-    "SidebarTarget",
-    # ── 控制器 (签名待采集) ──
+    # ── 控制器 ──
     "BackyardPage",
     "BackyardTarget",
     "BathPage",
+    "BattlePreparationPage",
     "BuildPage",
     "BuildTab",
     "CanteenPage",
     "FriendPage",
     "IntensifyPage",
     "IntensifyTab",
+    "MainPage",
+    "MainPageTarget",
+    "MapIdentity",
+    "MapPage",
+    "MapPanel",
     "MissionPage",
+    "Panel",
+    "SidebarPage",
+    "SidebarTarget",
+    # ── 浮层 ──
+    "NetworkError",
+    "OverlayType",
+    "detect_overlay",
+    "dismiss_news",
+    "dismiss_overlay",
+    "dismiss_sign",
     # ── 导航基础设施 ──
+    "NavConfig",
     "NavigationError",
+    "click_and_wait_for_page",
     "get_current_page",
     "get_registered_pages",
     "register_page",

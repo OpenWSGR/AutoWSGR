@@ -42,7 +42,31 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PAGE_SIGNATURE = PixelSignature(
+    name="餐厅页",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.7667, 0.0491, (27, 135, 226), tolerance=30.0),
+        PixelRule.of(0.8719, 0.1593, (29, 119, 205), tolerance=30.0),
+        PixelRule.of(0.8781, 0.2630, (29, 119, 205), tolerance=30.0),
+        PixelRule.of(0.8719, 0.3806, (27, 116, 198), tolerance=30.0),
+        PixelRule.of(0.8125, 0.0472, (172, 172, 172), tolerance=30.0),
+    ],
+)
+"""食堂页面像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -81,22 +105,33 @@ class CanteenPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为食堂页面。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集食堂页面像素签名。
+        通过 5 个特征像素点全部匹配判定。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回后院。"""
+        """点击回退按钮 (◁)，返回后院。
+
+        Raises
+        ------
+        NavigationError
+            超时仍在食堂页面。
+        """
+        from autowsgr.ui.backyard_page import BackyardPage
+
         logger.info("[UI] 食堂 → 返回后院")
-        self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=BackyardPage.is_current_page,
+            source="食堂",
+            target="后院",
+        )

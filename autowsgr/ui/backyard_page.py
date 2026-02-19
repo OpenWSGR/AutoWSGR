@@ -49,7 +49,13 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import wait_leave_page
+from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
+from autowsgr.vision.matcher import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -62,6 +68,24 @@ class BackyardTarget(enum.Enum):
 
     BATH = "浴室"
     CANTEEN = "食堂"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面识别签名
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PAGE_SIGNATURE = PixelSignature(
+    name="后院",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.6990, 0.8389, (193, 98, 66), tolerance=30.0),
+        PixelRule.of(0.2583, 0.7750, (240, 222, 146), tolerance=30.0),
+        PixelRule.of(0.3344, 0.5222, (246, 119, 76), tolerance=30.0),
+        PixelRule.of(0.5880, 0.2861, (255, 254, 250), tolerance=30.0),
+        PixelRule.of(0.9031, 0.4380, (255, 254, 250), tolerance=30.0),
+    ],
+)
+"""后院页面像素签名 — 检测后院背景及装饰特征。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -104,17 +128,15 @@ class BackyardPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为后院页面。
 
-        .. warning::
-            签名暂未采集，当前始终返回 ``False``。
-            TODO: 采集后院页面像素签名。
+        通过 5 个特征像素点 (背景及装饰) 全部匹配判定。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 实现像素签名检测
-        return False
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 
@@ -125,16 +147,27 @@ class BackyardPage:
         ----------
         target:
             导航目标。
+
+        Raises
+        ------
+        NavigationError
+            超时未到达目标页面。
         """
+        from autowsgr.ui.bath_page import BathPage
+        from autowsgr.ui.canteen_page import CanteenPage
+
+        target_checker = {
+            BackyardTarget.BATH: BathPage.is_current_page,
+            BackyardTarget.CANTEEN: CanteenPage.is_current_page,
+        }
         logger.info("[UI] 后院 → {}", target.value)
-        self._ctrl.click(*CLICK_NAV[target])
-        # TODO: 签名采集后启用导航验证
-        # wait_leave_page(
-        #     self._ctrl,
-        #     BackyardPage.is_current_page,
-        #     source="后院",
-        #     target=target.value,
-        # )
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_NAV[target],
+            checker=target_checker[target],
+            source="后院",
+            target=target.value,
+        )
 
     def go_to_bath(self) -> None:
         """进入浴室 (修理舰船)。"""
@@ -147,13 +180,20 @@ class BackyardPage:
     # ── 回退 ──────────────────────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回主页面。"""
+        """点击回退按钮 (◁)，返回主页面。
+
+        Raises
+        ------
+        NavigationError
+            超时仍在后院页面。
+        """
+        from autowsgr.ui.main_page import MainPage
+
         logger.info("[UI] 后院 → 返回主页面")
-        self._ctrl.click(*CLICK_BACK)
-        # TODO: 签名采集后启用导航验证
-        # wait_leave_page(
-        #     self._ctrl,
-        #     BackyardPage.is_current_page,
-        #     source="后院",
-        #     target="主页面",
-        # )
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=MainPage.is_current_page,
+            source="后院",
+            target="主页面",
+        )

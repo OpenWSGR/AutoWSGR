@@ -332,12 +332,17 @@ class TestMapDatabase:
 
 class TestGoBack:
     def test_go_back(self):
+        from autowsgr.ui.main_page import PAGE_SIGNATURE as MAIN_SIG
+
         ctrl = MagicMock(spec=AndroidController)
-        # go_back 现在会截图验证已离开地图页面
-        ctrl.screenshot.return_value = np.zeros((540, 960, 3), dtype=np.uint8)
+        # go_back 使用 click_and_wait_for_page 验证到达主页面
+        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+        for rule in MAIN_SIG.rules:
+            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+        ctrl.screenshot.return_value = screen
         page = MapPage(ctrl)
         page.go_back()
-        ctrl.click.assert_called_once_with(*CLICK_BACK)
+        ctrl.click.assert_called_with(*CLICK_BACK)
 
 
 # ─────────────────────────────────────────────
