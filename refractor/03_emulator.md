@@ -1,270 +1,127 @@
 # 模拟器操作层 (Emulator)
 
+> **状态**: ✅ **已完成** — 322 tests passing (含 72 emulator tests)
+
 ## 职责
 
-提供 **纯粹的设备控制**：连接、截图、点击、滑动、键入。
+提供 **纯粹的设备控制**：连接、截图、点击、滑动、键入、应用管理。
 
 **不做**任何图像匹配、页面识别或游戏逻辑判断。
 
 ---
 
-## 现状问题
+## 现状问题（已解决）
 
-当前 `AndroidController` (~470 行) 混杂了：
+原 `AndroidController` (~470 行) 混杂了：
 - 设备操作：`click()`, `swipe()`, `update_screen()`, `get_screen()`
 - 图像匹配：`image_exist()`, `wait_image()`, `wait_images()`, `click_image()`
 - 像素检查：`check_pixel()`, `get_pixel()`
 
-其中 `wait_images()` 返回值语义极为混乱：
-```python
-# 现状：找到返回 0-based index，超时返回 None 或 -1，取决于调用方式
-if ret := self.wait_images([img1, img2], timeout=5):  # type: int | None
-    # ret == 0 时被视为 False！
-```
+**V2 解决方案**：
+- 图像匹配相关方法已移至 Vision 层（`PixelChecker`）
+- 控制器仅保留纯设备操作
+- 所有坐标使用 **相对值 (0.0–1.0)**，不再使用 960×540 固定分辨率
 
 ---
 
-## 新设计
+## 已实现文件
+
+### `autowsgr/emulator/controller.py`
 
 ```python
-# autowsgr/emulator/controller.py
-
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-import numpy as np
-from loguru import logger
-
-
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DeviceInfo:
-    """设备信息"""
+    """已连接设备的基本信息。"""
     serial: str
-    resolution: tuple[int, int]   # (width, height)
-    name: str = ""
+    resolution: tuple[int, int]  # (width, height)
 
 
 class AndroidController(ABC):
-    """Android 设备控制器抽象基类
-    
-    仅负责设备操作，不做任何图像识别。
-    """
-    
-    @abstractmethod
-    def connect(self) -> DeviceInfo:
-        """连接设备，返回设备信息"""
-        ...
-    
-    @abstractmethod
-    def disconnect(self) -> None:
-        """断开连接"""
-        ...
-    
-    @abstractmethod
-    def screenshot(self) -> np.ndarray:
-        """截图，返回 BGR 格式的 numpy 数组"""
-        ...
-    
-    @abstractmethod
-    def click(self, x: int, y: int) -> None:
-        """点击指定坐标"""
-        ...
-    
-    @abstractmethod
-    def swipe(
-        self, 
-        x1: int, y1: int, 
-        x2: int, y2: int, 
-        duration: float = 0.5,
-    ) -> None:
-        """滑动"""
-        ...
-    
-    @abstractmethod
-    def key_event(self, key_code: int) -> None:
-        """发送按键事件"""
-        ...
-    
-    @abstractmethod
-    def start_app(self, package: str, activity: str = "") -> None:
-        """启动应用"""
-        ...
-    
-    @abstractmethod
-    def stop_app(self, package: str) -> None:
-        """停止应用"""
-        ...
-    
-    @abstractmethod
-    def is_app_running(self, package: str) -> bool:
-        """检查应用是否在运行"""
-        ...
-    
+    """Android 设备控制器抽象基类 — 13 个抽象方法。"""
+
+    # 连接管理
+    def connect(self) -> DeviceInfo: ...
+    def disconnect(self) -> None: ...
     @property
-    @abstractmethod
-    def resolution(self) -> tuple[int, int]:
-        """设备分辨率"""
-        ...
+    def resolution(self) -> tuple[int, int]: ...
+
+    # 截图 — 返回 BGR uint8 ndarray (H, W, 3)
+    def screenshot(self) -> np.ndarray: ...
+
+    # 触控 — 所有坐标为相对值 (0.0–1.0)
+    def click(self, x: float, y: float) -> None: ...
+    def swipe(self, x1: float, y1: float, x2: float, y2: float, duration: float = 0.5) -> None: ...
+    def long_tap(self, x: float, y: float, duration: float = 1.0) -> None: ...
+
+    # 按键 / 文本
+    def key_event(self, key_code: int) -> None: ...
+    def text(self, content: str) -> None: ...
+
+    # 应用管理
+    def start_app(self, package: str) -> None: ...
+    def stop_app(self, package: str) -> None: ...
+    def is_app_running(self, package: str) -> bool: ...
+
+    # Shell
+    def shell(self, cmd: str) -> str: ...
 
 
 class ADBController(AndroidController):
-    """基于 ADB (airtest) 的设备控制器"""
-    
-    def __init__(self, serial: str | None = None) -> None:
-        self._serial = serial
-        self._device = None
-        self._resolution: tuple[int, int] = (960, 540)
-    
-    def connect(self) -> DeviceInfo:
-        from airtest.core.api import connect_device, device as get_device
-        
-        uri = f"android:///{self._serial}" if self._serial else "android:///"
-        connect_device(uri)
-        self._device = get_device()
-        
-        # 获取分辨率
-        display = self._device.display_info
-        self._resolution = (display["width"], display["height"])
-        
-        logger.info("已连接设备: {} ({}x{})", self._serial, *self._resolution)
-        return DeviceInfo(
-            serial=self._serial or "auto",
-            resolution=self._resolution,
-        )
-    
-    def disconnect(self) -> None:
-        self._device = None
-        logger.info("已断开设备")
-    
-    def screenshot(self) -> np.ndarray:
-        """截图（BGR 格式）"""
-        import cv2
-        screen = self._device.snapshot(quality=99)  # RGB ndarray
-        return cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-    
-    def click(self, x: int, y: int) -> None:
-        logger.trace("click({}, {})", x, y)
-        self._device.touch((x, y))
-    
-    def swipe(
-        self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.5
-    ) -> None:
-        logger.trace("swipe({},{} → {},{})", x1, y1, x2, y2)
-        self._device.swipe((x1, y1), (x2, y2), duration=duration)
-    
-    def key_event(self, key_code: int) -> None:
-        self._device.keyevent(key_code)
-    
-    def start_app(self, package: str, activity: str = "") -> None:
-        self._device.start_app(package, activity or None)
-    
-    def stop_app(self, package: str) -> None:
-        self._device.stop_app(package)
-    
-    def is_app_running(self, package: str) -> bool:
-        # 通过检查前台应用判断
-        return package in (self._device.get_top_activity_name() or "")
-    
-    @property
-    def resolution(self) -> tuple[int, int]:
-        return self._resolution
+    """基于 Airtest/ADB 的具体实现。
+
+    - 内部坐标转换: px = int(x * width), py = int(y * height)
+    - 截图: snapshot(quality=99) → RGB→BGR
+    - 点击/滑动: 通过 `input tap/swipe` 命令
+    - 截图超时: 可配置, 超时抛 EmulatorConnectionError
+    """
 ```
 
----
-
-## OS 层控制器
-
-模拟器进程管理（启动/关闭/检测）不属于 Android 设备控制，单独设计：
+### `autowsgr/emulator/os_control.py`
 
 ```python
-# autowsgr/emulator/os_control.py
-
-from abc import ABC, abstractmethod
-from pathlib import Path
-from loguru import logger
-
-
 class EmulatorProcessManager(ABC):
-    """模拟器进程管理（操作系统级）"""
-    
-    @abstractmethod
-    def find_emulator(self) -> Path | None:
-        """自动检测模拟器安装路径"""
-        ...
-    
-    @abstractmethod
-    def start_emulator(self, path: Path) -> str:
-        """启动模拟器，返回 ADB serial"""
-        ...
-    
-    @abstractmethod
-    def stop_emulator(self) -> None:
-        """关闭模拟器"""
-        ...
-    
-    @abstractmethod
-    def is_emulator_running(self) -> bool:
-        """检查模拟器是否在运行"""
-        ...
-    
-    @classmethod
-    def create(cls, os_type: str, emulator_type: str) -> "EmulatorProcessManager":
-        """工厂方法"""
-        import platform
-        os_name = platform.system()
-        if os_name == "Windows":
-            return WindowsEmulatorManager(emulator_type)
-        elif os_name == "Darwin":
-            return MacEmulatorManager(emulator_type)
-        elif os_name == "Linux":
-            return LinuxEmulatorManager(emulator_type)
-        raise ValueError(f"不支持的操作系统: {os_name}")
+    """模拟器进程管理抽象基类 — 3 个抽象方法。"""
+    def is_running(self) -> bool: ...
+    def start(self) -> None: ...
+    def stop(self) -> None: ...
+    def restart(self) -> None: ...              # 默认: stop + start
+    def wait_until_online(self, timeout=120): ...  # 默认: 轮询 is_running
 
 
 class WindowsEmulatorManager(EmulatorProcessManager):
-    """Windows 下的模拟器管理"""
-    
-    def __init__(self, emulator_type: str) -> None:
-        self._type = emulator_type
-    
-    def find_emulator(self) -> Path | None:
-        """从注册表自动检测"""
-        import winreg
-        registry_paths = {
-            "雷电": r"SOFTWARE\leidian\ldplayer9",
-            "蓝叠": r"SOFTWARE\BlueStacks_nxt",
-            "MuMu": r"SOFTWARE\MuMu",
-        }
-        reg_path = registry_paths.get(self._type)
-        if not reg_path:
-            return None
-        try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path)
-            install_dir, _ = winreg.QueryValueEx(key, "InstallDir")
-            return Path(install_dir)
-        except OSError:
-            return None
-    
-    def start_emulator(self, path: Path) -> str:
-        import subprocess
-        subprocess.Popen([str(path)])
-        # ... 等待 ADB 端口可用
-        return "127.0.0.1:5555"
-    
-    def stop_emulator(self) -> None:
-        import subprocess
-        subprocess.run(["taskkill", "/F", "/IM", "dnplayer.exe"], capture_output=True)
-    
-    def is_emulator_running(self) -> bool:
-        import subprocess
-        result = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq dnplayer.exe"],
-            capture_output=True, text=True,
-        )
-        return "dnplayer.exe" in result.stdout
+    """雷电→ldconsole, MuMu→MuMuManager, 其他→taskkill"""
+
+class MacEmulatorManager(EmulatorProcessManager):
+    """pgrep/pkill + MuMu mumutool 支持"""
+
+class LinuxEmulatorManager(EmulatorProcessManager):
+    """支持 WSL (tasklist.exe/taskkill.exe) + 原生 Linux (pgrep/pkill)"""
 
 
-# MacEmulatorManager, LinuxEmulatorManager 类似
+def create_emulator_manager(config, os_type=None) -> EmulatorProcessManager:
+    """工厂函数 — 自动检测 OS 并返回对应管理器。"""
 ```
+
+### `autowsgr/emulator/__init__.py`
+
+重导出所有公共 API：`AndroidController`, `ADBController`, `DeviceInfo`,
+`EmulatorProcessManager`, `WindowsEmulatorManager`, `MacEmulatorManager`,
+`LinuxEmulatorManager`, `create_emulator_manager`。
+
+---
+
+## 关键设计决策
+
+| 决策 | 原方案 (文档) | 实际实现 | 原因 |
+|------|--------------|---------|------|
+| 坐标系统 | `int` 绝对坐标 | `float` 相对值 (0.0–1.0) | 与 Vision 层统一，无需关心分辨率 |
+| 点击实现 | `device.touch()` | `input tap` shell 命令 | 与遗留系统一致，更可靠 |
+| 滑动实现 | `device.swipe()` | `input swipe` shell 命令 | 同上 |
+| long_tap | 未规划 | `swipe(x, y, x, y, duration)` | 遗留代码逻辑保留 |
+| text 方法 | 未规划 | `device.text()` | 遗留代码有此功能 |
+| shell 方法 | 未规划 | `device.shell()` | 遗留代码有此功能 |
+| 工厂函数 | `classmethod` | 独立函数 `create_emulator_manager()` | 更 Pythonic |
+| EmulatorProcessManager | `find_emulator()` 返回 Path | 路径来自 `EmulatorConfig` | 路径检测已在 `EmulatorType.auto_emulator_path()` 实现 |
 
 ---
 
@@ -274,10 +131,19 @@ Emulator 层 **不依赖** Vision 层。截图返回原始 `np.ndarray`，由上
 
 ```
 UIControl 层:
-    screen = emulator.screenshot()              # Emulator
-    result = matcher.match(screen, template)     # Vision
-    if result:
-        emulator.click(result.position[0], ...)  # Emulator
+    screen = emulator.screenshot()                    # Emulator
+    result = checker.check(screen, signature)          # Vision
+    if result.matched:
+        emulator.click(result.detail[0].x, result.detail[0].y)  # Emulator (相对坐标)
 ```
 
-这使得 AndroidController 可以独立测试，也可以替换为模拟实现（用于单元测试）。
+这使得 AndroidController 可以独立测试，也可以替换为模拟实现。
+
+---
+
+## 测试覆盖 (72 tests)
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `test_controller.py` | 40 | DeviceInfo 不可变性、ABC 约束、坐标转换 (5种分辨率)、截图 RGB→BGR、超时重试、按键/文本、应用管理、Shell、连接 mock |
+| `test_os_control.py` | 32 | ABC 约束、restart 顺序、wait_until_online 超时、工厂函数 (3 OS)、Windows 各厂商检测、macOS pgrep、Linux ADB 设备列表、配置集成 |
