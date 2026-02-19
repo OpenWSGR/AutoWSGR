@@ -1,17 +1,3 @@
-main_page = PixelSignature(
-    name="main_page",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.8896, 0.0278, (110, 193, 255), tolerance=30.0),
-        PixelRule.of(0.7885, 0.0352, (252, 144, 71), tolerance=30.0),
-        PixelRule.of(0.6813, 0.0333, (82, 82, 82), tolerance=30.0),
-        PixelRule.of(0.5781, 0.0389, (64, 98, 63), tolerance=30.0),
-        PixelRule.of(0.4750, 0.0278, (158, 198, 109), tolerance=30.0),
-        PixelRule.of(0.9719, 0.9019, (136, 143, 149), tolerance=30.0),
-        PixelRule.of(0.0583, 0.8833, (250, 250, 248), tolerance=30.0),
-        PixelRule.of(0.9792, 0.0389, (40, 40, 50), tolerance=30.0),
-    ],
-)
 
 news_page = PixelSignature(
     name="news_page",

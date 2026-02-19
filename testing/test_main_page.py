@@ -1,0 +1,266 @@
+"""测试 主页面 UI 控制器。"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
+from autowsgr.emulator.controller import AndroidController
+from autowsgr.ui.main_page import (
+    CLICK_EXIT,
+    CLICK_NAV,
+    EXIT_SIDEBAR,
+    EXIT_TOP_LEFT,
+    MAP_PAGE_SIGNATURE,
+    PAGE_SIGNATURE,
+    SIDEBAR_PAGE_SIGNATURE,
+    SUB_PAGE_SIGNATURES,
+    MainPage,
+    MainPageTarget,
+)
+
+
+# ─────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────
+
+_W, _H = 960, 540
+
+
+def _set_pixel(
+    screen: np.ndarray, rx: float, ry: float, rgb: tuple[int, int, int]
+) -> None:
+    """在相对坐标处设置像素颜色。"""
+    h, w = screen.shape[:2]
+    px, py = int(rx * w), int(ry * h)
+    screen[py, px] = rgb
+
+
+def _make_main_screen() -> np.ndarray:
+    """生成主页面合成截图 (8 个特征点全部正确)。"""
+    screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+    for rule in PAGE_SIGNATURE.rules:
+        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    return screen
+
+
+def _make_map_screen() -> np.ndarray:
+    """生成出征页面合成截图。"""
+    screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+    for rule in MAP_PAGE_SIGNATURE.rules:
+        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    return screen
+
+
+def _make_sidebar_screen() -> np.ndarray:
+    """生成侧边栏页面合成截图。"""
+    screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+    for rule in SIDEBAR_PAGE_SIGNATURE.rules:
+        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    return screen
+
+
+# ─────────────────────────────────────────────
+# 页面识别
+# ─────────────────────────────────────────────
+
+
+class TestIsCurrentPage:
+    def test_main_page_detected(self):
+        screen = _make_main_screen()
+        assert MainPage.is_current_page(screen) is True
+
+    def test_blank_screen_not_detected(self):
+        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+        assert MainPage.is_current_page(screen) is False
+
+    def test_map_page_not_detected(self):
+        """出征页面不应被识别为主页面。"""
+        screen = _make_map_screen()
+        assert MainPage.is_current_page(screen) is False
+
+    def test_sidebar_page_not_detected(self):
+        """侧边栏页面不应被识别为主页面。"""
+        screen = _make_sidebar_screen()
+        assert MainPage.is_current_page(screen) is False
+
+    def test_one_pixel_wrong_not_detected(self):
+        """ALL 策略下，任一像素不匹配即失败。"""
+        screen = _make_main_screen()
+        # 破坏第一个特征点
+        first_rule = PAGE_SIGNATURE.rules[0]
+        _set_pixel(screen, first_rule.x, first_rule.y, (0, 0, 0))
+        assert MainPage.is_current_page(screen) is False
+
+    def test_slight_color_deviation_accepted(self):
+        """容差范围内的颜色偏差仍可匹配。"""
+        screen = _make_main_screen()
+        first_rule = PAGE_SIGNATURE.rules[0]
+        r, g, b = first_rule.color.as_rgb_tuple()
+        # 偏移 10 (在 tolerance=30 内), clamp to uint8 范围
+        _set_pixel(
+            screen,
+            first_rule.x,
+            first_rule.y,
+            (min(r + 10, 255), max(g - 10, 0), min(b + 5, 255)),
+        )
+        assert MainPage.is_current_page(screen) is True
+
+
+# ─────────────────────────────────────────────
+# 子页面识别
+# ─────────────────────────────────────────────
+
+
+class TestIsSubPage:
+    def test_map_page_detected(self):
+        screen = _make_map_screen()
+        assert MainPage.is_sub_page(screen, MainPageTarget.SORTIE) is True
+
+    def test_sidebar_detected(self):
+        screen = _make_sidebar_screen()
+        assert MainPage.is_sub_page(screen, MainPageTarget.SIDEBAR) is True
+
+    def test_map_page_negative(self):
+        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+        assert MainPage.is_sub_page(screen, MainPageTarget.SORTIE) is False
+
+    def test_no_signature_returns_none(self):
+        """无签名的子页面返回 None。"""
+        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+        assert MainPage.is_sub_page(screen, MainPageTarget.TASK) is None
+        assert MainPage.is_sub_page(screen, MainPageTarget.HOME) is None
+
+
+# ─────────────────────────────────────────────
+# 导航
+# ─────────────────────────────────────────────
+
+
+class TestNavigateTo:
+    @pytest.fixture()
+    def page(self):
+        ctrl = MagicMock(spec=AndroidController)
+        return MainPage(ctrl), ctrl
+
+    @pytest.mark.parametrize("target", list(MainPageTarget))
+    def test_navigate_calls_click(self, page, target: MainPageTarget):
+        pg, ctrl = page
+        pg.navigate_to(target)
+        ctrl.click.assert_called_once_with(*CLICK_NAV[target])
+
+    def test_go_to_sortie(self, page):
+        pg, ctrl = page
+        pg.go_to_sortie()
+        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SORTIE])
+
+    def test_go_to_task(self, page):
+        pg, ctrl = page
+        pg.go_to_task()
+        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.TASK])
+
+    def test_open_sidebar(self, page):
+        pg, ctrl = page
+        pg.open_sidebar()
+        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SIDEBAR])
+
+    def test_go_home(self, page):
+        pg, ctrl = page
+        pg.go_home()
+        ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.HOME])
+
+
+# ─────────────────────────────────────────────
+# 返回
+# ─────────────────────────────────────────────
+
+
+class TestReturnFrom:
+    @pytest.fixture()
+    def page(self):
+        ctrl = MagicMock(spec=AndroidController)
+        return MainPage(ctrl), ctrl
+
+    @pytest.mark.parametrize("target", list(MainPageTarget))
+    def test_return_calls_exit(self, page, target: MainPageTarget):
+        pg, ctrl = page
+        pg.return_from(target)
+        ctrl.click.assert_called_once_with(*CLICK_EXIT[target])
+
+    def test_sortie_exits_top_left(self, page):
+        pg, ctrl = page
+        pg.return_from(MainPageTarget.SORTIE)
+        ctrl.click.assert_called_once_with(*EXIT_TOP_LEFT)
+
+    def test_task_exits_top_left(self, page):
+        pg, ctrl = page
+        pg.return_from(MainPageTarget.TASK)
+        ctrl.click.assert_called_once_with(*EXIT_TOP_LEFT)
+
+    def test_home_exits_top_left(self, page):
+        pg, ctrl = page
+        pg.return_from(MainPageTarget.HOME)
+        ctrl.click.assert_called_once_with(*EXIT_TOP_LEFT)
+
+    def test_sidebar_exits_bottom_left(self, page):
+        pg, ctrl = page
+        pg.return_from(MainPageTarget.SIDEBAR)
+        ctrl.click.assert_called_once_with(*EXIT_SIDEBAR)
+
+
+# ─────────────────────────────────────────────
+# 枚举
+# ─────────────────────────────────────────────
+
+
+class TestMainPageTarget:
+    def test_values(self):
+        assert MainPageTarget.SORTIE.value == "出征"
+        assert MainPageTarget.TASK.value == "任务"
+        assert MainPageTarget.SIDEBAR.value == "侧边栏"
+        assert MainPageTarget.HOME.value == "主页"
+
+    def test_count(self):
+        assert len(MainPageTarget) == 4
+
+
+# ─────────────────────────────────────────────
+# 常量一致性
+# ─────────────────────────────────────────────
+
+
+class TestConstants:
+    def test_all_targets_have_nav(self):
+        """每个目标都有导航坐标。"""
+        for target in MainPageTarget:
+            assert target in CLICK_NAV
+
+    def test_all_targets_have_exit(self):
+        """每个目标都有退出坐标。"""
+        for target in MainPageTarget:
+            assert target in CLICK_EXIT
+
+    def test_all_targets_in_sub_signatures(self):
+        """每个目标在子页面签名字典中 (即使值为 None)。"""
+        for target in MainPageTarget:
+            assert target in SUB_PAGE_SIGNATURES
+
+    def test_page_signature_has_rules(self):
+        assert len(PAGE_SIGNATURE.rules) == 8
+
+    def test_nav_coords_in_range(self):
+        """导航坐标在 [0, 1] 范围内。"""
+        for target, (x, y) in CLICK_NAV.items():
+            assert 0.0 <= x <= 1.0, f"{target}: x={x}"
+            assert 0.0 <= y <= 1.0, f"{target}: y={y}"
+
+    def test_exit_coords_in_range(self):
+        for target, (x, y) in CLICK_EXIT.items():
+            assert 0.0 <= x <= 1.0, f"{target}: x={x}"
+            assert 0.0 <= y <= 1.0, f"{target}: y={y}"
+
+    def test_sidebar_exit_matches_nav(self):
+        """侧边栏退出坐标与导航坐标相同 (同一切换按钮)。"""
+        assert CLICK_EXIT[MainPageTarget.SIDEBAR] == CLICK_NAV[MainPageTarget.SIDEBAR]
