@@ -47,15 +47,16 @@
 | 浴室 | 主页面 | ◁ 可直接跳回 (跳过后院) |
 | 食堂 | 主页面 | ◁ 可直接跳回 (跳过后院) |
 
-### 标签组 (Tab Groups)
+### 页面内标签组 (Panel / Tab)
 
-标签组内的页面共享顶部标签栏，可直接切换而无需回退。
+标签组成员共享同一页面识别签名，通过控制器的 `switch_panel()` / `switch_tab()` 切换，
+不作为独立页面出现在导航图中。
 
-| 标签组 | 成员 | 入口 |
-|--------|------|------|
-| 出征页面面板 | 出征 / 演习 / 远征 / 战役 / 决战 | `MapPage.switch_panel()` |
-| 建造标签 | 建造 / 解体 / 开发 / 废弃 | `BuildPage.switch_tab()` |
-| 强化标签 | 强化 / 改修 / 技能 | `IntensifyPage.switch_tab()` |
+| 页面控制器 | 标签成员 | 切换方法 |
+|-----------|---------|----------|
+| `MapPage` | 出征 / 演习 / 远征 / 战役 / 决战 | `switch_panel(MapPanel.XXX)` |
+| `BuildPage` | 建造 / 解体 / 开发 / 废弃 | `switch_tab(BuildTab.XXX)` |
+| `IntensifyPage` | 强化 / 改修 / 技能 | `switch_tab(IntensifyTab.XXX)` |
 
 ---
 
@@ -178,7 +179,7 @@ if path:
 
 | V1 概念 | V2 对应 | 说明 |
 |---------|---------|------|
-| `ALL_PAGES` (23 页面) | `navigation.ALL_PAGES` (17 页面) | V2 将标签组成员合并到父控制器 |
+| `ALL_PAGES` (23 页面) | `navigation.ALL_PAGES` (12 页面) | V2 将标签组成员作为页面内 Panel/Tab |
 | `page_tree` + LCA | `NAV_GRAPH` + BFS | 有向图替代树，支持跨级边 |
 | `timer.now_page` | `get_current_page(screen)` | 无状态识别，无需手动维护 |
 | `goto_game_page()` | `MainPage.navigate_to()` 等 | 每个控制器独立负责验证 |

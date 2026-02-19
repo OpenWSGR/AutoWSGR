@@ -5,8 +5,7 @@
 
 - **source** / **target** — 起止页面名称
 - **click** — 相对坐标 (rx, ry)
-- **edge_type** — ``"child"`` (父子关系) / ``"tab"`` (同级标签切换) /
-  ``"cross"`` (跨级快捷通道)
+- **edge_type** — ``"child"`` (父子关系) / ``"cross"`` (跨级直通边)
 
 导航路径查找:
     两页面间的最优路径可通过 BFS / LCA 在 ``NAV_GRAPH`` 上查找。
@@ -34,7 +33,6 @@ from __future__ import annotations
 import enum
 from collections import deque
 from dataclasses import dataclass
-from typing import Sequence
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -47,9 +45,6 @@ class EdgeType(enum.Enum):
 
     CHILD = "child"
     """父子关系 — 进入下级页面。"""
-
-    TAB = "tab"
-    """标签切换 — 同级页面间切换。"""
 
     CROSS = "cross"
     """跨级快捷通道 — 跳过中间页面。"""
@@ -100,12 +95,7 @@ BATH_PAGE = "浴室页面"
 CANTEEN_PAGE = "食堂页面"
 CHOOSE_REPAIR_PAGE = "选择修理页面"
 BUILD_PAGE = "建造页面"
-DESTROY_PAGE = "解体页面"
-DEVELOP_PAGE = "开发页面"
-DISCARD_PAGE = "废弃页面"
 INTENSIFY_PAGE = "强化页面"
-REMAKE_PAGE = "改修页面"
-SKILL_PAGE = "技能页面"
 FRIEND_PAGE = "好友页面"
 
 ALL_PAGES: list[str] = [
@@ -119,15 +109,16 @@ ALL_PAGES: list[str] = [
     CANTEEN_PAGE,
     CHOOSE_REPAIR_PAGE,
     BUILD_PAGE,
-    DESTROY_PAGE,
-    DEVELOP_PAGE,
-    DISCARD_PAGE,
     INTENSIFY_PAGE,
-    REMAKE_PAGE,
-    SKILL_PAGE,
     FRIEND_PAGE,
 ]
-"""所有已声明的页面名称 (17 个)。"""
+"""所有已声明的页面名称 (12 个)。
+
+.. note::
+    建造页面内的标签切换 (解体/开发/废弃) 由 ``BuildPage.switch_tab()`` 管理，
+    强化页面内的标签切换 (改修/技能) 由 ``IntensifyPage.switch_tab()`` 管理。
+    标签组成员不作为独立页面出现在导航图中。
+"""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 导航图 — 全部边
@@ -203,65 +194,15 @@ NAV_GRAPH: list[NavEdge] = [
     NavEdge(SIDEBAR_PAGE, FRIEND_PAGE, (0.1563, 0.7593),
             EdgeType.CHILD, "侧边栏 → 好友"),
 
-    # ── 建造/解体/开发/废弃 (标签组) ──────────────────────────────────
+    # ── 建造页面 (含 建造/解体/开发/废弃 标签) ────────────────────────
+    #    标签切换由 BuildPage.switch_tab() 管理，不体现在导航图中。
     NavEdge(BUILD_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "建造 ◁ 返回侧边栏"),
-    NavEdge(DESTROY_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "解体 ◁ 返回侧边栏"),
-    NavEdge(DEVELOP_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "开发 ◁ 返回侧边栏"),
-    NavEdge(DISCARD_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "废弃 ◁ 返回侧边栏"),
+            EdgeType.CHILD, "建造页面 ◁ 返回侧边栏"),
 
-    # 标签互通: 建造 ↔ 解体 ↔ 开发 ↔ 废弃
-    # TODO: 确认各标签的精确点击坐标后补充
-    NavEdge(BUILD_PAGE, DESTROY_PAGE, (0.3125, 0.0463),
-            EdgeType.TAB, "建造 → 解体标签"),
-    NavEdge(BUILD_PAGE, DEVELOP_PAGE, (0.4375, 0.0463),
-            EdgeType.TAB, "建造 → 开发标签"),
-    NavEdge(BUILD_PAGE, DISCARD_PAGE, (0.5625, 0.0463),
-            EdgeType.TAB, "建造 → 废弃标签"),
-    NavEdge(DESTROY_PAGE, BUILD_PAGE, (0.1875, 0.0463),
-            EdgeType.TAB, "解体 → 建造标签"),
-    NavEdge(DESTROY_PAGE, DEVELOP_PAGE, (0.4375, 0.0463),
-            EdgeType.TAB, "解体 → 开发标签"),
-    NavEdge(DESTROY_PAGE, DISCARD_PAGE, (0.5625, 0.0463),
-            EdgeType.TAB, "解体 → 废弃标签"),
-    NavEdge(DEVELOP_PAGE, BUILD_PAGE, (0.1875, 0.0463),
-            EdgeType.TAB, "开发 → 建造标签"),
-    NavEdge(DEVELOP_PAGE, DESTROY_PAGE, (0.3125, 0.0463),
-            EdgeType.TAB, "开发 → 解体标签"),
-    NavEdge(DEVELOP_PAGE, DISCARD_PAGE, (0.5625, 0.0463),
-            EdgeType.TAB, "开发 → 废弃标签"),
-    NavEdge(DISCARD_PAGE, BUILD_PAGE, (0.1875, 0.0463),
-            EdgeType.TAB, "废弃 → 建造标签"),
-    NavEdge(DISCARD_PAGE, DESTROY_PAGE, (0.3125, 0.0463),
-            EdgeType.TAB, "废弃 → 解体标签"),
-    NavEdge(DISCARD_PAGE, DEVELOP_PAGE, (0.4375, 0.0463),
-            EdgeType.TAB, "废弃 → 开发标签"),
-
-    # ── 强化/改修/技能 (标签组) ────────────────────────────────────────
+    # ── 强化页面 (含 强化/改修/技能 标签) ──────────────────────────────
+    #    标签切换由 IntensifyPage.switch_tab() 管理，不体现在导航图中。
     NavEdge(INTENSIFY_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "强化 ◁ 返回侧边栏"),
-    NavEdge(REMAKE_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "改修 ◁ 返回侧边栏"),
-    NavEdge(SKILL_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "技能 ◁ 返回侧边栏"),
-
-    # 标签互通: 强化 ↔ 改修 ↔ 技能
-    # TODO: 确认各标签的精确点击坐标后补充
-    NavEdge(INTENSIFY_PAGE, REMAKE_PAGE, (0.3125, 0.0463),
-            EdgeType.TAB, "强化 → 改修标签"),
-    NavEdge(INTENSIFY_PAGE, SKILL_PAGE, (0.4375, 0.0463),
-            EdgeType.TAB, "强化 → 技能标签"),
-    NavEdge(REMAKE_PAGE, INTENSIFY_PAGE, (0.1875, 0.0463),
-            EdgeType.TAB, "改修 → 强化标签"),
-    NavEdge(REMAKE_PAGE, SKILL_PAGE, (0.4375, 0.0463),
-            EdgeType.TAB, "改修 → 技能标签"),
-    NavEdge(SKILL_PAGE, INTENSIFY_PAGE, (0.1875, 0.0463),
-            EdgeType.TAB, "技能 → 强化标签"),
-    NavEdge(SKILL_PAGE, REMAKE_PAGE, (0.3125, 0.0463),
-            EdgeType.TAB, "技能 → 改修标签"),
+            EdgeType.CHILD, "强化页面 ◁ 返回侧边栏"),
 
     # ── 好友 → 侧边栏 ────────────────────────────────────────────────
     NavEdge(FRIEND_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
