@@ -358,8 +358,10 @@ class TestSwitchPanel:
     @pytest.mark.parametrize("panel", list(MapPanel))
     def test_each_panel(self, page, panel: MapPanel):
         pg, ctrl = page
+        # switch_panel 先截图查当前状态, 再 click_and_wait_for_page 验证目标
+        ctrl.screenshot.return_value = _make_screen(active_panel=panel)
         pg.switch_panel(panel)
-        ctrl.click.assert_called_once_with(*CLICK_PANEL[panel])
+        ctrl.click.assert_called_with(*CLICK_PANEL[panel])
 
 
 # ─────────────────────────────────────────────

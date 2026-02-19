@@ -46,7 +46,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
     MatchStrategy,
     PixelChecker,
@@ -88,10 +88,11 @@ TAB_SIGNATURES: dict[BuildTab, PixelSignature] = {
         name="建造页-解装栏",
         strategy=MatchStrategy.ALL,
         rules=[
-            PixelRule.of(0.2714, 0.0519, (15, 132, 228), tolerance=30.0),
-            PixelRule.of(0.2167, 0.0556, (25, 37, 61), tolerance=30.0),
-            PixelRule.of(0.0464, 0.1361, (162, 193, 126), tolerance=30.0),
-            PixelRule.of(0.1443, 0.1361, (102, 140, 99), tolerance=30.0),
+            PixelRule.of(0.2708, 0.0472, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.8391, 0.9000, (29, 124, 214), tolerance=30.0),
+            PixelRule.of(0.8307, 0.7778, (56, 56, 56), tolerance=30.0),
+            PixelRule.of(0.8948, 0.2861, (12, 140, 227), tolerance=30.0),
+            PixelRule.of(0.9396, 0.2880, (237, 237, 237), tolerance=30.0),
         ],
     ),
     BuildTab.DEVELOP: PixelSignature(
@@ -197,15 +198,35 @@ class BuildPage:
     # ── 标签切换 ──────────────────────────────────────────────────────────
 
     def switch_tab(self, tab: BuildTab) -> None:
-        """切换到指定标签。
+        """切换到指定标签并验证到达。
+
+        会先截图判断当前标签状态并记录日志，然后点击目标标签，
+        最后验证目标标签签名匹配。
 
         Parameters
         ----------
         tab:
             目标标签。
+
+        Raises
+        ------
+        NavigationError
+            超时未到达目标标签。
         """
-        logger.info("[UI] 建造页面 → {}", tab.value)
-        self._ctrl.click(*CLICK_TAB[tab])
+        current = self.get_active_tab(self._ctrl.screenshot())
+        logger.info(
+            "[UI] 建造页面: {} → {}",
+            current.value if current else "未知",
+            tab.value,
+        )
+        target_sig = TAB_SIGNATURES[tab]
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_TAB[tab],
+            checker=lambda s, sig=target_sig: PixelChecker.check_signature(s, sig).matched,
+            source=f"建造-{current.value if current else '?'}",
+            target=f"建造-{tab.value}",
+        )
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 

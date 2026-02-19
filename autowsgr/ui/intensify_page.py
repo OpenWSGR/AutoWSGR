@@ -47,7 +47,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
     MatchStrategy,
     PixelChecker,
@@ -185,15 +185,35 @@ class IntensifyPage:
     # ── 标签切换 ──────────────────────────────────────────────────────────
 
     def switch_tab(self, tab: IntensifyTab) -> None:
-        """切换到指定标签。
+        """切换到指定标签并验证到达。
+
+        会先截图判断当前标签状态并记录日志，然后点击目标标签，
+        最后验证目标标签签名匹配。
 
         Parameters
         ----------
         tab:
             目标标签。
+
+        Raises
+        ------
+        NavigationError
+            超时未到达目标标签。
         """
-        logger.info("[UI] 强化页面 → {}", tab.value)
-        self._ctrl.click(*CLICK_TAB[tab])
+        current = self.get_active_tab(self._ctrl.screenshot())
+        logger.info(
+            "[UI] 强化页面: {} → {}",
+            current.value if current else "未知",
+            tab.value,
+        )
+        target_sig = TAB_SIGNATURES[tab]
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_TAB[tab],
+            checker=lambda s, sig=target_sig: PixelChecker.check_signature(s, sig).matched,
+            source=f"强化-{current.value if current else '?'}",
+            target=f"强化-{tab.value}",
+        )
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 

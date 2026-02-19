@@ -58,7 +58,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import Color, MatchStrategy, PixelChecker, PixelRule, PixelSignature
 from autowsgr.vision.ocr import OCREngine
 
@@ -617,15 +617,35 @@ class MapPage:
     # ── 动作 — 面板切换 ──────────────────────────────────────────────────
 
     def switch_panel(self, panel: MapPanel) -> None:
-        """切换到指定面板标签。
+        """切换到指定面板标签并验证到达。
+
+        会先截图判断当前面板状态并记录日志，然后点击目标面板，
+        最后验证目标面板签名匹配。
 
         Parameters
         ----------
         panel:
             目标面板。
+
+        Raises
+        ------
+        NavigationError
+            超时未到达目标面板。
         """
-        logger.info("[UI] 地图页面 → {}", panel.value)
-        self._ctrl.click(*CLICK_PANEL[panel])
+        current = self.get_active_panel(self._ctrl.screenshot())
+        logger.info(
+            "[UI] 地图页面: {} → {}",
+            current.value if current else "未知",
+            panel.value,
+        )
+        target_sig = PANEL_SIGNATURES[panel]
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_PANEL[panel],
+            checker=lambda s, sig=target_sig: PixelChecker.check_signature(s, sig).matched,
+            source=f"地图-{current.value if current else '?'}",
+            target=f"地图-{panel.value}",
+        )
 
     # ── 动作 — 章节导航 ──────────────────────────────────────────────────
 
