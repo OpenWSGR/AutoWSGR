@@ -50,6 +50,9 @@ version = {attr = "autowsgr.__version__"}
 [tool.codespell]
 ignore-words = "docs/spelling_wordlist.txt"
 
+[tool.pytest.ini_options]
+testpaths = ["testing"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

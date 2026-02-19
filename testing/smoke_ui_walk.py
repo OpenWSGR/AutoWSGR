@@ -30,7 +30,7 @@
     测试路径 (欧拉遍历):
 
     主页面
-    ├── → 出征 → 地图页面 → ◁ 主页面
+    ├── → 出征 → 地图页面 (5面板切换: 出征→演习→远征→战役→决战→出征) → ◁ 主页面
     ├── → 任务 → 任务页面 → ◁ 主页面
     ├── → 后院 → 后院页面
     │   ├── → 浴室 → 浴室页面 → ◁ 后院页面
@@ -42,7 +42,7 @@
         ├── → 好友 → 好友页面 → ◁ 侧边栏
         └── close → 主页面
 
-    共 22 个导航步骤 + 7 个标签切换 = 29 个操作步骤。
+    共 22 个导航步骤 + 7 个标签切换 + 5 个面板切换 = 34 个操作步骤。
 
 截图输出：
     logs/smoke_walk/images/ 目录下，每步一张截图，命名格式:
@@ -464,7 +464,7 @@ def run_walk(runner: UIWalkRunner) -> None:
     from autowsgr.ui.friend_page import FriendPage
     from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
     from autowsgr.ui.main_page import MainPage, MainPageTarget
-    from autowsgr.ui.map_page import MapPage
+    from autowsgr.ui.map_page import MapPage, MapPanel
     from autowsgr.ui.mission_page import MissionPage
     from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
 
@@ -492,7 +492,7 @@ def run_walk(runner: UIWalkRunner) -> None:
         return
 
     # ═══════════════════════════════════════════════════════════════════
-    # 路径 A: 主页面 → 出征 → 地图页面 → ◁ 主页面
+    # 路径 A: 主页面 → 出征 → 地图页面 (5面板切换) → ◁ 主页面
     # ═══════════════════════════════════════════════════════════════════
 
     runner.execute_step(
@@ -503,6 +503,17 @@ def run_walk(runner: UIWalkRunner) -> None:
     )
     if runner.aborted:
         return
+
+    # 地图 5 面板切换: 演习 → 远征 → 战役 → 决战 → 出征(回到初始)
+    for panel in [MapPanel.EXERCISE, MapPanel.EXPEDITION, MapPanel.BATTLE, MapPanel.DECISIVE, MapPanel.SORTIE]:
+        runner.execute_step(
+            f"地图页面: 切换面板 → {panel.value}",
+            "地图页面",
+            MapPage.is_current_page,
+            lambda p=panel: map_page.switch_panel(p),
+        )
+        if runner.aborted:
+            return
 
     runner.execute_step(
         "地图页面 → ◁ 主页面",
