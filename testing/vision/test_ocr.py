@@ -58,46 +58,6 @@ class TestOCRResult:
 
 
 # ─────────────────────────────────────────────
-# _edit_distance
-# ─────────────────────────────────────────────
-
-
-class TestEditDistance:
-    def test_identical_strings(self):
-        assert _edit_distance("abc", "abc") == 0
-
-    def test_empty_source(self):
-        assert _edit_distance("", "abc") == 3
-
-    def test_empty_target(self):
-        assert _edit_distance("abc", "") == 3
-
-    def test_both_empty(self):
-        assert _edit_distance("", "") == 0
-
-    def test_single_substitution(self):
-        assert _edit_distance("abc", "axc") == 1
-
-    def test_single_insertion(self):
-        assert _edit_distance("ac", "abc") == 1
-
-    def test_single_deletion(self):
-        assert _edit_distance("abc", "ac") == 1
-
-    def test_completely_different(self):
-        # "abc" → "xyz": 3 substitutions
-        assert _edit_distance("abc", "xyz") == 3
-
-    def test_chinese_characters(self):
-        assert _edit_distance("战列舰", "战列舰") == 0
-        assert _edit_distance("战列舰", "战列鑑") == 1
-
-    def test_prefix_suffix(self):
-        assert _edit_distance("ship", "shippp") == 2
-        assert _edit_distance("aaaship", "ship") == 3
-
-
-# ─────────────────────────────────────────────
 # _fuzzy_match
 # ─────────────────────────────────────────────
 

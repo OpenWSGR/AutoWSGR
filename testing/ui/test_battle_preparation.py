@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -170,15 +170,28 @@ class TestActions:
 
     def test_go_back(self, page):
         pg, ctrl = page
-        # go_back 验证到达地图页面: 设置出征面板签名的所有特征点
-        from autowsgr.ui.map_page import PANEL_SIGNATURES, MapPanel
+        # go_back 验证到达地图页面 — 使用 mock 绕过模板匹配
+        from autowsgr.ui.tabbed_page import (
+            TAB_BLUE,
+            TAB_DARK,
+            TAB_PROBES,
+            TabbedPageType,
+        )
 
         screen = np.zeros((540, 960, 3), dtype=np.uint8)
-        for rule in PANEL_SIGNATURES[MapPanel.SORTIE].rules:
-            px, py = int(rule.x * 960), int(rule.y * 540)
-            screen[py, px] = list(rule.color.as_rgb_tuple())
+        # 标签 0 (出征) 设蓝色，其余暗色
+        for i, (px, py) in enumerate(TAB_PROBES):
+            x, y = int(px * 960), int(py * 540)
+            if i == 0:
+                screen[y, x] = list(TAB_BLUE.as_rgb_tuple())
+            else:
+                screen[y, x] = list(TAB_DARK)
         ctrl.screenshot.return_value = screen
-        pg.go_back()
+        with patch(
+            "autowsgr.ui.map_page.identify_page_type",
+            return_value=TabbedPageType.MAP,
+        ):
+            pg.go_back()
         ctrl.click.assert_called_with(*CLICK_BACK)
 
     def test_start_battle(self, page):

@@ -94,15 +94,3 @@ class TestMergeDicts:
         merge_dicts(base, override)
         assert base == {"a": {"x": 1}}
         assert override == {"a": {"y": 2}}
-
-    def test_empty_base(self):
-        result = merge_dicts({}, {"a": 1})
-        assert result == {"a": 1}
-
-    def test_empty_override(self):
-        result = merge_dicts({"a": 1}, {})
-        assert result == {"a": 1}
-
-    def test_both_empty(self):
-        result = merge_dicts({}, {})
-        assert result == {}

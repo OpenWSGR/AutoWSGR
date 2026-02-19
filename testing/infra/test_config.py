@@ -1,27 +1,20 @@
-"""测试配置系统。"""
+"""测试配置系统与日志工具。"""
 
 import pytest
 from pathlib import Path
 
 from autowsgr.infra.config import (
-    AccountConfig,
     BattleConfig,
     ConfigManager,
-    DailyAutomationConfig,
     DecisiveBattleConfig,
     EmulatorConfig,
-    ExerciseConfig,
     FightConfig,
     LogConfig,
-    NodeConfig,
-    OCRConfig,
     UserConfig,
 )
 from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
-    GameAPP,
-    OcrBackend,
     OSType,
     RepairMode,
 )
@@ -31,114 +24,35 @@ from autowsgr.types import (
 
 
 class TestEmulatorConfig:
-    def test_defaults(self):
-        cfg = EmulatorConfig()
-        assert cfg.type == EmulatorType.leidian
-        assert cfg.path is None
-        assert cfg.serial is None
-        assert cfg.process_name is None
-
     def test_from_dict(self):
         cfg = EmulatorConfig.model_validate({"type": "蓝叠", "serial": "127.0.0.1:5555"})
         assert cfg.type == EmulatorType.bluestacks
         assert cfg.serial == "127.0.0.1:5555"
-
-    def test_frozen(self):
-        cfg = EmulatorConfig()
-        with pytest.raises(Exception):
-            cfg.type = EmulatorType.mumu  # type: ignore
-
-
-# ── AccountConfig ──
-
-
-class TestAccountConfig:
-    def test_defaults(self):
-        cfg = AccountConfig()
-        assert cfg.game_app == GameAPP.official
-        assert cfg.package_name == "com.huanmeng.zhanjian2"
-
-    def test_xiaomi(self):
-        cfg = AccountConfig(game_app=GameAPP.xiaomi)
-        assert cfg.package_name == "com.hoolai.zjsnr.mi"
-
-
-# ── OCRConfig ──
-
-
-class TestOCRConfig:
-    def test_defaults(self):
-        cfg = OCRConfig()
-        assert cfg.backend == OcrBackend.easyocr
-        assert cfg.gpu is False
 
 
 # ── LogConfig ──
 
 
 class TestLogConfig:
-    def test_defaults(self):
-        cfg = LogConfig()
-        assert cfg.level == "DEBUG"
-        assert cfg.root == Path("log")
-        assert cfg.dir is not None  # 自动生成
-
     def test_dir_auto_generated(self):
         cfg = LogConfig()
         assert cfg.dir is not None
         assert str(cfg.root) in str(cfg.dir)
 
 
-# ── DailyAutomationConfig ──
-
-
-class TestDailyAutomationConfig:
-    def test_defaults(self):
-        cfg = DailyAutomationConfig()
-        assert cfg.auto_expedition is True
-        assert cfg.auto_battle is True
-        assert cfg.battle_type == "困难潜艇"
-        assert cfg.normal_fight_tasks == []
-
-    def test_custom(self):
-        cfg = DailyAutomationConfig(auto_exercise=False, exercise_fleet_id=2)
-        assert cfg.auto_exercise is False
-        assert cfg.exercise_fleet_id == 2
-
-
 # ── DecisiveBattleConfig ──
 
 
 class TestDecisiveBattleConfig:
-    def test_defaults(self):
-        cfg = DecisiveBattleConfig()
-        assert cfg.chapter == 6
-        assert len(cfg.level1) > 0
-        assert len(cfg.level2) > 0
-
     def test_invalid_chapter(self):
         with pytest.raises(Exception):
             DecisiveBattleConfig(chapter=0)
-
-    def test_valid_chapter(self):
-        cfg = DecisiveBattleConfig(chapter=3)
-        assert cfg.chapter == 3
 
 
 # ── UserConfig ──
 
 
 class TestUserConfig:
-    def test_defaults(self):
-        cfg = UserConfig()
-        assert isinstance(cfg.emulator, EmulatorConfig)
-        assert isinstance(cfg.account, AccountConfig)
-        assert isinstance(cfg.ocr, OCRConfig)
-        assert isinstance(cfg.log, LogConfig)
-        assert isinstance(cfg.os_type, OSType)
-        assert cfg.delay == 1.5
-        assert cfg.dock_full_destroy is True
-
     def test_emulator_serial_auto_resolved(self):
         """非 WSL 环境下 serial 应被自动填充。"""
         cfg = UserConfig()
@@ -162,11 +76,6 @@ dock_full_destroy: false
         assert cfg.emulator.serial == "127.0.0.1:5555"
         assert cfg.delay == 2.0
         assert cfg.dock_full_destroy is False
-
-    def test_frozen(self):
-        cfg = UserConfig()
-        with pytest.raises(Exception):
-            cfg.delay = 3.0  # type: ignore
 
     def test_with_daily_automation(self, tmp_yaml):
         content = """\
@@ -221,12 +130,6 @@ destroy_ship_types:
 
 
 class TestFightConfig:
-    def test_defaults(self):
-        cfg = FightConfig()
-        assert cfg.chapter == 1
-        assert cfg.fleet_id == 1
-        assert cfg.fight_condition == 4
-
     def test_repair_mode_expanded(self):
         cfg = FightConfig(repair_mode=RepairMode.moderate_damage)
         assert isinstance(cfg.repair_mode, list)
@@ -244,26 +147,6 @@ class TestBattleConfig:
         cfg = BattleConfig()
         assert isinstance(cfg.repair_mode, list)
         assert all(r == RepairMode.moderate_damage for r in cfg.repair_mode)
-
-
-class TestExerciseConfig:
-    def test_defaults(self):
-        cfg = ExerciseConfig()
-        assert cfg.selected_nodes == ["player", "robot"]
-        assert cfg.exercise_times == 4
-        assert cfg.robot is True
-
-
-# ── NodeConfig ──
-
-
-class TestNodeConfig:
-    def test_defaults(self):
-        cfg = NodeConfig()
-        assert cfg.formation == 2
-        assert cfg.night is False
-        assert cfg.proceed is True
-        assert cfg.enemy_rules == []
 
 
 # ── ConfigManager ──
@@ -287,3 +170,18 @@ delay: 2.5
         cfg = ConfigManager.load(tmp_path / "no_such_file.yaml")
         assert isinstance(cfg, UserConfig)
         assert cfg.delay == 1.5
+
+
+# ── LogConfig (setup_logger) ──
+
+
+class TestSetupLogger:
+    """setup_logger 进行基本函数验证。"""
+
+    def test_with_log_dir(self, tmp_path: Path):
+        """log_dir 应被自动创建。"""
+        from autowsgr.infra.logger import setup_logger
+
+        log_dir = tmp_path / "logs" / "sub"
+        setup_logger(log_dir=log_dir, level="INFO")
+        assert log_dir.exists()

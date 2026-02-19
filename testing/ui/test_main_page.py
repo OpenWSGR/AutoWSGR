@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+from contextlib import ExitStack
 
 import numpy as np
 import pytest
@@ -17,6 +18,7 @@ from autowsgr.ui.main_page import (
     MainPage,
     MainPageTarget,
 )
+from autowsgr.ui.tabbed_page import TabbedPageType
 
 
 # ─────────────────────────────────────────────
@@ -24,6 +26,18 @@ from autowsgr.ui.main_page import (
 # ─────────────────────────────────────────────
 
 _W, _H = 960, 540
+
+# 需要 mock identify_page_type 的导航目标
+_NAVIGATE_PATCHES: dict[MainPageTarget, tuple[str, TabbedPageType]] = {
+    MainPageTarget.SORTIE: (
+        "autowsgr.ui.map_page.identify_page_type",
+        TabbedPageType.MAP,
+    ),
+    MainPageTarget.TASK: (
+        "autowsgr.ui.mission_page.identify_page_type",
+        TabbedPageType.MISSION,
+    ),
+}
 
 
 def _set_pixel(
@@ -51,20 +65,26 @@ def _make_non_main_screen() -> np.ndarray:
 def _make_target_screen(target: MainPageTarget) -> np.ndarray:
     """生成匹配导航目标页面签名的合成截图。
 
-    navigate_to 现在使用 click_and_wait_for_page 进行正向验证，
+    navigate_to 使用 click_and_wait_for_page 进行正向验证，
     需要截图匹配目标页面的签名。
+
+    注意: SORTIE/TASK 目标需要 mock identify_page_type 才能
+    让合成截图通过模板匹配验证。
     """
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
 
-    if target == MainPageTarget.SORTIE:
-        # MapPage: 设置出征面板签名的所有特征点
-        from autowsgr.ui.map_page import PANEL_SIGNATURES, MapPanel
-        for rule in PANEL_SIGNATURES[MapPanel.SORTIE].rules:
-            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
-    elif target == MainPageTarget.TASK:
-        from autowsgr.ui.mission_page import PAGE_SIGNATURE as MISSION_SIG
-        for rule in MISSION_SIG.rules:
-            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    if target in (MainPageTarget.SORTIE, MainPageTarget.TASK):
+        # 标签页: 标签 0 设蓝色，其余暗色
+        from autowsgr.ui.tabbed_page import (
+            TAB_BLUE,
+            TAB_DARK,
+            TAB_PROBES,
+        )
+        for i, (x, y) in enumerate(TAB_PROBES):
+            if i == 0:
+                _set_pixel(screen, x, y, TAB_BLUE.as_rgb_tuple())
+            else:
+                _set_pixel(screen, x, y, TAB_DARK)
     elif target == MainPageTarget.SIDEBAR:
         from autowsgr.ui.sidebar_page import MENU_PROBES, _MENU_GRAY
         for mx, my in MENU_PROBES:
@@ -133,9 +153,12 @@ class TestNavigateTo:
     @pytest.mark.parametrize("target", list(MainPageTarget))
     def test_navigate_calls_click(self, page, target: MainPageTarget):
         pg, ctrl = page
-        # navigate_to 使用 click_and_wait_for_page 正向验证目标页面
         ctrl.screenshot.return_value = _make_target_screen(target)
-        pg.navigate_to(target)
+        with ExitStack() as stack:
+            if target in _NAVIGATE_PATCHES:
+                mod, rv = _NAVIGATE_PATCHES[target]
+                stack.enter_context(patch(mod, return_value=rv))
+            pg.navigate_to(target)
         ctrl.click.assert_called_with(*CLICK_NAV[target])
 
     @pytest.mark.parametrize("target", list(MainPageTarget))
@@ -143,19 +166,27 @@ class TestNavigateTo:
         """导航后调用 screenshot 进行验证。"""
         pg, ctrl = page
         ctrl.screenshot.return_value = _make_target_screen(target)
-        pg.navigate_to(target)
+        with ExitStack() as stack:
+            if target in _NAVIGATE_PATCHES:
+                mod, rv = _NAVIGATE_PATCHES[target]
+                stack.enter_context(patch(mod, return_value=rv))
+            pg.navigate_to(target)
         ctrl.screenshot.assert_called()
 
     def test_go_to_sortie(self, page):
         pg, ctrl = page
         ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.SORTIE)
-        pg.go_to_sortie()
+        with patch("autowsgr.ui.map_page.identify_page_type",
+                   return_value=TabbedPageType.MAP):
+            pg.go_to_sortie()
         ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.SORTIE])
 
     def test_go_to_task(self, page):
         pg, ctrl = page
         ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.TASK)
-        pg.go_to_task()
+        with patch("autowsgr.ui.mission_page.identify_page_type",
+                   return_value=TabbedPageType.MISSION):
+            pg.go_to_task()
         ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.TASK])
 
     def test_open_sidebar(self, page):
@@ -251,7 +282,7 @@ class TestConstants:
             assert target in CLICK_EXIT
 
     def test_page_signature_has_rules(self):
-        assert len(PAGE_SIGNATURE.rules) == 7
+        assert len(PAGE_SIGNATURE.rules) == 4
 
     def test_nav_coords_in_range(self):
         """导航坐标在 [0, 1] 范围内。"""

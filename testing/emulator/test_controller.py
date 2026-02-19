@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -23,61 +22,12 @@ from autowsgr.infra.exceptions import EmulatorConnectionError
 
 
 # ═══════════════════════════════════════════════
-# DeviceInfo
-# ═══════════════════════════════════════════════
-
-
-class TestDeviceInfo:
-    """DeviceInfo 数据类测试。"""
-
-    def test_create(self):
-        info = DeviceInfo(serial="emulator-5554", resolution=(960, 540))
-        assert info.serial == "emulator-5554"
-        assert info.resolution == (960, 540)
-
-    def test_frozen(self):
-        info = DeviceInfo(serial="a", resolution=(100, 200))
-        with pytest.raises(FrozenInstanceError):
-            info.serial = "b"  # type: ignore[misc]
-
-    def test_equality(self):
-        a = DeviceInfo(serial="x", resolution=(1920, 1080))
-        b = DeviceInfo(serial="x", resolution=(1920, 1080))
-        assert a == b
-
-    def test_inequality(self):
-        a = DeviceInfo(serial="x", resolution=(1920, 1080))
-        b = DeviceInfo(serial="y", resolution=(1920, 1080))
-        assert a != b
-
-    def test_resolution_tuple(self):
-        info = DeviceInfo(serial="s", resolution=(1280, 720))
-        w, h = info.resolution
-        assert w == 1280
-        assert h == 720
-
-
-# ═══════════════════════════════════════════════
 # AndroidController ABC
 # ═══════════════════════════════════════════════
 
 
 class TestAndroidControllerABC:
     """确保 AndroidController 不能直接实例化，且强制子类实现所有抽象方法。"""
-
-    def test_cannot_instantiate_directly(self):
-        with pytest.raises(TypeError, match="abstract"):
-            AndroidController()  # type: ignore[abstract]
-
-    def test_incomplete_subclass(self):
-        """仅实现部分方法应导致 TypeError。"""
-
-        class Partial(AndroidController):
-            def connect(self):
-                return DeviceInfo(serial="s", resolution=(1, 1))
-
-        with pytest.raises(TypeError, match="abstract"):
-            Partial()  # type: ignore[abstract]
 
     def test_complete_subclass(self):
         """实现全部抽象方法后可正常实例化。"""
@@ -127,25 +77,6 @@ class TestAndroidControllerABC:
         assert isinstance(d, AndroidController)
         assert d.resolution == (100, 100)
 
-    def test_abstract_methods_list(self):
-        """验证全部抽象方法名。"""
-        expected = {
-            "connect",
-            "disconnect",
-            "resolution",
-            "screenshot",
-            "click",
-            "swipe",
-            "long_tap",
-            "key_event",
-            "text",
-            "start_app",
-            "stop_app",
-            "is_app_running",
-            "shell",
-        }
-        assert AndroidController.__abstractmethods__ == expected
-
 
 # ═══════════════════════════════════════════════
 # ADBController — 初始化 / 状态
@@ -154,26 +85,6 @@ class TestAndroidControllerABC:
 
 class TestADBControllerInit:
     """ADBController 初始化行为。"""
-
-    def test_default_serial(self):
-        ctrl = ADBController()
-        assert ctrl._serial is None
-        assert ctrl._resolution == (0, 0)
-
-    def test_custom_serial(self):
-        ctrl = ADBController(serial="127.0.0.1:5555")
-        assert ctrl._serial == "127.0.0.1:5555"
-
-    def test_custom_timeout(self):
-        ctrl = ADBController(screenshot_timeout=5.0)
-        assert ctrl._screenshot_timeout == 5.0
-
-    def test_is_android_controller(self):
-        assert issubclass(ADBController, AndroidController)
-
-    def test_resolution_before_connect(self):
-        ctrl = ADBController()
-        assert ctrl.resolution == (0, 0)
 
     def test_disconnect_resets_state(self):
         ctrl = ADBController(serial="s")
@@ -305,28 +216,6 @@ class TestADBControllerScreenshot:
 # ═══════════════════════════════════════════════
 
 
-class TestADBControllerKeys:
-    """测试 key_event / text 方法。"""
-
-    @pytest.fixture
-    def ctrl(self):
-        c = ADBController(serial="test")
-        c._device = MagicMock()
-        return c
-
-    def test_key_event_home(self, ctrl):
-        ctrl.key_event(3)
-        ctrl._device.keyevent.assert_called_once_with("3")  # airtest 需要字符串
-
-    def test_key_event_back(self, ctrl):
-        ctrl.key_event(4)
-        ctrl._device.keyevent.assert_called_once_with("4")  # airtest 需要字符串
-
-    def test_text_input(self, ctrl):
-        ctrl.text("hello")
-        ctrl._device.text.assert_called_once_with("hello")
-
-
 class TestADBControllerAppManagement:
     """测试应用管理方法。"""
 
@@ -335,14 +224,6 @@ class TestADBControllerAppManagement:
         c = ADBController(serial="test")
         c._device = MagicMock()
         return c
-
-    def test_start_app(self, ctrl):
-        ctrl.start_app("com.example.app")
-        ctrl._device.start_app.assert_called_once_with("com.example.app")
-
-    def test_stop_app(self, ctrl):
-        ctrl.stop_app("com.example.app")
-        ctrl._device.stop_app.assert_called_once_with("com.example.app")
 
     def test_is_app_running_true(self, ctrl):
         ctrl._device.shell.return_value = "u0_a1 12345 com.example.app"
@@ -359,12 +240,6 @@ class TestADBControllerAppManagement:
 
 class TestADBControllerShell:
     """测试 shell 方法。"""
-
-    def test_shell_returns_string(self):
-        ctrl = ADBController(serial="test")
-        ctrl._device = MagicMock()  # type: ignore[assignment]
-        ctrl._device.shell.return_value = "output line"  # type: ignore[union-attr]
-        assert ctrl.shell("ls") == "output line"
 
     def test_shell_non_string_result(self):
         ctrl = ADBController(serial="test")

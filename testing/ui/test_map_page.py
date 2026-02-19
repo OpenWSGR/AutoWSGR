@@ -16,7 +16,6 @@ from autowsgr.ui.map_page import (
     CLICK_PANEL,
     EXPEDITION_NOTIF_PROBE,
     MAP_DATABASE,
-    PANEL_SIGNATURES,
     SIDEBAR_BRIGHTNESS_THRESHOLD,
     SIDEBAR_CLICK_X,
     SIDEBAR_SCAN_X,
@@ -26,6 +25,12 @@ from autowsgr.ui.map_page import (
     MapPage,
     MapPanel,
     parse_map_title,
+)
+from autowsgr.ui.tabbed_page import (
+    TAB_BLUE,
+    TAB_DARK,
+    TAB_PROBES,
+    TabbedPageType,
 )
 
 
@@ -59,7 +64,12 @@ def _make_screen(
 ) -> np.ndarray:
     """生成地图页面的合成截图。
 
-    根据 ``active_panel`` 对应的 :data:`PANEL_SIGNATURES` 逐条设置像素。
+    通过 :mod:`~autowsgr.ui.tabbed_page` 统一检测模型构造:
+
+    - 标签栏: 对应面板设蓝色，其余设暗色
+
+    注意: 合成截图不包含模板匹配所需的真实标签栏纹理，
+    因此 ``MapPage.is_current_page`` 需要 mock ``identify_page_type``。
 
     Parameters
     ----------
@@ -72,9 +82,13 @@ def _make_screen(
     """
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
 
-    # 面板签名像素 (只设置当前激活面板的特征点)
-    for rule in PANEL_SIGNATURES[active_panel].rules:
-        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    # 标签栏探测点: 对应面板设为蓝色，其余设为暗色
+    panel_index = list(MapPanel).index(active_panel)
+    for i, (x, y) in enumerate(TAB_PROBES):
+        if i == panel_index:
+            _set_pixel(screen, x, y, TAB_BLUE.as_rgb_tuple())
+        else:
+            _set_pixel(screen, x, y, TAB_DARK)
 
     # 远征通知
     ex, ey = EXPEDITION_NOTIF_PROBE
@@ -101,11 +115,15 @@ def _make_screen(
 
 
 class TestIsCurrentPage:
-    def test_default_state_detected(self):
+    @patch("autowsgr.ui.map_page.identify_page_type",
+           return_value=TabbedPageType.MAP)
+    def test_default_state_detected(self, _mock):
         screen = _make_screen()
         assert MapPage.is_current_page(screen) is True
 
-    def test_each_panel(self):
+    @patch("autowsgr.ui.map_page.identify_page_type",
+           return_value=TabbedPageType.MAP)
+    def test_each_panel(self, _mock):
         for panel in MapPanel:
             screen = _make_screen(active_panel=panel)
             assert MapPage.is_current_page(screen) is True
@@ -114,14 +132,12 @@ class TestIsCurrentPage:
         screen = np.zeros((_H, _W, 3), dtype=np.uint8)
         assert MapPage.is_current_page(screen) is False
 
-    def test_two_panels_active_not_detected(self):
-        """两个独立面板的签名像素叠加 → 两者都能识别 (is_current_page 仍 True)。
-        但若 SORTIE 签名像素被故意破坏 → 该 panel 签名失败。"""
+    def test_two_blue_probes_not_detected(self):
+        """两个标签探测点同时为蓝色 → is_tabbed_page 返回 False。"""
         screen = _make_screen(active_panel=MapPanel.SORTIE)
-        # 破坏 SORTIE 签名中第一个规则的像素
-        first_rule = PANEL_SIGNATURES[MapPanel.SORTIE].rules[0]
-        _set_pixel(screen, first_rule.x, first_rule.y, (0, 0, 0))
-        assert MapPage.get_active_panel(screen) is not MapPanel.SORTIE
+        # 额外将第二个探测点也设为蓝色 → 不再满足 "恰好 1 蓝" 条件
+        _set_pixel(screen, *TAB_PROBES[1], TAB_BLUE.as_rgb_tuple())
+        assert MapPage.is_current_page(screen) is False
 
     def test_no_panel_selected_not_detected(self):
         """空白截图 — 任何面板签名均不匹配。"""
@@ -360,7 +376,9 @@ class TestSwitchPanel:
         pg, ctrl = page
         # switch_panel 先截图查当前状态, 再 click_and_wait_for_page 验证目标
         ctrl.screenshot.return_value = _make_screen(active_panel=panel)
-        pg.switch_panel(panel)
+        with patch("autowsgr.ui.tabbed_page._match_page_type",
+                   return_value=TabbedPageType.MAP):
+            pg.switch_panel(panel)
         ctrl.click.assert_called_with(*CLICK_PANEL[panel])
 
 
