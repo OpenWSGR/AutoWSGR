@@ -251,7 +251,7 @@ class ADBController(AndroidController):
         self._resolution = (int(width), int(height))
 
         logger.info(
-            "已连接设备: {} ({}×{})", self._serial or "auto", *self._resolution
+            "[Emulator] 已连接设备: {} ({}x{})", self._serial or "auto", *self._resolution
         )
         return DeviceInfo(
             serial=self._serial or "auto",
@@ -259,9 +259,10 @@ class ADBController(AndroidController):
         )
 
     def disconnect(self) -> None:
+        serial = self._serial or "auto"
         self._device = None
         self._resolution = (0, 0)
-        logger.info("已断开设备连接")
+        logger.info("[Emulator] 已断开设备连接: {}", serial)
 
     @property
     def resolution(self) -> tuple[int, int]:
@@ -283,7 +284,14 @@ class ADBController(AndroidController):
         while True:
             screen = dev.snapshot(quality=99)  # RGB ndarray
             if screen is not None:
-                return cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+                elapsed = time.monotonic() - start
+                bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+                h, w = bgr.shape[:2]
+                logger.debug(
+                    "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
+                    w, h, elapsed,
+                )
+                return bgr
             if time.monotonic() - start > self._screenshot_timeout:
                 raise EmulatorConnectionError(
                     f"截图超时 ({self._screenshot_timeout}s)，设备可能已失去响应"
@@ -296,7 +304,7 @@ class ADBController(AndroidController):
         dev = self._require_device()
         w, h = self._resolution
         px, py = int(x * w), int(y * h)
-        logger.trace("click({:.3f}, {:.3f}) → ({}, {})", x, y, px, py)
+        logger.debug("[Emulator] click({:.3f}, {:.3f}) → pixel({}, {})", x, y, px, py)
         dev.shell(f"input tap {px} {py}")
 
     def swipe(
@@ -312,9 +320,9 @@ class ADBController(AndroidController):
         px2, py2 = int(x2 * w), int(y2 * h)
         ms = int(duration * 1000)
         dev = self._require_device()
-        logger.trace(
-            "swipe({:.3f},{:.3f} → {:.3f},{:.3f}) → ({},{} → {},{})",
-            x1, y1, x2, y2, px1, py1, px2, py2,
+        logger.debug(
+            "[Emulator] swipe({:.3f},{:.3f}→{:.3f},{:.3f}) → pixel({},{}→{},{}) {}ms",
+            x1, y1, x2, y2, px1, py1, px2, py2, ms,
         )
         dev.shell(f"input swipe {px1} {py1} {px2} {py2} {ms}")
 
@@ -325,24 +333,25 @@ class ADBController(AndroidController):
 
     def key_event(self, key_code: int) -> None:
         dev = self._require_device()
-        logger.trace("key_event({})", key_code)
-        dev.keyevent(key_code)
+        logger.debug("[Emulator] key_event({})", key_code)
+        # airtest keyevent 内部调用 str.upper()，必须传字符串
+        dev.keyevent(str(key_code))
 
     def text(self, content: str) -> None:
         dev = self._require_device()
-        logger.trace("text('{}')", content)
+        logger.debug("[Emulator] text('{}')", content)
         dev.text(content)
 
     # ── 应用管理 ──
 
     def start_app(self, package: str) -> None:
         dev = self._require_device()
-        logger.info("启动应用: {}", package)
+        logger.info("[Emulator] 启动应用: {}", package)
         dev.start_app(package)
 
     def stop_app(self, package: str) -> None:
         dev = self._require_device()
-        logger.info("停止应用: {}", package)
+        logger.info("[Emulator] 停止应用: {}", package)
         dev.stop_app(package)
 
     def is_app_running(self, package: str) -> bool:
@@ -350,8 +359,11 @@ class ADBController(AndroidController):
             dev = self._require_device()
             ps_output = dev.shell("ps")
             assert isinstance(ps_output, str)
-            return package in (ps_output or "")
+            running = package in (ps_output or "")
+            logger.debug("[Emulator] is_app_running('{}') → {}", package, running)
+            return running
         except Exception:
+            logger.debug("[Emulator] is_app_running('{}') → False (异常)", package)
             return False
 
     # ── Shell ──

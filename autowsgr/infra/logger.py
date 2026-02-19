@@ -4,17 +4,28 @@
 
     # 应用启动时调用一次
     from autowsgr.infra.logger import setup_logger
-    setup_logger(log_dir=Path("log"))
+    setup_logger(log_dir=Path("log/2026-01-01"))
 
     # 各模块直接使用 loguru
     from loguru import logger
     logger.info("开始出征 章节={} 地图={}", chapter, map_id)
+
+    # 保存截图到日志目录
+    from autowsgr.infra.logger import save_image
+    save_image(screen, tag="click_before")
 """
 
 from __future__ import annotations
 
+import logging
 import sys
+import time as _time
 from pathlib import Path
+
+import numpy as np
+
+# 全局图片存储目录（由 setup_logger 设置）
+_image_dir: Path | None = None
 
 
 def setup_logger(
@@ -22,6 +33,7 @@ def setup_logger(
     level: str = "INFO",
     rotation: str = "10 MB",
     retention: str = "7 days",
+    save_images: bool = False,
 ) -> None:
     """配置全局 loguru logger。
 
@@ -35,7 +47,10 @@ def setup_logger(
         单个日志文件最大体积或时间周期。
     retention:
         日志文件保留时长。
+    save_images:
+        是否开启截图自动保存（保存至 log_dir/images/）。
     """
+    global _image_dir
     from loguru import logger
 
     # 移除默认 handler，避免重复输出
@@ -63,3 +78,68 @@ def setup_logger(
             retention=retention,
             encoding="utf-8",
         )
+
+        # 图片目录
+        if save_images:
+            _image_dir = log_dir / "images"
+            _image_dir.mkdir(parents=True, exist_ok=True)
+            logger.debug("截图存储目录: {}", _image_dir)
+    else:
+        _image_dir = None
+
+    # ── 静默第三方库的 Python logging 噪音 ──────────────────────────────
+    # airtest 使用标准 logging 模块，默认输出大量 DEBUG 行；统一压到 WARNING
+    for _noisy in (
+        "airtest",
+        "airtest.core.android.adb",
+        "airtest.core.android.rotation",
+        "airtest.utils.nbsp",
+        "pocoui",
+    ):
+        logging.getLogger(_noisy).setLevel(logging.WARNING)
+
+
+def save_image(
+    image: np.ndarray,
+    tag: str = "screenshot",
+    img_dir: Path | None = None,
+) -> Path | None:
+    """将 BGR ndarray 截图保存到磁盘。
+
+    Parameters
+    ----------
+    image:
+        BGR uint8 数组 (H×W×3)。
+    tag:
+        文件名前缀（不含扩展名）。
+    img_dir:
+        目标目录。为 *None* 时使用 :func:`setup_logger` 中设定的全局目录；
+        全局目录也为 None 则直接返回 None（不保存）。
+
+    Returns
+    -------
+    Path | None
+        保存的文件路径，未保存时返回 None。
+    """
+    import cv2
+    from loguru import logger
+
+    target_dir = img_dir or _image_dir
+    if target_dir is None:
+        return None
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    ts = _time.strftime("%H%M%S") + f"_{int(_time.monotonic() * 1000) % 1000:03d}"
+    filename = f"{tag}_{ts}.png"
+    path = target_dir / filename
+
+    # OpenCV 内部用 BGR，但 PNG 文件由第三方查看器以 RGB 解读。
+    # 写入前先转 RGB，确保保存的 PNG 颜色与屏幕一致。
+    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    ok = cv2.imwrite(str(path), rgb)
+    if ok:
+        logger.debug("截图已保存: {}", path)
+    else:
+        logger.warning("截图保存失败: {}", path)
+        return None
+    return path

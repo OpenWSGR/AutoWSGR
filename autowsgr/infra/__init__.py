@@ -34,7 +34,7 @@ from autowsgr.infra.exceptions import (
     VisionError,
 )
 from autowsgr.infra.file_utils import load_yaml, merge_dicts, save_yaml
-from autowsgr.infra.logger import setup_logger
+from autowsgr.infra.logger import save_image, setup_logger
 
 __all__ = [
     # config
@@ -74,4 +74,5 @@ __all__ = [
     "save_yaml",
     # logger
     "setup_logger",
+    "save_image",
 ]

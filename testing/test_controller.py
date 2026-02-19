@@ -316,11 +316,11 @@ class TestADBControllerKeys:
 
     def test_key_event_home(self, ctrl):
         ctrl.key_event(3)
-        ctrl._device.keyevent.assert_called_once_with(3)
+        ctrl._device.keyevent.assert_called_once_with("3")  # airtest 需要字符串
 
     def test_key_event_back(self, ctrl):
         ctrl.key_event(4)
-        ctrl._device.keyevent.assert_called_once_with(4)
+        ctrl._device.keyevent.assert_called_once_with("4")  # airtest 需要字符串
 
     def test_text_input(self, ctrl):
         ctrl.text("hello")

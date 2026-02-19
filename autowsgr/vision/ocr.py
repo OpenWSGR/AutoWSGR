@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
+from loguru import logger
 
 
 # ── 结果数据类 ──
@@ -87,8 +88,11 @@ class OCREngine(ABC):
         """
         results = self.recognize(image, allowlist)
         if not results:
+            logger.debug("[OCR] recognize_single: 无结果")
             return OCRResult(text="", confidence=0.0)
-        return max(results, key=lambda r: r.confidence)
+        best = max(results, key=lambda r: r.confidence)
+        logger.debug("[OCR] recognize_single: '{}' (conf={:.2f})", best.text, best.confidence)
+        return best
 
     def recognize_number(
         self,
@@ -124,8 +128,11 @@ class OCREngine(ABC):
             text = text[:-1]
 
         try:
-            return int(float(text) * multiplier)
+            value = int(float(text) * multiplier)
+            logger.debug("[OCR] recognize_number: '{}' → {}", result.text.strip(), value)
+            return value
         except (ValueError, TypeError):
+            logger.debug("[OCR] recognize_number: '{}' 解析失败", result.text.strip())
             return None
 
     def recognize_ship_name(
@@ -152,8 +159,14 @@ class OCREngine(ABC):
         """
         result = self.recognize_single(image)
         if not result.text:
+            logger.debug("[OCR] recognize_ship_name: 无文本")
             return None
-        return _fuzzy_match(result.text, candidates, threshold)
+        matched = _fuzzy_match(result.text, candidates, threshold)
+        logger.debug(
+            "[OCR] recognize_ship_name: '{}' → '{}'",
+            result.text, matched if matched else "\u672a匹配",
+        )
+        return matched
 
     # ── 工厂方法 ──
 
@@ -173,8 +186,10 @@ class OCREngine(ABC):
         OCREngine
         """
         if engine == "easyocr":
+            logger.info("[OCR] 初始化 EasyOCR（gpu={}）", gpu)
             return EasyOCREngine(gpu=gpu)
         if engine == "paddleocr":
+            logger.info("[OCR] 初始化 PaddleOCR（gpu={}）", gpu)
             return PaddleOCREngine(gpu=gpu)
         raise ValueError(f"不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr")
 

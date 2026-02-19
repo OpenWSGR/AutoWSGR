@@ -38,6 +38,7 @@ from dataclasses import dataclass, field
 from typing import Sequence
 
 import numpy as np
+from loguru import logger
 
 
 # ── 颜色 ──
@@ -461,6 +462,14 @@ class PixelChecker:
             case MatchStrategy.COUNT:
                 matched = matched_count >= signature.threshold
 
+        logger.debug(
+            "[Matcher] '{}' {} ({}/{} 规则匹配, 策略={})",
+            signature.name,
+            "✓" if matched else "✗",
+            matched_count,
+            total,
+            signature.strategy.value,
+        )
         return PixelMatchResult(
             matched=matched,
             signature_name=signature.name,
@@ -497,7 +506,9 @@ class PixelChecker:
         for sig in signatures:
             result = PixelChecker.check_signature(screen, sig, with_details=with_details)
             if result:
+                logger.debug("[Matcher] identify() → '{}'", result.signature_name)
                 return result
+        logger.debug("[Matcher] identify() → None（共 {} 个签名均未匹配）", len(signatures))
         return None
 
     @staticmethod
@@ -521,6 +532,12 @@ class PixelChecker:
             result = PixelChecker.check_signature(screen, sig, with_details=with_details)
             if result:
                 results.append(result)
+        logger.debug(
+            "[Matcher] identify_all() → {} / {} 匹配: [{}]",
+            len(results),
+            len(signatures),
+            ", ".join(r.signature_name for r in results),
+        )
         return results
 
     # ── 颜色分类 ──
@@ -559,7 +576,12 @@ class PixelChecker:
             if dist < best_dist:
                 best_dist = dist
                 best_name = name
-        return best_name if best_dist <= tolerance else None
+        result_name = best_name if best_dist <= tolerance else None
+        logger.debug(
+            "[Matcher] classify_color({:.3f},{:.3f}) → {} (dist={:.1f})",
+            x, y, result_name, best_dist if result_name else -1,
+        )
+        return result_name
 
     # ── 图像裁切（保留的通用工具） ──
 

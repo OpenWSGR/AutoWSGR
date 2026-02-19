@@ -1,13 +1,6 @@
 .env
-log/
-tmp/
-tests/
-test.bat
+logs/
 .vscode/
-autowsgr/bin/image_recognize/*.PNG
-autowsgr/bin/image_recognize/*.in
-autowsgr/bin/image_recognize/*.out
-system_test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
