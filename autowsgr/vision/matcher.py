@@ -443,10 +443,29 @@ class PixelChecker:
                     PixelDetail(rule=rule, actual=actual, distance=dist, matched=is_match)
                 )
 
+            logger.debug(
+                "[Matcher] '{}' [{:.4f},{:.4f}] 期望{} 实际{} 距离={:.1f} {}",
+                signature.name,
+                rule.x,
+                rule.y,
+                rule.color.as_rgb_tuple(),
+                actual.as_rgb_tuple(),
+                dist,
+                "✓" if is_match else f"✗(容差={rule.tolerance})",
+            )
+
             # 短路优化
             if signature.strategy == MatchStrategy.ALL and not is_match:
                 # ALL 模式下一旦失败可提前退出
                 if not with_details:
+                    logger.debug(
+                        "[Matcher] '{}' ✗ 短路退出 — ALL 首次失败于 [{:.4f},{:.4f}] ({}/{} 通过)",
+                        signature.name,
+                        rule.x,
+                        rule.y,
+                        matched_count,
+                        len(signature),
+                    )
                     return PixelMatchResult(
                         matched=False,
                         signature_name=signature.name,
@@ -456,6 +475,12 @@ class PixelChecker:
             elif signature.strategy == MatchStrategy.ANY and is_match:
                 # ANY 模式下一旦成功可提前退出
                 if not with_details:
+                    logger.debug(
+                        "[Matcher] '{}' ✓ 短路退出 — ANY 首次成功于 [{:.4f},{:.4f}]",
+                        signature.name,
+                        rule.x,
+                        rule.y,
+                    )
                     return PixelMatchResult(
                         matched=True,
                         signature_name=signature.name,
