@@ -135,8 +135,10 @@ def save_image(
 
     # cv2.imwrite 期望 BGR 排列，而我们统一使用 RGB，写入前需转换
     bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    ok = cv2.imwrite(str(path), bgr)
+    # 使用 imencode + write_bytes 避免 OpenCV C 层 ANSI 路径导致中文乱码
+    ok, buf = cv2.imencode(".png", bgr)
     if ok:
+        path.write_bytes(buf.tobytes())
         logger.debug("截图已保存: {}", path)
     else:
         logger.warning("截图保存失败: {}", path)

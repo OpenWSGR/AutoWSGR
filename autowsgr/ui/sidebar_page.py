@@ -51,10 +51,7 @@ from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import NavConfig, click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
     Color,
-    MatchStrategy,
     PixelChecker,
-    PixelRule,
-    PixelSignature,
 )
 
 
@@ -75,33 +72,25 @@ class SidebarTarget(enum.Enum):
 # 页面识别签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PAGE_SIGNATURE = PixelSignature(
-    name="sidebar_page",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        # 右侧特征 (侧边栏打开时画面右半部分稳定特征)
-        PixelRule.of(0.7667, 0.0454, (27, 134, 228), tolerance=30.0),
-        PixelRule.of(0.8734, 0.1611, (29, 119, 205), tolerance=30.0),
-        PixelRule.of(0.8745, 0.2750, (29, 115, 198), tolerance=30.0),
-        PixelRule.of(0.8734, 0.3806, (27, 116, 198), tolerance=30.0),
-        PixelRule.of(0.7734, 0.0602, (254, 255, 255), tolerance=30.0),
-        # 左侧菜单 — 仅使用不可选中项 (选中时颜色不会变)
-        PixelRule.of(0.0417, 0.0806, (55, 55, 55), tolerance=30.0),   # 商城
-        PixelRule.of(0.0422, 0.2102, (58, 58, 58), tolerance=30.0),   # 活动
-        PixelRule.of(0.0396, 0.6028, (56, 56, 56), tolerance=30.0),   # 图鉴
-    ],
-)
-"""侧边栏像素签名 (来自 sig.py 重新采集)。
+MENU_PROBES: list[tuple[float, float]] = [
+    (0.0417, 0.0806),   # 商城
+    (0.0422, 0.2102),   # 活动
+    (0.0453, 0.3463),   # 建造
+    (0.0406, 0.4676),   # 强化
+    (0.0396, 0.6028),   # 图鉴
+    (0.0432, 0.7231),   # 好友
+]
+"""侧边栏左侧 6 个菜单探测点 (来自 sig.py)。
 
-右侧 5 点为画面右半部分稳定特征，左侧 3 点选取不可导航项
-(商城/活动/图鉴) 以避免选中态蓝色引发误判。
+每个点在未选中时为深灰 ≈ (57, 57, 57)，选中时为亮蓝 ≈ (0, 160, 232)。
 """
 
-# 左侧菜单项颜色参考
 _MENU_GRAY = Color.of(57, 57, 57)
 """菜单项未选中颜色 (深灰)。"""
 _MENU_SELECTED = Color.of(0, 160, 232)
 """菜单项选中颜色 (亮蓝)。"""
+_MENU_TOLERANCE = 30.0
+"""菜单项颜色匹配容差。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -167,15 +156,25 @@ class SidebarPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为侧边栏页面。
 
-        通过 6 个深色菜单栏采样点全部匹配判定。
+        检测逻辑:
+        1. 6 个左侧菜单探测点每个都必须匹配 **灰色** 或 **蓝色高亮**。
+        2. 蓝色高亮的数量为 0 或 1 (无选中 / 单选中)。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+        blue_count = 0
+        for x, y in MENU_PROBES:
+            pixel = PixelChecker.get_pixel(screen, x, y)
+            if pixel.near(_MENU_SELECTED, _MENU_TOLERANCE):
+                blue_count += 1
+            elif pixel.near(_MENU_GRAY, _MENU_TOLERANCE):
+                pass  # 灰色 — 正常
+            else:
+                return False  # 既不灰也不蓝 → 不是侧边栏
+        return blue_count <= 1
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 

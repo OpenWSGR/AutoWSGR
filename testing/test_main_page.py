@@ -73,9 +73,9 @@ def _make_target_screen(target: MainPageTarget) -> np.ndarray:
         for rule in MISSION_SIG.rules:
             _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
     elif target == MainPageTarget.SIDEBAR:
-        from autowsgr.ui.sidebar_page import PAGE_SIGNATURE as SIDEBAR_SIG
-        for rule in SIDEBAR_SIG.rules:
-            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+        from autowsgr.ui.sidebar_page import MENU_PROBES, _MENU_GRAY
+        for mx, my in MENU_PROBES:
+            _set_pixel(screen, mx, my, _MENU_GRAY.as_rgb_tuple())
     elif target == MainPageTarget.HOME:
         from autowsgr.ui.backyard_page import PAGE_SIGNATURE as BACKYARD_SIG
         for rule in BACKYARD_SIG.rules:
