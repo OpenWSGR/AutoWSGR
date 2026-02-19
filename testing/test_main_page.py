@@ -62,6 +62,16 @@ def _make_sidebar_screen() -> np.ndarray:
     return screen
 
 
+def _make_target_screen(target: MainPageTarget) -> np.ndarray:
+    """生成满足导航验证的目标页面截图。"""
+    if target == MainPageTarget.SORTIE:
+        return _make_map_screen()
+    if target == MainPageTarget.SIDEBAR:
+        return _make_sidebar_screen()
+    # TASK / HOME — 无子页面签名，只需不匹配主页面
+    return np.zeros((_H, _W, 3), dtype=np.uint8)
+
+
 # ─────────────────────────────────────────────
 # 页面识别
 # ─────────────────────────────────────────────
@@ -148,26 +158,39 @@ class TestNavigateTo:
     @pytest.mark.parametrize("target", list(MainPageTarget))
     def test_navigate_calls_click(self, page, target: MainPageTarget):
         pg, ctrl = page
+        ctrl.screenshot.return_value = _make_target_screen(target)
         pg.navigate_to(target)
         ctrl.click.assert_called_once_with(*CLICK_NAV[target])
 
+    @pytest.mark.parametrize("target", list(MainPageTarget))
+    def test_navigate_verifies_screenshot(self, page, target: MainPageTarget):
+        """导航后调用 screenshot 进行验证。"""
+        pg, ctrl = page
+        ctrl.screenshot.return_value = _make_target_screen(target)
+        pg.navigate_to(target)
+        ctrl.screenshot.assert_called()
+
     def test_go_to_sortie(self, page):
         pg, ctrl = page
+        ctrl.screenshot.return_value = _make_map_screen()
         pg.go_to_sortie()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SORTIE])
 
     def test_go_to_task(self, page):
         pg, ctrl = page
+        ctrl.screenshot.return_value = np.zeros((_H, _W, 3), dtype=np.uint8)
         pg.go_to_task()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.TASK])
 
     def test_open_sidebar(self, page):
         pg, ctrl = page
+        ctrl.screenshot.return_value = _make_sidebar_screen()
         pg.open_sidebar()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SIDEBAR])
 
     def test_go_home(self, page):
         pg, ctrl = page
+        ctrl.screenshot.return_value = np.zeros((_H, _W, 3), dtype=np.uint8)
         pg.go_home()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.HOME])
 
@@ -181,6 +204,8 @@ class TestReturnFrom:
     @pytest.fixture()
     def page(self):
         ctrl = MagicMock(spec=AndroidController)
+        # return_from 验证回到主页面
+        ctrl.screenshot.return_value = _make_main_screen()
         return MainPage(ctrl), ctrl
 
     @pytest.mark.parametrize("target", list(MainPageTarget))
@@ -188,6 +213,13 @@ class TestReturnFrom:
         pg, ctrl = page
         pg.return_from(target)
         ctrl.click.assert_called_once_with(*CLICK_EXIT[target])
+
+    @pytest.mark.parametrize("target", list(MainPageTarget))
+    def test_return_verifies_screenshot(self, page, target: MainPageTarget):
+        """返回后调用 screenshot 验证回到主页面。"""
+        pg, ctrl = page
+        pg.return_from(target)
+        ctrl.screenshot.assert_called()
 
     def test_sortie_exits_top_left(self, page):
         pg, ctrl = page
@@ -248,7 +280,7 @@ class TestConstants:
             assert target in SUB_PAGE_SIGNATURES
 
     def test_page_signature_has_rules(self):
-        assert len(PAGE_SIGNATURE.rules) == 8
+        assert len(PAGE_SIGNATURE.rules) == 7
 
     def test_nav_coords_in_range(self):
         """导航坐标在 [0, 1] 范围内。"""

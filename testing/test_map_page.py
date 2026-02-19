@@ -333,6 +333,8 @@ class TestMapDatabase:
 class TestGoBack:
     def test_go_back(self):
         ctrl = MagicMock(spec=AndroidController)
+        # go_back 现在会截图验证已离开地图页面
+        ctrl.screenshot.return_value = np.zeros((540, 960, 3), dtype=np.uint8)
         page = MapPage(ctrl)
         page.go_back()
         ctrl.click.assert_called_once_with(*CLICK_BACK)

@@ -50,6 +50,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
+from autowsgr.ui.page import wait_for_page, wait_leave_page
 from autowsgr.vision.matcher import (
     Color,
     MatchStrategy,
@@ -88,7 +89,6 @@ PAGE_SIGNATURE = PixelSignature(
         PixelRule.of(0.4750, 0.0278, (158, 198, 109), tolerance=30.0),
         PixelRule.of(0.9719, 0.9019, (136, 143, 149), tolerance=30.0),
         PixelRule.of(0.0583, 0.8833, (250, 250, 248), tolerance=30.0),
-        PixelRule.of(0.9792, 0.0389, (40, 40, 50), tolerance=30.0),
     ],
 )
 """主页面像素签名 — 检测资源栏 + 角落特征。"""
@@ -234,13 +234,39 @@ class MainPage:
     def navigate_to(self, target: MainPageTarget) -> None:
         """点击导航控件，进入指定子页面。
 
+        点击后反复截图验证，确认已到达目标页面 (或已离开主页面)。
+
         Parameters
         ----------
         target:
             导航目标。
+
+        Raises
+        ------
+        NavigationError
+            超时未到达目标页面。
         """
         logger.info("[UI] 主页面 → {}", target.value)
         self._ctrl.click(*CLICK_NAV[target])
+
+        # 验证导航成功
+        sig = SUB_PAGE_SIGNATURES.get(target)
+        if sig is not None:
+            # 目标页面有签名 — 等待签名匹配
+            wait_for_page(
+                self._ctrl,
+                lambda s, t=target: MainPage.is_sub_page(s, t) is True,
+                source="主页面",
+                target=target.value,
+            )
+        else:
+            # 无签名 — 降级为等待离开主页面
+            wait_leave_page(
+                self._ctrl,
+                MainPage.is_current_page,
+                source="主页面",
+                target=target.value,
+            )
 
     def go_to_sortie(self) -> None:
         """点击「出征」— 进入地图选择页面。"""
@@ -266,10 +292,25 @@ class MainPage:
         - 出征 / 任务 / 主页: 左上角 ◁ 按钮
         - 侧边栏: 左下角 ≡ 按钮 (同一切换按钮)
 
+        点击后反复截图验证，确认已返回主页面。
+
         Parameters
         ----------
         target:
             当前所在的子页面。
+
+        Raises
+        ------
+        NavigationError
+            超时未返回主页面。
         """
         logger.info("[UI] {} → 返回主页面", target.value)
         self._ctrl.click(*CLICK_EXIT[target])
+
+        # 验证返回成功
+        wait_for_page(
+            self._ctrl,
+            MainPage.is_current_page,
+            source=target.value,
+            target="主页面",
+        )
