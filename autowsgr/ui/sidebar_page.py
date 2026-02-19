@@ -42,13 +42,15 @@
 from __future__ import annotations
 
 import enum
+import time
 
 import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.ui.page import NavConfig, click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
+    Color,
     MatchStrategy,
     PixelChecker,
     PixelRule,
@@ -77,15 +79,29 @@ PAGE_SIGNATURE = PixelSignature(
     name="sidebar_page",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.0406, 0.0787, (59, 59, 59), tolerance=30.0),
-        PixelRule.of(0.0443, 0.2074, (51, 51, 51), tolerance=30.0),
-        PixelRule.of(0.0417, 0.3426, (56, 56, 56), tolerance=30.0),
-        PixelRule.of(0.0422, 0.4583, (60, 62, 61), tolerance=30.0),
-        PixelRule.of(0.0417, 0.5935, (53, 53, 53), tolerance=30.0),
-        PixelRule.of(0.0422, 0.7231, (59, 59, 59), tolerance=30.0),
+        # 右侧特征 (侧边栏打开时画面右半部分稳定特征)
+        PixelRule.of(0.7667, 0.0454, (27, 134, 228), tolerance=30.0),
+        PixelRule.of(0.8734, 0.1611, (29, 119, 205), tolerance=30.0),
+        PixelRule.of(0.8745, 0.2750, (29, 115, 198), tolerance=30.0),
+        PixelRule.of(0.8734, 0.3806, (27, 116, 198), tolerance=30.0),
+        PixelRule.of(0.7734, 0.0602, (254, 255, 255), tolerance=30.0),
+        # 左侧菜单 — 仅使用不可选中项 (选中时颜色不会变)
+        PixelRule.of(0.0417, 0.0806, (55, 55, 55), tolerance=30.0),   # 商城
+        PixelRule.of(0.0422, 0.2102, (58, 58, 58), tolerance=30.0),   # 活动
+        PixelRule.of(0.0396, 0.6028, (56, 56, 56), tolerance=30.0),   # 图鉴
     ],
 )
-"""侧边栏像素签名 — 检测左侧深色菜单栏的 6 个采样点。"""
+"""侧边栏像素签名 (来自 sig.py 重新采集)。
+
+右侧 5 点为画面右半部分稳定特征，左侧 3 点选取不可导航项
+(商城/活动/图鉴) 以避免选中态蓝色引发误判。
+"""
+
+# 左侧菜单项颜色参考
+_MENU_GRAY = Color.of(57, 57, 57)
+"""菜单项未选中颜色 (深灰)。"""
+_MENU_SELECTED = Color.of(0, 160, 232)
+"""菜单项选中颜色 (亮蓝)。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -104,6 +120,25 @@ CLICK_NAV: dict[SidebarTarget, tuple[float, float]] = {
 
 CLICK_CLOSE: tuple[float, float] = (0.0438, 0.8963)
 """关闭侧边栏 (左下角 ≡ 同一切换按钮)。"""
+
+CLICK_SUBMENU: dict[SidebarTarget, tuple[float, float]] = {
+    SidebarTarget.BUILD:     (0.375, 0.3704),
+    SidebarTarget.INTENSIFY: (0.375, 0.5000),
+}
+"""二级弹出菜单点击坐标。
+
+建造 和 强化 点击后会弹出子选项菜单 (如 建造/特别船坞)，
+需要二次点击选中第一个选项。坐标来自旧代码 (360, 200)/(360, 270) ÷ (960, 540)。
+"""
+
+_SUBMENU_TARGETS: frozenset[SidebarTarget] = frozenset({
+    SidebarTarget.BUILD,
+    SidebarTarget.INTENSIFY,
+})
+"""需要二级菜单点击的导航目标。"""
+
+SUBMENU_DELAY: float = 1.25
+"""点击菜单项后等待二级菜单弹出的延迟 (秒)。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -147,7 +182,8 @@ class SidebarPage:
     def navigate_to(self, target: SidebarTarget) -> None:
         """点击菜单项，进入指定子页面。
 
-        利用目标页面的签名进行正向验证。
+        建造 / 强化 需要二级菜单选择 (点击侧边栏项 → 等待弹出 → 点击子选项)。
+        好友 直接单次点击。
 
         Parameters
         ----------
@@ -169,13 +205,73 @@ class SidebarPage:
             SidebarTarget.FRIEND: FriendPage.is_current_page,
         }
         logger.info("[UI] 侧边栏 → {}", target.value)
-        click_and_wait_for_page(
-            self._ctrl,
-            click_coord=CLICK_NAV[target],
-            checker=target_checker[target],
-            source="侧边栏",
-            target=target.value,
-        )
+
+        if target in _SUBMENU_TARGETS:
+            # 二级菜单: 点击侧边栏项 → 等弹出 → 点击子选项 → 验证
+            self._navigate_with_submenu(
+                target, target_checker[target],
+            )
+        else:
+            # 单次点击 (好友)
+            click_and_wait_for_page(
+                self._ctrl,
+                click_coord=CLICK_NAV[target],
+                checker=target_checker[target],
+                source="侧边栏",
+                target=target.value,
+            )
+
+    def _navigate_with_submenu(
+        self,
+        target: SidebarTarget,
+        checker,
+    ) -> None:
+        """带二级弹出菜单的导航 (建造 / 强化)。
+
+        流程: 点击侧边栏项 → 等待弹出 → 点击子选项 → 验证到达目标页面。
+        整个流程带重试。
+        """
+        from autowsgr.ui.page import DEFAULT_NAV_CONFIG, NavigationError
+
+        config = DEFAULT_NAV_CONFIG
+        last_err: NavigationError | None = None
+
+        for attempt in range(1, config.max_retries + 1):
+            if attempt > 1:
+                logger.warning(
+                    "[UI] 二级菜单重试 {}/{}: 侧边栏 → {} (等 {:.1f}s)",
+                    attempt, config.max_retries, target.value, config.retry_delay,
+                )
+                time.sleep(config.retry_delay)
+
+            # Step 1: 点击侧边栏菜单项
+            self._ctrl.click(*CLICK_NAV[target])
+            # Step 2: 等待二级弹出菜单出现
+            time.sleep(SUBMENU_DELAY)
+            # Step 3: 点击子选项
+            self._ctrl.click(*CLICK_SUBMENU[target])
+
+            try:
+                wait_for_page(
+                    self._ctrl,
+                    checker,
+                    timeout=config.timeout,
+                    interval=config.interval,
+                    handle_overlays=config.handle_overlays,
+                    source="侧边栏",
+                    target=target.value,
+                )
+                return
+            except NavigationError as e:
+                last_err = e
+                logger.warning(
+                    "[UI] 二级菜单后超时 ({}/{}): 侧边栏 → {}",
+                    attempt, config.max_retries, target.value,
+                )
+
+        raise NavigationError(
+            f"导航失败 (已重试 {config.max_retries} 次): 侧边栏 → {target.value}"
+        ) from last_err
 
     def go_to_build(self) -> None:
         """点击「建造」— 进入建造页面。"""

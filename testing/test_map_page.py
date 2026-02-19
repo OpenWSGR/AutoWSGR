@@ -16,6 +16,7 @@ from autowsgr.ui.map_page import (
     CLICK_PANEL,
     EXPEDITION_NOTIF_PROBE,
     MAP_DATABASE,
+    MAP_FEATURE_PROBE,
     PANEL_PROBE,
     SIDEBAR_BRIGHTNESS_THRESHOLD,
     SIDEBAR_CLICK_X,
@@ -35,9 +36,10 @@ from autowsgr.ui.map_page import (
 
 # 参考颜色 (RGB)
 _PANEL_SELECTED = (15, 128, 220)
-_PANEL_UNSELECTED = (24, 40, 65)
+_PANEL_UNSELECTED = (22, 37, 62)
 _EXPEDITION_NOTIF = (245, 88, 47)
 _EXPEDITION_NO_NOTIF = (21, 37, 63)
+_MAP_FEATURE = (240, 90, 63)  # 地图页面右上角特征点
 _CHAPTER_BRIGHT = (252, 227, 47)  # 选中章节 (黄色岛屿)
 _CHAPTER_DARK = (24, 40, 65)  # 未选中章节
 
@@ -71,6 +73,10 @@ def _make_screen(
         选中章节在侧边栏的中心 y 坐标 (None 表示无选中)。
     """
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
+
+    # 地图页面特征点
+    fx, fy = MAP_FEATURE_PROBE
+    _set_pixel(screen, fx, fy, _MAP_FEATURE)
 
     # 面板标签
     for panel, (x, y) in PANEL_PROBE.items():

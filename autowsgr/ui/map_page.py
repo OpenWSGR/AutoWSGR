@@ -112,11 +112,20 @@ class MapIdentity:
 _PANEL_ACTIVE = Color.of(15, 128, 220)
 """面板标签选中态颜色 — 明亮蓝色。"""
 
+_PANEL_DARK = Color.of(22, 37, 62)
+"""面板标签未选中颜色 — 深蓝色。"""
+
+_MAP_FEATURE_COLOR = Color.of(240, 90, 63)
+"""地图页面右上角特征点颜色 — 橙色图标。"""
+
 _EXPEDITION_NOTIF_COLOR = Color.of(245, 88, 47)
 """远征通知颜色 — 橙红色圆点。"""
 
 _STATE_TOLERANCE = 30.0
 """状态检测颜色容差。"""
+
+_DARK_TOLERANCE = 30.0
+"""未选中面板检测容差。"""
 
 _EXPEDITION_TOLERANCE = 40.0
 """远征通知检测颜色容差 (稍宽松以适应动画)。"""
@@ -198,13 +207,16 @@ for _ch, _mn in MAP_DATABASE:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PANEL_PROBE: dict[MapPanel, tuple[float, float]] = {
-    MapPanel.SORTIE:     (0.2177, 0.0574),
-    MapPanel.EXERCISE:   (0.3469, 0.0593),
-    MapPanel.EXPEDITION: (0.4786, 0.0620),
-    MapPanel.BATTLE:     (0.6062, 0.0574),
-    MapPanel.DECISIVE:   (0.7365, 0.0574),
+    MapPanel.SORTIE:     (0.1396, 0.0574),
+    MapPanel.EXERCISE:   (0.2745, 0.0537),
+    MapPanel.EXPEDITION: (0.4042, 0.0556),
+    MapPanel.BATTLE:     (0.5276, 0.0519),
+    MapPanel.DECISIVE:   (0.6620, 0.0556),
 }
-"""面板标签探测点。选中项探测颜色 ≈ (15, 128, 220)。"""
+"""面板标签探测点 (来自 sig.py 采样)。选中项颜色 ≈ (15, 132, 228)。"""
+
+MAP_FEATURE_PROBE: tuple[float, float] = (0.8938, 0.0593)
+"""地图页面右上角特征点 (来自 sig.py)。颜色 ≈ (240, 90, 63)，仅地图页面存在。"""
 
 EXPEDITION_NOTIF_PROBE: tuple[float, float] = (0.4953, 0.0213)
 """远征通知探测点。有远征完成时显示橙色 ≈ (245, 88, 47)。"""
@@ -248,13 +260,13 @@ CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """回退按钮 (◁)。"""
 
 CLICK_PANEL: dict[MapPanel, tuple[float, float]] = {
-    MapPanel.SORTIE:     (0.2177, 0.0574),
-    MapPanel.EXERCISE:   (0.3469, 0.0593),
-    MapPanel.EXPEDITION: (0.4586, 0.0620),
-    MapPanel.BATTLE:     (0.5862, 0.0574),
-    MapPanel.DECISIVE:   (0.7065, 0.0574),
+    MapPanel.SORTIE:     (0.1396, 0.0574),
+    MapPanel.EXERCISE:   (0.2745, 0.0537),
+    MapPanel.EXPEDITION: (0.4042, 0.0556),
+    MapPanel.BATTLE:     (0.5276, 0.0519),
+    MapPanel.DECISIVE:   (0.6620, 0.0556),
 }
-"""面板标签点击位置。"""
+"""面板标签点击位置 (与探测坐标一致)。"""
 
 TOTAL_CHAPTERS: int = 9
 """总章节数。"""
@@ -404,21 +416,32 @@ class MapPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为地图页面。
 
-        检测逻辑: 5 个面板标签探测点中恰好有 1 个为选中蓝色。
+        检测逻辑:
+        1. 右上角特征点 (橙色图标) 必须匹配 — 排除大部分非地图页面。
+        2. 5 个面板标签中恰好 1 个为选中蓝色、其余 4 个为深色。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        active_count = sum(
-            1
-            for (x, y) in PANEL_PROBE.values()
-            if PixelChecker.get_pixel(screen, x, y).near(
-                _PANEL_ACTIVE, _STATE_TOLERANCE
-            )
-        )
-        return active_count == 1
+        # 1. 特征点校验 (快速排除)
+        fx, fy = MAP_FEATURE_PROBE
+        if not PixelChecker.get_pixel(screen, fx, fy).near(
+            _MAP_FEATURE_COLOR, _STATE_TOLERANCE
+        ):
+            return False
+
+        # 2. 面板标签: 恰好 1 蓝 + 4 暗
+        active_count = 0
+        dark_count = 0
+        for x, y in PANEL_PROBE.values():
+            pixel = PixelChecker.get_pixel(screen, x, y)
+            if pixel.near(_PANEL_ACTIVE, _STATE_TOLERANCE):
+                active_count += 1
+            elif pixel.near(_PANEL_DARK, _DARK_TOLERANCE):
+                dark_count += 1
+        return active_count == 1 and dark_count == 4
 
     # ── 状态查询 — 面板 ──────────────────────────────────────────────────
 

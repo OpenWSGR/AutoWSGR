@@ -171,16 +171,20 @@ class TestActions:
     def test_go_back(self, page):
         pg, ctrl = page
         # go_back 现在使用 click_and_wait_for_page 验证到达地图页面
-        # 需要提供一个让 MapPage.is_current_page 返回 True 的截图
-        # MapPage 检测: 5 个面板探测点中恰好 1 个为选中蓝色 (15, 128, 220)
-        from autowsgr.ui.map_page import PANEL_PROBE, MapPanel
+        # MapPage 检测: 特征点 + 5 个面板标签中恰好 1 蓝 4 暗
+        from autowsgr.ui.map_page import MAP_FEATURE_PROBE, PANEL_PROBE, MapPanel
 
         screen = np.zeros((540, 960, 3), dtype=np.uint8)
-        # 在 SORTIE 面板探测点放置选中态颜色
-        # PixelChecker.get_pixel 使用 int(x * w) (截断), 此处保持一致
-        sx, sy = PANEL_PROBE[MapPanel.SORTIE]
-        px, py = int(sx * 960), int(sy * 540)
-        screen[py, px] = [15, 128, 220]
+        # 特征点 (橙色)
+        fx, fy = MAP_FEATURE_PROBE
+        screen[int(fy * 540), int(fx * 960)] = [240, 90, 63]
+        # SORTIE 面板为选中蓝色, 其余为暗色
+        for panel, (px_r, py_r) in PANEL_PROBE.items():
+            px, py = int(px_r * 960), int(py_r * 540)
+            if panel == MapPanel.SORTIE:
+                screen[py, px] = [15, 128, 220]
+            else:
+                screen[py, px] = [22, 37, 62]
         ctrl.screenshot.return_value = screen
         pg.go_back()
         ctrl.click.assert_called_with(*CLICK_BACK)

@@ -59,14 +59,14 @@ PAGE_SIGNATURE = PixelSignature(
     name="餐厅页",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.7667, 0.0491, (27, 135, 226), tolerance=30.0),
-        PixelRule.of(0.8719, 0.1593, (29, 119, 205), tolerance=30.0),
-        PixelRule.of(0.8781, 0.2630, (29, 119, 205), tolerance=30.0),
-        PixelRule.of(0.8719, 0.3806, (27, 116, 198), tolerance=30.0),
-        PixelRule.of(0.8125, 0.0472, (172, 172, 172), tolerance=30.0),
+        PixelRule.of(0.7667, 0.0454, (27, 134, 228), tolerance=30.0),
+        PixelRule.of(0.8734, 0.1611, (29, 119, 205), tolerance=30.0),
+        PixelRule.of(0.8745, 0.2750, (29, 115, 198), tolerance=30.0),
+        PixelRule.of(0.8734, 0.3806, (27, 116, 198), tolerance=30.0),
+        PixelRule.of(0.7734, 0.0602, (254, 255, 255), tolerance=30.0),
     ],
 )
-"""食堂页面像素签名。"""
+"""食堂页面像素签名 (来自 sig.py 重新采集)。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -295,7 +295,22 @@ class UIWalkRunner:
             return rec
 
         # 2. 执行动作
-        tag = screenshot_tag or f"{idx:03d}_{action.replace(' ', '_').replace('→', 'to').replace('◁', 'back')}"
+        # 文件名安全化: 去除 Windows 非法字符 (: * ? " < > |) 及中文标点
+        raw_tag = screenshot_tag or f"{idx:03d}_{action}"
+        tag = (
+            raw_tag
+            .replace(' ', '_')
+            .replace('→', 'to')
+            .replace('◁', 'back')
+            .replace(':', '')
+            .replace('：', '')
+            .replace('*', '')
+            .replace('?', '')
+            .replace('"', '')
+            .replace('<', '')
+            .replace('>', '')
+            .replace('|', '')
+        )
         rec = StepRecord(index=idx, action=action, expected_page=expected_page)
         t0 = time.monotonic()
 
