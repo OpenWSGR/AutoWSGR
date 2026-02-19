@@ -277,18 +277,21 @@ class ADBController(AndroidController):
     # ── 截图 ──
 
     def screenshot(self) -> np.ndarray:
+        import cv2
+
         dev = self._require_device()
         start = time.monotonic()
         while True:
-            screen = dev.snapshot(quality=99)  # airtest 返回 RGB ndarray
+            screen = dev.snapshot(quality=99)  # airtest 返回 BGR ndarray
             if screen is not None:
+                rgb = cv2.cvtColor(screen, cv2.COLOR_BGR2RGB)
                 elapsed = time.monotonic() - start
-                h, w = screen.shape[:2]
+                h, w = rgb.shape[:2]
                 logger.debug(
                     "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
                     w, h, elapsed,
                 )
-                return screen
+                return rgb
             if time.monotonic() - start > self._screenshot_timeout:
                 raise EmulatorConnectionError(
                     f"截图超时 ({self._screenshot_timeout}s)，设备可能已失去响应"
