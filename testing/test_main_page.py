@@ -13,10 +13,7 @@ from autowsgr.ui.main_page import (
     CLICK_NAV,
     EXIT_SIDEBAR,
     EXIT_TOP_LEFT,
-    MAP_PAGE_SIGNATURE,
     PAGE_SIGNATURE,
-    SIDEBAR_PAGE_SIGNATURE,
-    SUB_PAGE_SIGNATURES,
     MainPage,
     MainPageTarget,
 )
@@ -39,36 +36,15 @@ def _set_pixel(
 
 
 def _make_main_screen() -> np.ndarray:
-    """生成主页面合成截图 (8 个特征点全部正确)。"""
+    """生成主页面合成截图 (特征点全部正确)。"""
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
     for rule in PAGE_SIGNATURE.rules:
         _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
     return screen
 
 
-def _make_map_screen() -> np.ndarray:
-    """生成出征页面合成截图。"""
-    screen = np.zeros((_H, _W, 3), dtype=np.uint8)
-    for rule in MAP_PAGE_SIGNATURE.rules:
-        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
-    return screen
-
-
-def _make_sidebar_screen() -> np.ndarray:
-    """生成侧边栏页面合成截图。"""
-    screen = np.zeros((_H, _W, 3), dtype=np.uint8)
-    for rule in SIDEBAR_PAGE_SIGNATURE.rules:
-        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
-    return screen
-
-
-def _make_target_screen(target: MainPageTarget) -> np.ndarray:
-    """生成满足导航验证的目标页面截图。"""
-    if target == MainPageTarget.SORTIE:
-        return _make_map_screen()
-    if target == MainPageTarget.SIDEBAR:
-        return _make_sidebar_screen()
-    # TASK / HOME — 无子页面签名，只需不匹配主页面
+def _make_non_main_screen() -> np.ndarray:
+    """生成一个不匹配主页面的截图。"""
     return np.zeros((_H, _W, 3), dtype=np.uint8)
 
 
@@ -86,14 +62,9 @@ class TestIsCurrentPage:
         screen = np.zeros((_H, _W, 3), dtype=np.uint8)
         assert MainPage.is_current_page(screen) is False
 
-    def test_map_page_not_detected(self):
-        """出征页面不应被识别为主页面。"""
-        screen = _make_map_screen()
-        assert MainPage.is_current_page(screen) is False
-
-    def test_sidebar_page_not_detected(self):
-        """侧边栏页面不应被识别为主页面。"""
-        screen = _make_sidebar_screen()
+    def test_non_main_page_not_detected(self):
+        """其他页面不应被识别为主页面。"""
+        screen = _make_non_main_screen()
         assert MainPage.is_current_page(screen) is False
 
     def test_one_pixel_wrong_not_detected(self):
@@ -120,31 +91,6 @@ class TestIsCurrentPage:
 
 
 # ─────────────────────────────────────────────
-# 子页面识别
-# ─────────────────────────────────────────────
-
-
-class TestIsSubPage:
-    def test_map_page_detected(self):
-        screen = _make_map_screen()
-        assert MainPage.is_sub_page(screen, MainPageTarget.SORTIE) is True
-
-    def test_sidebar_detected(self):
-        screen = _make_sidebar_screen()
-        assert MainPage.is_sub_page(screen, MainPageTarget.SIDEBAR) is True
-
-    def test_map_page_negative(self):
-        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
-        assert MainPage.is_sub_page(screen, MainPageTarget.SORTIE) is False
-
-    def test_no_signature_returns_none(self):
-        """无签名的子页面返回 None。"""
-        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
-        assert MainPage.is_sub_page(screen, MainPageTarget.TASK) is None
-        assert MainPage.is_sub_page(screen, MainPageTarget.HOME) is None
-
-
-# ─────────────────────────────────────────────
 # 导航
 # ─────────────────────────────────────────────
 
@@ -158,7 +104,8 @@ class TestNavigateTo:
     @pytest.mark.parametrize("target", list(MainPageTarget))
     def test_navigate_calls_click(self, page, target: MainPageTarget):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_target_screen(target)
+        # navigate_to 使用 wait_leave_page 验证，截图需返回非主页面
+        ctrl.screenshot.return_value = _make_non_main_screen()
         pg.navigate_to(target)
         ctrl.click.assert_called_once_with(*CLICK_NAV[target])
 
@@ -166,31 +113,31 @@ class TestNavigateTo:
     def test_navigate_verifies_screenshot(self, page, target: MainPageTarget):
         """导航后调用 screenshot 进行验证。"""
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_target_screen(target)
+        ctrl.screenshot.return_value = _make_non_main_screen()
         pg.navigate_to(target)
         ctrl.screenshot.assert_called()
 
     def test_go_to_sortie(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_map_screen()
+        ctrl.screenshot.return_value = _make_non_main_screen()
         pg.go_to_sortie()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SORTIE])
 
     def test_go_to_task(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = np.zeros((_H, _W, 3), dtype=np.uint8)
+        ctrl.screenshot.return_value = _make_non_main_screen()
         pg.go_to_task()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.TASK])
 
     def test_open_sidebar(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = _make_sidebar_screen()
+        ctrl.screenshot.return_value = _make_non_main_screen()
         pg.open_sidebar()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.SIDEBAR])
 
     def test_go_home(self, page):
         pg, ctrl = page
-        ctrl.screenshot.return_value = np.zeros((_H, _W, 3), dtype=np.uint8)
+        ctrl.screenshot.return_value = _make_non_main_screen()
         pg.go_home()
         ctrl.click.assert_called_once_with(*CLICK_NAV[MainPageTarget.HOME])
 
@@ -273,11 +220,6 @@ class TestConstants:
         """每个目标都有退出坐标。"""
         for target in MainPageTarget:
             assert target in CLICK_EXIT
-
-    def test_all_targets_in_sub_signatures(self):
-        """每个目标在子页面签名字典中 (即使值为 None)。"""
-        for target in MainPageTarget:
-            assert target in SUB_PAGE_SIGNATURES
 
     def test_page_signature_has_rules(self):
         assert len(PAGE_SIGNATURE.rules) == 7

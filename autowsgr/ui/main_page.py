@@ -52,7 +52,6 @@ from loguru import logger
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import wait_for_page, wait_leave_page
 from autowsgr.vision.matcher import (
-    Color,
     MatchStrategy,
     PixelChecker,
     PixelRule,
@@ -93,9 +92,6 @@ PAGE_SIGNATURE = PixelSignature(
 )
 """主页面像素签名 — 检测资源栏 + 角落特征。"""
 
-_STATE_TOLERANCE = 30.0
-"""通用颜色容差。"""
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 导航按钮点击坐标
@@ -127,46 +123,6 @@ CLICK_EXIT: dict[MainPageTarget, tuple[float, float]] = {
     MainPageTarget.SIDEBAR: EXIT_SIDEBAR,
 }
 """子页面退出控件的点击坐标。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 子页面识别签名 (用于冒烟测试验证)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-MAP_PAGE_SIGNATURE = PixelSignature(
-    name="map_page",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.8938, 0.0602, (241, 96, 69), tolerance=30.0),
-        PixelRule.of(0.9672, 0.0472, (21, 38, 66), tolerance=30.0),
-        PixelRule.of(0.6297, 0.1046, (23, 42, 72), tolerance=30.0),
-        PixelRule.of(0.3391, 0.1019, (28, 44, 69), tolerance=30.0),
-        PixelRule.of(0.1833, 0.1083, (17, 33, 58), tolerance=30.0),
-    ],
-)
-"""出征 (地图选择) 页面签名。"""
-
-SIDEBAR_PAGE_SIGNATURE = PixelSignature(
-    name="sidebar_page",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.0406, 0.0787, (59, 59, 59), tolerance=30.0),
-        PixelRule.of(0.0443, 0.2074, (51, 51, 51), tolerance=30.0),
-        PixelRule.of(0.0417, 0.3426, (56, 56, 56), tolerance=30.0),
-        PixelRule.of(0.0422, 0.4583, (60, 62, 61), tolerance=30.0),
-        PixelRule.of(0.0417, 0.5935, (53, 53, 53), tolerance=30.0),
-        PixelRule.of(0.0422, 0.7231, (59, 59, 59), tolerance=30.0),
-    ],
-)
-"""侧边栏页面签名。"""
-
-SUB_PAGE_SIGNATURES: dict[MainPageTarget, PixelSignature | None] = {
-    MainPageTarget.SORTIE:  MAP_PAGE_SIGNATURE,
-    MainPageTarget.TASK:    None,  # TODO: 待采集
-    MainPageTarget.SIDEBAR: SIDEBAR_PAGE_SIGNATURE,
-    MainPageTarget.HOME:    None,  # TODO: 待采集
-}
-"""子页面签名 (``None`` 表示尚未采集，仅用 "非主页面" 判定)。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -205,30 +161,6 @@ class MainPage:
         result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
         return result.matched
 
-    # ── 子页面识别 ────────────────────────────────────────────────────────
-
-    @staticmethod
-    def is_sub_page(screen: np.ndarray, target: MainPageTarget) -> bool | None:
-        """检测截图是否为指定子页面。
-
-        Parameters
-        ----------
-        screen:
-            截图 (H×W×3, RGB)。
-        target:
-            目标子页面。
-
-        Returns
-        -------
-        bool | None
-            匹配结果。无签名时返回 ``None``。
-        """
-        sig = SUB_PAGE_SIGNATURES.get(target)
-        if sig is None:
-            return None
-        result = PixelChecker.check_signature(screen, sig)
-        return result.matched
-
     # ── 导航 ──────────────────────────────────────────────────────────────
 
     def navigate_to(self, target: MainPageTarget) -> None:
@@ -249,24 +181,13 @@ class MainPage:
         logger.info("[UI] 主页面 → {}", target.value)
         self._ctrl.click(*CLICK_NAV[target])
 
-        # 验证导航成功
-        sig = SUB_PAGE_SIGNATURES.get(target)
-        if sig is not None:
-            # 目标页面有签名 — 等待签名匹配
-            wait_for_page(
-                self._ctrl,
-                lambda s, t=target: MainPage.is_sub_page(s, t) is True,
-                source="主页面",
-                target=target.value,
-            )
-        else:
-            # 无签名 — 降级为等待离开主页面
-            wait_leave_page(
-                self._ctrl,
-                MainPage.is_current_page,
-                source="主页面",
-                target=target.value,
-            )
+        # 验证已离开主页面
+        wait_leave_page(
+            self._ctrl,
+            MainPage.is_current_page,
+            source="主页面",
+            target=target.value,
+        )
 
     def go_to_sortie(self) -> None:
         """点击「出征」— 进入地图选择页面。"""

@@ -19,7 +19,7 @@
     对 4 个导航控件 (出征 / 任务 / 侧边栏 / 主页) 依次:
     1. 验证当前在主页面
     2. 点击导航控件进入子页面
-    3. 验证已离开主页面 (+ 子页面签名验证, 若有)
+    3. 验证已离开主页面
     4. 点击退出控件返回主页面
     5. 验证已返回主页面
 
@@ -129,15 +129,6 @@ def test_roundtrip(
         success = False
     else:
         ok(f"[{label}] 已离开主页面")
-
-    # 3b. 子页面签名验证 (如果有)
-    sub_result = MainPage.is_sub_page(screen, target)
-    if sub_result is True:
-        ok(f"[{label}] 子页面签名匹配 ✓")
-    elif sub_result is False:
-        info(f"[{label}] 子页面签名不匹配 (可能需要调整)")
-    else:
-        info(f"[{label}] 无子页面签名，跳过验证")
 
     # 4. 点击退出
     info(f"[{label}] 点击退出控件...")
