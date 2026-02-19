@@ -104,12 +104,12 @@ def save_image(
     tag: str = "screenshot",
     img_dir: Path | None = None,
 ) -> Path | None:
-    """将 BGR ndarray 截图保存到磁盘。
+    """将 RGB ndarray 截图保存到磁盘。
 
     Parameters
     ----------
     image:
-        BGR uint8 数组 (H×W×3)。
+        RGB uint8 数组 (H×W×3)。
     tag:
         文件名前缀（不含扩展名）。
     img_dir:
@@ -133,10 +133,9 @@ def save_image(
     filename = f"{tag}_{ts}.png"
     path = target_dir / filename
 
-    # OpenCV 内部用 BGR，但 PNG 文件由第三方查看器以 RGB 解读。
-    # 写入前先转 RGB，确保保存的 PNG 颜色与屏幕一致。
-    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    ok = cv2.imwrite(str(path), rgb)
+    # cv2.imwrite 期望 BGR 排列，而我们统一使用 RGB，写入前需转换
+    bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    ok = cv2.imwrite(str(path), bgr)
     if ok:
         logger.debug("截图已保存: {}", path)
     else:

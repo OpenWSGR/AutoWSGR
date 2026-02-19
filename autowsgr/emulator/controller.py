@@ -87,7 +87,7 @@ class AndroidController(ABC):
 
     @abstractmethod
     def screenshot(self) -> np.ndarray:
-        """截取当前屏幕，返回 BGR uint8 数组 ``(H, W, 3)``。
+        """截取当前屏幕，返回 RGB uint8 数组 ``(H, W, 3)``。
 
         Raises
         ------
@@ -277,21 +277,18 @@ class ADBController(AndroidController):
     # ── 截图 ──
 
     def screenshot(self) -> np.ndarray:
-        import cv2
-
         dev = self._require_device()
         start = time.monotonic()
         while True:
-            screen = dev.snapshot(quality=99)  # RGB ndarray
+            screen = dev.snapshot(quality=99)  # airtest 返回 RGB ndarray
             if screen is not None:
                 elapsed = time.monotonic() - start
-                bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-                h, w = bgr.shape[:2]
+                h, w = screen.shape[:2]
                 logger.debug(
                     "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
                     w, h, elapsed,
                 )
-                return bgr
+                return screen
             if time.monotonic() - start > self._screenshot_timeout:
                 raise EmulatorConnectionError(
                     f"截图超时 ({self._screenshot_timeout}s)，设备可能已失去响应"

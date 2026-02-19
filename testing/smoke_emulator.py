@@ -156,8 +156,8 @@ def main() -> None:
 
             # 打印右下角像素供参考
             h, w = screen.shape[:2]
-            b, g, r = int(screen[h - 1, w - 1, 0]), int(screen[h - 1, w - 1, 1]), int(screen[h - 1, w - 1, 2])
-            show_ok(f"右下角像素 BGR=({b},{g},{r})")
+            r, g, b = int(screen[h - 1, w - 1, 0]), int(screen[h - 1, w - 1, 1]), int(screen[h - 1, w - 1, 2])
+            show_ok(f"右下角像素 RGB=({r},{g},{b})")
 
         run_with_retry(_screenshot, "截图")
 

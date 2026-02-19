@@ -22,18 +22,18 @@ from autowsgr.vision.matcher import (
 # ─────────────────────────────────────────────
 
 
-def solid_screen(b: int, g: int, r: int, h: int = 540, w: int = 960) -> np.ndarray:
-    """创建纯色截图 (H×W×3, BGR uint8)。"""
+def solid_screen(r: int, g: int, b: int, h: int = 540, w: int = 960) -> np.ndarray:
+    """创建纯色截图 (H×W×3, RGB uint8)。"""
     screen = np.zeros((h, w, 3), dtype=np.uint8)
-    screen[:, :] = [b, g, r]
+    screen[:, :] = [r, g, b]
     return screen
 
 
 def patch_screen(screen: np.ndarray, patches: dict[tuple[int, int], tuple[int, int, int]]) -> np.ndarray:
-    """在截图指定坐标写入颜色 {(x,y): (b,g,r)}。"""
+    """在截图指定坐标写入颜色 {(x,y): (r,g,b)}。"""
     s = screen.copy()
-    for (x, y), bgr in patches.items():
-        s[y, x] = bgr
+    for (x, y), rgb in patches.items():
+        s[y, x] = rgb
     return s
 
 
@@ -43,17 +43,17 @@ def patch_screen(screen: np.ndarray, patches: dict[tuple[int, int], tuple[int, i
 
 
 class TestColor:
-    def test_of_creates_bgr_color(self):
+    def test_of_creates_rgb_color(self):
         c = Color.of(10, 20, 30)
-        assert c.b == 10 and c.g == 20 and c.r == 30
+        assert c.r == 10 and c.g == 20 and c.b == 30
 
-    def test_from_rgb_swaps_channels(self):
+    def test_from_rgb(self):
         c = Color.from_rgb(r=10, g=20, b=30)
         assert c.r == 10 and c.g == 20 and c.b == 30
 
     def test_from_bgr_tuple(self):
         c = Color.from_bgr_tuple((1, 2, 3))
-        assert c == Color(b=1, g=2, r=3)
+        assert c == Color(r=3, g=2, b=1)
 
     def test_from_rgb_tuple(self):
         c = Color.from_rgb_tuple((10, 20, 30))
@@ -80,22 +80,22 @@ class TestColor:
         b = Color.of(120, 110, 95)
         assert a.near(b)  # distance ≈ 22.9 < 30
 
-    def test_as_bgr_tuple(self):
-        c = Color.of(5, 10, 15)
-        assert c.as_bgr_tuple() == (5, 10, 15)
-
     def test_as_rgb_tuple(self):
         c = Color.of(5, 10, 15)
-        assert c.as_rgb_tuple() == (15, 10, 5)
+        assert c.as_rgb_tuple() == (5, 10, 15)
+
+    def test_as_bgr_tuple(self):
+        c = Color.of(5, 10, 15)
+        assert c.as_bgr_tuple() == (15, 10, 5)
 
     def test_repr(self):
-        c = Color(b=1, g=2, r=3)
+        c = Color(r=3, g=2, b=1)
         assert "Color" in repr(c)
 
     def test_immutable(self):
         c = Color.of(10, 20, 30)
         with pytest.raises((AttributeError, TypeError)):
-            c.b = 99  # type: ignore[misc]
+            c.r = 99  # type: ignore[misc]
 
 
 # ─────────────────────────────────────────────
@@ -110,7 +110,7 @@ class TestPixelRule:
 
     def test_of_convenience(self):
         r = PixelRule.of(10, 20, (50, 60, 70))
-        assert r.color == Color(b=50, g=60, r=70)
+        assert r.color == Color(r=50, g=60, b=70)
         assert r.tolerance == 30.0
 
     def test_of_custom_tolerance(self):
@@ -120,7 +120,7 @@ class TestPixelRule:
     def test_from_dict_list_color(self):
         d = {"x": 10, "y": 20, "color": [50, 60, 70]}
         r = PixelRule.from_dict(d)
-        assert r.x == 10 and r.color.b == 50
+        assert r.x == 10 and r.color.r == 50
 
     def test_from_dict_with_tolerance(self):
         d = {"x": 5, "y": 5, "color": [10, 20, 30], "tolerance": 40.0}
@@ -128,9 +128,9 @@ class TestPixelRule:
         assert r.tolerance == 40.0
 
     def test_from_dict_dict_color(self):
-        d = {"x": 0, "y": 0, "color": {"b": 1, "g": 2, "r": 3}}
+        d = {"x": 0, "y": 0, "color": {"r": 3, "g": 2, "b": 1}}
         r = PixelRule.from_dict(d)
-        assert r.color == Color(b=1, g=2, r=3)
+        assert r.color == Color(r=3, g=2, b=1)
 
     def test_from_dict_invalid_color_raises(self):
         with pytest.raises(ValueError):
@@ -271,13 +271,13 @@ class TestPixelCheckerSingle:
         # 纯色屏，任意相对坐标均返回相同颜色
         screen = solid_screen(100, 150, 200)
         c = PixelChecker.get_pixel(screen, x=0.5, y=0.5)
-        assert c == Color(b=100, g=150, r=200)
+        assert c == Color(r=100, g=150, b=200)
 
     def test_get_pixel_origin(self):
         screen = solid_screen(0, 0, 0)
         screen[0, 0] = [1, 2, 3]
         c = PixelChecker.get_pixel(screen, x=0.0, y=0.0)
-        assert c == Color(b=1, g=2, r=3)
+        assert c == Color(r=1, g=2, b=3)
 
     def test_get_pixel_reads_y_then_x(self):
         """确保内部转换为 screen[py, px] 顺序正确。
@@ -286,7 +286,7 @@ class TestPixelCheckerSingle:
         screen = np.zeros((10, 10, 3), dtype=np.uint8)
         screen[3, 7] = [11, 22, 33]  # row=3, col=7
         c = PixelChecker.get_pixel(screen, x=0.7, y=0.3)
-        assert c.b == 11 and c.g == 22 and c.r == 33
+        assert c.r == 11 and c.g == 22 and c.b == 33
 
     def test_check_pixel_match(self):
         screen = solid_screen(100, 150, 200)
@@ -318,7 +318,7 @@ class TestPixelCheckerBatch:
         screen = solid_screen(50, 60, 70)
         colors = PixelChecker.get_pixels(screen, [(0.0, 0.0), (0.1, 0.1), (0.2, 0.2)])
         assert len(colors) == 3
-        assert all(c == Color(b=50, g=60, r=70) for c in colors)
+        assert all(c == Color(r=50, g=60, b=70) for c in colors)
 
     def test_get_pixels_empty(self):
         screen = solid_screen(0, 0, 0)
@@ -395,12 +395,12 @@ class TestCheckSignatureAll:
         assert result.details == ()
 
     def test_details_contain_actual_color(self):
-        b, g, r = 55, 66, 77
-        screen = solid_screen(b, g, r)
-        sig = self._sig([PixelRule.of(0.0, 0.0, (b, g, r))])
+        r, g, b = 55, 66, 77
+        screen = solid_screen(r, g, b)
+        sig = self._sig([PixelRule.of(0.0, 0.0, (r, g, b))])
         result = PixelChecker.check_signature(screen, sig, with_details=True)
         detail = result.details[0]
-        assert detail.actual == Color(b=b, g=g, r=r)
+        assert detail.actual == Color(r=r, g=g, b=b)
         assert detail.matched is True
         assert detail.distance == pytest.approx(0.0)
 
@@ -560,24 +560,24 @@ class TestIdentify:
 
 class TestClassifyColor:
     BLOOD_COLORS = {
-        "green":  Color.of(69, 162, 117),
-        "yellow": Color.of(246, 184, 51),
-        "red":    Color.of(230, 58, 89),
+        "green":  Color.of(117, 162, 69),
+        "yellow": Color.of(51, 184, 246),
+        "red":    Color.of(89, 58, 230),
     }
 
-    def _screen_with_pixel(self, b, g, r) -> np.ndarray:
+    def _screen_with_pixel(self, r, g, b) -> np.ndarray:
         s = np.zeros((10, 10, 3), dtype=np.uint8)
-        s[5, 5] = [b, g, r]
+        s[5, 5] = [r, g, b]
         return s
 
     # _screen_with_pixel 使用 10×10 屏幕，s[5,5] 对应 x=0.5, y=0.5
     def test_classify_green(self):
-        screen = self._screen_with_pixel(69, 162, 117)
+        screen = self._screen_with_pixel(117, 162, 69)
         result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS)
         assert result == "green"
 
     def test_classify_yellow(self):
-        screen = self._screen_with_pixel(246, 184, 51)
+        screen = self._screen_with_pixel(51, 184, 246)
         result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS)
         assert result == "yellow"
 
@@ -590,7 +590,7 @@ class TestClassifyColor:
 
     def test_classify_nearest_within_tolerance(self):
         # Slightly off from green
-        screen = self._screen_with_pixel(72, 160, 115)
+        screen = self._screen_with_pixel(115, 160, 72)
         result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS, tolerance=30)
         assert result == "green"
 

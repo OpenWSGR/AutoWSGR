@@ -64,7 +64,7 @@ class OCREngine(ABC):
         Parameters
         ----------
         image:
-            输入图像 (BGR, uint8)。
+            输入图像 (RGB, uint8)。
         allowlist:
             仅允许识别的字符集（空字符串表示不限制）。
 

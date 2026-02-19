@@ -3,7 +3,7 @@
 提供 tkinter GUI，支持：
     1. 连接模拟器实时截图 / 加载本地 PNG 图片
     2. 在截图上点击标注特征点
-    3. 自动读取点击处 BGR 颜色
+    3. 自动读取点击处 RGB 颜色
     4. 编辑签名名称、匹配策略、容差
     5. 导出为 Python 代码 / YAML 片段，可直接粘贴到项目中
 
@@ -59,10 +59,10 @@ class MarkedPoint:
     # 绝对像素坐标
     px: int
     py: int
-    # BGR 颜色
-    b: int
-    g: int
+    # RGB 颜色
     r: int
+    g: int
+    b: int
     # 容差
     tolerance: float = 30.0
 
@@ -72,21 +72,21 @@ class MarkedPoint:
         return f"#{self.r:02x}{self.g:02x}{self.b:02x}"
 
     @property
-    def color_bgr(self) -> tuple[int, int, int]:
-        return (self.b, self.g, self.r)
+    def color_rgb(self) -> tuple[int, int, int]:
+        return (self.r, self.g, self.b)
 
     def to_pixel_rule_code(self) -> str:
         """生成 PixelRule.of(...) 代码。"""
         return (
             f"PixelRule.of({self.rx:.4f}, {self.ry:.4f}, "
-            f"({self.b}, {self.g}, {self.r}), tolerance={self.tolerance})"
+            f"({self.r}, {self.g}, {self.b}), tolerance={self.tolerance})"
         )
 
     def to_yaml_dict(self) -> dict:
         return {
             "x": round(self.rx, 4),
             "y": round(self.ry, 4),
-            "color": [self.b, self.g, self.r],
+            "color": [self.r, self.g, self.b],
             "tolerance": self.tolerance,
         }
 
@@ -155,7 +155,7 @@ class PixelMarkerApp:
         self._controller: object | None = None  # ADBController (lazy)
         self._connected = False
 
-        # 原始截图 (BGR, full resolution)
+        # 原始截图 (RGB, full resolution)
         self._image: np.ndarray | None = None
         self._img_w = 0
         self._img_h = 0
@@ -233,16 +233,16 @@ class PixelMarkerApp:
         list_frame = ttk.LabelFrame(sidebar, text="标注点列表")
         list_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
-        cols = ("#", "rx", "ry", "B", "G", "R", "色块")
+        cols = ("#", "rx", "ry", "R", "G", "B", "色块")
         self._tree = ttk.Treeview(list_frame, columns=cols, show="headings", height=12)
         for c in cols:
             self._tree.heading(c, text=c)
         self._tree.column("#", width=30, anchor="center")
         self._tree.column("rx", width=55, anchor="center")
         self._tree.column("ry", width=55, anchor="center")
-        self._tree.column("B", width=35, anchor="center")
-        self._tree.column("G", width=35, anchor="center")
         self._tree.column("R", width=35, anchor="center")
+        self._tree.column("G", width=35, anchor="center")
+        self._tree.column("B", width=35, anchor="center")
         self._tree.column("色块", width=50, anchor="center")
         self._tree.pack(fill=tk.BOTH, expand=True)
 
@@ -345,17 +345,18 @@ class PixelMarkerApp:
             self._load_image_file(path)
 
     def _load_image_file(self, path: str) -> None:
-        img = cv2.imread(path)
-        if img is None:
+        bgr = cv2.imread(path)
+        if bgr is None:
             messagebox.showerror("加载失败", f"无法读取图片: {path}")
             return
+        img = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         self._set_image(img)
         self._status_var.set(f"已加载: {Path(path).name}  ({img.shape[1]}x{img.shape[0]})")
 
-    def _set_image(self, bgr: np.ndarray) -> None:
-        """设置当前截图（BGR ndarray）。"""
-        self._image = bgr
-        self._img_h, self._img_w = bgr.shape[:2]
+    def _set_image(self, rgb: np.ndarray) -> None:
+        """设置当前截图（RGB ndarray）。"""
+        self._image = rgb
+        self._img_h, self._img_w = rgb.shape[:2]
 
         # 计算缩放使图片适配画布
         canvas_w = max(self._canvas.winfo_width(), PREVIEW_MAX_W)
@@ -367,13 +368,13 @@ class PixelMarkerApp:
         disp_w = int(self._img_w * self._scale)
         disp_h = int(self._img_h * self._scale)
 
-        # BGR → RGB → resize → PhotoImage
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        # resize → PhotoImage（图像已是 RGB）
+        display = rgb.copy()
         if self._scale < 1.0:
-            rgb = cv2.resize(rgb, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
+            display = cv2.resize(display, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
 
         from PIL import Image, ImageTk
-        pil_img = Image.fromarray(rgb)
+        pil_img = Image.fromarray(display)
         self._tk_photo = ImageTk.PhotoImage(pil_img)
 
         self._canvas.delete("all")
@@ -402,19 +403,19 @@ class PixelMarkerApp:
             return
 
         px, py = pos
-        b, g, r = int(self._image[py, px, 0]), int(self._image[py, px, 1]), int(self._image[py, px, 2])
+        r, g, b = int(self._image[py, px, 0]), int(self._image[py, px, 1]), int(self._image[py, px, 2])
         rx = round(px / self._img_w, 4)
         ry = round(py / self._img_h, 4)
         tol = self._tolerance_var.get()
 
-        pt = MarkedPoint(rx=rx, ry=ry, px=px, py=py, b=b, g=g, r=r, tolerance=tol)
+        pt = MarkedPoint(rx=rx, ry=ry, px=px, py=py, r=r, g=g, b=b, tolerance=tol)
         self._config.points.append(pt)
 
         self._draw_marker(pt)
         self._refresh_tree()
         self._status_var.set(
             f"添加点 #{len(self._config.points)}: "
-            f"({rx:.4f}, {ry:.4f}) BGR=({b},{g},{r})"
+            f"({rx:.4f}, {ry:.4f}) RGB=({r},{g},{b})"
         )
 
     def _on_canvas_right_click(self, event: tk.Event) -> None:  # type: ignore[type-arg]
@@ -440,7 +441,7 @@ class PixelMarkerApp:
             self._redraw_markers()
             self._refresh_tree()
             self._status_var.set(
-                f"删除点: ({removed.rx:.4f}, {removed.ry:.4f}) BGR=({removed.b},{removed.g},{removed.r})"
+                f"删除点: ({removed.rx:.4f}, {removed.ry:.4f}) RGB=({removed.r},{removed.g},{removed.b})"
             )
 
     def _on_canvas_motion(self, event: tk.Event) -> None:  # type: ignore[type-arg]
@@ -450,12 +451,12 @@ class PixelMarkerApp:
             self._mouse_info_var.set("鼠标超出图片范围")
             return
         px, py = pos
-        b, g, r = int(self._image[py, px, 0]), int(self._image[py, px, 1]), int(self._image[py, px, 2])
+        r, g, b = int(self._image[py, px, 0]), int(self._image[py, px, 1]), int(self._image[py, px, 2])
         rx = px / self._img_w
         ry = py / self._img_h
         self._mouse_info_var.set(
             f"像素: ({px}, {py})    相对: ({rx:.4f}, {ry:.4f})\n"
-            f"BGR: ({b}, {g}, {r})    #{r:02x}{g:02x}{b:02x}"
+            f"RGB: ({r}, {g}, {b})    #{r:02x}{g:02x}{b:02x}"
         )
 
     # ── 标注绘制 ─────────────────────────────────────────────────────────
@@ -497,7 +498,7 @@ class PixelMarkerApp:
         for i, pt in enumerate(self._config.points, 1):
             self._tree.insert(
                 "", "end", iid=str(i),
-                values=(i, f"{pt.rx:.4f}", f"{pt.ry:.4f}", pt.b, pt.g, pt.r, pt.color_hex),
+                values=(i, f"{pt.rx:.4f}", f"{pt.ry:.4f}", pt.r, pt.g, pt.b, pt.color_hex),
             )
 
     def _on_delete_selected(self) -> None:

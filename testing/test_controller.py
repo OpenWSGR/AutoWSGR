@@ -253,12 +253,12 @@ class TestADBControllerCoordinates:
 class TestADBControllerScreenshot:
     """测试截图功能（使用 mock）。"""
 
-    def test_screenshot_rgb_to_bgr(self):
-        """确认 RGB → BGR 转换。"""
+    def test_screenshot_returns_rgb(self):
+        """确认截图直接返回 RGB 数组（不做任何通道转换）。"""
         ctrl = ADBController(serial="test")
         ctrl._resolution = (4, 3)
 
-        # 创建一个纯红色 RGB 图像
+        # 创建一个纯红色 RGB 图像（airtest snapshot 返回 RGB）
         rgb = np.zeros((3, 4, 3), dtype=np.uint8)
         rgb[:, :, 0] = 255  # R 通道
 
@@ -267,11 +267,11 @@ class TestADBControllerScreenshot:
         ctrl._device = mock_device
 
         result = ctrl.screenshot()
-        # BGR: B=255, G=0, R=0? No — RGB Red(255,0,0) → BGR(0,0,255)
+        # RGB 直接透传: R=255, G=0, B=0
         assert result.shape == (3, 4, 3)
-        assert result[0, 0, 0] == 0    # B
+        assert result[0, 0, 0] == 255  # R
         assert result[0, 0, 1] == 0    # G
-        assert result[0, 0, 2] == 255  # R
+        assert result[0, 0, 2] == 0    # B
 
     def test_screenshot_timeout(self):
         """截图超时应抛异常。"""

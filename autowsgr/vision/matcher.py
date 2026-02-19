@@ -20,8 +20,8 @@
     main_page = PixelSignature(
         name="main_page",
         rules=[
-            PixelRule(0.50, 0.85, Color.of(201, 129, 54)),
-            PixelRule(0.20, 0.60, Color.of(47, 253, 226)),
+            PixelRule(0.50, 0.85, Color.of(54, 129, 201)),
+            PixelRule(0.20, 0.60, Color.of(226, 253, 47)),
         ],
     )
 
@@ -46,39 +46,46 @@ from loguru import logger
 
 @dataclass(frozen=True, slots=True)
 class Color:
-    """BGR 颜色值（OpenCV 默认格式）。
+    """RGB 颜色值。
+
+    项目统一使用 RGB 通道顺序，与截图数组一致。
 
     Parameters
     ----------
-    b, g, r:
-        蓝、绿、红通道值，范围 0–255。
+    r, g, b:
+        红、绿、蓝通道值，范围 0–255。
     """
 
-    b: int
-    g: int
     r: int
+    g: int
+    b: int
 
     # ── 构造 ──
 
     @classmethod
-    def of(cls, b: int, g: int, r: int) -> Color:
-        """从 BGR 值创建（与 OpenCV 一致）。"""
-        return cls(b=b, g=g, r=r)
+    def of(cls, r: int, g: int, b: int) -> Color:
+        """从 RGB 值创建。"""
+        return cls(r=r, g=g, b=b)
 
     @classmethod
     def from_rgb(cls, r: int, g: int, b: int) -> Color:
-        """从 RGB 值创建。"""
-        return cls(b=b, g=g, r=r)
+        """从 RGB 值创建（与 :meth:`of` 等价）。"""
+        return cls(r=r, g=g, b=b)
 
     @classmethod
-    def from_bgr_tuple(cls, bgr: tuple[int, int, int]) -> Color:
-        """从 (B, G, R) 元组创建。"""
-        return cls(b=bgr[0], g=bgr[1], r=bgr[2])
+    def from_bgr(cls, b: int, g: int, r: int) -> Color:
+        """从 BGR 值创建（OpenCV 顺序）。"""
+        return cls(r=r, g=g, b=b)
 
     @classmethod
     def from_rgb_tuple(cls, rgb: tuple[int, int, int]) -> Color:
         """从 (R, G, B) 元组创建。"""
-        return cls(b=rgb[2], g=rgb[1], r=rgb[0])
+        return cls(r=rgb[0], g=rgb[1], b=rgb[2])
+
+    @classmethod
+    def from_bgr_tuple(cls, bgr: tuple[int, int, int]) -> Color:
+        """从 (B, G, R) 元组创建（兼容 OpenCV）。"""
+        return cls(r=bgr[2], g=bgr[1], b=bgr[0])
 
     # ── 距离 ──
 
@@ -96,14 +103,14 @@ class Color:
 
     # ── 转换 ──
 
-    def as_bgr_tuple(self) -> tuple[int, int, int]:
-        return (self.b, self.g, self.r)
-
     def as_rgb_tuple(self) -> tuple[int, int, int]:
         return (self.r, self.g, self.b)
 
+    def as_bgr_tuple(self) -> tuple[int, int, int]:
+        return (self.b, self.g, self.r)
+
     def __repr__(self) -> str:
-        return f"Color(b={self.b}, g={self.g}, r={self.r})"
+        return f"Color(r={self.r}, g={self.g}, b={self.b})"
 
 
 # ── 像素规则 ──
@@ -118,7 +125,7 @@ class PixelRule:
     x, y:
         像素的相对坐标（左上角为 0.0，右下角趋近 1.0）。
     color:
-        期望的 BGR 颜色。
+        期望的 RGB 颜色。
     tolerance:
         允许的最大色彩距离（欧几里得距离）。
     """
@@ -133,11 +140,11 @@ class PixelRule:
         cls,
         x: float,
         y: float,
-        bgr: tuple[int, int, int],
+        rgb: tuple[int, int, int],
         tolerance: float = 30.0,
     ) -> PixelRule:
-        """便捷构造：相对坐标 + BGR 元组。"""
-        return cls(x=x, y=y, color=Color.from_bgr_tuple(bgr), tolerance=tolerance)
+        """便捷构造：相对坐标 + RGB 元组。"""
+        return cls(x=x, y=y, color=Color.from_rgb_tuple(rgb), tolerance=tolerance)
 
     @classmethod
     def from_dict(cls, d: dict) -> PixelRule:
@@ -147,22 +154,24 @@ class PixelRule:
 
             {"x": 0.50, "y": 0.85, "color": [201, 129, 54]}
             {"x": 0.50, "y": 0.85, "color": [201, 129, 54], "tolerance": 40}
+
+        其中 color 为 RGB 顺序 ``[R, G, B]``。
         """
         color = d["color"]
         if isinstance(color, (list, tuple)):
-            c = Color.from_bgr_tuple(tuple(color))  # type: ignore[arg-type]
+            c = Color.from_rgb_tuple(tuple(color))  # type: ignore[arg-type]
         elif isinstance(color, dict):
-            c = Color(b=color["b"], g=color["g"], r=color["r"])
+            c = Color(r=color["r"], g=color["g"], b=color["b"])
         else:
             raise ValueError(f"无法解析颜色: {color}")
         return cls(x=float(d["x"]), y=float(d["y"]), color=c, tolerance=d.get("tolerance", 30.0))
 
     def to_dict(self) -> dict:
-        """序列化为字典。"""
+        """序列化为字典（color 为 RGB 顺序 ``[R, G, B]``）。"""
         return {
             "x": self.x,
             "y": self.y,
-            "color": list(self.color.as_bgr_tuple()),
+            "color": list(self.color.as_rgb_tuple()),
             "tolerance": self.tolerance,
         }
 
@@ -224,6 +233,8 @@ class PixelSignature:
             rules:
               - {x: 70, y: 485, color: [201, 129, 54]}
               - {x: 35, y: 297, color: [47, 253, 226]}
+
+        其中 color 为 RGB 顺序 ``[R, G, B]``。
         """
         rules = [PixelRule.from_dict(r) for r in d["rules"]]
         strategy = MatchStrategy(d.get("strategy", "all"))
@@ -296,7 +307,7 @@ class PixelMatchResult:
 class PixelChecker:
     """像素特征检测引擎 — 视觉层核心 API。
 
-    所有方法接收 numpy 数组形式的截图 (H×W×3, BGR uint8)，
+    所有方法接收 numpy 数组形式的截图 (H×W×3, RGB uint8)，
     坐标一律使用相对值（左上角为 0.0，右下角趋近 1.0），
     内部自动转换为像素索引，与截图分辨率无关。
     不执行任何设备操作（截图由上层提供）。
@@ -311,19 +322,19 @@ class PixelChecker:
         Parameters
         ----------
         screen:
-            截图 (H×W×3, BGR)。
+            截图 (H×W×3, RGB)。
         x, y:
             像素的相对坐标（左上角为 0.0，右下角趋近 1.0）。
 
         Returns
         -------
         Color
-            该像素的 BGR 颜色。
+            该像素的 RGB 颜色。
         """
         h, w = screen.shape[:2]
         px, py = int(x * w), int(y * h)
-        bgr = screen[py, px]
-        return Color(b=int(bgr[0]), g=int(bgr[1]), r=int(bgr[2]))
+        rgb = screen[py, px]
+        return Color(r=int(rgb[0]), g=int(rgb[1]), b=int(rgb[2]))
 
     @staticmethod
     def check_pixel(
@@ -338,11 +349,11 @@ class PixelChecker:
         Parameters
         ----------
         screen:
-            截图 (H×W×3, BGR)。
+            截图 (H×W×3, RGB)。
         x, y:
             像素的相对坐标（左上角为 0.0，右下角趋近 1.0）。
         color:
-            期望的 BGR 颜色。
+            期望的 RGB 颜色。
         tolerance:
             允许的最大色彩距离。
 
@@ -365,7 +376,7 @@ class PixelChecker:
         Parameters
         ----------
         screen:
-            截图 (H×W×3, BGR)。
+            截图 (H×W×3, RGB)。
         positions:
             相对坐标列表 [(x1, y1), (x2, y2), ...]（取值范围 0.0–1.0）。
 
@@ -406,7 +417,7 @@ class PixelChecker:
         Parameters
         ----------
         screen:
-            截图 (H×W×3, BGR)。
+            截图 (H×W×3, RGB)。
         signature:
             要检查的像素签名。
         with_details:
@@ -492,7 +503,7 @@ class PixelChecker:
         Parameters
         ----------
         screen:
-            截图 (H×W×3, BGR)。
+            截图 (H×W×3, RGB)。
         signatures:
             候选签名列表。
         with_details:
