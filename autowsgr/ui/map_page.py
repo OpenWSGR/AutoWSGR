@@ -59,7 +59,7 @@ from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.vision.matcher import Color, PixelChecker
+from autowsgr.vision.matcher import Color, MatchStrategy, PixelChecker, PixelRule, PixelSignature
 from autowsgr.vision.ocr import OCREngine
 
 
@@ -106,26 +106,11 @@ class MapIdentity:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 选中态参考颜色 (RGB)
+# 参考颜色 (RGB)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-_PANEL_ACTIVE = Color.of(15, 128, 220)
-"""面板标签选中态颜色 — 明亮蓝色。"""
-
-_PANEL_DARK = Color.of(22, 37, 62)
-"""面板标签未选中颜色 — 深蓝色。"""
-
-_MAP_FEATURE_COLOR = Color.of(240, 90, 63)
-"""地图页面右上角特征点颜色 — 橙色图标。"""
 
 _EXPEDITION_NOTIF_COLOR = Color.of(245, 88, 47)
 """远征通知颜色 — 橙红色圆点。"""
-
-_STATE_TOLERANCE = 30.0
-"""状态检测颜色容差。"""
-
-_DARK_TOLERANCE = 30.0
-"""未选中面板检测容差。"""
 
 _EXPEDITION_TOLERANCE = 40.0
 """远征通知检测颜色容差 (稍宽松以适应动画)。"""
@@ -203,20 +188,73 @@ for _ch, _mn in MAP_DATABASE:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 探测坐标 — 采样颜色判断状态
+# 各面板独立像素签名 (来自 sig.py 重新采集)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PANEL_PROBE: dict[MapPanel, tuple[float, float]] = {
-    MapPanel.SORTIE:     (0.1396, 0.0574),
-    MapPanel.EXERCISE:   (0.2745, 0.0537),
-    MapPanel.EXPEDITION: (0.4042, 0.0556),
-    MapPanel.BATTLE:     (0.5276, 0.0519),
-    MapPanel.DECISIVE:   (0.6620, 0.0556),
+PANEL_SIGNATURES: dict[MapPanel, PixelSignature] = {
+    MapPanel.SORTIE: PixelSignature(
+        name="map_page出征",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.8938, 0.0602, (241, 96, 69),  tolerance=30.0),
+            PixelRule.of(0.1437, 0.0519, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.0359, 0.5620, (253, 226, 47), tolerance=30.0),
+        ],
+    ),
+    MapPanel.EXERCISE: PixelSignature(
+        name="map_page演习",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.2677, 0.0472, (15, 132, 228),  tolerance=30.0),
+            PixelRule.of(0.1406, 0.0509, (18, 21, 40),    tolerance=30.0),
+            PixelRule.of(0.0292, 0.0574, (164, 167, 176), tolerance=30.0),
+            PixelRule.of(0.4161, 0.0556, (20, 34, 60),    tolerance=30.0),
+            PixelRule.of(0.5443, 0.0556, (20, 36, 59),    tolerance=30.0),
+            PixelRule.of(0.6807, 0.0444, (26, 38, 62),    tolerance=30.0),
+            PixelRule.of(0.4578, 0.0593, (138, 146, 165), tolerance=30.0),
+            PixelRule.of(0.3208, 0.0472, (9, 130, 234),   tolerance=30.0),
+            PixelRule.of(0.3010, 0.0639, (15, 139, 239),  tolerance=30.0),
+        ],
+    ),
+    MapPanel.EXPEDITION: PixelSignature(
+        name="map_page远征",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.4021, 0.0509, (15, 132, 228), tolerance=30.0),
+            PixelRule.of(0.0380, 0.5722, (253, 226, 47), tolerance=30.0),
+            PixelRule.of(0.5208, 0.0602, (22, 38, 63),   tolerance=30.0),
+            PixelRule.of(0.2661, 0.0574, (21, 36, 59),   tolerance=30.0),
+        ],
+    ),
+    MapPanel.BATTLE: PixelSignature(
+        name="map_page战役",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.6057, 0.0491, (17, 127, 222),  tolerance=30.0),
+            PixelRule.of(0.9542, 0.1509, (240, 220, 11),  tolerance=30.0),
+            PixelRule.of(0.2260, 0.1565, (100, 99, 95),   tolerance=30.0),
+            PixelRule.of(0.1094, 0.1565, (104, 104, 102), tolerance=30.0),
+            PixelRule.of(0.4589, 0.1574, (105, 109, 110), tolerance=30.0),
+        ],
+    ),
+    MapPanel.DECISIVE: PixelSignature(
+        name="map_page决战",
+        strategy=MatchStrategy.ALL,
+        rules=[
+            PixelRule.of(0.1797, 0.1731, (247, 68, 90),   tolerance=30.0),
+            PixelRule.of(0.1651, 0.3907, (227, 203, 216), tolerance=30.0),
+            PixelRule.of(0.1240, 0.4611, (255, 210, 253), tolerance=30.0),
+            PixelRule.of(0.6583, 0.0454, (15, 132, 228),  tolerance=30.0),
+            PixelRule.of(0.1880, 0.3833, (229, 196, 213), tolerance=30.0),
+            PixelRule.of(0.0943, 0.2417, (238, 219, 215), tolerance=30.0),
+        ],
+    ),
 }
-"""面板标签探测点 (来自 sig.py 采样)。选中项颜色 ≈ (15, 132, 228)。"""
+"""各面板独立像素签名 — 5 个 panel 分别采集，互相独立。
 
-MAP_FEATURE_PROBE: tuple[float, float] = (0.8938, 0.0593)
-"""地图页面右上角特征点 (来自 sig.py)。颜色 ≈ (240, 90, 63)，仅地图页面存在。"""
+``is_current_page`` = 任意一个签名匹配；
+``get_active_panel`` = 第一个匹配的签名对应的 panel。
+"""
 
 EXPEDITION_NOTIF_PROBE: tuple[float, float] = (0.4953, 0.0213)
 """远征通知探测点。有远征完成时显示橙色 ≈ (245, 88, 47)。"""
@@ -416,38 +454,25 @@ class MapPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为地图页面。
 
-        检测逻辑:
-        1. 右上角特征点 (橙色图标) 必须匹配 — 排除大部分非地图页面。
-        2. 5 个面板标签中恰好 1 个为选中蓝色、其余 4 个为深色。
+        任意一个面板签名 (出征/演习/远征/战役/决战) 匹配即返回 ``True``。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        # 1. 特征点校验 (快速排除)
-        fx, fy = MAP_FEATURE_PROBE
-        if not PixelChecker.get_pixel(screen, fx, fy).near(
-            _MAP_FEATURE_COLOR, _STATE_TOLERANCE
-        ):
-            return False
-
-        # 2. 面板标签: 恰好 1 蓝 + 4 暗
-        active_count = 0
-        dark_count = 0
-        for x, y in PANEL_PROBE.values():
-            pixel = PixelChecker.get_pixel(screen, x, y)
-            if pixel.near(_PANEL_ACTIVE, _STATE_TOLERANCE):
-                active_count += 1
-            elif pixel.near(_PANEL_DARK, _DARK_TOLERANCE):
-                dark_count += 1
-        return active_count == 1 and dark_count == 4
+        return any(
+            PixelChecker.check_signature(screen, sig).matched
+            for sig in PANEL_SIGNATURES.values()
+        )
 
     # ── 状态查询 — 面板 ──────────────────────────────────────────────────
 
     @staticmethod
     def get_active_panel(screen: np.ndarray) -> MapPanel | None:
         """获取当前激活的面板标签。
+
+        遍历 :data:`PANEL_SIGNATURES`，返回第一个匹配签名对应的面板。
 
         Parameters
         ----------
@@ -459,9 +484,8 @@ class MapPage:
         MapPanel | None
             当前激活的面板，或 ``None``。
         """
-        for panel, (x, y) in PANEL_PROBE.items():
-            pixel = PixelChecker.get_pixel(screen, x, y)
-            if pixel.near(_PANEL_ACTIVE, _STATE_TOLERANCE):
+        for panel, sig in PANEL_SIGNATURES.items():
+            if PixelChecker.check_signature(screen, sig).matched:
                 return panel
         return None
 

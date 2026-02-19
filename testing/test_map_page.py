@@ -16,8 +16,7 @@ from autowsgr.ui.map_page import (
     CLICK_PANEL,
     EXPEDITION_NOTIF_PROBE,
     MAP_DATABASE,
-    MAP_FEATURE_PROBE,
-    PANEL_PROBE,
+    PANEL_SIGNATURES,
     SIDEBAR_BRIGHTNESS_THRESHOLD,
     SIDEBAR_CLICK_X,
     SIDEBAR_SCAN_X,
@@ -35,11 +34,8 @@ from autowsgr.ui.map_page import (
 # ─────────────────────────────────────────────
 
 # 参考颜色 (RGB)
-_PANEL_SELECTED = (15, 128, 220)
-_PANEL_UNSELECTED = (22, 37, 62)
 _EXPEDITION_NOTIF = (245, 88, 47)
 _EXPEDITION_NO_NOTIF = (21, 37, 63)
-_MAP_FEATURE = (240, 90, 63)  # 地图页面右上角特征点
 _CHAPTER_BRIGHT = (252, 227, 47)  # 选中章节 (黄色岛屿)
 _CHAPTER_DARK = (24, 40, 65)  # 未选中章节
 
@@ -63,6 +59,8 @@ def _make_screen(
 ) -> np.ndarray:
     """生成地图页面的合成截图。
 
+    根据 ``active_panel`` 对应的 :data:`PANEL_SIGNATURES` 逐条设置像素。
+
     Parameters
     ----------
     active_panel:
@@ -74,14 +72,9 @@ def _make_screen(
     """
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
 
-    # 地图页面特征点
-    fx, fy = MAP_FEATURE_PROBE
-    _set_pixel(screen, fx, fy, _MAP_FEATURE)
-
-    # 面板标签
-    for panel, (x, y) in PANEL_PROBE.items():
-        color = _PANEL_SELECTED if panel == active_panel else _PANEL_UNSELECTED
-        _set_pixel(screen, x, y, color)
+    # 面板签名像素 (只设置当前激活面板的特征点)
+    for rule in PANEL_SIGNATURES[active_panel].rules:
+        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
 
     # 远征通知
     ex, ey = EXPEDITION_NOTIF_PROBE
@@ -122,17 +115,17 @@ class TestIsCurrentPage:
         assert MapPage.is_current_page(screen) is False
 
     def test_two_panels_active_not_detected(self):
-        """两个面板同时为选中蓝色 → 不是合法状态。"""
+        """两个独立面板的签名像素叠加 → 两者都能识别 (is_current_page 仍 True)。
+        但若 SORTIE 签名像素被故意破坏 → 该 panel 签名失败。"""
         screen = _make_screen(active_panel=MapPanel.SORTIE)
-        _set_pixel(screen, *PANEL_PROBE[MapPanel.EXERCISE], _PANEL_SELECTED)
-        assert MapPage.is_current_page(screen) is False
+        # 破坏 SORTIE 签名中第一个规则的像素
+        first_rule = PANEL_SIGNATURES[MapPanel.SORTIE].rules[0]
+        _set_pixel(screen, first_rule.x, first_rule.y, (0, 0, 0))
+        assert MapPage.get_active_panel(screen) is not MapPanel.SORTIE
 
     def test_no_panel_selected_not_detected(self):
-        """没有面板选中 → 不是合法状态。"""
-        screen = _make_screen(active_panel=MapPanel.SORTIE)
-        _set_pixel(
-            screen, *PANEL_PROBE[MapPanel.SORTIE], _PANEL_UNSELECTED
-        )
+        """空白截图 — 任何面板签名均不匹配。"""
+        screen = np.zeros((_H, _W, 3), dtype=np.uint8)
         assert MapPage.is_current_page(screen) is False
 
 

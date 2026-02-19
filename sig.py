@@ -1,40 +1,57 @@
-map_page = PixelSignature(
-    name="map_page",
+map_page决战 = PixelSignature(
+    name="map_page决战",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.1396, 0.0574, (15, 132, 228), tolerance=30.0),
-        PixelRule.of(0.2745, 0.0537, (18, 33, 56), tolerance=30.0),
-        PixelRule.of(0.4042, 0.0556, (23, 37, 63), tolerance=30.0),
-        PixelRule.of(0.5276, 0.0519, (25, 39, 66), tolerance=30.0),
-        PixelRule.of(0.6620, 0.0556, (24, 40, 65), tolerance=30.0),
-        PixelRule.of(0.8938, 0.0593, (240, 90, 63), tolerance=30.0),
+        PixelRule.of(0.1797, 0.1731, (247, 68, 90), tolerance=30.0),
+        PixelRule.of(0.1651, 0.3907, (227, 203, 216), tolerance=30.0),
+        PixelRule.of(0.1240, 0.4611, (255, 210, 253), tolerance=30.0),
+        PixelRule.of(0.6583, 0.0454, (15, 132, 228), tolerance=30.0),
+        PixelRule.of(0.1880, 0.3833, (229, 196, 213), tolerance=30.0),
+        PixelRule.of(0.0943, 0.2417, (238, 219, 215), tolerance=30.0),
     ],
 )
-食堂 = PixelSignature(
-    name="食堂",
+map_page战役 = PixelSignature(
+    name="map_page战役",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.7667, 0.0454, (27, 134, 228), tolerance=30.0),
-        PixelRule.of(0.8734, 0.1611, (29, 119, 205), tolerance=30.0),
-        PixelRule.of(0.8745, 0.2750, (29, 115, 198), tolerance=30.0),
-        PixelRule.of(0.8734, 0.3806, (27, 116, 198), tolerance=30.0),
-        PixelRule.of(0.7734, 0.0602, (254, 255, 255), tolerance=30.0),
+        PixelRule.of(0.6057, 0.0491, (17, 127, 222), tolerance=30.0),
+        PixelRule.of(0.9542, 0.1509, (240, 220, 11), tolerance=30.0),
+        PixelRule.of(0.2260, 0.1565, (100, 99, 95), tolerance=30.0),
+        PixelRule.of(0.1094, 0.1565, (104, 104, 102), tolerance=30.0),
+        PixelRule.of(0.4589, 0.1574, (105, 109, 110), tolerance=30.0),
     ],
 )
-sidebar = PixelSignature(
-    name="sidebar",
+map_page远征 = PixelSignature(
+    name="map_page远征",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.7667, 0.0454, (27, 134, 228), tolerance=30.0),
-        PixelRule.of(0.8734, 0.1611, (29, 119, 205), tolerance=30.0),
-        PixelRule.of(0.8745, 0.2750, (29, 115, 198), tolerance=30.0),
-        PixelRule.of(0.8734, 0.3806, (27, 116, 198), tolerance=30.0),
-        PixelRule.of(0.7734, 0.0602, (254, 255, 255), tolerance=30.0),
-        PixelRule.of(0.0417, 0.0806, (55, 55, 55), tolerance=30.0),
-        PixelRule.of(0.0422, 0.2102, (58, 58, 58), tolerance=30.0),
-        PixelRule.of(0.0453, 0.3463, (0, 160, 232), tolerance=30.0),
-        PixelRule.of(0.0406, 0.4676, (58, 58, 58), tolerance=30.0),
-        PixelRule.of(0.0396, 0.6028, (56, 56, 56), tolerance=30.0),
-        PixelRule.of(0.0432, 0.7231, (56, 56, 56), tolerance=30.0),
+        PixelRule.of(0.4021, 0.0509, (15, 132, 228), tolerance=30.0),
+        PixelRule.of(0.0380, 0.5722, (253, 226, 47), tolerance=30.0),
+        PixelRule.of(0.5208, 0.0602, (22, 38, 63), tolerance=30.0),
+        PixelRule.of(0.2661, 0.0574, (21, 36, 59), tolerance=30.0),
+    ],
+)
+map_page演习 = PixelSignature(
+    name="map_page演习",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.2677, 0.0472, (15, 132, 228), tolerance=30.0),
+        PixelRule.of(0.1406, 0.0509, (18, 21, 40), tolerance=30.0),
+        PixelRule.of(0.0292, 0.0574, (164, 167, 176), tolerance=30.0),
+        PixelRule.of(0.4161, 0.0556, (20, 34, 60), tolerance=30.0),
+        PixelRule.of(0.5443, 0.0556, (20, 36, 59), tolerance=30.0),
+        PixelRule.of(0.6807, 0.0444, (26, 38, 62), tolerance=30.0),
+        PixelRule.of(0.4578, 0.0593, (138, 146, 165), tolerance=30.0),
+        PixelRule.of(0.3208, 0.0472, (9, 130, 234), tolerance=30.0),
+        PixelRule.of(0.3010, 0.0639, (15, 139, 239), tolerance=30.0),
+    ],
+)
+map_page出征 = PixelSignature(
+    name="map_page出征",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.8938, 0.0602, (241, 96, 69), tolerance=30.0),
+        PixelRule.of(0.1437, 0.0519, (15, 132, 228), tolerance=30.0),
+        PixelRule.of(0.0359, 0.5620, (253, 226, 47), tolerance=30.0),
     ],
 )

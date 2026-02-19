@@ -57,17 +57,10 @@ def _make_target_screen(target: MainPageTarget) -> np.ndarray:
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
 
     if target == MainPageTarget.SORTIE:
-        # MapPage: 特征点 + 1蓝4暗面板
-        from autowsgr.ui.map_page import MAP_FEATURE_PROBE, PANEL_PROBE, MapPanel
-        # 右上角特征点 (橙色)
-        fx, fy = MAP_FEATURE_PROBE
-        _set_pixel(screen, fx, fy, (240, 90, 63))
-        # 面板标签: SORTIE 蓝色, 其余暗色
-        for panel, (px, py) in PANEL_PROBE.items():
-            if panel == MapPanel.SORTIE:
-                _set_pixel(screen, px, py, (15, 128, 220))
-            else:
-                _set_pixel(screen, px, py, (22, 37, 62))
+        # MapPage: 设置出征面板签名的所有特征点
+        from autowsgr.ui.map_page import PANEL_SIGNATURES, MapPanel
+        for rule in PANEL_SIGNATURES[MapPanel.SORTIE].rules:
+            _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
     elif target == MainPageTarget.TASK:
         from autowsgr.ui.mission_page import PAGE_SIGNATURE as MISSION_SIG
         for rule in MISSION_SIG.rules:
