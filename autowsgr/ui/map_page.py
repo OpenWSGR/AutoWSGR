@@ -59,7 +59,13 @@ from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
-from autowsgr.vision.matcher import Color, MatchStrategy, PixelChecker, PixelRule, PixelSignature
+from autowsgr.ui.tabbed_page import (
+    TabbedPageType,
+    get_active_tab_index,
+    identify_page_type,
+    make_tab_checker,
+)
+from autowsgr.vision.matcher import Color, PixelChecker
 from autowsgr.vision.ocr import OCREngine
 
 
@@ -188,73 +194,16 @@ for _ch, _mn in MAP_DATABASE:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 各面板独立像素签名 (来自 sig.py 重新采集)
+# 面板索引映射
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PANEL_SIGNATURES: dict[MapPanel, PixelSignature] = {
-    MapPanel.SORTIE: PixelSignature(
-        name="map_page出征",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.8938, 0.0602, (241, 96, 69),  tolerance=30.0),
-            PixelRule.of(0.1437, 0.0519, (15, 132, 228), tolerance=30.0),
-            PixelRule.of(0.0359, 0.5620, (253, 226, 47), tolerance=30.0),
-        ],
-    ),
-    MapPanel.EXERCISE: PixelSignature(
-        name="map_page演习",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.2677, 0.0472, (15, 132, 228),  tolerance=30.0),
-            PixelRule.of(0.1406, 0.0509, (18, 21, 40),    tolerance=30.0),
-            PixelRule.of(0.0292, 0.0574, (164, 167, 176), tolerance=30.0),
-            PixelRule.of(0.4161, 0.0556, (20, 34, 60),    tolerance=30.0),
-            PixelRule.of(0.5443, 0.0556, (20, 36, 59),    tolerance=30.0),
-            PixelRule.of(0.6807, 0.0444, (26, 38, 62),    tolerance=30.0),
-            PixelRule.of(0.4578, 0.0593, (138, 146, 165), tolerance=30.0),
-            PixelRule.of(0.3208, 0.0472, (9, 130, 234),   tolerance=30.0),
-            PixelRule.of(0.3010, 0.0639, (15, 139, 239),  tolerance=30.0),
-        ],
-    ),
-    MapPanel.EXPEDITION: PixelSignature(
-        name="map_page远征",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.4021, 0.0509, (15, 132, 228), tolerance=30.0),
-            PixelRule.of(0.0380, 0.5722, (253, 226, 47), tolerance=30.0),
-            PixelRule.of(0.5208, 0.0602, (22, 38, 63),   tolerance=30.0),
-            PixelRule.of(0.2661, 0.0574, (21, 36, 59),   tolerance=30.0),
-        ],
-    ),
-    MapPanel.BATTLE: PixelSignature(
-        name="map_page战役",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.6057, 0.0491, (17, 127, 222),  tolerance=30.0),
-            PixelRule.of(0.9542, 0.1509, (240, 220, 11),  tolerance=30.0),
-            PixelRule.of(0.2260, 0.1565, (100, 99, 95),   tolerance=30.0),
-            PixelRule.of(0.1094, 0.1565, (104, 104, 102), tolerance=30.0),
-            PixelRule.of(0.4589, 0.1574, (105, 109, 110), tolerance=30.0),
-        ],
-    ),
-    MapPanel.DECISIVE: PixelSignature(
-        name="map_page决战",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.1797, 0.1731, (247, 68, 90),   tolerance=30.0),
-            PixelRule.of(0.1651, 0.3907, (227, 203, 216), tolerance=30.0),
-            PixelRule.of(0.1240, 0.4611, (255, 210, 253), tolerance=30.0),
-            PixelRule.of(0.6583, 0.0454, (15, 132, 228),  tolerance=30.0),
-            PixelRule.of(0.1880, 0.3833, (229, 196, 213), tolerance=30.0),
-            PixelRule.of(0.0943, 0.2417, (238, 219, 215), tolerance=30.0),
-        ],
-    ),
-}
-"""各面板独立像素签名 — 5 个 panel 分别采集，互相独立。
+_PANEL_LIST: list[MapPanel] = list(MapPanel)
+"""面板枚举值列表 — 索引与标签栏探测位置一一对应。"""
 
-``is_current_page`` = 任意一个签名匹配；
-``get_active_panel`` = 第一个匹配的签名对应的 panel。
-"""
+_PANEL_TO_INDEX: dict[MapPanel, int] = {
+    panel: i for i, panel in enumerate(_PANEL_LIST)
+}
+"""面板 → 标签索引映射。"""
 
 EXPEDITION_NOTIF_PROBE: tuple[float, float] = (0.4953, 0.0213)
 """远征通知探测点。有远征完成时显示橙色 ≈ (245, 88, 47)。"""
@@ -454,17 +403,14 @@ class MapPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为地图页面。
 
-        任意一个面板签名 (出征/演习/远征/战役/决战) 匹配即返回 ``True``。
+        通过统一标签页检测层 (:mod:`~autowsgr.ui.tabbed_page`) 识别。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        return any(
-            PixelChecker.check_signature(screen, sig).matched
-            for sig in PANEL_SIGNATURES.values()
-        )
+        return identify_page_type(screen) == TabbedPageType.MAP
 
     # ── 状态查询 — 面板 ──────────────────────────────────────────────────
 
@@ -472,7 +418,7 @@ class MapPage:
     def get_active_panel(screen: np.ndarray) -> MapPanel | None:
         """获取当前激活的面板标签。
 
-        遍历 :data:`PANEL_SIGNATURES`，返回第一个匹配签名对应的面板。
+        通过统一标签栏检测获取蓝色标签索引，映射为 :class:`MapPanel`。
 
         Parameters
         ----------
@@ -482,12 +428,12 @@ class MapPage:
         Returns
         -------
         MapPanel | None
-            当前激活的面板，或 ``None``。
+            当前激活的面板，索引越界或未检测到时返回 ``None``。
         """
-        for panel, sig in PANEL_SIGNATURES.items():
-            if PixelChecker.check_signature(screen, sig).matched:
-                return panel
-        return None
+        idx = get_active_tab_index(screen)
+        if idx is None or idx >= len(_PANEL_LIST):
+            return None
+        return _PANEL_LIST[idx]
 
     # ── 状态查询 — 远征通知 ──────────────────────────────────────────────
 
@@ -638,11 +584,11 @@ class MapPage:
             current.value if current else "未知",
             panel.value,
         )
-        target_sig = PANEL_SIGNATURES[panel]
+        target_idx = _PANEL_TO_INDEX[panel]
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_PANEL[panel],
-            checker=lambda s, sig=target_sig: PixelChecker.check_signature(s, sig).matched,
+            checker=make_tab_checker(TabbedPageType.MAP, target_idx),
             source=f"地图-{current.value if current else '?'}",
             target=f"地图-{panel.value}",
         )

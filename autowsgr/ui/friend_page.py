@@ -97,15 +97,16 @@ class FriendPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为好友页面。
 
-        通过 6 个特征像素点全部匹配判定。
+        通过标签页统一检测层判定 (4 标签 + 头部探测点较亮)。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+        from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
+
+        return identify_page_type(screen) == TabbedPageType.FRIEND
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 

@@ -47,11 +47,11 @@ from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
-from autowsgr.vision.matcher import (
-    MatchStrategy,
-    PixelChecker,
-    PixelRule,
-    PixelSignature,
+from autowsgr.ui.tabbed_page import (
+    TabbedPageType,
+    get_active_tab_index,
+    identify_page_type,
+    make_tab_checker,
 )
 
 
@@ -70,55 +70,16 @@ class BuildTab(enum.Enum):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 页面识别签名 — 每个标签各一组
+# 标签索引映射
 # ═══════════════════════════════════════════════════════════════════════════════
 
-TAB_SIGNATURES: dict[BuildTab, PixelSignature] = {
-    BuildTab.BUILD: PixelSignature(
-        name="建造页-建造栏",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.6724, 0.1278, (105, 203, 255), tolerance=30.0),
-            PixelRule.of(0.7792, 0.1417, (220, 86, 87), tolerance=30.0),
-            PixelRule.of(0.2250, 0.0556, (15, 124, 215), tolerance=30.0),
-            PixelRule.of(0.8922, 0.1380, (51, 164, 240), tolerance=30.0),
-        ],
-    ),
-    BuildTab.DESTROY: PixelSignature(
-        name="建造页-解装栏",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.2708, 0.0472, (15, 132, 228), tolerance=30.0),
-            PixelRule.of(0.8391, 0.9000, (29, 124, 214), tolerance=30.0),
-            PixelRule.of(0.8307, 0.7778, (56, 56, 56), tolerance=30.0),
-            PixelRule.of(0.8948, 0.2861, (12, 140, 227), tolerance=30.0),
-            PixelRule.of(0.9396, 0.2880, (237, 237, 237), tolerance=30.0),
-        ],
-    ),
-    BuildTab.DEVELOP: PixelSignature(
-        name="建造页-开发栏",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.6656, 0.1278, (115, 205, 255), tolerance=30.0),
-            PixelRule.of(0.7792, 0.1398, (220, 88, 86), tolerance=30.0),
-            PixelRule.of(0.4802, 0.0537, (18, 125, 219), tolerance=30.0),
-            PixelRule.of(0.2203, 0.0491, (20, 32, 56), tolerance=30.0),
-        ],
-    ),
-    BuildTab.DISCARD: PixelSignature(
-        name="建造页-废弃栏",
-        strategy=MatchStrategy.ALL,
-        rules=[
-            PixelRule.of(0.5240, 0.0519, (15, 132, 228), tolerance=30.0),
-            PixelRule.of(0.3484, 0.0676, (21, 37, 63), tolerance=30.0),
-            PixelRule.of(0.8854, 0.1500, (25, 121, 208), tolerance=30.0),
-            PixelRule.of(0.4526, 0.9741, (25, 120, 210), tolerance=30.0),
-            PixelRule.of(0.7370, 0.9657, (54, 54, 54), tolerance=30.0),
-            PixelRule.of(0.8495, 0.9713, (26, 121, 211), tolerance=30.0),
-        ],
-    ),
+_TAB_LIST: list[BuildTab] = list(BuildTab)
+"""标签枚举值列表 — 索引与标签栏探测位置一一对应。"""
+
+_TAB_TO_INDEX: dict[BuildTab, int] = {
+    tab: i for i, tab in enumerate(_TAB_LIST)
 }
-"""建造页面每个标签的像素签名。"""
+"""标签 → 标签索引映射。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -164,17 +125,14 @@ class BuildPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为建造页面组 (含全部 4 个标签)。
 
-        任一标签签名匹配即判定为建造页面。
+        通过统一标签页检测层识别。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        return any(
-            PixelChecker.check_signature(screen, sig).matched
-            for sig in TAB_SIGNATURES.values()
-        )
+        return identify_page_type(screen) == TabbedPageType.BUILD
 
     @staticmethod
     def get_active_tab(screen: np.ndarray) -> BuildTab | None:
@@ -188,12 +146,12 @@ class BuildPage:
         Returns
         -------
         BuildTab | None
-            当前标签，无法确定时返回 ``None``。
+            当前标签，索引越界或无法确定时返回 ``None``。
         """
-        for tab, sig in TAB_SIGNATURES.items():
-            if PixelChecker.check_signature(screen, sig).matched:
-                return tab
-        return None
+        idx = get_active_tab_index(screen)
+        if idx is None or idx >= len(_TAB_LIST):
+            return None
+        return _TAB_LIST[idx]
 
     # ── 标签切换 ──────────────────────────────────────────────────────────
 
@@ -219,11 +177,11 @@ class BuildPage:
             current.value if current else "未知",
             tab.value,
         )
-        target_sig = TAB_SIGNATURES[tab]
+        target_idx = _TAB_TO_INDEX[tab]
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_TAB[tab],
-            checker=lambda s, sig=target_sig: PixelChecker.check_signature(s, sig).matched,
+            checker=make_tab_checker(TabbedPageType.BUILD, target_idx),
             source=f"建造-{current.value if current else '?'}",
             target=f"建造-{tab.value}",
         )

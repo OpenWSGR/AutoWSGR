@@ -80,6 +80,18 @@ from autowsgr.ui.map_page import MAP_DATABASE, MapIdentity, MapPage, MapPanel
 from autowsgr.ui.mission_page import MissionPage
 from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
 
+# ── 标签页统一检测层 ──────────────────────────────────────────────
+from autowsgr.ui.tabbed_page import (
+    TAB_BLUE,
+    TAB_PROBES,
+    TabbedPageType,
+    get_active_tab_index,
+    identify_page_type,
+    is_tabbed_page,
+    make_page_checker,
+    make_tab_checker,
+)
+
 # ── 浮层处理 ───────────────────────────────────────────────────────────
 from autowsgr.ui.overlay import (
     NetworkError,
@@ -136,6 +148,15 @@ __all__ = [
     "Panel",
     "SidebarPage",
     "SidebarTarget",
+    # ── 标签页统一检测 ──
+    "TAB_BLUE",
+    "TAB_PROBES",
+    "TabbedPageType",
+    "get_active_tab_index",
+    "identify_page_type",
+    "is_tabbed_page",
+    "make_page_checker",
+    "make_tab_checker",
     # ── 浮层 ──
     "NetworkError",
     "OverlayType",

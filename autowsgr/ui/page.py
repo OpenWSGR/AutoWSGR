@@ -84,7 +84,7 @@ class NavConfig:
 
     max_retries: int = 3
     retry_delay: float = 1.0
-    timeout: float = 10.0
+    timeout: float = 5.0
     interval: float = 0.5
     handle_overlays: bool = True
 

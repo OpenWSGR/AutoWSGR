@@ -40,34 +40,7 @@ from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.vision.matcher import (
-    MatchStrategy,
-    PixelChecker,
-    PixelRule,
-    PixelSignature,
-)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 页面识别签名
-# ═══════════════════════════════════════════════════════════════════════════════
-
-PAGE_SIGNATURE = PixelSignature(
-    name="任务页",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.1474, 0.0509, (15, 132, 228), tolerance=30.0),
-        PixelRule.of(0.2203, 0.0537, (17, 128, 220), tolerance=30.0),
-        PixelRule.of(0.1818, 0.0593, (21, 129, 227), tolerance=30.0),
-        PixelRule.of(0.1703, 0.0491, (249, 255, 255), tolerance=30.0),
-        PixelRule.of(0.1734, 0.0370, (242, 251, 255), tolerance=30.0),
-        PixelRule.of(0.1984, 0.0370, (252, 250, 251), tolerance=30.0),
-        PixelRule.of(0.1693, 0.0657, (255, 255, 250), tolerance=30.0),
-        PixelRule.of(0.4339, 0.0509, (140, 146, 146), tolerance=30.0),
-        PixelRule.of(0.3021, 0.0537, (123, 126, 141), tolerance=30.0),
-    ],
-)
-"""任务页面像素签名。"""
+from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -101,15 +74,14 @@ class MissionPage:
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为任务页面。
 
-        通过 9 个特征像素点全部匹配判定。
+        通过统一标签页检测层 (:mod:`~autowsgr.ui.tabbed_page`) 识别。
 
         Parameters
         ----------
         screen:
             截图 (H×W×3, RGB)。
         """
-        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+        return identify_page_type(screen) == TabbedPageType.MISSION
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 
