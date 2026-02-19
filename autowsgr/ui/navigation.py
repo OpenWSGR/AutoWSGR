@@ -1,0 +1,334 @@
+"""UI 导航树 — 声明式页面拓扑与路径查找。
+
+本模块定义游戏全部页面之间的导航关系（树形 + 跨级直通边）。
+核心数据结构为有向图 ``NAV_GRAPH``，每条边包含：
+
+- **source** / **target** — 起止页面名称
+- **click** — 相对坐标 (rx, ry)
+- **edge_type** — ``"child"`` (父子关系) / ``"tab"`` (同级标签切换) /
+  ``"cross"`` (跨级快捷通道)
+
+导航路径查找:
+    两页面间的最优路径可通过 BFS / LCA 在 ``NAV_GRAPH`` 上查找。
+    旧 V1 代码使用树上 LCA 算法实现，V2 保留拓扑声明以便后续接入。
+
+页面命名约定:
+    - 使用中文短名与 ``__init__.py`` 中 ``register_page()`` 的名称一致。
+    - 如 ``"主页面"``、``"地图页面"``、``"出征准备"``。
+
+坐标体系:
+    所有坐标为相对值 (0.0–1.0)，由旧代码 960×540 绝对坐标换算:
+    ``rx = x / 960``, ``ry = y / 540``。
+
+Usage::
+
+    from autowsgr.ui.navigation import NAV_GRAPH, find_path
+
+    path = find_path("主页面", "建造页面")
+    for edge in path:
+        ctrl.click(*edge.click)
+"""
+
+from __future__ import annotations
+
+import enum
+from collections import deque
+from dataclasses import dataclass
+from typing import Sequence
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 边类型
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class EdgeType(enum.Enum):
+    """导航边类型。"""
+
+    CHILD = "child"
+    """父子关系 — 进入下级页面。"""
+
+    TAB = "tab"
+    """标签切换 — 同级页面间切换。"""
+
+    CROSS = "cross"
+    """跨级快捷通道 — 跳过中间页面。"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 导航边
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True, slots=True)
+class NavEdge:
+    """导航图中的一条有向边。
+
+    Attributes
+    ----------
+    source:
+        出发页面名称。
+    target:
+        到达页面名称。
+    click:
+        点击坐标 (rx, ry)，相对值 0.0–1.0。
+    edge_type:
+        边类型。
+    description:
+        人类可读描述 (可选)。
+    """
+
+    source: str
+    target: str
+    click: tuple[float, float]
+    edge_type: EdgeType
+    description: str = ""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 页面名称常量
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── 与 register_page() 一致 ──
+
+MAIN_PAGE = "主页面"
+MAP_PAGE = "地图页面"
+BATTLE_PREP = "出征准备"
+SIDEBAR_PAGE = "侧边栏"
+MISSION_PAGE = "任务页面"
+BACKYARD_PAGE = "后院页面"
+BATH_PAGE = "浴室页面"
+CANTEEN_PAGE = "食堂页面"
+CHOOSE_REPAIR_PAGE = "选择修理页面"
+BUILD_PAGE = "建造页面"
+DESTROY_PAGE = "解体页面"
+DEVELOP_PAGE = "开发页面"
+DISCARD_PAGE = "废弃页面"
+INTENSIFY_PAGE = "强化页面"
+REMAKE_PAGE = "改修页面"
+SKILL_PAGE = "技能页面"
+FRIEND_PAGE = "好友页面"
+
+ALL_PAGES: list[str] = [
+    MAIN_PAGE,
+    MAP_PAGE,
+    BATTLE_PREP,
+    SIDEBAR_PAGE,
+    MISSION_PAGE,
+    BACKYARD_PAGE,
+    BATH_PAGE,
+    CANTEEN_PAGE,
+    CHOOSE_REPAIR_PAGE,
+    BUILD_PAGE,
+    DESTROY_PAGE,
+    DEVELOP_PAGE,
+    DISCARD_PAGE,
+    INTENSIFY_PAGE,
+    REMAKE_PAGE,
+    SKILL_PAGE,
+    FRIEND_PAGE,
+]
+"""所有已声明的页面名称 (17 个)。"""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 导航图 — 全部边
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_BACK_TOP_LEFT: tuple[float, float] = (0.022, 0.058)
+"""通用左上角回退按钮 (◁)。"""
+
+NAV_GRAPH: list[NavEdge] = [
+    # ── 主页面 → 一级子页面 ──────────────────────────────────────────
+    NavEdge(MAIN_PAGE, MAP_PAGE, (0.9375, 0.8889),
+            EdgeType.CHILD, "点击「出征」"),
+    NavEdge(MAIN_PAGE, MISSION_PAGE, (0.6833, 0.8889),
+            EdgeType.CHILD, "点击「任务」"),
+    NavEdge(MAIN_PAGE, BACKYARD_PAGE, (0.0469, 0.1481),
+            EdgeType.CHILD, "点击主页图标 (后院)"),
+    NavEdge(MAIN_PAGE, SIDEBAR_PAGE, (0.0438, 0.8963),
+            EdgeType.CHILD, "点击左下角 ≡ (侧边栏)"),
+
+    # ── 一级子页面 → 主页面 (回退) ──────────────────────────────────────
+    NavEdge(MAP_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "地图页面 ◁ 返回主页面"),
+    NavEdge(MISSION_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "任务页面 ◁ 返回主页面"),
+    NavEdge(BACKYARD_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "后院 ◁ 返回主页面"),
+    NavEdge(SIDEBAR_PAGE, MAIN_PAGE, (0.0438, 0.8963),
+            EdgeType.CHILD, "侧边栏 ≡ 关闭 (同一按钮切换)"),
+
+    # ── 地图页面 → 出征准备 ─────────────────────────────────────────────
+    #    注: 实际点击坐标取决于章节中具体地图节点位置，
+    #    此处仅声明拓扑关系，click 坐标需由 MapPage 动态确定。
+    NavEdge(MAP_PAGE, BATTLE_PREP, (0.6250, 0.5556),
+            EdgeType.CHILD, "点击地图节点进入出征准备 (坐标因图而异)"),
+
+    # ── 出征准备 → 地图页面 (回退) ──────────────────────────────────────
+    NavEdge(BATTLE_PREP, MAP_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "出征准备 ◁ 返回地图页面"),
+
+    # ── 出征准备 → 浴室 (跨级快捷通道) ─────────────────────────────────
+    NavEdge(BATTLE_PREP, BATH_PAGE, (0.875, 0.037),
+            EdgeType.CROSS, "出征准备右上角 🔧 → 浴室"),
+
+    # ── 后院 → 子页面 ──────────────────────────────────────────────────
+    NavEdge(BACKYARD_PAGE, BATH_PAGE, (0.3125, 0.3704),
+            EdgeType.CHILD, "后院 → 浴室 (修理舰船)"),
+    NavEdge(BACKYARD_PAGE, CANTEEN_PAGE, (0.7292, 0.7407),
+            EdgeType.CHILD, "后院 → 食堂"),
+
+    # ── 浴室 → 回退 / 子页面 ─────────────────────────────────────────
+    NavEdge(BATH_PAGE, BACKYARD_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "浴室 ◁ 返回后院"),
+    NavEdge(BATH_PAGE, CHOOSE_REPAIR_PAGE, (0.9375, 0.0556),
+            EdgeType.CHILD, "浴室 → 选择修理"),
+    NavEdge(BATH_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CROSS, "浴室 ◁ 直接返回主页面 (跨级)"),
+
+    # ── 选择修理 → 浴室 ─────────────────────────────────────────────
+    NavEdge(CHOOSE_REPAIR_PAGE, BATH_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "选择修理 ◁ 返回浴室"),
+
+    # ── 食堂 → 回退 ────────────────────────────────────────────────────
+    NavEdge(CANTEEN_PAGE, BACKYARD_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "食堂 ◁ 返回后院"),
+    NavEdge(CANTEEN_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CROSS, "食堂 ◁ 直接返回主页面 (跨级)"),
+
+    # ── 侧边栏 → 子页面 ──────────────────────────────────────────────
+    NavEdge(SIDEBAR_PAGE, BUILD_PAGE, (0.1563, 0.3704),
+            EdgeType.CHILD, "侧边栏 → 建造"),
+    NavEdge(SIDEBAR_PAGE, INTENSIFY_PAGE, (0.1563, 0.5000),
+            EdgeType.CHILD, "侧边栏 → 强化"),
+    NavEdge(SIDEBAR_PAGE, FRIEND_PAGE, (0.1563, 0.7593),
+            EdgeType.CHILD, "侧边栏 → 好友"),
+
+    # ── 建造/解体/开发/废弃 (标签组) ──────────────────────────────────
+    NavEdge(BUILD_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "建造 ◁ 返回侧边栏"),
+    NavEdge(DESTROY_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "解体 ◁ 返回侧边栏"),
+    NavEdge(DEVELOP_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "开发 ◁ 返回侧边栏"),
+    NavEdge(DISCARD_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "废弃 ◁ 返回侧边栏"),
+
+    # 标签互通: 建造 ↔ 解体 ↔ 开发 ↔ 废弃
+    # TODO: 确认各标签的精确点击坐标后补充
+    NavEdge(BUILD_PAGE, DESTROY_PAGE, (0.3125, 0.0463),
+            EdgeType.TAB, "建造 → 解体标签"),
+    NavEdge(BUILD_PAGE, DEVELOP_PAGE, (0.4375, 0.0463),
+            EdgeType.TAB, "建造 → 开发标签"),
+    NavEdge(BUILD_PAGE, DISCARD_PAGE, (0.5625, 0.0463),
+            EdgeType.TAB, "建造 → 废弃标签"),
+    NavEdge(DESTROY_PAGE, BUILD_PAGE, (0.1875, 0.0463),
+            EdgeType.TAB, "解体 → 建造标签"),
+    NavEdge(DESTROY_PAGE, DEVELOP_PAGE, (0.4375, 0.0463),
+            EdgeType.TAB, "解体 → 开发标签"),
+    NavEdge(DESTROY_PAGE, DISCARD_PAGE, (0.5625, 0.0463),
+            EdgeType.TAB, "解体 → 废弃标签"),
+    NavEdge(DEVELOP_PAGE, BUILD_PAGE, (0.1875, 0.0463),
+            EdgeType.TAB, "开发 → 建造标签"),
+    NavEdge(DEVELOP_PAGE, DESTROY_PAGE, (0.3125, 0.0463),
+            EdgeType.TAB, "开发 → 解体标签"),
+    NavEdge(DEVELOP_PAGE, DISCARD_PAGE, (0.5625, 0.0463),
+            EdgeType.TAB, "开发 → 废弃标签"),
+    NavEdge(DISCARD_PAGE, BUILD_PAGE, (0.1875, 0.0463),
+            EdgeType.TAB, "废弃 → 建造标签"),
+    NavEdge(DISCARD_PAGE, DESTROY_PAGE, (0.3125, 0.0463),
+            EdgeType.TAB, "废弃 → 解体标签"),
+    NavEdge(DISCARD_PAGE, DEVELOP_PAGE, (0.4375, 0.0463),
+            EdgeType.TAB, "废弃 → 开发标签"),
+
+    # ── 强化/改修/技能 (标签组) ────────────────────────────────────────
+    NavEdge(INTENSIFY_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "强化 ◁ 返回侧边栏"),
+    NavEdge(REMAKE_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "改修 ◁ 返回侧边栏"),
+    NavEdge(SKILL_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "技能 ◁ 返回侧边栏"),
+
+    # 标签互通: 强化 ↔ 改修 ↔ 技能
+    # TODO: 确认各标签的精确点击坐标后补充
+    NavEdge(INTENSIFY_PAGE, REMAKE_PAGE, (0.3125, 0.0463),
+            EdgeType.TAB, "强化 → 改修标签"),
+    NavEdge(INTENSIFY_PAGE, SKILL_PAGE, (0.4375, 0.0463),
+            EdgeType.TAB, "强化 → 技能标签"),
+    NavEdge(REMAKE_PAGE, INTENSIFY_PAGE, (0.1875, 0.0463),
+            EdgeType.TAB, "改修 → 强化标签"),
+    NavEdge(REMAKE_PAGE, SKILL_PAGE, (0.4375, 0.0463),
+            EdgeType.TAB, "改修 → 技能标签"),
+    NavEdge(SKILL_PAGE, INTENSIFY_PAGE, (0.1875, 0.0463),
+            EdgeType.TAB, "技能 → 强化标签"),
+    NavEdge(SKILL_PAGE, REMAKE_PAGE, (0.3125, 0.0463),
+            EdgeType.TAB, "技能 → 改修标签"),
+
+    # ── 好友 → 侧边栏 ────────────────────────────────────────────────
+    NavEdge(FRIEND_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CHILD, "好友 ◁ 返回侧边栏"),
+]
+"""完整导航图 — 所有已知页面间的有向边。
+
+边中标注 ``TODO`` 的坐标为估计值，待实际游戏截图确认后精确化。
+"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 查找辅助
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 按 source 索引，方便查找
+_adjacency: dict[str, list[NavEdge]] = {}
+for _e in NAV_GRAPH:
+    _adjacency.setdefault(_e.source, []).append(_e)
+
+
+def get_edges_from(page: str) -> list[NavEdge]:
+    """获取从 ``page`` 出发的所有边。"""
+    return list(_adjacency.get(page, []))
+
+
+def find_path(source: str, target: str) -> list[NavEdge] | None:
+    """BFS 查找从 ``source`` 到 ``target`` 的最短路径。
+
+    Parameters
+    ----------
+    source:
+        起始页面名称。
+    target:
+        目标页面名称。
+
+    Returns
+    -------
+    list[NavEdge] | None
+        路径上的边列表，不可达时返回 ``None``。
+        如果 ``source == target``，返回空列表。
+    """
+    if source == target:
+        return []
+
+    visited: set[str] = {source}
+    queue: deque[tuple[str, list[NavEdge]]] = deque()
+    queue.append((source, []))
+
+    while queue:
+        current, path = queue.popleft()
+        for edge in _adjacency.get(current, []):
+            if edge.target in visited:
+                continue
+            new_path = [*path, edge]
+            if edge.target == target:
+                return new_path
+            visited.add(edge.target)
+            queue.append((edge.target, new_path))
+
+    return None
+
+
+def get_all_pages() -> list[str]:
+    """返回导航图中涉及的所有页面名称 (去重)。"""
+    pages: set[str] = set()
+    for edge in NAV_GRAPH:
+        pages.add(edge.source)
+        pages.add(edge.target)
+    return sorted(pages)

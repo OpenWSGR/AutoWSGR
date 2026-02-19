@@ -12,12 +12,39 @@
 导航操作 (``go_back``、``navigate_to`` 等) 内置截图验证，
 点击后反复截图确认页面已切换，超时抛出 :class:`NavigationError`。
 
+页面导航树::
+
+    主页面 (MainPage)
+    ├── 地图页面 (MapPage)                  ← 出征
+    │   ├── [面板] 出征/演习/远征/战役/决战
+    │   └── 出征准备 (BattlePreparationPage)
+    │       └── → 浴室 (BathPage)           ← 跨级快捷通道
+    ├── 任务页面 (MissionPage)              ← 任务
+    ├── 后院页面 (BackyardPage)             ← 主页图标
+    │   ├── 浴室 (BathPage)
+    │   │   └── 选择修理 (ChooseRepairPage)
+    │   └── 食堂 (CanteenPage)
+    └── 侧边栏 (SidebarPage)               ← ≡ 按钮
+        ├── 建造 (BuildPage)
+        │   └── [标签] 建造/解体/开发/废弃
+        ├── 强化 (IntensifyPage)
+        │   └── [标签] 强化/改修/技能
+        └── 好友 (FriendPage)
+
 页面识别注册中心::
 
     from autowsgr.ui import get_current_page
 
     screen = ctrl.screenshot()
     page_name = get_current_page(screen)  # "主页面" / "地图页面" / ...
+
+导航路径查找::
+
+    from autowsgr.ui.navigation import find_path
+
+    path = find_path("主页面", "建造页面")
+    for edge in path:
+        ctrl.click(*edge.click)
 
 使用方式::
 
@@ -30,9 +57,22 @@
         page.start_battle()
 """
 
+# ── 已完成签名采集的控制器 ──────────────────────────────────────────────
 from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
 from autowsgr.ui.main_page import MainPage, MainPageTarget
 from autowsgr.ui.map_page import MAP_DATABASE, MapIdentity, MapPage, MapPanel
+from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
+
+# ── 签名待采集的控制器 (stub) ──────────────────────────────────────────
+from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
+from autowsgr.ui.bath_page import BathPage
+from autowsgr.ui.build_page import BuildPage, BuildTab
+from autowsgr.ui.canteen_page import CanteenPage
+from autowsgr.ui.friend_page import FriendPage
+from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
+from autowsgr.ui.mission_page import MissionPage
+
+# ── 导航基础设施 ───────────────────────────────────────────────────────
 from autowsgr.ui.page import (
     NavigationError,
     get_current_page,
@@ -43,22 +83,51 @@ from autowsgr.ui.page import (
 )
 
 # ── 注册所有页面识别器 ──
+# 已完成签名采集的页面 — is_current_page() 可用于实际识别
 register_page("主页面", MainPage.is_current_page)
 register_page("地图页面", MapPage.is_current_page)
 register_page("出征准备", BattlePreparationPage.is_current_page)
+register_page("侧边栏", SidebarPage.is_current_page)
+
+# 签名待采集的页面 — is_current_page() 暂时返回 False
+# 注册后可在签名采集完成后自动生效
+register_page("任务页面", MissionPage.is_current_page)
+register_page("后院页面", BackyardPage.is_current_page)
+register_page("浴室页面", BathPage.is_current_page)
+register_page("食堂页面", CanteenPage.is_current_page)
+register_page("建造页面", BuildPage.is_current_page)
+register_page("强化页面", IntensifyPage.is_current_page)
+register_page("好友页面", FriendPage.is_current_page)
 
 __all__ = [
+    # ── 控制器 (已完成签名) ──
     "BattlePreparationPage",
     "MainPage",
     "MainPageTarget",
     "MapIdentity",
     "MapPage",
     "MapPanel",
-    "NavigationError",
     "Panel",
+    "SidebarPage",
+    "SidebarTarget",
+    # ── 控制器 (签名待采集) ──
+    "BackyardPage",
+    "BackyardTarget",
+    "BathPage",
+    "BuildPage",
+    "BuildTab",
+    "CanteenPage",
+    "FriendPage",
+    "IntensifyPage",
+    "IntensifyTab",
+    "MissionPage",
+    # ── 导航基础设施 ──
+    "NavigationError",
     "get_current_page",
     "get_registered_pages",
     "register_page",
     "wait_for_page",
     "wait_leave_page",
+    # ── 数据 ──
+    "MAP_DATABASE",
 ]
