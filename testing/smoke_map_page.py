@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from autowsgr.emulator.controller import ADBController
 from autowsgr.infra.logger import save_image, setup_logger
-from autowsgr.ui.map_page import MapPage, MapPanel
+from autowsgr.ui.map_page import MAP_DATABASE, MapPage, MapPanel
 from autowsgr.vision.matcher import PixelChecker
 from autowsgr.vision.ocr import OCREngine
 
@@ -49,8 +49,14 @@ PAUSE_AFTER_ACTION = 1.0  # 每个动作执行后等待秒数
 # ── 工具函数 ──
 
 
-def step(title: str) -> bool:
-    """打印步骤标题，询问是否执行。"""
+def step(title: str) -> str:
+    """打印步骤标题，询问是否执行。
+
+    Returns
+    -------
+    str
+        ``"run"`` / ``"skip"`` / ``"quit"``
+    """
     print()
     print("─" * 60)
     print(f"  步骤: {title}")
@@ -59,7 +65,19 @@ def step(title: str) -> bool:
     if ans == "q":
         print("  用户中止测试。")
         sys.exit(0)
-    return ans != "s"
+    return "skip" if ans == "s" else "run"
+
+
+def retry_prompt() -> bool:
+    """步骤完成后询问是否重试。
+
+    Returns
+    -------
+    bool
+        ``True`` 表示重试当前步骤，``False`` 表示继续。
+    """
+    ans = input("  [Enter] 继续下一步  |  [r] 重试此步骤: ").strip().lower()
+    return ans == "r"
 
 
 def ok(msg: str) -> None:
@@ -126,10 +144,11 @@ def main() -> None:
     print("═" * 60)
     print()
     print("  请确保游戏已打开并进入【地图选择】页面 (出征 tab)")
+    print("  每个步骤完成后可按 [r] 重试 (人工切换页面后再跑)")
     print()
 
     # ── Step 1: 连接设备 ──
-    if step("连接设备并截图"):
+    if step("连接设备并截图") == "run":
         ctrl = ADBController(serial=serial, screenshot_timeout=15.0)
         ctrl.connect()
         ok(f"已连接: {ctrl._serial}")
@@ -147,16 +166,28 @@ def main() -> None:
         return
 
     # ── Step 2: 读取初始状态 ──
-    if step("读取当前状态"):
+    while step("读取当前状态") == "run":
         read_state(ctrl, tag="step2_initial")
+        if not retry_prompt():
+            break
 
     # ── Step 3: OCR 地图标题 ──
-    if step("OCR 识别地图标题"):
-        info("正在初始化 OCR 引擎 (EasyOCR)...")
-        try:
-            ocr = OCREngine.create("easyocr", gpu=False)
-            ok("OCR 引擎初始化成功")
+    ocr = None
+    while step("OCR 识别地图标题") == "run":
+        if ocr is None:
+            info("正在初始化 OCR 引擎 (EasyOCR)...")
+            try:
+                ocr = OCREngine.create("easyocr", gpu=False)
+                ok("OCR 引擎初始化成功")
+            except ImportError:
+                fail("EasyOCR 未安装，跳过 OCR 测试")
+                info("安装: pip install easyocr")
+                break
+            except Exception as e:
+                fail(f"OCR 引擎初始化异常: {e}")
+                break
 
+        try:
             screen = ctrl.screenshot()
             from autowsgr.ui.map_page import TITLE_CROP_REGION
 
@@ -168,6 +199,15 @@ def main() -> None:
             if map_info:
                 ok(f"地图识别: 第{map_info.chapter}章 {map_info.chapter}-{map_info.map_num} {map_info.name}")
                 info(f"  原始文本: '{map_info.raw_text}'")
+                # 校验是否在数据库中
+                db_name = MAP_DATABASE.get((map_info.chapter, map_info.map_num))
+                if db_name:
+                    if db_name == map_info.name:
+                        ok(f"  数据库匹配: ✓")
+                    else:
+                        info(f"  数据库名称: '{db_name}' (OCR: '{map_info.name}')")
+                else:
+                    info(f"  ({map_info.chapter}, {map_info.map_num}) 不在数据库中")
             else:
                 fail("OCR 未能识别地图标题")
                 info("请检查裁切区域和 OCR 结果")
@@ -176,42 +216,44 @@ def main() -> None:
                 results = ocr.recognize(cropped)
                 for r in results:
                     info(f"  OCR 结果: text='{r.text}' conf={r.confidence:.2f}")
-        except ImportError:
-            fail("EasyOCR 未安装，跳过 OCR 测试")
-            info("安装: pip install easyocr")
-            ocr = None
         except Exception as e:
             fail(f"OCR 测试异常: {e}")
-            ocr = None
-    else:
-        ocr = None
+
+        if not retry_prompt():
+            break
 
     # ── Step 4: 切换面板到演习 ──
-    if step("切换到演习面板"):
+    while step("切换到演习面板") == "run":
         page = MapPage(ctrl)
         page.switch_panel(MapPanel.EXERCISE)
         time.sleep(PAUSE_AFTER_ACTION)
         verify_panel(ctrl, MapPanel.EXERCISE)
         save_image(ctrl.screenshot(), tag="map_step4_exercise")
+        if not retry_prompt():
+            break
 
     # ── Step 5: 切换面板到远征 ──
-    if step("切换到远征面板"):
+    while step("切换到远征面板") == "run":
         page = MapPage(ctrl)
         page.switch_panel(MapPanel.EXPEDITION)
         time.sleep(PAUSE_AFTER_ACTION)
         verify_panel(ctrl, MapPanel.EXPEDITION)
         save_image(ctrl.screenshot(), tag="map_step5_expedition")
+        if not retry_prompt():
+            break
 
     # ── Step 6: 切回出征面板 ──
-    if step("切回出征面板"):
+    while step("切回出征面板") == "run":
         page = MapPage(ctrl)
         page.switch_panel(MapPanel.SORTIE)
         time.sleep(PAUSE_AFTER_ACTION)
         verify_panel(ctrl, MapPanel.SORTIE)
         save_image(ctrl.screenshot(), tag="map_step6_sortie")
+        if not retry_prompt():
+            break
 
     # ── Step 7: 切换到上一章 ──
-    if step("切换到上一章"):
+    while step("切换到上一章") == "run":
         page = MapPage(ctrl)
         screen = ctrl.screenshot()
         chapter_y_before = MapPage.find_selected_chapter_y(screen)
@@ -235,8 +277,11 @@ def main() -> None:
         else:
             fail("无法点击上一章 (可能已在最前)")
 
+        if not retry_prompt():
+            break
+
     # ── Step 8: 切换到下一章 (回到原来) ──
-    if step("切换到下一章 (回到原来的章节)"):
+    while step("切换到下一章 (回到原来的章节)") == "run":
         page = MapPage(ctrl)
         screen = ctrl.screenshot()
 
@@ -255,12 +300,17 @@ def main() -> None:
         else:
             fail("无法点击下一章 (可能已在最后)")
 
+        if not retry_prompt():
+            break
+
     # ── Step 9: 最终状态 ──
-    if step("读取最终状态"):
+    while step("读取最终状态") == "run":
         read_state(ctrl, tag="step9_final")
+        if not retry_prompt():
+            break
 
     # ── Step 10: 回退 ──
-    if step("点击回退按钮"):
+    if step("点击回退按钮") == "run":
         page = MapPage(ctrl)
         page.go_back()
         time.sleep(PAUSE_AFTER_ACTION)

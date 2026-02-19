@@ -21,7 +21,7 @@
 """
 
 from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
-from autowsgr.ui.map_page import MapIdentity, MapPage, MapPanel
+from autowsgr.ui.map_page import MAP_DATABASE, MapIdentity, MapPage, MapPanel
 
 __all__ = [
     "BattlePreparationPage",

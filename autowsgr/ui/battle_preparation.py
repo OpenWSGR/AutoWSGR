@@ -312,17 +312,18 @@ class BattlePreparationPage:
 
     def toggle_battle_support(self) -> None:
         """切换战役支援开关。
-
+        TODO: 暂时无效，暂时不管
         .. note::
             此方法仅点击开关区域，不判断当前状态。
             需要配合截图 + 状态查询确认最终状态。
+            
         """
         logger.info("[UI] 出征准备 → 切换战役支援")
         self._ctrl.click(*CLICK_SUPPORT)
 
     def toggle_auto_supply(self) -> None:
         """切换自动补给开关。
-
+        TODO: 暂时无效，暂时不管
         .. note::
             此方法仅点击复选框，不判断当前状态。
             如需确保特定状态，先用 :meth:`is_auto_supply_enabled` 检查。
