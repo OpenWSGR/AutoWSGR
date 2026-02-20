@@ -7,30 +7,32 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from autowsgr.ops.image_resources import Templates
 from autowsgr.ui.map.data import (
-    CAMPAIGN_NAMES,
     CAMPAIGN_POSITIONS,
     CLICK_CHALLENGE,
-    CLICK_DIFFICULTY_EASY,
-    CLICK_DIFFICULTY_HARD,
-    CLICK_ENTER_CAMPAIGN,
+    CLICK_DIFFICULTY,
+    DIFFICULTY_EASY_COLOR,
+    DIFFICULTY_HARD_COLOR,
     CLICK_ENTER_DECISIVE,
     CLICK_REFRESH_RIVALS,
     CLICK_SCREEN_CENTER,
-    MAP_NODE_POSITIONS,
+    EXPEDITION_READY_COLOR,
+    EXPEDITION_SLOT_PROBES,
+    EXPEDITION_SLOT_TOLERANCE,
     MapPanel,
     RIVAL_POSITIONS,
 )
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
-from autowsgr.vision import ImageChecker
-
-if TYPE_CHECKING:
-    from autowsgr.emulator import AndroidController
+from autowsgr.ui.page import (
+    click_and_wait_for_page,
+    confirm_operation,
+    wait_for_page,
+)
+from autowsgr.vision import ImageChecker, PixelChecker
+from autowsgr.emulator import AndroidController
 
 
 class _MapPageOpsMixin:
@@ -42,11 +44,31 @@ class _MapPageOpsMixin:
     _ctrl: AndroidController
 
     # ── 动作 — 进入战役 (地图 → 出征准备) ───────────────────────────────
+    def recognize_difficulty(self) -> str | None:
+        """通过检测难度按钮颜色识别当前难度。
+        切换图标为蓝色时，说明可以切换为 easy，当前为 hard；反之亦然。
+        """
+        retry = 0
+        while retry < 10:
+            screen = self._ctrl.screenshot()
+            px = PixelChecker.get_pixel(screen, *CLICK_DIFFICULTY)
+            if px.near(DIFFICULTY_EASY_COLOR, tolerance=50):
+                return "hard"
+            elif px.near(DIFFICULTY_HARD_COLOR, tolerance=50):
+                return "easy"
+            time.sleep(0.25)
+            retry += 1
 
+        logger.warning(
+            "[UI] 无法识别难度: 检测点颜色 {} 不匹配简单或困难",
+        )
+        raise
+    
     def enter_campaign(
         self,
         map_index: int = 2,
         difficulty: str = "hard",
+        campaign_name: str = "未知"
     ) -> None:
         """进入战役: 选择难度和战役类型，直接到达出征准备页面。
 
@@ -71,10 +93,9 @@ class _MapPageOpsMixin:
         if difficulty not in ("easy", "hard"):
             raise ValueError(f"难度必须为 easy 或 hard，收到: {difficulty}")
 
-        battle_name = CAMPAIGN_NAMES.get(map_index, "未知")
         logger.info(
             "[UI] 地图页面 → 进入战役 {} ({})",
-            battle_name,
+            campaign_name,
             difficulty,
         )
 
@@ -82,29 +103,24 @@ class _MapPageOpsMixin:
         screen = self._ctrl.screenshot()
         if self.get_active_panel(screen) != MapPanel.BATTLE:  # type: ignore[attr-defined]
             self.switch_panel(MapPanel.BATTLE)  # type: ignore[attr-defined]
-            time.sleep(1.0)
 
         # 2. 选择难度
-        if difficulty == "easy":
-            self._ctrl.click(*CLICK_DIFFICULTY_EASY)
-        else:
-            self._ctrl.click(*CLICK_DIFFICULTY_HARD)
-        time.sleep(0.5)
+        if self.recognize_difficulty() != difficulty:
+            self._ctrl.click(*CLICK_DIFFICULTY)
+        while self.recognize_difficulty() != difficulty:
+            logger.debug("[UI] 等待难度切换到 {}…", difficulty)
+            time.sleep(0.25)
+        time.sleep(0.75)
 
         # 3. 选择战役
         self._ctrl.click(*CAMPAIGN_POSITIONS[map_index])
         time.sleep(0.5)
 
-        # 4. 点击进入 (双击确保)
-        self._ctrl.click(*CLICK_ENTER_CAMPAIGN)
-        self._ctrl.click(*CLICK_ENTER_CAMPAIGN)
-        time.sleep(1.5)
-
         # 等待到达出征准备
         wait_for_page(
             self._ctrl,
             checker=BattlePreparationPage.is_current_page,
-            source=f"地图-战役 {battle_name}",
+            source=f"地图-战役 {campaign_name}",
             target="出征准备",
         )
 
@@ -158,46 +174,130 @@ class _MapPageOpsMixin:
 
     # ── 动作 — 地图节点操作 ──────────────────────────────────────────────
 
-    def click_map_node(self, node: int) -> None:
-        """出征面板 → 点击指定地图节点 (1–5)。"""
-        if node not in MAP_NODE_POSITIONS:
-            raise ValueError(f"地图节点必须为 1–5，收到: {node}")
-        logger.info("[UI] 地图 (出征) → 点击节点 {}", node)
-        self._ctrl.click(*MAP_NODE_POSITIONS[node])
-
     def click_screen_center(self) -> None:
         """点击屏幕中央 — 用于跳过动画/确认弹窗。"""
         self._ctrl.click(*CLICK_SCREEN_CENTER)
 
     # ── 动作 — 远征收取 ──
 
+    def _find_ready_expedition_slot(self, screen) -> int | None:
+        """检测 4 个远征槽位，返回第一个已完成 (黄色) 的槽位索引。
+
+        Parameters
+        ----------
+        screen:
+            截图 (H×W×3, RGB)。
+
+        Returns
+        -------
+        int | None
+            就绪槽位索引 (0–3)，无就绪则返回 ``None``。
+        """
+        for i, (px, py) in enumerate(EXPEDITION_SLOT_PROBES):
+            actual = PixelChecker.get_pixel(screen, px, py)
+            if actual.near(EXPEDITION_READY_COLOR, EXPEDITION_SLOT_TOLERANCE):
+                logger.debug(
+                    "[UI] 远征槽位 {} 就绪: 实际颜色 {} ≈ 黄色",
+                    i + 1,
+                    actual.as_rgb_tuple(),
+                )
+                return i
+        return None
+
     def collect_expedition(self) -> int:
-        """在远征面板收取已完成的远征 (循环确认弹窗)。
+        """在远征面板收取已完成的远征。
 
         Returns
         -------
         int
             收取的远征数量。
+
+        Raises
+        ------
+        NavigationError
+            远征通知仍在但 10s 内无法检测到就绪槽位。
         """
+        from autowsgr.ui.map.page import MapPage
+
         collected = 0
-        for _ in range(6):
+        for _ in range(8):
+            # ── 检测就绪槽位 (含等待逻辑) ──
             screen = self._ctrl.screenshot()
-            has_notif = self.has_expedition_notification(screen)  # type: ignore[attr-defined]
-            if not has_notif and collected > 0:
-                break
+            slot_idx = self._find_ready_expedition_slot(
+                screen
+            )
+            if slot_idx is None:
+                # 无黄色槽位 — 检查上方探测点是否仍报告有远征
+                if not MapPage.has_expedition_notification(
+                    screen
+                ):
+                    logger.debug("[UI] 远征收取: 无就绪槽位且无通知，结束")
+                    break
 
-            detail = ImageChecker.find_any(screen, Templates.Confirm.all())
-            if detail is not None:
-                self._ctrl.click(*detail.center)
-                time.sleep(1.0)
-                collected += 1
-                continue
+                # 上方探测点仍亮 — 等待槽位刷新 (最多 10s)
+                logger.debug("[UI] 远征收取: 通知仍在，等待槽位刷新…")
+                deadline = time.monotonic() + 10.0
+                while time.monotonic() < deadline:
+                    time.sleep(0.1)
+                    screen = self._ctrl.screenshot()
+                    slot_idx = self._find_ready_expedition_slot(screen)
+                    if slot_idx is not None:
+                        break
+                    if not MapPage.has_expedition_notification(screen):
+                        logger.debug(
+                            "[UI] 远征收取: 通知消失，结束",
+                        )
+                        break
+                else:
+                    from autowsgr.ui.page import NavigationError
+                    raise NavigationError(
+                        "远征收取超时: 通知仍在但 10s 内未检测到就绪槽位"
+                    )
 
-            if has_notif:
-                self.click_screen_center()
-                time.sleep(1.0)
-            else:
-                break
+                if slot_idx is None:
+                    break
+
+            slot_pos = EXPEDITION_SLOT_PROBES[slot_idx]
+            logger.info("[UI] 远征收取: 点击槽位 {} ({:.4f}, {:.4f})",
+                        slot_idx + 1, *slot_pos)
+
+            # 1. 点击就绪槽位 (Legacy: timer.click(pos, delay=1))
+            self._ctrl.click(*slot_pos)
+            time.sleep(1.0)
+
+            # 2. 等待远征结果画面 (Legacy: wait_image(fight_image[3]))
+            _result_templates = [
+                Templates.Symbol.CLICK_TO_CONTINUE,
+            ]
+            _wait_deadline = time.monotonic() + 5.0
+            while time.monotonic() < _wait_deadline:
+                screen = self._ctrl.screenshot()
+                if ImageChecker.template_exists(screen, _result_templates):
+                    break
+            time.sleep(0.25)
+
+            # 3. 点击屏幕中央跳过动画 (Legacy: timer.click(900, 500, delay=1))
+            self.click_screen_center()
+            time.sleep(1.0)
+
+            # 4. 确认弹窗 (Legacy: confirm_operation(must_confirm=True))
+            confirm_operation(
+                self._ctrl,
+                must_confirm=True,
+                delay=0.5,
+                confidence=0.9,
+                timeout=5.0,
+            )
+
+            # 5. 等待回到地图页面
+            wait_for_page(
+                self._ctrl,
+                checker=MapPage.is_current_page,
+                source=f"远征收取",
+                target="地图页面",
+            )
+
+            collected += 1
 
         logger.info("[UI] 远征收取: {} 支", collected)
         return collected

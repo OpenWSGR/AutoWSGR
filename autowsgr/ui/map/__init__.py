@@ -4,7 +4,6 @@ re-export 公开 API，外部统一通过 ``autowsgr.ui.map`` 导入。
 """
 
 from autowsgr.ui.map.data import (
-    CAMPAIGN_NAMES,
     CAMPAIGN_POSITIONS,
     CHAPTER_MAP_COUNTS,
     CLICK_PANEL,
@@ -20,7 +19,6 @@ from autowsgr.ui.map.data import (
 from autowsgr.ui.map.page import MapPage
 
 __all__ = [
-    "CAMPAIGN_NAMES",
     "CAMPAIGN_POSITIONS",
     "CHAPTER_MAP_COUNTS",
     "CLICK_PANEL",

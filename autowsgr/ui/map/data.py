@@ -117,10 +117,25 @@ TOTAL_CHAPTERS: int = 9
 # ═══════════════════════════════════════════════════════════════════════════════
 
 EXPEDITION_NOTIF_COLOR = Color.of(245, 88, 47)
-"""远征通知颜色 — 橙红色圆点。"""
+"""远征通知颜色 — 橙红色圆点 (标签栏通知)。"""
 
 EXPEDITION_TOLERANCE = 40.0
 """远征通知检测颜色容差 (稍宽松以适应动画)。"""
+
+EXPEDITION_READY_COLOR = Color.of(253, 228, 66)
+"""远征槽位就绪颜色 — 黄色 (表示该槽位远征已完成)。"""
+
+EXPEDITION_IDLE_COLOR = Color.of(38, 147, 250)
+"""远征槽位空闲颜色 — 蓝色 (表示该槽位无远征或进行中)。"""
+
+DIFFICULTY_EASY_COLOR = Color.of(29, 139, 234)
+"""难度按钮「简单」状态颜色 — 蓝色。"""
+
+DIFFICULTY_HARD_COLOR = Color.of(141, 46, 52)
+"""难度按钮「困难」状态颜色 — 红色。"""
+
+EXPEDITION_SLOT_TOLERANCE = 30.0
+"""远征槽位颜色检测容差。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -129,6 +144,18 @@ EXPEDITION_TOLERANCE = 40.0
 
 EXPEDITION_NOTIF_PROBE: tuple[float, float] = (0.4953, 0.0213)
 """远征通知探测点。有远征完成时显示橙色 ≈ (245, 88, 47)。"""
+
+EXPEDITION_SLOT_PROBES: list[tuple[float, float]] = [
+    (0.8516, 0.2736),
+    (0.8531, 0.4736),
+    (0.8539, 0.6667),
+    (0.8547, 0.8694),
+]
+"""远征面板 4 个槽位的检测点。
+
+黄色 ≈ (253, 228, 66) 表示远征完成可收取，
+蓝色 ≈ (38, 147, 250) 表示无远征或进行中。
+"""
 
 TITLE_CROP_REGION: tuple[float, float, float, float] = (0.7, 0.18, 0.9, 0.215)
 """地图标题 OCR 裁切区域 (x1, y1, x2, y2)。"""
@@ -273,31 +300,18 @@ def parse_map_title(text: str) -> MapIdentity | None:
 # ── 战役坐标 ──
 
 CAMPAIGN_POSITIONS: dict[int, tuple[float, float]] = {
-    1: (0.350, 0.225),   # 航母 (carrier)
-    2: (0.350, 0.400),   # 潜艇 (submarine)
-    3: (0.350, 0.575),   # 驱逐 (destroyer)
-    4: (0.350, 0.750),   # 巡洋 (cruiser)
-    5: (0.350, 0.900),   # 战列 (battleship)
+    1: (0.17, 0.5),   # 驱逐 (carrier)
+    2: (0.34, 0.5),   # 巡洋 (submarine)
+    3: (0.51, 0.5),   # 战列 (destroyer)
+    4: (0.68, 0.5),   # 航母 (cruiser)
+    5: (0.85, 0.5),   # 潜艇 (battleship)
 }
 """5 种战役类型的点击位置。"""
 
-CAMPAIGN_NAMES: dict[int, str] = {
-    1: "航母",
-    2: "潜艇",
-    3: "驱逐",
-    4: "巡洋",
-    5: "战列",
-}
-"""战役编号 → 中文名称。"""
 
-CLICK_DIFFICULTY_EASY: tuple[float, float] = (0.800, 0.130)
-"""切换到「简单」难度。"""
+CLICK_DIFFICULTY: tuple[float, float] = (0.800, 0.130)
+"""切换难度。"""
 
-CLICK_DIFFICULTY_HARD: tuple[float, float] = (0.900, 0.130)
-"""切换到「困难」难度。"""
-
-CLICK_ENTER_CAMPAIGN: tuple[float, float] = (0.850, 0.500)
-"""点击进入战役 (选中战役后的确认)。"""
 
 # ── 出征地图节点切换 ──
 
