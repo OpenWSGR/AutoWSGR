@@ -182,7 +182,7 @@ from loguru import logger
 from autowsgr.scheduler.task import Task, TaskStatus, TaskResult
 from autowsgr.ui.recognizer import UIRecognizer
 from autowsgr.ui.router import go_main_page
-from autowsgr.infra.exceptions import AutoWSGRError, CriticalError, NetworkError
+from autowsgr.infra import AutoWSGRError, CriticalError, NetworkError
 
 
 class Scheduler:
@@ -287,12 +287,12 @@ class Scheduler:
 from pathlib import Path
 from loguru import logger
 
-from autowsgr.infra.config import ConfigManager
-from autowsgr.infra.logger import setup_logger
+from autowsgr.infra import ConfigManager
+from autowsgr.infra import setup_logger
 from autowsgr.vision.matcher import ImageMatcher
 from autowsgr.vision.ocr import OCREngine
-from autowsgr.emulator.controller import ADBController
-from autowsgr.emulator.os_control import EmulatorProcessManager
+from autowsgr.emulator import ADBController
+from autowsgr.emulator import EmulatorProcessManager
 from autowsgr.ui.recognizer import UIRecognizer
 from autowsgr.scheduler.scheduler import Scheduler
 

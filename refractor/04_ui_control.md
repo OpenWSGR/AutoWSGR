@@ -31,9 +31,9 @@ import time
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.vision.matcher import ImageMatcher, MatchResult, Color
-from autowsgr.infra.exceptions import ActionFailedError
+from autowsgr.infra import ActionFailedError
 
 
 @dataclass(frozen=True)
@@ -99,10 +99,10 @@ import time
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.vision.matcher import ImageMatcher, Color
 from autowsgr.vision.ocr import OCREngine
-from autowsgr.infra.exceptions import ActionFailedError, NavigationError
+from autowsgr.infra import ActionFailedError, NavigationError
 
 if TYPE_CHECKING:
     from autowsgr.ui.recognizer import UIRecognizer
@@ -427,7 +427,7 @@ from __future__ import annotations
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.vision.matcher import ImageMatcher, Color
 from autowsgr.vision.ocr import OCREngine
 from autowsgr.vision.templates import PageTemplate, TemplateRegistry
@@ -529,7 +529,7 @@ class UIRecognizer:
     ) -> UIController:
         """等待到达目标页面之一"""
         import time
-        from autowsgr.infra.exceptions import PageNotFoundError
+        from autowsgr.infra import PageNotFoundError
         
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -578,7 +578,7 @@ def _identify_tab_group(screen: np.ndarray, matcher: ImageMatcher) -> int | None
 from loguru import logger
 from autowsgr.ui.controller import UIController
 from autowsgr.ui.recognizer import UIRecognizer
-from autowsgr.infra.exceptions import NavigationError
+from autowsgr.infra import NavigationError
 
 
 # 页面邻接表（从 UI 树退化为静态配置）

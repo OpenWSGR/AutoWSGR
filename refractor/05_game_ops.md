@@ -45,7 +45,7 @@ from loguru import logger
 from autowsgr.ui.controller import UIController
 from autowsgr.ui.recognizer import UIRecognizer
 from autowsgr.ui.router import navigate, go_main_page
-from autowsgr.infra.exceptions import DockFullError, GameError
+from autowsgr.infra import DockFullError, GameError
 
 
 @dataclass
@@ -292,7 +292,7 @@ def cook(
 # autowsgr/ops/daily.py
 
 from dataclasses import dataclass
-from autowsgr.infra.config import DailyConfig
+from autowsgr.infra import DailyConfig
 from autowsgr.ui.recognizer import UIRecognizer
 from autowsgr.ui.router import go_main_page
 
@@ -341,7 +341,7 @@ def collect_rewards(
 ```python
 # 用户脚本示例
 
-from autowsgr.infra.config import ConfigManager
+from autowsgr.infra import ConfigManager
 from autowsgr.ops.sortie import prepare_sortie, SortieConfig
 from autowsgr.ops.expedition import collect_expedition
 from autowsgr.ui.router import go_main_page
