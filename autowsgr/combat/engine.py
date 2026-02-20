@@ -9,21 +9,21 @@
 统一到一个清晰的状态机循环中。
 
 设计要点:
-  1. **分离关注点**: 识别 (recognizer)、决策 (handlers)、操作 (actions) 各司其职
+  1. **自包含**: 图像匹配、敌方识别、战果检测等全部由引擎内部完成
   2. **数据驱动**: 节点决策全部来自 ``CombatPlan`` (YAML 配置)
   3. **安全规则**: 使用 ``RuleEngine`` 替代 ``eval()``
   4. **完整历史**: 所有事件通过 ``CombatHistory`` 记录
 
 模块拆分::
 
-    callbacks.py  — 回调类型签名与 CombatResult
+    callbacks.py  — CombatResult 与类型签名
     handlers.py   — 各状态处理器 (PhaseHandlersMixin)
     engine.py     — 主循环与状态识别 (本文件)
 
 使用方式::
 
-    engine = CombatEngine(device, plan, image_matcher)
-    result = engine.fight()
+    engine = CombatEngine(device)
+    result = engine.fight(plan)
 """
 
 from __future__ import annotations
@@ -34,25 +34,24 @@ from typing import TYPE_CHECKING, Callable
 from loguru import logger
 
 from autowsgr.combat.actions import click_speed_up, click_start_march
-from autowsgr.combat.callbacks import (
-    ClickImageFunc,
-    CombatResult,
-    DetectResultGradeFunc,
-    DetectShipStatsFunc,
-    GetEnemyFormationFunc,
-    GetEnemyInfoFunc,
-    GetShipDropFunc,
-    ImageExistFunc,
-)
+from autowsgr.combat.callbacks import CombatResult
 from autowsgr.combat.handlers import PhaseHandlersMixin
 from autowsgr.combat.history import CombatEvent, CombatHistory, EventType, FightResult
+from autowsgr.combat.image_resources import get_template
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
-from autowsgr.combat.recognizer import CombatRecognitionTimeout, CombatRecognizer, ImageMatcherFunc
+from autowsgr.combat.recognition import recognize_enemy_ships, recognize_enemy_formation
+from autowsgr.combat.recognizer import (
+    CombatRecognitionTimeout,
+    CombatRecognizer,
+    RESULT_GRADE_TEMPLATES,
+)
 from autowsgr.combat.state import CombatPhase, resolve_successors
 from autowsgr.types import ConditionFlag, Formation
+from autowsgr.vision import ImageChecker
 
 if TYPE_CHECKING:
     from autowsgr.emulator.controller import AndroidController
+    from autowsgr.vision import OCREngine
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -61,64 +60,30 @@ if TYPE_CHECKING:
 
 
 class CombatEngine(PhaseHandlersMixin):
-    """战斗状态机引擎。
+    """自包含的战斗状态机引擎。
 
-    驱动一次完整的战斗流程，从出征准备页面开始，
-    经过多个节点的 索敌→阵型→战斗→夜战→结算 循环，
-    直到回港或 SL。
+    引擎内部自行完成图像匹配、敌方编成/阵型识别、战果等级检测等，
+    无需外部注入回调函数，沿袭旧代码 ``Timer`` 内置识别能力的设计。
 
     Parameters
     ----------
     device:
-        设备控制器。
-    plan:
-        作战计划。
-    image_matcher:
-        图像匹配函数。
-    get_enemy_info:
-        获取敌方编成的回调。
-    get_enemy_formation:
-        获取敌方阵型的回调。
-    detect_ship_stats:
-        检测血量的回调。
-    detect_result_grade:
-        检测战果等级的回调。
-    get_ship_drop:
-        获取掉落的回调。
-    image_exist:
-        检查图像是否存在的回调。
-    click_image:
-        点击图像的回调。
+        设备控制器 (截图 + 触控)。
+    ocr:
+        OCR 引擎实例 (阵型识别用)。可选，为 ``None`` 则跳过阵型识别。
     """
 
     def __init__(
         self,
         device: AndroidController,
-        plan: CombatPlan,
-        image_matcher: ImageMatcherFunc,
-        *,
-        get_enemy_info: GetEnemyInfoFunc | None = None,
-        get_enemy_formation: GetEnemyFormationFunc | None = None,
-        detect_ship_stats: DetectShipStatsFunc | None = None,
-        detect_result_grade: DetectResultGradeFunc | None = None,
-        get_ship_drop: GetShipDropFunc | None = None,
-        image_exist: ImageExistFunc | None = None,
-        click_image: ClickImageFunc | None = None,
+        ocr: OCREngine | None = None,
     ) -> None:
         self._device = device
-        self._plan = plan
-        self._recognizer = CombatRecognizer(device, image_matcher)
+        self._ocr = ocr
 
-        # 回调
-        self._get_enemy_info = get_enemy_info or (lambda: {})
-        self._get_enemy_formation = get_enemy_formation or (lambda: "")
-        self._detect_ship_stats = detect_ship_stats or (lambda mode: [0] * 7)
-        self._detect_result_grade = detect_result_grade or (lambda: "")
-        self._get_ship_drop = get_ship_drop or (lambda: None)
-        self._image_exist = image_exist or (lambda key, conf: False)
-        self._click_image = click_image or (lambda key, timeout: False)
-
-        # 运行时状态
+        # 运行时状态 (由 fight() 重置)
+        self._plan: CombatPlan = CombatPlan(name="", mode=CombatMode.BATTLE)
+        self._recognizer: CombatRecognizer = None  # type: ignore[assignment]  # set in fight()
         self._phase = CombatPhase.PROCEED
         self._last_action = "yes"
         self._node = "0"
@@ -135,7 +100,11 @@ class CombatEngine(PhaseHandlersMixin):
     # 公共接口
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def fight(self, initial_ship_stats: list[int] | None = None) -> CombatResult:
+    def fight(
+        self,
+        plan: CombatPlan,
+        initial_ship_stats: list[int] | None = None,
+    ) -> CombatResult:
         """执行一次完整的战斗循环。
 
         从当前状态开始，循环执行:
@@ -143,6 +112,8 @@ class CombatEngine(PhaseHandlersMixin):
 
         Parameters
         ----------
+        plan:
+            作战计划 (阵型、夜战、节点决策等)。
         initial_ship_stats:
             初始血量状态（来自出征准备页面的检测结果）。
 
@@ -150,6 +121,11 @@ class CombatEngine(PhaseHandlersMixin):
         -------
         CombatResult
         """
+        self._plan = plan
+        self._recognizer = CombatRecognizer(
+            self._device,
+            self._make_image_matcher(),
+        )
         self._reset()
         if initial_ship_stats is not None:
             self._ship_stats = initial_ship_stats[:]
@@ -318,37 +294,91 @@ class CombatEngine(PhaseHandlersMixin):
         """战斗历史。"""
         return self._history
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 自包含识别能力 — 参考旧代码 Timer 内置方法
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _make_image_matcher(self):
+        """构建给 CombatRecognizer 用的 image_matcher 回调。"""
+        from autowsgr.combat.image_resources import resolve_image_matcher
+
+        return resolve_image_matcher(ImageChecker.find_any)
+
+    def _image_exist(self, template_key: str, confidence: float) -> bool:
+        """检查模板是否存在于当前截图中（等价旧代码 ``timer.image_exist``）。"""
+        screen = self._device.screenshot()
+        templates = get_template(template_key)
+        return ImageChecker.find_any(screen, templates, confidence=confidence) is not None
+
+    def _click_image(self, template_key: str, timeout: float) -> bool:
+        """等待并点击模板图像中心（等价旧代码 ``timer.click_image``）。"""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            screen = self._device.screenshot()
+            templates = get_template(template_key)
+            detail = ImageChecker.find_any(screen, templates, confidence=0.8)
+            if detail is not None:
+                self._device.click(*detail.center)
+                return True
+            time.sleep(0.3)
+        return False
+
+    def _get_enemy_info(self) -> dict[str, int]:
+        """识别敌方舰类编成（等价旧代码 ``get_enemy_condition``）。"""
+        screen = self._device.screenshot()
+        mode = "exercise" if self._plan and self._plan.mode == CombatMode.EXERCISE else "fight"
+        return recognize_enemy_ships(screen, mode=mode)
+
+    def _get_enemy_formation(self) -> str:
+        """OCR 识别敌方阵型（等价旧代码 ``get_enemy_formation``）。"""
+        if self._ocr is None:
+            return ""
+        screen = self._device.screenshot()
+        return recognize_enemy_formation(screen, self._ocr)
+
+    def _detect_result_grade(self) -> str:
+        """从战果结算截图识别评级 (SS/S/A/B/C/D)。"""
+        while retry := 0 < 5:
+            screen = self._device.screenshot()
+            for grade, key in RESULT_GRADE_TEMPLATES.items():
+                templates = get_template(key)
+                if ImageChecker.find_any(screen, templates, confidence=0.8) is not None:
+                    return grade
+            time.sleep(0.25)
+            retry += 1
+        raise CombatRecognitionTimeout("战果等级识别超时: 5 次尝试未识别到有效等级")
+
+    def _detect_ship_stats(self, mode: str) -> list[int]:
+        """检测我方舰队血量状态。
+
+        当前返回维持原有 ship_stats，后续可接入像素检测。
+        """
+        # TODO: 接入 BattlePreparationPage.detect_ship_damage 的像素检测逻辑
+        return self._ship_stats[:]
+
+    def _get_ship_drop(self) -> str | None:
+        """获取舰船掉落（当前未实现 OCR，返回 None）。"""
+        # TODO: 接入 OCR 识别掉落舰船名
+        return None
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 便捷函数
+# 兼容函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def run_combat(
     device: AndroidController,
     plan: CombatPlan,
-    image_matcher: ImageMatcherFunc,
+    image_matcher=None,
     *,
     ship_stats: list[int] | None = None,
-    get_enemy_info: GetEnemyInfoFunc | None = None,
-    get_enemy_formation: GetEnemyFormationFunc | None = None,
-    detect_ship_stats: DetectShipStatsFunc | None = None,
-    detect_result_grade: DetectResultGradeFunc | None = None,
-    get_ship_drop: GetShipDropFunc | None = None,
-    image_exist: ImageExistFunc | None = None,
-    click_image: ClickImageFunc | None = None,
+    **_kwargs,
 ) -> CombatResult:
-    """执行一次完整战斗的便捷函数。"""
-    engine = CombatEngine(
-        device=device,
-        plan=plan,
-        image_matcher=image_matcher,
-        get_enemy_info=get_enemy_info,
-        get_enemy_formation=get_enemy_formation,
-        detect_ship_stats=detect_ship_stats,
-        detect_result_grade=detect_result_grade,
-        get_ship_drop=get_ship_drop,
-        image_exist=image_exist,
-        click_image=click_image,
-    )
-    return engine.fight(initial_ship_stats=ship_stats)
+    """执行一次完整战斗的便捷函数 (兼容旧调用方式)。
+
+    现在 ``CombatEngine`` 已自包含所有识别能力，
+    ``image_matcher`` 和其余回调参数被忽略。
+    """
+    engine = CombatEngine(device=device)
+    return engine.fight(plan, initial_ship_stats=ship_stats)

@@ -272,7 +272,7 @@ def resolve_image_matcher(
     """
     def _match(screen, template_key: str, confidence: float) -> bool:
         templates = get_template(template_key)
-        return image_checker_find_any(screen, templates, confidence) is not None
+        return image_checker_find_any(screen, templates, confidence=confidence) is not None
 
     return _match
 

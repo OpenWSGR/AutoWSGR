@@ -345,8 +345,13 @@ class PhaseHandlersMixin:
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_result(self) -> ConditionFlag:
-        """处理战果结算。"""
+        """处理战果结算。
+        TODO: 增强可靠性
+        """
+        time.sleep(1)  # 等待结算界面完全加载
         click_result(self._device)
+        time.sleep(0.25)
+        click_result(self._device)  # 二次点击以关闭结算界面
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_get_ship(self) -> ConditionFlag:

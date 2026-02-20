@@ -13,12 +13,11 @@
 
 典型使用::
 
-    from autowsgr.combat.plan import CombatPlan
     from autowsgr.combat.engine import CombatEngine
+    from autowsgr.combat.plan import CombatPlan
 
-    plan = CombatPlan.from_yaml("plans/5-4.yaml")
-    engine = CombatEngine(device, plan)
-    result = engine.run()
+    engine = CombatEngine(device)
+    result = engine.fight(plan)
 """
 
 from autowsgr.combat.callbacks import CombatResult
