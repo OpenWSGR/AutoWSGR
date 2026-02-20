@@ -207,6 +207,8 @@ class Symbol:
 
     GET_ITEM = _LazyTemplate("combat/get_item.png", "symbol_get_item")
     """获取物品标志。"""
+    
+    CLICK_TO_CONTINUE = _LazyTemplate("combat/result.png", "click_to_continue")
 
 
 class BackButton:
