@@ -46,7 +46,7 @@ import enum
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,

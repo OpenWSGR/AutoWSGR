@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import enum
 import re
 from dataclasses import dataclass
 
@@ -263,3 +264,117 @@ def parse_map_title(text: str) -> MapIdentity | None:
         name=raw_name,
         raw_text=text,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 地图页面点击坐标
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── 战役坐标 ──
+
+CAMPAIGN_POSITIONS: dict[int, tuple[float, float]] = {
+    1: (0.350, 0.225),   # 航母 (carrier)
+    2: (0.350, 0.400),   # 潜艇 (submarine)
+    3: (0.350, 0.575),   # 驱逐 (destroyer)
+    4: (0.350, 0.750),   # 巡洋 (cruiser)
+    5: (0.350, 0.900),   # 战列 (battleship)
+}
+"""5 种战役类型的点击位置。"""
+
+CAMPAIGN_NAMES: dict[int, str] = {
+    1: "航母",
+    2: "潜艇",
+    3: "驱逐",
+    4: "巡洋",
+    5: "战列",
+}
+"""战役编号 → 中文名称。"""
+
+CLICK_DIFFICULTY_EASY: tuple[float, float] = (0.800, 0.130)
+"""切换到「简单」难度。"""
+
+CLICK_DIFFICULTY_HARD: tuple[float, float] = (0.900, 0.130)
+"""切换到「困难」难度。"""
+
+CLICK_ENTER_CAMPAIGN: tuple[float, float] = (0.850, 0.500)
+"""点击进入战役 (选中战役后的确认)。"""
+
+# ── 出征地图节点切换 ──
+
+CLICK_MAP_NEXT: tuple[float, float] = (937 / 960, 277 / 540)
+"""出征面板中地图节点向右切换 (→)。"""
+
+CLICK_MAP_PREV: tuple[float, float] = (247 / 960, 277 / 540)
+"""出征面板中地图节点向左切换 (←)。"""
+
+CLICK_ENTER_SORTIE: tuple[float, float] = (0.625, 0.556)
+"""出征面板中点击地图节点进入出征准备。"""
+
+# ── 决战面板进入 ──
+
+CLICK_ENTER_DECISIVE: tuple[float, float] = (115 / 960, 113 / 540)
+"""从地图页「决战」面板点击进入决战总览页。"""
+
+# ── 出征地图节点 ──
+
+MAP_NODE_POSITIONS: dict[int, tuple[float, float]] = {
+    1: (0.500, 0.200),
+    2: (0.500, 0.350),
+    3: (0.500, 0.500),
+    4: (0.500, 0.650),
+    5: (0.500, 0.800),
+}
+"""出征面板中各地图节点的点击位置 (1–5, 从上到下)。"""
+
+# ── 演习坐标 ──
+
+RIVAL_POSITIONS: list[tuple[float, float]] = [
+    (0.800, 0.222),
+    (0.800, 0.444),
+    (0.800, 0.667),
+    (0.800, 0.889),
+]
+"""演习面板中 4 个对手位置的「挑战」按钮。"""
+
+CLICK_REFRESH_RIVALS: tuple[float, float] = (0.938, 0.056)
+"""演习面板 — 刷新对手按钮 (右上角)。"""
+
+CLICK_CHALLENGE: tuple[float, float] = (0.800, 0.500)
+"""演习面板 — 通用挑战按钮。"""
+
+# ── 远征 ──
+
+CLICK_SCREEN_CENTER: tuple[float, float] = (0.5, 0.5)
+"""屏幕中央 — 用于闪过动画/确认弹窗。"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 面板枚举及映射
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class MapPanel(enum.Enum):
+    """地图页面顶部导航面板。"""
+
+    SORTIE = "出征"
+    EXERCISE = "演习"
+    EXPEDITION = "远征"
+    BATTLE = "战役"
+    DECISIVE = "决战"
+
+
+PANEL_LIST: list[MapPanel] = list(MapPanel)
+"""面板枚举值列表 — 索引与标签栏探测位置一一对应。"""
+
+PANEL_TO_INDEX: dict[MapPanel, int] = {
+    panel: i for i, panel in enumerate(PANEL_LIST)
+}
+
+CLICK_PANEL: dict[MapPanel, tuple[float, float]] = {
+    MapPanel.SORTIE:     (0.1396, 0.0574),
+    MapPanel.EXERCISE:   (0.2745, 0.0537),
+    MapPanel.EXPEDITION: (0.4042, 0.0556),
+    MapPanel.BATTLE:     (0.5276, 0.0519),
+    MapPanel.DECISIVE:   (0.6620, 0.0556),
+}
+"""面板标签点击位置。"""

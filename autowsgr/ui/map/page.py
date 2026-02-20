@@ -2,27 +2,34 @@
 
 覆盖 **地图选择** 页面的全部界面交互，包括面板切换、章节导航等。
 
-数据常量和 OCR 解析逻辑见 :mod:`autowsgr.ui.map_data`。
+数据常量和 OCR 解析逻辑见 :mod:`autowsgr.ui.map.data`。
+战役 / 决战 / 演习 / 远征操作见 :mod:`autowsgr.ui.map.ops`。
 """
 
 from __future__ import annotations
 
-import enum
 import time
 
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.map_data import (
+from autowsgr.emulator import AndroidController
+from autowsgr.ui.map.data import (
+    CHAPTER_MAP_COUNTS,
     CHAPTER_NAV_DELAY,
     CHAPTER_NAV_MAX_ATTEMPTS,
     CHAPTER_SPACING,
     CLICK_BACK,
+    CLICK_ENTER_SORTIE,
+    CLICK_MAP_NEXT,
+    CLICK_MAP_PREV,
+    CLICK_PANEL,
     EXPEDITION_NOTIF_COLOR,
     EXPEDITION_NOTIF_PROBE,
     EXPEDITION_TOLERANCE,
-    MAP_DATABASE,
+    MapPanel,
+    PANEL_LIST,
+    PANEL_TO_INDEX,
     SIDEBAR_BRIGHTNESS_THRESHOLD,
     SIDEBAR_CLICK_X,
     SIDEBAR_SCAN_STEP,
@@ -33,51 +40,16 @@ from autowsgr.ui.map_data import (
     MapIdentity,
     parse_map_title,
 )
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
+from autowsgr.ui.map.ops import _MapPageOpsMixin
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
     get_active_tab_index,
     identify_page_type,
     make_tab_checker,
 )
-from autowsgr.vision.matcher import Color, PixelChecker
+from autowsgr.vision.matcher import PixelChecker
 from autowsgr.vision.ocr import OCREngine
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 枚举
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class MapPanel(enum.Enum):
-    """地图页面顶部导航面板。"""
-
-    SORTIE = "出征"
-    EXERCISE = "演习"
-    EXPEDITION = "远征"
-    BATTLE = "战役"
-    DECISIVE = "决战"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 面板索引映射
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_PANEL_LIST: list[MapPanel] = list(MapPanel)
-"""面板枚举值列表 — 索引与标签栏探测位置一一对应。"""
-
-_PANEL_TO_INDEX: dict[MapPanel, int] = {
-    panel: i for i, panel in enumerate(_PANEL_LIST)
-}
-
-CLICK_PANEL: dict[MapPanel, tuple[float, float]] = {
-    MapPanel.SORTIE:     (0.1396, 0.0574),
-    MapPanel.EXERCISE:   (0.2745, 0.0537),
-    MapPanel.EXPEDITION: (0.4042, 0.0556),
-    MapPanel.BATTLE:     (0.5276, 0.0519),
-    MapPanel.DECISIVE:   (0.6620, 0.0556),
-}
-"""面板标签点击位置。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -85,7 +57,7 @@ CLICK_PANEL: dict[MapPanel, tuple[float, float]] = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class MapPage:
+class MapPage(_MapPageOpsMixin):
     """地图页面控制器。
 
     **状态查询** 为 ``staticmethod``，只需截图即可调用。
@@ -120,9 +92,9 @@ class MapPage:
     def get_active_panel(screen: np.ndarray) -> MapPanel | None:
         """获取当前激活的面板标签。"""
         idx = get_active_tab_index(screen)
-        if idx is None or idx >= len(_PANEL_LIST):
+        if idx is None or idx >= len(PANEL_LIST):
             return None
-        return _PANEL_LIST[idx]
+        return PANEL_LIST[idx]
 
     # ── 状态查询 — 远征通知 ──────────────────────────────────────────────
 
@@ -214,7 +186,7 @@ class MapPage:
             current.value if current else "未知",
             panel.value,
         )
-        target_idx = _PANEL_TO_INDEX[panel]
+        target_idx = PANEL_TO_INDEX[panel]
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_PANEL[panel],
@@ -309,3 +281,73 @@ class MapPage:
             target,
         )
         return None
+
+    # ── 动作 — 进入出征 (地图 → 出征准备) ───────────────────────────────
+
+    def enter_sortie(self, chapter: int | str, map_num: int | str) -> None:
+        """进入出征: 选择指定章节和地图节点，直接到达出征准备页面。
+
+        Parameters
+        ----------
+        chapter:
+            目标章节编号 (1–9) 或事件地图标识字符串。
+        map_num:
+            目标地图节点编号 (1–6) 或事件地图标识字符串。
+
+        Raises
+        ------
+        ValueError
+            章节或地图编号无效 (仅数字模式)。
+        NavigationError
+            导航超时。
+        """
+        from autowsgr.ui.battle.preparation import BattlePreparationPage
+
+        logger.info("[UI] 地图页面 → 进入出征 {}-{}", chapter, map_num)
+
+        # 1. 确保在出征面板
+        screen = self._ctrl.screenshot()
+        if self.get_active_panel(screen) != MapPanel.SORTIE:
+            self.switch_panel(MapPanel.SORTIE)
+            time.sleep(0.5)
+
+        # 2. 导航到指定章节
+        if isinstance(chapter, int):
+            max_maps = CHAPTER_MAP_COUNTS.get(chapter, 0)
+            if max_maps == 0:
+                raise ValueError(f"章节 {chapter} 不在已知地图数据中")
+            if isinstance(map_num, int) and not 1 <= map_num <= max_maps:
+                raise ValueError(
+                    f"章节 {chapter} 的地图编号必须为 1–{max_maps}，收到: {map_num}"
+                )
+            result = self.navigate_to_chapter(chapter)
+            if result is None:
+                from autowsgr.ui.page import NavigationError
+                raise NavigationError(f"无法导航到第 {chapter} 章")
+
+        # 3. 切换到指定地图节点
+        if isinstance(map_num, int) and self._ocr is not None:
+            screen = self._ctrl.screenshot()
+            info = self.recognize_map(screen, self._ocr)
+            if info is not None:
+                current_map = info.map_num
+                if current_map != map_num:
+                    delta = map_num - current_map
+                    if delta > 0:
+                        for _ in range(delta):
+                            self._ctrl.click(*CLICK_MAP_NEXT)
+                            time.sleep(0.3)
+                    else:
+                        for _ in range(-delta):
+                            self._ctrl.click(*CLICK_MAP_PREV)
+                            time.sleep(0.3)
+                    time.sleep(0.5)
+
+        # 4. 点击进入出征准备
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_ENTER_SORTIE,
+            checker=BattlePreparationPage.is_current_page,
+            source=f"地图-出征 {chapter}-{map_num}",
+            target="出征准备",
+        )

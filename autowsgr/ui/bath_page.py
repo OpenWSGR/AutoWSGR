@@ -48,7 +48,7 @@ from __future__ import annotations
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision.matcher import (
     MatchStrategy,
@@ -93,6 +93,12 @@ CLICK_CHOOSE_REPAIR: tuple[float, float] = (0.9375, 0.0556)
 """选择修理按钮 (右上角)。
 
 坐标换算: 旧代码 (900, 30) ÷ (960, 540)。
+"""
+
+CLICK_FIRST_REPAIR_SHIP: tuple[float, float] = (0.1198, 0.4315)
+"""选择修理页面中第一个舰船的位置。
+
+旧代码: timer.click(115, 233) → (115/960, 233/540)。
 """
 
 
@@ -178,3 +184,10 @@ class BathPage:
             source="浴室",
             target="后院/主页面",
         )
+
+    # ── 选择修理子页面操作 ────────────────────────────────────────────────
+
+    def click_first_repair_ship(self) -> None:
+        """选择修理页面 → 点击第一个舰船 (修理时间最长的排在首位)。"""
+        logger.info("[UI] 浴室 (选择修理) → 点击第一个舰船")
+        self._ctrl.click(*CLICK_FIRST_REPAIR_SHIP)

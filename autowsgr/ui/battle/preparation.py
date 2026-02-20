@@ -1,19 +1,21 @@
 """出征准备页面 UI 控制器。
 
 覆盖 **出征准备** 页面的全部界面交互。
-坐标与颜色常量见 :mod:`autowsgr.ui.battle_constants`。
+坐标与颜色常量见 :mod:`autowsgr.ui.battle.constants`。
 """
 
 from __future__ import annotations
 
 import enum
 import time
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.battle_constants import (
+from autowsgr.emulator import AndroidController
+from autowsgr.ui.battle.constants import (
     AUTO_SUPPLY_ON,
     AUTO_SUPPLY_PROBE,
     BLOOD_BAR_PROBE,
@@ -41,10 +43,29 @@ from autowsgr.ui.battle_constants import (
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision.matcher import PixelChecker
 
+if TYPE_CHECKING:
+    from autowsgr.vision.ocr import OCREngine
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+class RepairStrategy(enum.Enum):
+    """修理策略。"""
+
+    MODERATE = "moderate"
+    """修中破及以上 (damage >= 1)。"""
+
+    SEVERE = "severe"
+    """仅修大破 (damage >= 2)。"""
+
+    ALWAYS = "always"
+    """有损伤即修 (damage >= 1, 含黄血)。"""
+
+    NEVER = "never"
+    """不修理。"""
 
 
 class Panel(enum.Enum):
@@ -144,7 +165,7 @@ class BattlePreparationPage:
 
     def go_back(self) -> None:
         """点击回退按钮 (◁)，返回地图页面。"""
-        from autowsgr.ui.map_page import MapPage
+        from autowsgr.ui.map.page import MapPage
 
         logger.info("[UI] 出征准备 → 回退")
         click_and_wait_for_page(
@@ -274,3 +295,136 @@ class BattlePreparationPage:
             raise ValueError(f"舰船槽位必须为 1–6，收到: {slot}")
         logger.info("[UI] 出征准备 → 点击舰船位 {}", slot)
         self._ctrl.click(*CLICK_SHIP_SLOT[slot])
+
+    # ── 组合动作 — 修理 / 补给 / 换船 ──
+
+    def apply_repair(
+        self,
+        strategy: RepairStrategy = RepairStrategy.SEVERE,
+    ) -> list[int]:
+        """根据策略执行快速修理。
+
+        Returns
+        -------
+        list[int]
+            实际修理的槽位列表。
+        """
+        if strategy is RepairStrategy.NEVER:
+            return []
+
+        screen = self._ctrl.screenshot()
+        damage = self.detect_ship_damage(screen)
+
+        positions: list[int] = []
+        for slot, dmg in damage.items():
+            if dmg <= 0 or dmg == 3:
+                continue
+            if strategy is RepairStrategy.ALWAYS and dmg >= 1:
+                positions.append(slot)
+            elif strategy is RepairStrategy.MODERATE and dmg >= 1:
+                positions.append(slot)
+            elif strategy is RepairStrategy.SEVERE and dmg >= 2:
+                positions.append(slot)
+
+        if positions:
+            self.repair_slots(positions)
+            logger.info("[UI] 修理位置: {} (策略: {})", positions, strategy.value)
+        return positions
+
+    def apply_supply(self) -> None:
+        """确保舰队已补给 (自动补给未开启则手动补给)。"""
+        screen = self._ctrl.screenshot()
+        if self.is_auto_supply_enabled(screen):
+            return
+        self.supply()
+
+    def change_fleet(
+        self,
+        fleet_id: int,
+        ship_names: Sequence[str | None],
+        *,
+        ocr: OCREngine | None = None,
+    ) -> None:
+        """更换编队全部舰船。
+
+        Parameters
+        ----------
+        fleet_id:
+            舰队编号 (2–4)。1 队不支持更换。
+        ship_names:
+            舰船名列表 (按槽位 1–6)。``None`` 或 ``""`` 表示该位留空。
+        ocr:
+            OCR 引擎 (搜索时用于匹配舰船名)。
+        """
+        from autowsgr.ui.choose_ship_page import ChooseShipPage
+
+        if fleet_id == 1:
+            raise ValueError("不支持更换 1 队舰船编成")
+
+        logger.info("[UI] 更换 {} 队编成: {}", fleet_id, ship_names)
+
+        names = list(ship_names) + [None] * 6
+        names = [n if n else None for n in names[:6]]
+
+        # 检测当前各槽位状态
+        screen = self._ctrl.screenshot()
+        damage = self.detect_ship_damage(screen)
+
+        # 先移除所有已有舰船
+        for slot in range(1, 7):
+            if damage.get(slot, -1) != -1:
+                self._change_single_ship(1, None, slot_occupied=True)
+                time.sleep(0.3)
+
+        # 检测移除后状态
+        screen = self._ctrl.screenshot()
+        damage = self.detect_ship_damage(screen)
+
+        # 逐个放入目标舰船
+        for slot in range(1, 7):
+            name = names[slot - 1]
+            occupied = damage.get(slot, -1) != -1
+            self._change_single_ship(slot, name, ocr=ocr, slot_occupied=occupied)
+            time.sleep(0.3)
+
+        logger.info("[UI] {} 队编成更换完成", fleet_id)
+
+    def _change_single_ship(
+        self,
+        slot: int,
+        name: str | None,
+        *,
+        ocr: OCREngine | None = None,
+        slot_occupied: bool = True,
+    ) -> None:
+        """更换/移除指定位置的单艘舰船。"""
+        from autowsgr.ui.choose_ship_page import ChooseShipPage
+
+        if name is None and not slot_occupied:
+            return
+
+        self.click_ship_slot(slot)
+        time.sleep(1.0)
+
+        choose_page = ChooseShipPage(self._ctrl)
+
+        if name is None:
+            choose_page.click_remove()
+            time.sleep(0.8)
+            return
+
+        choose_page.click_search_box()
+        time.sleep(0.5)
+        choose_page.input_ship_name(name)
+        time.sleep(0.3)
+        choose_page.dismiss_keyboard()
+        time.sleep(0.8)
+
+        if ocr is not None:
+            screen = self._ctrl.screenshot()
+            ship_name = ocr.recognize_ship_name(screen, [name])
+            if ship_name != name:
+                logger.warning("[UI] 未精确匹配 '{}', OCR 识别: '{}'", name, ship_name)
+
+        choose_page.click_first_result()
+        time.sleep(1.0)

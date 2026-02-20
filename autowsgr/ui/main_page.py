@@ -37,9 +37,6 @@
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
         page.navigate_to(MainPageTarget.SORTIE)
-
-    # 从子页面返回
-    page.return_from(MainPageTarget.SORTIE)
 """
 
 from __future__ import annotations
@@ -49,7 +46,7 @@ import enum
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
     Color,
@@ -122,25 +119,6 @@ CLICK_NAV: dict[MainPageTarget, tuple[float, float]] = {
     MainPageTarget.HOME:    (0.0531, 0.1519),
 }
 """4 个导航控件的点击坐标。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 子页面退出坐标
-# ═══════════════════════════════════════════════════════════════════════════════
-
-EXIT_TOP_LEFT: tuple[float, float] = (0.022, 0.058)
-"""左上角回退按钮 ◁ (出征/任务/主页 通用)。"""
-
-EXIT_SIDEBAR: tuple[float, float] = (0.0490, 0.8981)
-"""侧边栏退出 — 左下角同一按钮 (≡ 切换)。"""
-
-CLICK_EXIT: dict[MainPageTarget, tuple[float, float]] = {
-    MainPageTarget.SORTIE:  EXIT_TOP_LEFT,
-    MainPageTarget.TASK:    EXIT_TOP_LEFT,
-    MainPageTarget.HOME:    EXIT_TOP_LEFT,
-    MainPageTarget.SIDEBAR: EXIT_SIDEBAR,
-}
-"""子页面退出控件的点击坐标。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -232,7 +210,7 @@ class MainPage:
             超时未到达目标页面。
         """
         from autowsgr.ui.backyard_page import BackyardPage
-        from autowsgr.ui.map_page import MapPage
+        from autowsgr.ui.map.page import MapPage
         from autowsgr.ui.mission_page import MissionPage
         from autowsgr.ui.sidebar_page import SidebarPage
 
@@ -266,32 +244,3 @@ class MainPage:
     def go_home(self) -> None:
         """点击主页图标 — 进入主页页面。"""
         self.navigate_to(MainPageTarget.HOME)
-
-    # ── 返回 ──────────────────────────────────────────────────────────────
-
-    def return_from(self, target: MainPageTarget) -> None:
-        """点击子页面退出控件，返回主页面。
-
-        - 出征 / 任务 / 主页: 左上角 ◁ 按钮
-        - 侧边栏: 左下角 ≡ 按钮 (同一切换按钮)
-
-        点击后反复截图验证，确认已返回主页面。
-
-        Parameters
-        ----------
-        target:
-            当前所在的子页面。
-
-        Raises
-        ------
-        NavigationError
-            超时未返回主页面。
-        """
-        logger.info("[UI] {} → 返回主页面", target.value)
-        click_and_wait_for_page(
-            self._ctrl,
-            click_coord=CLICK_EXIT[target],
-            checker=MainPage.is_current_page,
-            source=target.value,
-            target="主页面",
-        )

@@ -36,7 +36,7 @@ import enum
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.vision.matcher import (
     MatchStrategy,
     PixelChecker,

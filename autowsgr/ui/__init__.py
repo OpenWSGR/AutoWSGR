@@ -70,15 +70,17 @@
 # ── 控制器 ─────────────────────────────────────────────────────────────
 from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
 from autowsgr.ui.bath_page import BathPage
-from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
+from autowsgr.ui.battle.preparation import BattlePreparationPage, Panel
 from autowsgr.ui.build_page import BuildPage, BuildTab
 from autowsgr.ui.canteen_page import CanteenPage
+from autowsgr.ui.choose_ship_page import ChooseShipPage
 from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
 from autowsgr.ui.friend_page import FriendPage
 from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
 from autowsgr.ui.main_page import MainPage, MainPageTarget
-from autowsgr.ui.map_data import MAP_DATABASE, MapIdentity
-from autowsgr.ui.map_page import MapPage, MapPanel
+from autowsgr.ui.map.data import MAP_DATABASE, MapIdentity
+from autowsgr.ui.map.page import MapPage
+from autowsgr.ui.map.data import MapPanel
 from autowsgr.ui.mission_page import MissionPage
 from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
 
@@ -139,6 +141,7 @@ __all__ = [
     "BuildPage",
     "BuildTab",
     "CanteenPage",
+    "ChooseShipPage",
     "DecisiveBattlePage",
     "FriendPage",
     "IntensifyPage",

@@ -35,12 +35,16 @@
 
 from __future__ import annotations
 
+import time
+
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
+from autowsgr.ops.image_resources import Templates
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
+from autowsgr.vision.image_matcher import ImageChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -49,6 +53,9 @@ from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
 
 CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """回退按钮 (◁)。"""
+
+CLICK_CONFIRM_CENTER: tuple[float, float] = (0.5, 0.5)
+"""领取奖励后弹窗确认 — 点击屏幕中央关闭。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -103,3 +110,57 @@ class MissionPage:
             source="任务页面",
             target="主页面",
         )
+
+    # ── 操作 ──────────────────────────────────────────────────────────────
+
+    def dismiss_reward_popup(self) -> None:
+        """点击屏幕中央，关闭领取奖励后的弹窗。"""
+        logger.info("[UI] 任务页面 → 关闭奖励弹窗")
+        self._ctrl.click(*CLICK_CONFIRM_CENTER)
+
+    # ── 组合动作 — 奖励收取 ──
+
+    def _try_confirm(self, *, timeout: float = 5.0) -> bool:
+        """等待并点击确认弹窗。"""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            detail = ImageChecker.find_any(screen, Templates.Confirm.all())
+            if detail is not None:
+                self._ctrl.click(*detail.center)
+                time.sleep(0.5)
+                return True
+            time.sleep(0.3)
+        return False
+
+    def collect_rewards(self) -> bool:
+        """在任务页面收取奖励。
+
+        必须已在任务页面。依次尝试一键领取和单个领取。
+
+        Returns
+        -------
+        bool
+            是否成功领取了奖励。
+        """
+        # 尝试 "一键领取"
+        screen = self._ctrl.screenshot()
+        detail = ImageChecker.find_template(screen, Templates.GameUI.REWARD_COLLECT_ALL)
+        if detail is not None:
+            self._ctrl.click(*detail.center)
+            time.sleep(0.5)
+            self.dismiss_reward_popup()
+            time.sleep(0.3)
+            self._try_confirm(timeout=5.0)
+            return True
+
+        # 尝试 "单个领取"
+        screen = self._ctrl.screenshot()
+        detail = ImageChecker.find_template(screen, Templates.GameUI.REWARD_COLLECT)
+        if detail is not None:
+            self._ctrl.click(*detail.center)
+            time.sleep(0.5)
+            self._try_confirm(timeout=5.0)
+            return True
+
+        return False

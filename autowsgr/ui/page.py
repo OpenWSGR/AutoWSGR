@@ -46,7 +46,7 @@ from typing import Callable
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.overlay import NetworkError, OverlayType, detect_overlay, dismiss_overlay  # noqa: F401
 
 
@@ -91,10 +91,6 @@ class NavConfig:
 
 DEFAULT_NAV_CONFIG = NavConfig()
 
-# 向前兼容常量
-DEFAULT_TIMEOUT: float = DEFAULT_NAV_CONFIG.timeout
-DEFAULT_INTERVAL: float = DEFAULT_NAV_CONFIG.interval
-
 
 # ---------------------------------------------------------------------------
 # 页面注册中心
@@ -113,6 +109,7 @@ def register_page(name: str, checker: Callable[[np.ndarray], bool]) -> None:
 
 def get_current_page(screen: np.ndarray) -> str | None:
     """识别截图对应的页面名称，无匹配返回 ``None``。"""
+    failed_checkers: list[str] = []
     for name, checker in _PAGE_REGISTRY.items():
         try:
             if checker(screen):
@@ -120,7 +117,14 @@ def get_current_page(screen: np.ndarray) -> str | None:
                 return name
         except Exception:
             logger.opt(exception=True).warning("[UI] 页面 '{}' 识别器异常", name)
-    logger.debug("[UI] 当前页面: 无匹配 (共 {} 个注册页面)", len(_PAGE_REGISTRY))
+            failed_checkers.append(name)
+    if failed_checkers:
+        logger.warning(
+            "[UI] 无匹配页面，且以下识别器抛异常: {} (共 {} 个注册页面)",
+            failed_checkers, len(_PAGE_REGISTRY),
+        )
+    else:
+        logger.debug("[UI] 当前页面: 无匹配 (共 {} 个注册页面)", len(_PAGE_REGISTRY))
     return None
 
 

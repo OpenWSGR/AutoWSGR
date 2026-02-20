@@ -38,11 +38,15 @@
 
 from __future__ import annotations
 
+import time
+
 import numpy as np
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
+from autowsgr.ops.image_resources import Templates
 from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision.image_matcher import ImageChecker
 from autowsgr.vision.matcher import (
     MatchStrategy,
     PixelChecker,
@@ -89,6 +93,26 @@ CLICK_RECIPE: dict[int, tuple[float, float]] = {
 """菜谱点击坐标 (1–3)。
 
 换算自旧代码: (318, 276), (420, 140), (556, 217) ÷ (960, 540)。
+"""
+
+# ── 做菜弹窗坐标 ──────────────────────────────────────────────────────
+
+CLICK_FORCE_COOK: tuple[float, float] = (0.414, 0.628)
+"""「效果正在生效」弹窗中选择继续做菜按钮。
+
+旧代码: timer.relative_click(0.414, 0.628)
+"""
+
+CLICK_CANCEL_COOK: tuple[float, float] = (0.650, 0.628)
+"""「效果正在生效」弹窗中取消做菜按钮。
+
+旧代码: timer.relative_click(0.65, 0.628)
+"""
+
+CLICK_DISMISS_POPUP: tuple[float, float] = (0.788, 0.207)
+"""关闭弹窗通用按钮。
+
+旧代码: timer.relative_click(0.788, 0.207)
 """
 
 
@@ -165,3 +189,74 @@ class CanteenPage:
             raise ValueError(f"菜谱编号必须为 1–3，收到: {position}")
         logger.info("[UI] 食堂 → 选择菜谱 {}", position)
         self._ctrl.click(*CLICK_RECIPE[position])
+
+    def confirm_force_cook(self) -> None:
+        """「效果正在生效」弹窗 → 点击继续做菜。"""
+        logger.info("[UI] 食堂 → 确认继续做菜 (覆盖生效中的菜)")
+        self._ctrl.click(*CLICK_FORCE_COOK)
+
+    def cancel_force_cook(self) -> None:
+        """「效果正在生效」弹窗 → 取消做菜。"""
+        logger.info("[UI] 食堂 → 取消做菜 (保留生效中的菜)")
+        self._ctrl.click(*CLICK_CANCEL_COOK)
+
+    def dismiss_popup(self) -> None:
+        """关闭弹窗 (通用关闭按钮)。"""
+        logger.info("[UI] 食堂 → 关闭弹窗")
+        self._ctrl.click(*CLICK_DISMISS_POPUP)
+
+    # ── 组合动作 — 做菜 ──
+
+    _COOK_BUTTON_TIMEOUT: float = 7.5
+
+    def cook(self, position: int = 1, *, force_cook: bool = False) -> bool:
+        """选择菜谱并做菜。
+
+        必须已在食堂页面。
+
+        Parameters
+        ----------
+        position:
+            菜谱编号 (1–3)。
+        force_cook:
+            当有菜正在生效时是否继续做菜。
+
+        Returns
+        -------
+        bool
+            做菜是否成功。
+        """
+        self.select_recipe(position)
+
+        # 等待做菜按钮出现
+        deadline = time.monotonic() + self._COOK_BUTTON_TIMEOUT
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            detail = ImageChecker.find_template(screen, Templates.Cook.COOK_BUTTON)
+            if detail is not None:
+                self._ctrl.click(*detail.center)
+                break
+            time.sleep(0.3)
+        else:
+            raise TimeoutError(f"做菜按钮未出现 ({self._COOK_BUTTON_TIMEOUT}s)")
+
+        time.sleep(0.5)
+
+        # 检测 "效果正在生效" 弹窗
+        screen = self._ctrl.screenshot()
+        if ImageChecker.template_exists(screen, Templates.Cook.HAVE_COOK):
+            if force_cook:
+                self.confirm_force_cook()
+                time.sleep(0.5)
+                screen = self._ctrl.screenshot()
+                if ImageChecker.template_exists(screen, Templates.Cook.NO_TIMES):
+                    self.dismiss_popup()
+                    return False
+            else:
+                self.cancel_force_cook()
+                time.sleep(0.3)
+                self.dismiss_popup()
+                return False
+
+        logger.info("[UI] 做菜完成 (菜谱 {})", position)
+        return True
