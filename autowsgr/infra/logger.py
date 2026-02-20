@@ -20,6 +20,8 @@ from __future__ import annotations
 import logging
 import sys
 import time as _time
+import cv2
+from loguru import logger
 from pathlib import Path
 
 import numpy as np
@@ -73,7 +75,6 @@ def setup_logger(
         是否开启截图自动保存（保存至 log_dir/images/）。
     """
     global _image_dir
-    from loguru import logger
 
     # 移除默认 handler，避免重复输出
     logger.remove()
@@ -162,8 +163,6 @@ def save_image(
     Path | None
         保存的文件路径，未保存时返回 None。
     """
-    import cv2
-    from loguru import logger
 
     target_dir = img_dir or _image_dir
     if target_dir is None:
