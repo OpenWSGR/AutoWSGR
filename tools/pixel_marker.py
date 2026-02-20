@@ -30,6 +30,7 @@ import argparse
 import sys
 import tkinter as tk
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 from typing import TYPE_CHECKING
@@ -198,6 +199,7 @@ class PixelMarkerApp:
         ttk.Button(toolbar, text="📷 截图", command=self._on_screenshot).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="📂 打开图片", command=self._on_open_image).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="🔄 重新截图 (F5)", command=self._on_screenshot).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="💾 保存截图", command=self._on_save_screenshot).pack(side=tk.LEFT, padx=2)
 
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=6)
 
@@ -391,6 +393,28 @@ class PixelMarkerApp:
         )
         if path:
             self._load_image_file(path)
+
+    def _on_save_screenshot(self) -> None:
+        """保存当前截图到 logs/pixel_marker 目录。"""
+        if self._image is None:
+            messagebox.showwarning("警告", "还没有加载任何截图")
+            return
+
+        # 创建 logs/pixel_marker 目录
+        log_dir = _ROOT / "logs" / "pixel_marker"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成文件名：pixel_marker_YYYYMMDD_HHMMSS.png
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"pixel_marker_{timestamp}.png"
+        filepath = log_dir / filename
+
+        # 保存图片 (RGB → BGR for cv2)
+        bgr = cv2.cvtColor(self._image, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(str(filepath), bgr)
+        self._status_var.set(f"已保存截图: {filepath.relative_to(_ROOT)}")
+        messagebox.showinfo("成功", f"截图已保存到:\n{filepath}")
+
 
     def _load_image_file(self, path: str) -> None:
         bgr = cv2.imread(path)
