@@ -36,11 +36,11 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from autowsgr.infra.exceptions import EmulatorConnectionError
+from autowsgr.infra import EmulatorConnectionError
 from autowsgr.types import EmulatorType
 
 if TYPE_CHECKING:
-    from autowsgr.infra.config import EmulatorConfig
+    from autowsgr.infra import EmulatorConfig
 
 
 # ── serial → EmulatorType 识别规则 ──
@@ -107,8 +107,8 @@ def _registry_adb_candidates_windows() -> list[str]:
             with winreg.OpenKey(key, sub_key_name) as sub:
                 install_dir, _ = winreg.QueryValueEx(sub, "InstallDir")
                 candidates.append(os.path.join(install_dir, "adb.exe"))
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("[Detector] 雷电模拟器注册表读取跳过: {}", exc)
 
     # ── 蓝叠（国内版） ──
     # HKLM\SOFTWARE\BlueStacks_nxt_cn\InstallDir
@@ -118,8 +118,8 @@ def _registry_adb_candidates_windows() -> list[str]:
                 install_dir, _ = winreg.QueryValueEx(key, "InstallDir")
                 candidates.append(os.path.join(install_dir, "HD-Adb.exe"))
                 break
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("[Detector] 蓝叠模拟器注册表读取跳过 ({}): {}", reg_key, exc)
 
     # ── MuMu 12（新版） ──
     # HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0
@@ -133,8 +133,8 @@ def _registry_adb_candidates_windows() -> list[str]:
             uninstall_str, _ = winreg.QueryValueEx(key, "UninstallString")
             root = os.path.dirname(uninstall_str.strip('"'))
             candidates.append(os.path.join(root, "shell", "adb.exe"))
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("[Detector] MuMu 12 注册表读取跳过: {}", exc)
 
     # ── MuMu 旧版 ──
     # UninstallString dirname → <root>\nx_main\adb.exe
@@ -146,8 +146,8 @@ def _registry_adb_candidates_windows() -> list[str]:
             uninstall_str, _ = winreg.QueryValueEx(key, "UninstallString")
             root = os.path.dirname(uninstall_str.strip('"'))
             candidates.append(os.path.join(root, "nx_main", "adb.exe"))
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.debug("[Detector] MuMu 旧版注册表读取跳过: {}", exc)
 
     return candidates
 

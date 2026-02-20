@@ -31,10 +31,10 @@ import numpy as np
 from loguru import logger
 
 if TYPE_CHECKING:
-    from autowsgr.infra.config import EmulatorConfig
+    from autowsgr.infra import EmulatorConfig
 
-from autowsgr.infra.exceptions import EmulatorConnectionError
-from autowsgr.emulator.detector import resolve_serial
+from autowsgr.infra import EmulatorConnectionError
+from .detector import resolve_serial
 from airtest.core.api import connect_device
 from airtest.core.api import device as get_device
 from airtest.core.error import AdbError, DeviceConnectionError
@@ -264,7 +264,7 @@ class ADBController(AndroidController):
             if resolved
             else "Android:///?cap_method=javacap"
         )
-        # uri = f"Android:///{resolved}" if resolved else "Android:///"
+
 
         try:
             connect_device(uri)
@@ -277,7 +277,11 @@ class ADBController(AndroidController):
 
         # 获取分辨率
         display = self._device.display_info
-        assert isinstance(display, dict)
+        if not isinstance(display, dict):
+            raise EmulatorConnectionError(
+                f"display_info 返回非 dict 类型 {type(display).__name__}，"
+                f"serial={self._serial}"
+            )
         width = display.get("width")
         height = display.get("height")
         if width is None or height is None:
@@ -432,17 +436,27 @@ class ADBController(AndroidController):
         try:
             dev = self._require_device()
             ps_output = dev.shell("ps")
-            assert isinstance(ps_output, str)
-            running = package in (ps_output or "")
-            logger.debug("[Emulator] is_app_running('{}') → {}", package, running)
-            return running
-        except Exception:
-            logger.debug("[Emulator] is_app_running('{}') → False (异常)", package)
+        except (AdbError, DeviceConnectionError, EmulatorConnectionError) as exc:
+            logger.debug("[Emulator] is_app_running('{}') → False (设备异常: {})", package, exc)
             return False
+        if not isinstance(ps_output, str):
+            logger.warning(
+                "[Emulator] is_app_running: shell('ps') 返回非字符串 ({})，无法判断进程状态",
+                type(ps_output).__name__,
+            )
+            return False
+        running = package in ps_output
+        logger.debug("[Emulator] is_app_running('{}') → {}", package, running)
+        return running
 
     # ── Shell ──
 
     def shell(self, cmd: str) -> str:
         dev = self._require_device()
         result = dev.shell(cmd)
-        return result if isinstance(result, str) else ""
+        if not isinstance(result, str):
+            raise EmulatorConnectionError(
+                f"shell('{cmd}') 返回了非字符串类型 {type(result).__name__}，"
+                "airtest API 契约已变化"
+            )
+        return result

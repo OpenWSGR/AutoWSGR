@@ -7,9 +7,8 @@ import subprocess
 
 from loguru import logger
 
-from autowsgr.emulator.os_control import EmulatorProcessManager
-from autowsgr.infra.config import EmulatorConfig
-from autowsgr.infra.exceptions import EmulatorError, EmulatorNotFoundError
+from .os_control import EmulatorProcessManager
+from autowsgr.infra import EmulatorConfig, EmulatorError, EmulatorNotFoundError
 from autowsgr.types import OSType
 
 
@@ -97,7 +96,8 @@ class LinuxEmulatorManager(EmulatorProcessManager):
                 text=True,
                 check=True,
             )
-        except Exception:
+        except (ImportError, OSError, subprocess.CalledProcessError) as exc:
+            logger.debug("[OS-Linux] ADB 设备列表获取失败: {}", exc)
             return []
 
         devices: list[str] = []

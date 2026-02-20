@@ -1,6 +1,6 @@
 """基础设施层 — 日志、配置、异常体系、文件工具。"""
 
-from autowsgr.infra.config import (
+from .config import (
     AccountConfig,
     BattleConfig,
     ConfigManager,
@@ -14,7 +14,7 @@ from autowsgr.infra.config import (
     OCRConfig,
     UserConfig,
 )
-from autowsgr.infra.exceptions import (
+from .exceptions import (
     ActionFailedError,
     AutoWSGRError,
     ConfigError,
@@ -33,8 +33,8 @@ from autowsgr.infra.exceptions import (
     UIError,
     VisionError,
 )
-from autowsgr.infra.file_utils import load_yaml, merge_dicts, save_yaml
-from autowsgr.infra.logger import save_image, setup_logger
+from .file_utils import load_yaml, merge_dicts, save_yaml
+from .logger import save_image, setup_logger
 
 __all__ = [
     # config

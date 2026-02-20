@@ -10,23 +10,24 @@
    在宿主操作系统上启动、停止、检测模拟器进程。
 """
 
-from autowsgr.emulator.controller import (
+from .controller import (
     ADBController,
     AndroidController,
     DeviceInfo,
 )
-from autowsgr.emulator.detector import (
+from .detector import (
     EmulatorCandidate,
     detect_emulators,
+    prompt_user_select,
     resolve_serial,
 )
-from autowsgr.emulator.os_control import (
+from .os_control import (
     EmulatorProcessManager,
     create_emulator_manager,
 )
-from autowsgr.emulator._os_windows import WindowsEmulatorManager
-from autowsgr.emulator._os_macos import MacEmulatorManager
-from autowsgr.emulator._os_linux import LinuxEmulatorManager
+from ._os_windows import WindowsEmulatorManager
+from ._os_macos import MacEmulatorManager
+from ._os_linux import LinuxEmulatorManager
 
 __all__ = [
     # controller
@@ -36,6 +37,7 @@ __all__ = [
     # detector
     "EmulatorCandidate",
     "detect_emulators",
+    "prompt_user_select",
     "resolve_serial",
     # os_control
     "EmulatorProcessManager",

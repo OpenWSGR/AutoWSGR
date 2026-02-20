@@ -8,8 +8,8 @@ import subprocess
 
 from loguru import logger
 
-from autowsgr.emulator.os_control import EmulatorProcessManager
-from autowsgr.infra.exceptions import EmulatorError, EmulatorNotFoundError
+from .os_control import EmulatorProcessManager
+from autowsgr.infra import EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType
 
 

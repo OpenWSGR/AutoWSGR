@@ -21,8 +21,7 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 
-from autowsgr.infra.config import EmulatorConfig
-from autowsgr.infra.exceptions import EmulatorError
+from autowsgr.infra import EmulatorConfig, EmulatorError
 from autowsgr.types import OSType
 
 

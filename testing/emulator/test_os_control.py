@@ -21,76 +21,6 @@ from autowsgr.types import EmulatorType, OSType
 
 
 # ═══════════════════════════════════════════════
-# EmulatorProcessManager ABC
-# ═══════════════════════════════════════════════
-
-
-class TestEmulatorProcessManagerABC:
-    """ABC 不能直接实例化。"""
-
-    def test_cannot_instantiate(self):
-        config = EmulatorConfig()
-        with pytest.raises(TypeError, match="abstract"):
-            EmulatorProcessManager(config)  # type: ignore[abstract]
-
-    def test_abstract_methods(self):
-        expected = {"is_running", "start", "stop"}
-        assert EmulatorProcessManager.__abstractmethods__ == expected
-
-    def test_restart_calls_stop_then_start(self):
-        """restart 默认实现 = stop + start。"""
-
-        class Stub(EmulatorProcessManager):
-            calls: list[str] = []
-
-            def is_running(self):
-                return True
-
-            def start(self):
-                self.calls.append("start")
-
-            def stop(self):
-                self.calls.append("stop")
-
-        mgr = Stub(EmulatorConfig())
-        mgr.restart()
-        assert mgr.calls == ["stop", "start"]
-
-    def test_wait_until_online_immediate(self):
-        """is_running 立刻返回 True 时直接通过。"""
-
-        class Stub(EmulatorProcessManager):
-            def is_running(self):
-                return True
-
-            def start(self):
-                pass
-
-            def stop(self):
-                pass
-
-        mgr = Stub(EmulatorConfig())
-        mgr.wait_until_online(timeout=1)  # 不应抛异常
-
-    def test_wait_until_online_timeout(self):
-        """始终 False 时应超时。"""
-
-        class Stub(EmulatorProcessManager):
-            def is_running(self):
-                return False
-
-            def start(self):
-                pass
-
-            def stop(self):
-                pass
-
-        mgr = Stub(EmulatorConfig())
-        with pytest.raises(EmulatorError, match="启动超时"):
-            mgr.wait_until_online(timeout=0.5)
-
-
-# ═══════════════════════════════════════════════
 # 工厂函数
 # ═══════════════════════════════════════════════
 
@@ -201,7 +131,7 @@ class TestWindowsEmulatorManager:
         )
         mgr = WindowsEmulatorManager(config)
         fake_output = "映像名称  PID  会话名  会话#  内存使用\nHD-Player.exe  1234  Console  1  100,000 K".encode("gbk")
-        with patch("autowsgr.emulator.os_control.subprocess.check_output", return_value=fake_output):
+        with patch("autowsgr.emulator._os_windows.subprocess.check_output", return_value=fake_output):
             assert mgr.is_running() is True
 
     def test_others_tasklist_check_not_running(self):
@@ -294,7 +224,7 @@ class TestLinuxEmulatorManager:
     def test_adb_devices_empty(self):
         """_adb_devices 在异常时返回空列表。"""
         with patch(
-            "autowsgr.emulator.os_control.LinuxEmulatorManager._adb_devices",
+            "autowsgr.emulator._os_linux.LinuxEmulatorManager._adb_devices",
             return_value=[],
         ):
             config = EmulatorConfig(

@@ -20,7 +20,7 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from autowsgr.infra.file_utils import load_yaml
+from .file_utils import load_yaml
 from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
