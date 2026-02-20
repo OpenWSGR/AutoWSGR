@@ -29,7 +29,7 @@
 """
 
 from .api_dll import ApiDll, get_api_dll
-from .image_matcher import ImageChecker
+from .image_matcher import ImageChecker, TEMPLATE_SOURCE_RESOLUTION
 from .image_template import (
     ImageMatchDetail,
     ImageMatchResult,
@@ -46,7 +46,7 @@ from .pixel import (
     PixelSignature,
 )
 from .matcher import PixelChecker
-from .ocr import OCREngine, OCRResult
+from .ocr import OCREngine, OCRResult, EasyOCREngine
 from .roi import ROI
 
 __all__ = [
@@ -66,9 +66,11 @@ __all__ = [
     "ImageChecker",
     "ImageMatchResult",
     "ImageMatchDetail",
+    "TEMPLATE_SOURCE_RESOLUTION",
     # ocr
     "OCREngine",
     "OCRResult",
+    "EasyOCREngine",
     # api_dll
     "ApiDll",
     "get_api_dll",

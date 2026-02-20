@@ -32,6 +32,11 @@ from .image_template import (
 from .matcher import MatchStrategy
 from .roi import ROI
 
+# ── 模板采集基准分辨率 ──
+# 所有模板图片均在此分辨率下采集。当截图分辨率与此不同时，
+# 引擎会自动缩放模板以适配实际截图尺寸。
+TEMPLATE_SOURCE_RESOLUTION: tuple[int, int] = (960, 540)
+"""模板图片采集时的屏幕分辨率 (width, height)。"""
 
 
 class ImageChecker:
@@ -43,7 +48,50 @@ class ImageChecker:
     所有方法接收 numpy 数组形式的截图 (H×W×3, RGB uint8)，
     坐标一律使用相对值（左上角为 0.0，右下角趋近 1.0），
     不执行任何设备操作（截图由上层提供）。
+
+    当截图分辨率与模板采集分辨率 (:data:`TEMPLATE_SOURCE_RESOLUTION`)
+    不同时，引擎会动态缩放模板图片以适配实际截图尺寸。
     """
+
+    # ── 分辨率适配 ──
+
+    @staticmethod
+    def _scale_template_if_needed(
+        template_img: np.ndarray,
+        screen_w: int,
+        screen_h: int,
+    ) -> np.ndarray:
+        """根据截图分辨率动态缩放模板图片。
+
+        若截图分辨率与 :data:`TEMPLATE_SOURCE_RESOLUTION` 一致则原样返回；
+        否则按宽高比缩放模板，使其像素尺寸与截图中的目标元素匹配。
+
+        Parameters
+        ----------
+        template_img:
+            模板图像 (H×W×3 或 H×W, uint8)。
+        screen_w, screen_h:
+            截图的宽度和高度 (像素)。
+
+        Returns
+        -------
+        np.ndarray
+            缩放后的模板图像（分辨率一致时返回原对象，无拷贝）。
+        """
+        src_w, src_h = TEMPLATE_SOURCE_RESOLUTION
+        if screen_w == src_w and screen_h == src_h:
+            return template_img
+
+        scale_x = screen_w / src_w
+        scale_y = screen_h / src_h
+        th, tw = template_img.shape[:2]
+        new_w = max(1, round(tw * scale_x))
+        new_h = max(1, round(th * scale_y))
+
+        # 缩小用 INTER_AREA（抗锯齿），放大用 INTER_LINEAR
+        interp = cv2.INTER_AREA if scale_x < 1.0 else cv2.INTER_LINEAR
+        scaled = cv2.resize(template_img, (new_w, new_h), interpolation=interp)
+        return scaled
 
     # ── 核心匹配 ──
 
@@ -55,23 +103,31 @@ class ImageChecker:
         confidence: float = 0.85,
         method: int = cv2.TM_CCOEFF_NORMED,
     ) -> ImageMatchDetail | None:
-        """对单个模板执行匹配（内部方法）。"""
+        """对单个模板执行匹配（内部方法）。
+
+        当截图分辨率与模板采集分辨率不同时，自动缩放模板。
+        """
         h, w = screen.shape[:2]
         roi = roi or ROI.full()
 
         cropped = roi.crop(screen)
         ch, cw = cropped.shape[:2]
-        th, tw = template.shape
 
-        if th > ch or tw > cw:
+        # 分辨率适配：按截图实际尺寸缩放模板
+        tmpl_img = ImageChecker._scale_template_if_needed(
+            template.image, w, h,
+        )
+        th, tw_ = tmpl_img.shape[:2]
+
+        if th > ch or tw_ > cw:
             logger.debug(
                 "[ImageMatcher] 模板 '{}' ({}x{}) 大于搜索区域 ({}x{})，跳过",
-                template.name, tw, th, cw, ch,
+                template.name, tw_, th, cw, ch,
             )
             return None
 
         screen_gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
-        template_gray = cv2.cvtColor(template.image, cv2.COLOR_RGB2GRAY)
+        template_gray = cv2.cvtColor(tmpl_img, cv2.COLOR_RGB2GRAY)
         result = cv2.matchTemplate(screen_gray, template_gray, method)
 
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
@@ -94,7 +150,7 @@ class ImageChecker:
         abs_x = int(roi.x1 * w) + local_x
         abs_y = int(roi.y1 * h) + local_y
         rel_x1, rel_y1 = abs_x / w, abs_y / h
-        rel_x2, rel_y2 = (abs_x + tw) / w, (abs_y + th) / h
+        rel_x2, rel_y2 = (abs_x + tw_) / w, (abs_y + th) / h
         rel_cx, rel_cy = (rel_x1 + rel_x2) / 2, (rel_y1 + rel_y2) / 2
 
         logger.debug(
@@ -225,18 +281,26 @@ class ImageChecker:
         roi: ROI | None = None, confidence: float = 0.85,
         max_count: int = 20, min_distance: int = 10,
     ) -> list[ImageMatchDetail]:
-        """查找单个模板的所有出现位置（非极大值抑制去重）。"""
+        """查找单个模板的所有出现位置（非极大值抑制去重）。
+
+        当截图分辨率与模板采集分辨率不同时，自动缩放模板。
+        """
         h, w = screen.shape[:2]
         roi = roi or ROI.full()
         cropped = roi.crop(screen)
         ch, cw = cropped.shape[:2]
-        th, tw = template.shape
 
-        if th > ch or tw > cw:
+        # 分辨率适配
+        tmpl_img = ImageChecker._scale_template_if_needed(
+            template.image, w, h,
+        )
+        th, tw_ = tmpl_img.shape[:2]
+
+        if th > ch or tw_ > cw:
             return []
 
         screen_gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
-        template_gray = cv2.cvtColor(template.image, cv2.COLOR_RGB2GRAY)
+        template_gray = cv2.cvtColor(tmpl_img, cv2.COLOR_RGB2GRAY)
         result = cv2.matchTemplate(screen_gray, template_gray, cv2.TM_CCOEFF_NORMED)
 
         locations = np.where(result >= confidence)
@@ -252,13 +316,13 @@ class ImageChecker:
             if len(details) >= max_count:
                 break
             lx, ly = int(locations[1][idx]), int(locations[0][idx])
-            cx, cy = lx + tw // 2, ly + th // 2
+            cx, cy = lx + tw_ // 2, ly + th // 2
             if any(abs(cx - ux) < min_distance and abs(cy - uy) < min_distance for ux, uy in used):
                 continue
             used.append((cx, cy))
             ax, ay = int(roi.x1 * w) + lx, int(roi.y1 * h) + ly
             rx1, ry1 = ax / w, ay / h
-            rx2, ry2 = (ax + tw) / w, (ay + th) / h
+            rx2, ry2 = (ax + tw_) / w, (ay + th) / h
             details.append(ImageMatchDetail(
                 template_name=template.name, confidence=float(scores[idx]),
                 center=((rx1 + rx2) / 2, (ry1 + ry2) / 2),
