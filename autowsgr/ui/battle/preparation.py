@@ -41,7 +41,7 @@ from autowsgr.ui.battle.constants import (
     SUPPORT_PROBE,
 )
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.vision import PixelChecker
+from autowsgr.vision import PixelChecker, PixelSignature, PixelRule, MatchStrategy
 
 if TYPE_CHECKING:
     from autowsgr.vision import OCREngine
@@ -91,6 +91,17 @@ CLICK_PANEL: dict[Panel, tuple[float, float]] = {
     Panel.QUICK_REPAIR: (0.417, 0.793),
     Panel.EQUIPMENT:    (0.548, 0.793),
 }
+
+PAGE_SIGNATURE = unnamed_page = PixelSignature(
+    name="unnamed_page",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.0758, 0.7806, (46, 61, 80), tolerance=30.0),
+        PixelRule.of(0.8758, 0.0500, (216, 223, 229), tolerance=30.0),
+        PixelRule.of(0.9422, 0.9389, (255, 219, 47), tolerance=30.0),
+        PixelRule.of(0.8070, 0.9417, (255, 219, 47), tolerance=30.0),
+    ],
+)
 """面板标签点击位置。"""
 
 
@@ -114,24 +125,8 @@ class BattlePreparationPage:
     @staticmethod
     def is_current_page(screen: np.ndarray) -> bool:
         """判断截图是否为出征准备页面。"""
-        fleet_active = sum(
-            1
-            for (x, y) in FLEET_PROBE.values()
-            if PixelChecker.get_pixel(screen, x, y).near(
-                FLEET_ACTIVE, STATE_TOLERANCE
-            )
-        )
-        if fleet_active != 1:
-            return False
-
-        panel_active = sum(
-            1
-            for (x, y) in PANEL_PROBE.values()
-            if PixelChecker.get_pixel(screen, x, y).near(
-                PANEL_ACTIVE, STATE_TOLERANCE
-            )
-        )
-        return panel_active == 1
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 状态查询 ──
 
