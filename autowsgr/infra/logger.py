@@ -27,6 +27,23 @@ import numpy as np
 # 全局图片存储目录（由 setup_logger 设置）
 _image_dir: Path | None = None
 
+# 项目根目录，用于将绝对路径转换为相对路径（Ctrl+点击用）
+_PROJECT_ROOT = Path(__file__).parent.parent
+
+
+def _src_patcher(record: dict) -> None:
+    """将 record["file"].path 转为以项目根目录为基准的相对路径，并存入 extra["src"]。
+
+    格式示例：``autowsgr/emulator/controller.py:346``
+    在 VS Code 终端中可通过 Ctrl+点击直接跳转。
+    """
+    try:
+        rel = Path(record["file"].path).relative_to(_PROJECT_ROOT)
+        # 统一使用正斜杠，与 VS Code 兼容
+        record["extra"]["src"] = f"{rel.as_posix()}:{record['line']}"
+    except ValueError:
+        record["extra"]["src"] = f"{record['file'].name}:{record['line']}"
+
 
 def setup_logger(
     log_dir: Path | None = None,
@@ -37,12 +54,17 @@ def setup_logger(
 ) -> None:
     """配置全局 loguru logger。
 
+    日志策略：
+    - 控制台：按 *level* 过滤输出。
+    - 文件（全量）：始终以 DEBUG 级别记录，文件名含 ``.debug`` 后缀，不可通过参数更改级别。
+    - 文件（过滤）：与控制台 *level* 一致，文件名不含后缀。
+
     Parameters
     ----------
     log_dir:
         日志文件存放目录。为 *None* 时仅输出到控制台。
     level:
-        最低日志级别。
+        控制台及过滤文件的最低日志级别。
     rotation:
         单个日志文件最大体积或时间周期。
     retention:
@@ -56,28 +78,47 @@ def setup_logger(
     # 移除默认 handler，避免重复输出
     logger.remove()
 
-    # 控制台输出
+    # 注册 patcher：为每条记录附加可点击的相对路径
+    logger.configure(patcher=_src_patcher)
+
+    _FMT = (
+        "<green>{time:HH:mm:ss.SSS}</green> | "
+        "<level>{level:8}</level> | "
+        "<cyan>{extra[src]}</cyan> | "
+        "{message}"
+    )
+
+    # 控制台输出（按 level 过滤）
     logger.add(
         sys.stderr,
         level=level,
-        format=(
-            "<green>{time:HH:mm:ss.SSS}</green> | "
-            "<level>{level:8}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            "{message}"
-        ),
+        format=_FMT,
     )
 
     # 文件输出
     if log_dir is not None:
         log_dir.mkdir(parents=True, exist_ok=True)
+
+        # 全量文件：固定 DEBUG 级别，不可配置
         logger.add(
-            log_dir / "autowsgr_{time:YYYY-MM-DD}.log",
-            level=level,
+            log_dir / "autowsgr_{time:YYYY-MM-DD}.debug.log",
+            level="DEBUG",
             rotation=rotation,
             retention=retention,
             encoding="utf-8",
+            format=_FMT,
         )
+
+        # 过滤文件：与控制台 level 一致
+        if level.upper() != "DEBUG":
+            logger.add(
+                log_dir / "autowsgr_{time:YYYY-MM-DD}.log",
+                level=level,
+                rotation=rotation,
+                retention=retention,
+                encoding="utf-8",
+                format=_FMT,
+            )
 
         # 图片目录
         if save_images:

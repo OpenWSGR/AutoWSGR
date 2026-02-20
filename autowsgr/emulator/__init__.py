@@ -15,6 +15,11 @@ from autowsgr.emulator.controller import (
     AndroidController,
     DeviceInfo,
 )
+from autowsgr.emulator.detector import (
+    EmulatorCandidate,
+    detect_emulators,
+    resolve_serial,
+)
 from autowsgr.emulator.os_control import (
     EmulatorProcessManager,
     LinuxEmulatorManager,
@@ -28,6 +33,10 @@ __all__ = [
     "AndroidController",
     "ADBController",
     "DeviceInfo",
+    # detector
+    "EmulatorCandidate",
+    "detect_emulators",
+    "resolve_serial",
     # os_control
     "EmulatorProcessManager",
     "WindowsEmulatorManager",

@@ -25,11 +25,16 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
 
+if TYPE_CHECKING:
+    from autowsgr.infra.config import EmulatorConfig
+
 from autowsgr.infra.exceptions import EmulatorConnectionError
+from autowsgr.emulator.detector import resolve_serial
 from airtest.core.api import connect_device
 from airtest.core.api import device as get_device
 from airtest.core.error import AdbError, DeviceConnectionError
@@ -209,7 +214,11 @@ class ADBController(AndroidController):
     ----------
     serial:
         设备的 ADB serial 地址（如 ``"emulator-5554"``、``"127.0.0.1:16384"``）。
-        为 None 时使用自动检测。
+        为 None 时自动检测；若同时提供了 ``config``，则走完整的
+        :func:`~autowsgr.emulator.detector.resolve_serial` 决策流程。
+    config:
+        :class:`~autowsgr.infra.config.EmulatorConfig` 实例，用于辅助多设备时的
+        自动筛选。``serial`` 非空时此参数被忽略。
     screenshot_timeout:
         截图超时（秒），超过后抛出异常。
     """
@@ -217,9 +226,11 @@ class ADBController(AndroidController):
     def __init__(
         self,
         serial: str | None = None,
+        config: "EmulatorConfig | None" = None,
         screenshot_timeout: float = 10.0,
     ) -> None:
         self._serial = serial
+        self._config = config
         self._screenshot_timeout = screenshot_timeout
         self._device: Android | None = None  # airtest.core.android.Android
         self._resolution: tuple[int, int] = (0, 0)
@@ -227,8 +238,33 @@ class ADBController(AndroidController):
     # ── 连接 ──
 
     def connect(self) -> DeviceInfo:
+        # ── serial 解析 ──
+        # 优先使用构造时传入的 serial；否则走自动检测流程。
+        if self._serial:
+            resolved = self._serial
+        elif self._config is not None:
+            resolved = resolve_serial(self._config)
+        else:
+            # 无配置时，尝试纯 adb devices 自动检测（单设备场景）
+            from autowsgr.emulator.detector import detect_emulators, EmulatorCandidate
+            candidates = detect_emulators()
+            if len(candidates) == 1:
+                resolved = candidates[0].serial
+                logger.info("[Emulator] 自动检测到唯一设备: {}", candidates[0].description)
+            elif len(candidates) == 0:
+                resolved = ""  # 交给 airtest "Android:///" 兜底
+            else:
+                from autowsgr.emulator.detector import prompt_user_select
+                resolved = prompt_user_select(candidates)
+        self._serial = resolved or None
 
-        uri = f"Android:///{self._serial}" if self._serial else "Android:///"
+        # 使用 javacap 截图（minicap 在 Android 12+ x86_64 模拟器上不可用）
+        uri = (
+            f"Android:///{resolved}?cap_method=javacap"
+            if resolved
+            else "Android:///?cap_method=javacap"
+        )
+        # uri = f"Android:///{resolved}" if resolved else "Android:///"
 
         try:
             connect_device(uri)
@@ -249,6 +285,29 @@ class ADBController(AndroidController):
                 f"无法获取设备分辨率: {self._serial}, display_info: {display}"
             )
         self._resolution = (int(width), int(height))
+
+        # ── 用首张截图校正分辨率（display_info 不考虑旋转方向） ──
+        # 当设备处于横屏时 display_info 仍返回物理竖屏尺寸，
+        # 实际截图尺寸才反映真实坐标系，必须以此为准。
+        try:
+            import cv2
+            raw = self._device.snapshot(quality=99)
+            if raw is not None:
+                h_s, w_s = raw.shape[:2]
+                # javacap 在横屏设备上返回竖屏截图，需顺时针旋转 90°
+                orientation = getattr(self._device, "_current_orientation", None)
+                if orientation == 1 and h_s > w_s:
+                    w_s, h_s = h_s, w_s  # 旋转后的尺寸
+                actual = (w_s, h_s)
+                if actual != self._resolution:
+                    logger.warning(
+                        "[Emulator] display_info 分辨率 {}x{} 与实际截图 {}x{} 不符 "
+                        "(设备可能处于横屏)，已修正",
+                        *self._resolution, w_s, h_s,
+                    )
+                    self._resolution = actual
+        except Exception as exc:
+            logger.warning("[Emulator] 分辨率校验截图失败，使用 display_info 值: {}", exc)
 
         logger.info(
             "[Emulator] 已连接设备: {} ({}x{})", self._serial or "auto", *self._resolution
@@ -285,8 +344,23 @@ class ADBController(AndroidController):
             screen = dev.snapshot(quality=99)  # airtest 返回 BGR ndarray
             if screen is not None:
                 rgb = cv2.cvtColor(screen, cv2.COLOR_BGR2RGB)
-                elapsed = time.monotonic() - start
+
+                # javacap 在横屏设备上返回未旋转的竖屏截图，
+                # 需要顺时针旋转 90° 使其与显示坐标系一致。
                 h, w = rgb.shape[:2]
+                orientation = getattr(dev, "_current_orientation", None)
+                if orientation == 1 and h > w:
+                    rgb = cv2.rotate(rgb, cv2.ROTATE_90_CLOCKWISE)
+                    h, w = rgb.shape[:2]
+
+                elapsed = time.monotonic() - start
+                # 运行时自动同步分辨率（防止旋转后首次使用仍是旧值）
+                if self._resolution != (w, h):
+                    logger.warning(
+                        "[Emulator] 截图尺寸 {}x{} 与缓存分辨率 {}x{} 不符，已更新",
+                        w, h, *self._resolution,
+                    )
+                    self._resolution = (w, h)
                 logger.debug(
                     "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
                     w, h, elapsed,
@@ -304,7 +378,7 @@ class ADBController(AndroidController):
         dev = self._require_device()
         w, h = self._resolution
         px, py = int(x * w), int(y * h)
-        logger.debug("[Emulator] click({:.3f}, {:.3f}) → pixel({}, {})", x, y, px, py)
+        logger.debug("[Emulator] click({:.3f}, {:.3f}) → pixel({}, {})  res={}x{}", x, y, px, py, w, h)
         dev.shell(f"input tap {px} {py}")
 
     def swipe(
