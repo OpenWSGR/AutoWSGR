@@ -12,7 +12,6 @@ DLL 二进制位于 ``autowsgr/data/bin/{platform}_image_autowsgrs.bin``。
 from __future__ import annotations
 
 import ctypes
-import os
 import sys
 from ctypes import (
     POINTER,

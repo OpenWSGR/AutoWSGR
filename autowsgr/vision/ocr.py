@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-
+import easyocr
 import numpy as np
 from loguru import logger
 
@@ -188,9 +188,6 @@ class OCREngine(ABC):
         if engine == "easyocr":
             logger.info("[OCR] 初始化 EasyOCR（gpu={}）", gpu)
             return EasyOCREngine(gpu=gpu)
-        if engine == "paddleocr":
-            logger.info("[OCR] 初始化 PaddleOCR（gpu={}）", gpu)
-            return PaddleOCREngine(gpu=gpu)
         raise ValueError(f"不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr")
 
 
@@ -201,8 +198,6 @@ class EasyOCREngine(OCREngine):
     """基于 EasyOCR 的识别引擎。"""
 
     def __init__(self, gpu: bool = False) -> None:
-        import easyocr
-
         self._reader = easyocr.Reader(["ch_sim", "en"], gpu=gpu)
 
     def recognize(
@@ -227,41 +222,6 @@ class EasyOCREngine(OCREngine):
             )
             for box, text, conf in raw
         ]
-
-
-class PaddleOCREngine(OCREngine):
-    """基于 PaddleOCR 的识别引擎。"""
-
-    def __init__(self, gpu: bool = False) -> None:
-        from paddleocr import PaddleOCR
-
-        self._ocr = PaddleOCR(
-            use_angle_cls=True, lang="ch", use_gpu=gpu, show_log=False
-        )
-
-    def recognize(
-        self,
-        image: np.ndarray,
-        allowlist: str = "",
-    ) -> list[OCRResult]:
-        raw = self._ocr.ocr(image, cls=True)
-        if not raw or not raw[0]:
-            return []
-        return [
-            OCRResult(
-                text=line[1][0],
-                confidence=float(line[1][1]),
-                bbox=(
-                    int(line[0][0][0]),
-                    int(line[0][0][1]),
-                    int(line[0][2][0]),
-                    int(line[0][2][1]),
-                ),
-            )
-            for line in raw[0]
-        ]
-
-
 # ── 辅助函数 ──
 
 
