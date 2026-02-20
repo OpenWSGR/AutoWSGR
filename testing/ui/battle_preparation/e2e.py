@@ -112,8 +112,7 @@ def _navigate_to(ctrl, pause: float, *, chapter: int = 1, map_node: int = 1) -> 
     from autowsgr.ui.main_page import MainPage, MainPageTarget
     from autowsgr.ui.map.data import TOTAL_CHAPTERS
     from autowsgr.ui.map.page import MapPage
-    from autowsgr.ui.map.data import MapPanel
-    from autowsgr.ops.normal_fight import MAP_NODE_POSITIONS
+    from autowsgr.ui.map.data import MapPanel, MAP_NODE_POSITIONS
 
     if not reset_to_main_page(ctrl, pause):
         return
