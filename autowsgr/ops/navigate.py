@@ -1,25 +1,6 @@
 """跨页面导航 — 从任意页面到达目标页面。
 
-本模块提供游戏层的核心导航能力:
-
-1. **goto_page** — 从当前页面导航到目标页面（利用导航图 BFS）
-
-.. deprecated::
-    ``go_main_page`` 已弃用，统一改用 ``goto_page(ctrl, "主页面")``。
-    函数暂时保留以兼容旧调用方，后续将删除。
-
-这些函数属于 GameOps 层，因为它们跨越多个 UIController，
-需要识别当前页面、规划路径、逐步执行导航。
-
-Usage::
-
-    from autowsgr.ops.navigate import goto_page
-
-    # 从当前页面导航到建造页面
-    goto_page(ctrl, "建造页面")
-
-    # 回到主页面
-    goto_page(ctrl, "主页面")
+提供游戏层的核心导航能力: ``goto_page(ctrl, "目标页面")``
 """
 
 from __future__ import annotations
@@ -28,7 +9,7 @@ import time
 
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.navigation import find_path
 from autowsgr.ui.page import (
     NavigationError,
@@ -47,9 +28,6 @@ MAX_IDENTIFY_ATTEMPTS: int = 5
 
 IDENTIFY_INTERVAL: float = 1.0
 """页面识别重试间隔 (秒)。"""
-
-BACK_BUTTON: tuple[float, float] = (0.022, 0.058)
-"""通用左上角回退按钮坐标。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -97,13 +75,13 @@ def _get_page_checker(page_name: str):
     """
     from autowsgr.ui.backyard_page import BackyardPage
     from autowsgr.ui.bath_page import BathPage
-    from autowsgr.ui.battle_preparation import BattlePreparationPage
+    from autowsgr.ui.battle.preparation import BattlePreparationPage
     from autowsgr.ui.build_page import BuildPage
     from autowsgr.ui.canteen_page import CanteenPage
     from autowsgr.ui.friend_page import FriendPage
     from autowsgr.ui.intensify_page import IntensifyPage
     from autowsgr.ui.main_page import MainPage
-    from autowsgr.ui.map_page import MapPage
+    from autowsgr.ui.map.page import MapPage
     from autowsgr.ui.mission_page import MissionPage
     from autowsgr.ui.sidebar_page import SidebarPage
 
@@ -195,33 +173,3 @@ def goto_page(ctrl: AndroidController, target: str) -> None:
     logger.info("[OPS] 已到达: {}", target)
 
 
-def go_main_page(ctrl: AndroidController) -> None:  # noqa: D401
-    """**[已弃用]** 从任意页面回到主页面。
-
-    .. deprecated::
-        请改用 ``goto_page(ctrl, "主页面")``。
-        本函数保留仅供过渡期兼容，后续将删除。
-
-    内部先尝试 ``goto_page``；若失败，退化为反复点击左上角回退按钮。
-
-    Parameters
-    ----------
-    ctrl:
-        Android 设备控制器实例。
-
-    Raises
-    ------
-    NavigationError
-        回退多次后仍未到达主页面。
-    """
-    from autowsgr.ui.main_page import MainPage
-
-    # 快速检查
-    screen = ctrl.screenshot()
-    if MainPage.is_current_page(screen):
-        logger.info("[OPS] 已在主页面")
-        return
-
-    # 尝试智能导航
-    goto_page(ctrl, "主页面")
-        

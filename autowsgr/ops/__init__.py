@@ -5,51 +5,35 @@
 与 UI 层的区别:
 
 - **UI 层** (:mod:`autowsgr.ui`): 单页面内的原子操作（识别、点击、状态查询）
-- **GameOps 层** (:mod:`autowsgr.ops`): 跨页面导航 + 多个 UI 操作的组合
+- **GameOps 层** (:mod:`autowsgr.ops`): 跨页面导航 + 委托 UI 执行
 
 设计原则:
 
 - **无状态**: 所有函数都是纯函数式的，不维护全局 ``now_page``
+- **薄包装**: ops 只负责导航，实际操作全部委托 UI 层
 - **可组合**: 函数之间通过 ``ctrl`` 串联
 - **可测试**: mock ``AndroidController`` 即可单元测试
-
-Usage::
-
-    from autowsgr.ops import goto_page, cook, collect_rewards
-
-    # 回到主页面
-    goto_page(ctrl, "主页面")
-
-    # 导航到任意页面
-    goto_page(ctrl, "建造页面")
-
-    # 做菜
-    cook(ctrl, position=1)
-
-    # 收取任务奖励
-    collect_rewards(ctrl)
 
 模块结构::
 
     ops/
-    ├── __init__.py      ← 本文件 (统一导出)
-    ├── navigate.py      ← 跨页面导航
-    ├── sortie.py        ← 出征准备 (换船、修理策略)
-    ├── decisive.py      ← 决战过程控制器
-    ├── reward.py        ← 任务奖励
-    ├── cook.py          ← 食堂做菜
-    ├── destroy.py       ← 解装舰船
-    ├── expedition.py    ← 远征收取
-    ├── build.py         ← 建造/收取
-    ├── repair.py        ← 浴室修理
+    ├── __init__.py        ← 本文件 (统一导出)
+    ├── navigate.py        ← 跨页面导航
+    ├── decisive/          ← 决战过程控制器
+    ├── exercise.py        ← 演习战斗
+    ├── normal_fight.py    ← 常规战斗 (多节点地图)
+    ├── campaign.py        ← 战役战斗 (单点)
+    ├── reward.py          ← 任务奖励
+    ├── cook.py            ← 食堂做菜
+    ├── destroy.py         ← 解装舰船
+    ├── expedition.py      ← 远征收取
+    ├── build.py           ← 建造/收取
+    ├── repair.py          ← 浴室修理
     └── image_resources.py ← 图像模板资源注册中心
 """
 
 # ── 导航 ──
 from autowsgr.ops.navigate import goto_page, identify_current_page
-
-# ── 出征准备 ──
-from autowsgr.ops.sortie import RepairStrategy, apply_repair
 
 # ── 任务奖励 ──
 from autowsgr.ops.reward import collect_rewards
@@ -72,17 +56,27 @@ from autowsgr.ops.repair import repair_in_bath
 # ── 决战 ──
 from autowsgr.ops.decisive import DecisiveConfig, DecisiveController, DecisiveResult
 
+# ── 演习 ──
+from autowsgr.ops.exercise import ExerciseRunner, run_exercise
+from autowsgr.infra import ExerciseConfig
+
+# ── 常规战斗 ──
+from autowsgr.ops.normal_fight import (
+    NormalFightRunner,
+    run_normal_fight,
+    run_normal_fight_from_yaml,
+)
+
+# ── 战役 ──
+from autowsgr.ops.campaign import CampaignConfig, CampaignRunner, run_campaign
+
 # ── 图像模板资源 ──
 from autowsgr.ops.image_resources import Templates
 
 __all__ = [
     # 导航
-    # "go_main_page",  # deprecated — use goto_page(ctrl, "主页面") instead
     "goto_page",
     "identify_current_page",
-    # 出征准备
-    "RepairStrategy",
-    "apply_repair",
     # 任务奖励
     "collect_rewards",
     # 食堂
@@ -101,6 +95,18 @@ __all__ = [
     "DecisiveConfig",
     "DecisiveController",
     "DecisiveResult",
+    # 演习
+    "ExerciseConfig",
+    "ExerciseRunner",
+    "run_exercise",
+    # 常规战斗
+    "NormalFightRunner",
+    "run_normal_fight",
+    "run_normal_fight_from_yaml",
+    # 战役
+    "CampaignConfig",
+    "CampaignRunner",
+    "run_campaign",
     # 图像模板资源
     "Templates",
 ]

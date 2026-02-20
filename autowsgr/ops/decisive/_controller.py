@@ -5,16 +5,19 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ops.decisive._config import DecisiveConfig
 from autowsgr.ops.decisive._handlers import PhaseHandlersMixin
 from autowsgr.ops.decisive._logic import DecisiveLogic
 from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
+from autowsgr.vision.api_dll import ApiDll
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy as np
+
+    from autowsgr.vision.ocr import OCREngine
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,11 +58,15 @@ class DecisiveController(PhaseHandlersMixin):
         ctrl: AndroidController,
         config: DecisiveConfig,
         *,
-        ocr_func: Callable[[np.ndarray], str] | None = None,
+        ocr: OCREngine | None = None,
+        image_matcher: Callable[[np.ndarray], str | None] | None = None,
+        dll: ApiDll | None = None,
     ) -> None:
         self._ctrl = ctrl
         self._config = config
-        self._ocr = ocr_func
+        self._ocr = ocr
+        self._image_matcher = image_matcher
+        self._dll = dll
         self._state = DecisiveState(chapter=config.chapter)
         self._logic = DecisiveLogic(config, self._state)
 

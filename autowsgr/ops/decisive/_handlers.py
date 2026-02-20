@@ -20,6 +20,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 from loguru import logger
 
+from autowsgr.combat.callbacks import CombatResult
+from autowsgr.combat.engine import run_combat
+from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.ops.decisive._logic import FleetSelection
 from autowsgr.ops.decisive._overlay import (
     ADVANCE_CARD_POSITIONS,
@@ -30,6 +33,12 @@ from autowsgr.ops.decisive._overlay import (
     CLICK_RETREAT_BUTTON,
     CLICK_RETREAT_CONFIRM,
     CLICK_SORTIE,
+    COST_AREA,
+    FLEET_CARD_CLICK_Y,
+    FLEET_CARD_X_POSITIONS,
+    RESOURCE_AREA,
+    SHIP_NAME_X_RANGES,
+    SHIP_NAME_Y_RANGE,
     DecisiveOverlay,
     detect_decisive_overlay,
     get_overlay_signature,
@@ -37,13 +46,19 @@ from autowsgr.ops.decisive._overlay import (
     is_decisive_map_page,
 )
 from autowsgr.ops.decisive._state import DecisivePhase
+from autowsgr.types import ConditionFlag, Formation
+from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
+from autowsgr.vision.api_dll import ApiDll, get_api_dll
 from autowsgr.vision.matcher import PixelChecker
+from autowsgr.vision.roi import ROI
 
 if TYPE_CHECKING:
-    from autowsgr.emulator.controller import AndroidController
+    from autowsgr.combat.recognizer import ImageMatcherFunc
+    from autowsgr.emulator import AndroidController
     from autowsgr.ops.decisive._config import DecisiveConfig
     from autowsgr.ops.decisive._logic import DecisiveLogic
     from autowsgr.ops.decisive._state import DecisiveState
+    from autowsgr.vision.ocr import OCREngine
 
 
 class PhaseHandlersMixin:
@@ -58,6 +73,9 @@ class PhaseHandlersMixin:
     _config: DecisiveConfig
     _state: DecisiveState
     _logic: DecisiveLogic
+    _image_matcher: ImageMatcherFunc | None
+    _ocr: OCREngine | None
+    _dll: ApiDll | None
 
     # ══════════════════════════════════════════════════════════════════════
     # 阶段处理方法
@@ -146,9 +164,6 @@ class PhaseHandlersMixin:
         self._ctrl.click(*CLICK_SORTIE)
         time.sleep(2.0)
 
-        # TODO: 集成 BattlePreparationPage 编队操作
-        # TODO: 集成 apply_repair() 修理操作
-
         best_fleet = self._logic.get_best_fleet()
         if self._logic.should_retreat(best_fleet):
             logger.info("[决战] 舰船不足, 准备撤退")
@@ -156,25 +171,68 @@ class PhaseHandlersMixin:
             return
 
         self._state.fleet = best_fleet
-        # TODO: 使用 BattlePreparationPage 出征按钮
+
+        # 编队与修理
+        page = BattlePreparationPage(self._ctrl)
+
+        # 修理: 根据配置决定修理等级
+        if self._config.repair_level <= 1:
+            page.apply_repair(RepairStrategy.MODERATE)
+        else:
+            page.apply_repair(RepairStrategy.SEVERE)
+
+        # 检测战前血量
+        screen = self._ctrl.screenshot()
+        damage = page.detect_ship_damage(screen)
+        self._state.ship_stats = [0] + [damage.get(i, 0) for i in range(1, 7)]
+
+        # 出征
+        page.start_battle()
+        time.sleep(1.0)
         self._state.phase = DecisivePhase.IN_COMBAT
 
     def _handle_combat(self) -> None:
-        """战斗阶段：委托 CombatEngine 执行（当前为占位）。
+        """战斗阶段：委托 CombatEngine 执行。
 
-        TODO:
-        - 根据 enemy_spec.yaml 及敌方编成决定阵型/夜战
-        - 构建 :class:`~autowsgr.combat.plan.CombatPlan`
-        - 调用 :func:`~autowsgr.combat.engine.run_combat`
-        - 将战果写入 ``self._state.ship_stats``
+        构建 BATTLE 模式的 CombatPlan，调用 run_combat 执行单节点战斗，
+        将战果写入 state.ship_stats。
         """
         logger.info(
             "[决战] 开始战斗 (小关 {} 节点 {})",
             self._state.stage,
             self._state.node,
         )
-        # TODO: result = run_combat(self._ctrl, plan, ...)
-        # TODO: self._state.ship_stats = result.ship_stats
+
+        if self._image_matcher is None:
+            logger.warning("[决战] 无图像匹配器, 跳过战斗")
+            self._state.phase = DecisivePhase.NODE_RESULT
+            return
+
+        # 构建决战专用 CombatPlan (BATTLE 模式, 单点战斗)
+        plan = CombatPlan(
+            name=f"决战-{self._state.stage}-{self._state.node}",
+            mode=CombatMode.BATTLE,
+            default_node=NodeDecision(
+                formation=Formation.double_column,
+                night=True,
+            ),
+        )
+
+        result = run_combat(
+            self._ctrl,
+            plan,
+            self._image_matcher,
+            ship_stats=self._state.ship_stats[:],
+        )
+
+        # 更新状态
+        self._state.ship_stats = result.ship_stats[:]
+        logger.info(
+            "[决战] 战斗结束: {} (节点 {} 血量 {})",
+            result.flag.value,
+            self._state.node,
+            self._state.ship_stats,
+        )
         self._state.phase = DecisivePhase.NODE_RESULT
 
     def _handle_node_result(self) -> None:
@@ -277,7 +335,7 @@ class PhaseHandlersMixin:
             time.sleep(interval)
 
     # ══════════════════════════════════════════════════════════════════════
-    # OCR 相关（预留接口）
+    # OCR / DLL 识别
     # ══════════════════════════════════════════════════════════════════════
 
     def _recognize_fleet_options(
@@ -286,29 +344,141 @@ class PhaseHandlersMixin:
     ) -> dict[str, FleetSelection]:
         """OCR 识别战备舰队获取界面的 5 个可选项。
 
+        移植自旧代码 ``decisive_battle.py`` 的 ``choose()`` 方法。
+
         流程::
 
             1. 裁切右上角资源区域 → 识别可用分数 → 写入 state.score
             2. 裁切底部费用整行   → 识别每张卡的费用
-            3. 裁切每张卡名称区域  → 识别舰船名
+            3. 对可负担的卡裁切名称区域  → 识别舰船名
             4. 组装 {name: FleetSelection}
 
         Returns
         -------
         dict[str, FleetSelection]
-            可购买项字典；OCR 未实现时返回 ``{}``。
+            可购买项字典；无 OCR 引擎时返回 ``{}``。
         """
-        # TODO: 接入 OCR 引擎
-        logger.warning("[决战] OCR 识别尚未实现, 跳过舰队选择")
-        return {}
+        if self._ocr is None:
+            logger.warning("[决战] 无 OCR 引擎, 跳过舰队选择")
+            return {}
+
+        h, w = screen.shape[:2]
+
+        # 1. 识别可用分数
+        res_roi = ROI(
+            x1=RESOURCE_AREA[0][0], y1=RESOURCE_AREA[1][1],
+            x2=RESOURCE_AREA[1][0], y2=RESOURCE_AREA[0][1],
+        )
+        score_img = res_roi.crop(screen)
+        score_val = self._ocr.recognize_number(score_img)
+        if score_val is not None:
+            self._state.score = score_val
+            logger.debug("[决战] 可用分数: {}", score_val)
+        else:
+            logger.warning("[决战] 分数 OCR 失败, 使用默认值: {}", self._state.score)
+
+        # 2. 识别费用整行
+        cost_roi = ROI(
+            x1=COST_AREA[0][0], y1=COST_AREA[1][1],
+            x2=COST_AREA[1][0], y2=COST_AREA[0][1],
+        )
+        cost_img = cost_roi.crop(screen)
+        cost_results = self._ocr.recognize(cost_img, allowlist="0123456789x")
+
+        # 解析费用: 取每个 OCR 结果中的数字
+        costs: list[int] = []
+        for r in cost_results:
+            text = r.text.strip().lstrip("xX")
+            try:
+                costs.append(int(text))
+            except (ValueError, TypeError):
+                logger.debug("[决战] 费用解析跳过: '{}'", r.text)
+
+        logger.debug("[决战] 识别到 {} 项费用: {}", len(costs), costs)
+
+        # 3. 对可负担的卡识别舰船名
+        score = self._state.score
+        ship_names = self._config.level1 + self._config.level2 + [
+            "长跑训练", "肌肉记忆", "黑科技",
+        ]
+        selections: dict[str, FleetSelection] = {}
+
+        for i, cost in enumerate(costs):
+            if cost > score:
+                continue
+            if i >= len(SHIP_NAME_X_RANGES):
+                break
+
+            # 裁切舰船名区域
+            x_range = SHIP_NAME_X_RANGES[i]
+            y_range = SHIP_NAME_Y_RANGE
+            name_roi = ROI(x1=x_range[0], y1=y_range[0], x2=x_range[1], y2=y_range[1])
+            name_img = name_roi.crop(screen)
+
+            name = self._ocr.recognize_ship_name(name_img, ship_names)
+            if name is None:
+                # fallback: 直接用 OCR 文本
+                raw = self._ocr.recognize_single(name_img)
+                name = raw.text.strip() if raw.text.strip() else f"未识别_{i}"
+                logger.debug("[决战] 舰船名模糊匹配失败, 原文: '{}'", name)
+
+            click_x = FLEET_CARD_X_POSITIONS[i] if i < len(FLEET_CARD_X_POSITIONS) else 0.5
+            click_y = FLEET_CARD_CLICK_Y
+
+            selections[name] = FleetSelection(
+                name=name,
+                cost=cost,
+                click_position=(click_x, click_y),
+            )
+
+        logger.info("[决战] 舰队选项: {}", {k: v.cost for k, v in selections.items()})
+        return selections
 
     def _recognize_node(self, screen: np.ndarray) -> str:
-        """OCR 识别当前节点名（如 'A', 'B'）。
+        """DLL 识别当前决战节点字母 (如 'A', 'B')。
+
+        移植自旧代码 ``decisive_battle.py`` 的 ``recognize_node()``:
+        查找舰船图标位置 → 裁切该列图像 → DLL ``recognize_map()``。
 
         Returns
         -------
         str
-            节点字母；OCR 未实现时返回当前 ``state.node``。
+            节点字母；识别失败时返回当前 ``state.node``。
         """
-        # TODO: 查找舰船图标位置 → 裁切上方区域 → OCR 识别
+        dll = self._dll
+        if dll is None:
+            try:
+                dll = get_api_dll()
+            except FileNotFoundError:
+                logger.warning("[决战] 无 DLL, 跳过节点识别")
+                return self._state.node
+
+        # 使用 image_matcher 查找舰船图标位置
+        # 旧代码: position = timer.wait_images_position(IMG.fight_image[18:20])
+        # 这里简化：在当前截图中搜索图标位置
+        if self._image_matcher is not None:
+            match_result = self._image_matcher(screen)
+            if match_result is not None:
+                logger.debug("[决战] 图标匹配结果: {}", match_result)
+
+        # 裁切整列图像用于 DLL 识别（与旧代码一致）
+        # 旧代码: crop_rectangle_relative(screen, pos_x/960 - 0.03, 0, 0.042, 1)
+        # 简化: 使用屏幕中心偏左的列区域
+        h, w = screen.shape[:2]
+        # 默认使用 x=0.5 附近的列
+        x_center = 0.47
+        col_width = 0.042
+        x1 = max(0, int((x_center - col_width / 2) * w))
+        x2 = min(w, int((x_center + col_width / 2) * w))
+        col_crop = screen[0:h, x1:x2]
+
+        try:
+            result = dll.recognize_map(col_crop)
+            if result != "0":
+                logger.info("[决战] DLL 节点识别: {}", result)
+                return result
+        except Exception:
+            logger.warning("[决战] DLL 节点识别异常", exc_info=True)
+
+        logger.debug("[决战] 节点识别失败, 保持: {}", self._state.node)
         return self._state.node
