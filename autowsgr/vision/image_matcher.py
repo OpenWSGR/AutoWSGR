@@ -9,7 +9,7 @@
 
 使用方式::
 
-    from autowsgr.vision.image_matcher import (
+    from autowsgr.vision import (
         ROI, ImageTemplate, ImageRule, ImageSignature, ImageChecker,
     )
 """
@@ -22,15 +22,15 @@ import cv2
 import numpy as np
 from loguru import logger
 
-from autowsgr.vision.image_template import (
+from .image_template import (
     ImageMatchDetail,
     ImageMatchResult,
     ImageRule,
     ImageSignature,
     ImageTemplate,
 )
-from autowsgr.vision.matcher import MatchStrategy
-from autowsgr.vision.roi import ROI
+from .matcher import MatchStrategy
+from .roi import ROI
 
 
 

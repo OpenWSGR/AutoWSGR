@@ -41,10 +41,10 @@ from autowsgr.ui.battle.constants import (
     SUPPORT_PROBE,
 )
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.vision.matcher import PixelChecker
+from autowsgr.vision import PixelChecker
 
 if TYPE_CHECKING:
-    from autowsgr.vision.ocr import OCREngine
+    from autowsgr.vision import OCREngine
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

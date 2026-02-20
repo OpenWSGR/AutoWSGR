@@ -48,8 +48,7 @@ from autowsgr.ui.tabbed_page import (
     identify_page_type,
     make_tab_checker,
 )
-from autowsgr.vision.matcher import PixelChecker
-from autowsgr.vision.ocr import OCREngine
+from autowsgr.vision import OCREngine, PixelChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

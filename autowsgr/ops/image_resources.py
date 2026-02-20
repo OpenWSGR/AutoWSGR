@@ -23,7 +23,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from autowsgr.vision.image_template import ImageTemplate
+from autowsgr.vision import ImageTemplate
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 资源根目录

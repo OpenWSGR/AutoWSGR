@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import pytest
 
-from autowsgr.vision.image_matcher import (
+from autowsgr.vision import (
     ROI,
     ImageChecker,
     ImageRule,
     ImageSignature,
+    MatchStrategy,
 )
-from autowsgr.vision.matcher import MatchStrategy
 
 from ._helpers import embed_template_in_screen, make_template, solid_screen
 

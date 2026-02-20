@@ -55,7 +55,7 @@ from autowsgr.ui.tabbed_page import (
     identify_page_type,
     make_tab_checker,
 )
-from autowsgr.vision.image_matcher import ImageChecker
+from autowsgr.vision import ImageChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

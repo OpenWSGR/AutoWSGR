@@ -17,7 +17,7 @@ import enum
 import numpy as np
 from loguru import logger
 
-from autowsgr.vision.matcher import (
+from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
     PixelRule,

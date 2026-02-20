@@ -8,7 +8,7 @@
 
 使用方式::
 
-    from autowsgr.vision.matcher import Color, PixelRule, PixelSignature, PixelChecker
+    from autowsgr.vision import Color, PixelRule, PixelSignature, PixelChecker
 
     main_page = PixelSignature(
         name="main_page",
@@ -30,7 +30,7 @@ import numpy as np
 from loguru import logger
 
 # 从 pixel.py 导入所有数据类型 (保持向后兼容)
-from autowsgr.vision.pixel import (
+from .pixel import (
     Color,
     MatchStrategy,
     PixelDetail,

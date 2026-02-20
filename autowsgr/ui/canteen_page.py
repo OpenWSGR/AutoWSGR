@@ -46,8 +46,8 @@ from loguru import logger
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.image_resources import Templates
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.vision.image_matcher import ImageChecker
-from autowsgr.vision.matcher import (
+from autowsgr.vision import (
+    ImageChecker,
     MatchStrategy,
     PixelChecker,
     PixelRule,

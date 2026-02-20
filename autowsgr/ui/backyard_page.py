@@ -50,7 +50,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
-from autowsgr.vision.matcher import (
+from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
     PixelRule,

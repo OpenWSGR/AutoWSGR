@@ -28,15 +28,16 @@
     from autowsgr.vision import OCREngine, OCRResult
 """
 
-from autowsgr.vision.image_matcher import ImageChecker
-from autowsgr.vision.image_template import (
+from .api_dll import ApiDll, get_api_dll
+from .image_matcher import ImageChecker
+from .image_template import (
     ImageMatchDetail,
     ImageMatchResult,
     ImageRule,
     ImageSignature,
     ImageTemplate,
 )
-from autowsgr.vision.pixel import (
+from .pixel import (
     Color,
     MatchStrategy,
     PixelDetail,
@@ -44,9 +45,9 @@ from autowsgr.vision.pixel import (
     PixelRule,
     PixelSignature,
 )
-from autowsgr.vision.matcher import PixelChecker
-from autowsgr.vision.ocr import OCREngine, OCRResult
-from autowsgr.vision.roi import ROI
+from .matcher import PixelChecker
+from .ocr import OCREngine, OCRResult
+from .roi import ROI
 
 __all__ = [
     # matcher (pixel)
@@ -68,4 +69,7 @@ __all__ = [
     # ocr
     "OCREngine",
     "OCRResult",
+    # api_dll
+    "ApiDll",
+    "get_api_dll",
 ]

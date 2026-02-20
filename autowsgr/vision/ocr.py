@@ -4,7 +4,7 @@
 
 使用方式::
 
-    from autowsgr.vision.ocr import OCREngine
+    from autowsgr.vision import OCREngine
 
     engine = OCREngine.create("easyocr", gpu=False)
     results = engine.recognize(cropped_image)

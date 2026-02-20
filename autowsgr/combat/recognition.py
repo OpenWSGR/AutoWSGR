@@ -32,12 +32,11 @@ from loguru import logger
 from PIL import Image
 
 from autowsgr.combat.callbacks import GetEnemyFormationFunc, GetEnemyInfoFunc
-from autowsgr.vision.api_dll import ApiDll, get_api_dll
-from autowsgr.vision.roi import ROI
+from autowsgr.vision import ApiDll, get_api_dll, ROI
 
 if TYPE_CHECKING:
     from autowsgr.emulator.controller import AndroidController
-    from autowsgr.vision.ocr import OCREngine
+    from autowsgr.vision import OCREngine
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

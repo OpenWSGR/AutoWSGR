@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pytest
 
-from autowsgr.vision.matcher import (
+from autowsgr.vision import (
     Color,
     MatchStrategy,
     PixelChecker,

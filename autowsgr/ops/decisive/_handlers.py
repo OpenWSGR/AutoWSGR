@@ -48,9 +48,7 @@ from autowsgr.ops.decisive._overlay import (
 from autowsgr.ops.decisive._state import DecisivePhase
 from autowsgr.types import ConditionFlag, Formation
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.vision.api_dll import ApiDll, get_api_dll
-from autowsgr.vision.matcher import PixelChecker
-from autowsgr.vision.roi import ROI
+from autowsgr.vision import ApiDll, get_api_dll, PixelChecker, ROI
 
 if TYPE_CHECKING:
     from autowsgr.combat.recognizer import ImageMatcherFunc
@@ -58,7 +56,7 @@ if TYPE_CHECKING:
     from autowsgr.ops.decisive._config import DecisiveConfig
     from autowsgr.ops.decisive._logic import DecisiveLogic
     from autowsgr.ops.decisive._state import DecisiveState
-    from autowsgr.vision.ocr import OCREngine
+    from autowsgr.vision import OCREngine
 
 
 class PhaseHandlersMixin:

@@ -10,14 +10,14 @@ from autowsgr.ops.decisive._config import DecisiveConfig
 from autowsgr.ops.decisive._handlers import PhaseHandlersMixin
 from autowsgr.ops.decisive._logic import DecisiveLogic
 from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
-from autowsgr.vision.api_dll import ApiDll
+from autowsgr.vision import ApiDll
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy as np
 
-    from autowsgr.vision.ocr import OCREngine
+    from autowsgr.vision import OCREngine
 
 
 # ─────────────────────────────────────────────────────────────────────────────

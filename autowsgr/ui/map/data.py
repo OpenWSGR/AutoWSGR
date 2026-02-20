@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from autowsgr.vision.matcher import Color
+from autowsgr.vision import Color
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

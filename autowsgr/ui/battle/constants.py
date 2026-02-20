@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from autowsgr.vision.matcher import Color
+from autowsgr.vision import Color
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

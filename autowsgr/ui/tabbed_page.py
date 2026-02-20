@@ -70,7 +70,7 @@ from typing import Callable
 import cv2
 import numpy as np
 
-from autowsgr.vision.matcher import Color, PixelChecker
+from autowsgr.vision import Color, PixelChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -44,7 +44,7 @@ from autowsgr.emulator import AndroidController
 from autowsgr.ops.image_resources import Templates
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
-from autowsgr.vision.image_matcher import ImageChecker
+from autowsgr.vision import ImageChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

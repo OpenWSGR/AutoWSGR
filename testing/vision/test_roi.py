@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from autowsgr.vision.image_matcher import ROI
+from autowsgr.vision import ROI
 
 from ._helpers import solid_screen
 

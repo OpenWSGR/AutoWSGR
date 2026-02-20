@@ -4,9 +4,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from autowsgr.vision import OCREngine, OCRResult
 from autowsgr.vision.ocr import (
-    OCREngine,
-    OCRResult,
     _edit_distance,
     _fuzzy_match,
 )

@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     )
     from autowsgr.combat.recognizer import ImageMatcherFunc
     from autowsgr.emulator import AndroidController
-    from autowsgr.vision.ocr import OCREngine
+    from autowsgr.vision import OCREngine
 
 
 class NormalFightRunner:

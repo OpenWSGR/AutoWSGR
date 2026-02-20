@@ -27,7 +27,7 @@ from autowsgr.ui.map.data import (
     RIVAL_POSITIONS,
 )
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
-from autowsgr.vision.image_matcher import ImageChecker
+from autowsgr.vision import ImageChecker
 
 if TYPE_CHECKING:
     from autowsgr.emulator import AndroidController

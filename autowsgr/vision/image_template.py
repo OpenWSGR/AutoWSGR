@@ -19,8 +19,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from autowsgr.vision.matcher import MatchStrategy
-from autowsgr.vision.roi import ROI
+from .matcher import MatchStrategy
+from .roi import ROI
 
 
 # ── 图像模板 ──
