@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from autowsgr.infra.file_utils import load_yaml, merge_dicts, save_yaml
+from autowsgr.infra import load_yaml, merge_dicts, save_yaml
 
 
 class TestLoadYaml:

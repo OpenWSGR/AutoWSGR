@@ -42,7 +42,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 if TYPE_CHECKING:
-    from autowsgr.emulator.controller import ADBController
+    from autowsgr.emulator import ADBController
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -305,7 +305,7 @@ class PixelMarkerApp:
         if not serial:
             # 自动检测可用模拟器
             try:
-                from autowsgr.emulator.detector import detect_emulators, prompt_user_select
+                from autowsgr.emulator import detect_emulators, prompt_user_select
 
                 candidates = detect_emulators()
                 if not candidates:
@@ -342,8 +342,8 @@ class PixelMarkerApp:
                 return False
 
         try:
-            from autowsgr.emulator.controller import ADBController
-            from autowsgr.infra.logger import setup_logger
+            from autowsgr.emulator import ADBController
+            from autowsgr.infra import setup_logger
 
             # 只输出错误及以上等级（避免 airtest 噪音）
             setup_logger(level="ERROR")

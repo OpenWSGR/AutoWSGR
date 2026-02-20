@@ -2,7 +2,7 @@
 
 import pytest
 
-from autowsgr.infra.exceptions import (
+from autowsgr.infra import (
     ActionFailedError,
     ImageNotFoundError,
     NavigationError,

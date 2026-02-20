@@ -13,12 +13,12 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from autowsgr.emulator.controller import (
+from autowsgr.emulator import (
     ADBController,
     AndroidController,
     DeviceInfo,
 )
-from autowsgr.infra.exceptions import EmulatorConnectionError
+from autowsgr.infra import EmulatorConnectionError
 
 
 # ═══════════════════════════════════════════════

@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from autowsgr.infra.config import (
+from autowsgr.infra import (
     BattleConfig,
     ConfigManager,
     DecisiveBattleConfig,
@@ -180,7 +180,7 @@ class TestSetupLogger:
 
     def test_with_log_dir(self, tmp_path: Path):
         """log_dir 应被自动创建。"""
-        from autowsgr.infra.logger import setup_logger
+        from autowsgr.infra import setup_logger
 
         log_dir = tmp_path / "logs" / "sub"
         setup_logger(log_dir=log_dir, level="INFO")

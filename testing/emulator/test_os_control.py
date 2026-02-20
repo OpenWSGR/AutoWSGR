@@ -9,15 +9,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from autowsgr.emulator.os_control import (
+from autowsgr.emulator import (
     EmulatorProcessManager,
     create_emulator_manager,
+    WindowsEmulatorManager,
+    MacEmulatorManager,
+    LinuxEmulatorManager,
 )
-from autowsgr.emulator._os_windows import WindowsEmulatorManager
-from autowsgr.emulator._os_macos import MacEmulatorManager
-from autowsgr.emulator._os_linux import LinuxEmulatorManager
-from autowsgr.infra.config import EmulatorConfig
-from autowsgr.infra.exceptions import EmulatorError, EmulatorNotFoundError
+from autowsgr.infra import EmulatorConfig, EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType, OSType
 
 
