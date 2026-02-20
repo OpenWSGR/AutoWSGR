@@ -68,7 +68,7 @@ from autowsgr.ops.normal_fight import (
 )
 
 # ── 战役 ──
-from autowsgr.ops.campaign import CampaignConfig, CampaignRunner, run_campaign
+from autowsgr.ops.campaign import CampaignRunner
 
 # ── 图像模板资源 ──
 from autowsgr.ops.image_resources import Templates
@@ -104,9 +104,7 @@ __all__ = [
     "run_normal_fight",
     "run_normal_fight_from_yaml",
     # 战役
-    "CampaignConfig",
     "CampaignRunner",
-    "run_campaign",
     # 图像模板资源
     "Templates",
 ]

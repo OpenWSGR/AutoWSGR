@@ -3,56 +3,76 @@
 涉及跨页面操作: 主页面 → 地图页面(战役面板) → 选择战役 → 出征准备 → 战斗 → 战役页面。
 
 旧代码参考: ``fight/battle.py`` (BattlePlan)
+
+使用方式::
+
+    engine = CombatEngine(ctrl)
+    runner = CampaignRunner(ctrl, engine, "困难航母")
+    results = runner.run()
 """
 
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from autowsgr.combat.callbacks import CombatResult
-from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import ConditionFlag, Formation, RepairMode
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.ui.map.data import CAMPAIGN_NAMES
 from autowsgr.ui.map.page import MapPage
 
 if TYPE_CHECKING:
-    from autowsgr.combat.callbacks import (
-        ClickImageFunc,
-        DetectResultGradeFunc,
-        DetectShipStatsFunc,
-        GetEnemyFormationFunc,
-        GetEnemyInfoFunc,
-        GetShipDropFunc,
-        ImageExistFunc,
-    )
-    from autowsgr.combat.recognizer import ImageMatcherFunc
+    from autowsgr.combat.engine import CombatEngine
     from autowsgr.emulator import AndroidController
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 配置
-# ═══════════════════════════════════════════════════════════════════════════════
+CAMPAIGN_NAMES: dict[int, str] = {
+    1: "驱逐",
+    2: "巡洋",
+    3: "战列",
+    4: "航母",
+    5: "潜艇",
+}
+"""战役编号 → 中文名称。"""
 
+# 用户友好的战役名称 → (map_index, difficulty)
+# 支持 "困难航母"、"简单驱逐" 等名称直接映射
+CAMPAIGN_NAME_MAP: dict[str, tuple[int, str]] = {}
+"""战役中文名 → ``(map_index, difficulty)``。"""
 
-@dataclass
-class CampaignConfig:
-    """战役配置。"""
+for _idx, _short_name in CAMPAIGN_NAMES.items():
+    CAMPAIGN_NAME_MAP[f"简单{_short_name}"] = (_idx, "easy")
+    CAMPAIGN_NAME_MAP[f"困难{_short_name}"] = (_idx, "hard")
 
-    map_index: int = 2
-    difficulty: str = "hard"
-    fleet_id: int = 1
-    formation: int = 2
-    night: bool = True
-    repair_mode: RepairMode = RepairMode.moderate_damage
-    auto_support: bool = False
-    max_times: int = 3
+def parse_campaign_name(name: str) -> tuple[int, str]:
+    """解析战役名称为 ``(map_index, difficulty)``。
+
+    Parameters
+    ----------
+    name:
+        战役名称，如 ``"困难航母"``、``"简单驱逐"``。
+
+    Returns
+    -------
+    tuple[int, str]
+        ``(map_index, difficulty)``
+
+    Raises
+    ------
+    ValueError
+        名称无法识别。
+    """
+    result = CAMPAIGN_NAME_MAP.get(name)
+    if result is None:
+        raise ValueError(
+            f"无法识别的战役名称: {name!r}，"
+            f"可选: {', '.join(sorted(CAMPAIGN_NAME_MAP))}"
+        )
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -61,90 +81,77 @@ class CampaignConfig:
 
 
 class CampaignRunner:
-    """战役战斗执行器。"""
+    """战役战斗执行器。
+
+    Parameters
+    ----------
+    ctrl:
+        设备控制器。
+    engine:
+        自包含的战斗引擎 (无需外部回调)。
+    campaign_name:
+        战役名称，如 ``"困难航母"``、``"简单驱逐"``。
+    times:
+        重复次数。
+    formation:
+        战斗阵型。
+    night:
+        是否夜战。
+    repair_mode:
+        修理模式。
+    """
 
     def __init__(
         self,
         ctrl: AndroidController,
-        config: CampaignConfig,
-        image_matcher: ImageMatcherFunc,
-        *,
-        get_enemy_info: GetEnemyInfoFunc | None = None,
-        get_enemy_formation: GetEnemyFormationFunc | None = None,
-        detect_ship_stats: DetectShipStatsFunc | None = None,
-        detect_result_grade: DetectResultGradeFunc | None = None,
-        get_ship_drop: GetShipDropFunc | None = None,
-        image_exist: ImageExistFunc | None = None,
-        click_image: ClickImageFunc | None = None,
+        engine: CombatEngine,
+        campaign_name: str,
+        times: int = 3,
+        formation: Formation = Formation.double_column,
+        night: bool = True,
+        repair_mode: RepairMode = RepairMode.moderate_damage,
     ) -> None:
         self._ctrl = ctrl
-        self._config = config
-        self._image_matcher = image_matcher
+        self._engine = engine
+        self._campaign_name = campaign_name
+        self._times = times
+        self._formation = formation
+        self._night = night
+        self._repair_mode = repair_mode
 
-        # 战斗引擎回调
-        self._get_enemy_info = get_enemy_info
-        self._get_enemy_formation = get_enemy_formation
-        self._detect_ship_stats = detect_ship_stats
-        self._detect_result_grade = detect_result_grade
-        self._get_ship_drop = get_ship_drop
-        self._image_exist = image_exist
-        self._click_image = click_image
-
-        self._results: list[CombatResult] = []
+        # 解析战役名称
+        self._map_index, self._difficulty = parse_campaign_name(campaign_name)
 
     # ── 公共接口 ──
 
-    def run(self) -> CombatResult:
-        """执行一次战役战斗。
-
-        Returns
-        -------
-        CombatResult
-        """
-        battle_name = CAMPAIGN_NAMES.get(self._config.map_index, "未知")
-        logger.info(
-            "[OPS] 战役: {} ({}) 舰队 {}",
-            battle_name,
-            self._config.difficulty,
-            self._config.fleet_id,
-        )
-
-        # 1. 进入战役
-        self._enter_battle()
-
-        # 2. 出征准备
-        ship_stats = self._prepare_for_battle()
-
-        # 3. 执行战斗
-        result = self._do_combat(ship_stats)
-
-        # 4. 处理结果
-        self._handle_result(result)
-
-        return result
-
-    def run_for_times(self, times: int | None = None) -> list[CombatResult]:
-        """重复执行战役。
-
-        Parameters
-        ----------
-        times:
-            重复次数。None 使用配置中的 max_times。
+    def run(self) -> list[CombatResult]:
+        """执行战役。
 
         Returns
         -------
         list[CombatResult]
         """
-        if times is None:
-            times = self._config.max_times
+        logger.info(
+            "[OPS] 战役: {} 阵型={} 夜战={} 共 {} 次",
+            self._campaign_name,
+            self._formation.name,
+            self._night,
+            self._times,
+        )
+        results: list[CombatResult] = []
 
-        logger.info("[OPS] 战役连续执行 {} 次", times)
-        self._results = []
+        for i in range(self._times):
+            logger.info("[OPS] 战役第 {}/{} 次", i + 1, self._times)
 
-        for i in range(times):
-            logger.info("[OPS] 战役第 {}/{} 次", i + 1, times)
-            result = self.run()
-            self._results.append(result)
+            # 1. 进入战役
+            self._enter_battle()
+
+            # 2. 出征准备
+            ship_stats = self._prepare_for_battle()
+
+            # 3. 构建计划并执行战斗
+            result = self._do_combat(ship_stats)
+            results.append(result)
 
             if result.flag == ConditionFlag.BATTLE_TIMES_EXCEED:
                 logger.info("[OPS] 战役次数已用完")
@@ -156,10 +163,10 @@ class CampaignRunner:
 
         logger.info(
             "[OPS] 战役完成: {} 次 (成功 {} 次)",
-            len(self._results),
-            sum(1 for r in self._results if r.flag == ConditionFlag.OPERATION_SUCCESS),
+            len(results),
+            sum(1 for r in results if r.flag == ConditionFlag.OPERATION_SUCCESS),
         )
-        return self._results
+        return results
 
     # ── 进入战役 ──
 
@@ -168,27 +175,28 @@ class CampaignRunner:
         goto_page(self._ctrl, "地图页面")
         map_page = MapPage(self._ctrl)
         map_page.enter_campaign(
-            map_index=self._config.map_index,
-            difficulty=self._config.difficulty,
+            map_index=self._map_index,
+            difficulty=self._difficulty,
+            campaign_name=self._campaign_name,
         )
 
     # ── 出征准备 ──
 
     def _prepare_for_battle(self) -> list[int]:
-        """出征准备: 舰队选择、修理、支援设置。
+        """出征准备: 修理、出征。
 
         Returns
         -------
         list[int]
             战前血量状态。
         """
-        time.sleep(1.0)
+        time.sleep(0.25) # 等待页面稳定
         page = BattlePreparationPage(self._ctrl)
 
         # 修理策略
-        if self._config.repair_mode == RepairMode.moderate_damage:
+        if self._repair_mode == RepairMode.moderate_damage:
             page.apply_repair(RepairStrategy.MODERATE)
-        elif self._config.repair_mode == RepairMode.severe_damage:
+        elif self._repair_mode == RepairMode.severe_damage:
             page.apply_repair(RepairStrategy.SEVERE)
 
         # 检测战前血量
@@ -207,43 +215,12 @@ class CampaignRunner:
     def _do_combat(self, ship_stats: list[int]) -> CombatResult:
         """构建 CombatPlan 并执行战斗。"""
         plan = CombatPlan(
-            name=f"战役-{CAMPAIGN_NAMES.get(self._config.map_index, '?')}",
+            name=f"战役-{self._campaign_name}",
             mode=CombatMode.BATTLE,
             default_node=NodeDecision(
-                formation=Formation(self._config.formation),
-                night=self._config.night,
+                formation=self._formation,
+                night=self._night,
             ),
         )
 
-        return run_combat(
-            self._ctrl,
-            plan,
-            self._image_matcher,
-            ship_stats=ship_stats,
-            get_enemy_info=self._get_enemy_info,
-            get_enemy_formation=self._get_enemy_formation,
-            detect_ship_stats=self._detect_ship_stats,
-            detect_result_grade=self._detect_result_grade,
-            get_ship_drop=self._get_ship_drop,
-            image_exist=self._image_exist,
-            click_image=self._click_image,
-        )
-
-    # ── 结果处理 ──
-
-    def _handle_result(self, result: CombatResult) -> None:
-        """处理战役结果。"""
-        logger.info("[OPS] 战役结果: {}", result.flag.value)
-
-
-def run_campaign(
-    ctrl: AndroidController,
-    config: CampaignConfig,
-    image_matcher: ImageMatcherFunc,
-    *,
-    times: int | None = None,
-    **kwargs,
-) -> list[CombatResult]:
-    """执行战役的便捷函数。"""
-    runner = CampaignRunner(ctrl, config, image_matcher, **kwargs)
-    return runner.run_for_times(times)
+        return self._engine.fight(plan, initial_ship_stats=ship_stats)

@@ -12,7 +12,10 @@ from autowsgr.ui.mission_page import MissionPage
 
 
 def collect_rewards(ctrl: AndroidController) -> bool:
-    """检查并收取任务奖励。"""
+    """检查并收取任务奖励。
+    
+    已完成，测试通过
+    """
     goto_page(ctrl, "主页面")
 
     screen = ctrl.screenshot()

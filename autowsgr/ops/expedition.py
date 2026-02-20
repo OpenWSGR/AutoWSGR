@@ -16,6 +16,8 @@ from autowsgr.ui.map.data import MapPanel
 
 def collect_expedition(ctrl: AndroidController) -> bool:
     """收取已完成的远征。
+    
+    已完成，测试通过
 
     Returns
     -------
