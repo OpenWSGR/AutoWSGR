@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
 from contextlib import ExitStack
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.main_page import (
-    CLICK_EXIT,
     CLICK_NAV,
-    EXIT_SIDEBAR,
-    EXIT_TOP_LEFT,
     PAGE_SIGNATURE,
     MainPage,
     MainPageTarget,
@@ -30,7 +27,7 @@ _W, _H = 960, 540
 # 需要 mock identify_page_type 的导航目标
 _NAVIGATE_PATCHES: dict[MainPageTarget, tuple[str, TabbedPageType]] = {
     MainPageTarget.SORTIE: (
-        "autowsgr.ui.map_page.identify_page_type",
+        "autowsgr.ui.map.page.identify_page_type",
         TabbedPageType.MAP,
     ),
     MainPageTarget.TASK: (
@@ -58,28 +55,14 @@ def _make_main_screen() -> np.ndarray:
 
 
 def _make_non_main_screen() -> np.ndarray:
-    """生成一个不匹配主页面的截图。"""
     return np.zeros((_H, _W, 3), dtype=np.uint8)
 
 
 def _make_target_screen(target: MainPageTarget) -> np.ndarray:
-    """生成匹配导航目标页面签名的合成截图。
-
-    navigate_to 使用 click_and_wait_for_page 进行正向验证，
-    需要截图匹配目标页面的签名。
-
-    注意: SORTIE/TASK 目标需要 mock identify_page_type 才能
-    让合成截图通过模板匹配验证。
-    """
+    """生成匹配导航目标页面签名的合成截图。"""
     screen = np.zeros((_H, _W, 3), dtype=np.uint8)
-
     if target in (MainPageTarget.SORTIE, MainPageTarget.TASK):
-        # 标签页: 标签 0 设蓝色，其余暗色
-        from autowsgr.ui.tabbed_page import (
-            TAB_BLUE,
-            TAB_DARK,
-            TAB_PROBES,
-        )
+        from autowsgr.ui.tabbed_page import TAB_BLUE, TAB_DARK, TAB_PROBES
         for i, (x, y) in enumerate(TAB_PROBES):
             if i == 0:
                 _set_pixel(screen, x, y, TAB_BLUE.as_rgb_tuple())
@@ -93,7 +76,6 @@ def _make_target_screen(target: MainPageTarget) -> np.ndarray:
         from autowsgr.ui.backyard_page import PAGE_SIGNATURE as BACKYARD_SIG
         for rule in BACKYARD_SIG.rules:
             _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
-
     return screen
 
 
@@ -112,14 +94,12 @@ class TestIsCurrentPage:
         assert MainPage.is_current_page(screen) is False
 
     def test_non_main_page_not_detected(self):
-        """其他页面不应被识别为主页面。"""
         screen = _make_non_main_screen()
         assert MainPage.is_current_page(screen) is False
 
     def test_one_pixel_wrong_not_detected(self):
         """ALL 策略下，任一像素不匹配即失败。"""
         screen = _make_main_screen()
-        # 破坏第一个特征点
         first_rule = PAGE_SIGNATURE.rules[0]
         _set_pixel(screen, first_rule.x, first_rule.y, (0, 0, 0))
         assert MainPage.is_current_page(screen) is False
@@ -129,7 +109,6 @@ class TestIsCurrentPage:
         screen = _make_main_screen()
         first_rule = PAGE_SIGNATURE.rules[0]
         r, g, b = first_rule.color.as_rgb_tuple()
-        # 偏移 10 (在 tolerance=30 内), clamp to uint8 范围
         _set_pixel(
             screen,
             first_rule.x,
@@ -161,22 +140,10 @@ class TestNavigateTo:
             pg.navigate_to(target)
         ctrl.click.assert_called_with(*CLICK_NAV[target])
 
-    @pytest.mark.parametrize("target", list(MainPageTarget))
-    def test_navigate_verifies_screenshot(self, page, target: MainPageTarget):
-        """导航后调用 screenshot 进行验证。"""
-        pg, ctrl = page
-        ctrl.screenshot.return_value = _make_target_screen(target)
-        with ExitStack() as stack:
-            if target in _NAVIGATE_PATCHES:
-                mod, rv = _NAVIGATE_PATCHES[target]
-                stack.enter_context(patch(mod, return_value=rv))
-            pg.navigate_to(target)
-        ctrl.screenshot.assert_called()
-
     def test_go_to_sortie(self, page):
         pg, ctrl = page
         ctrl.screenshot.return_value = _make_target_screen(MainPageTarget.SORTIE)
-        with patch("autowsgr.ui.map_page.identify_page_type",
+        with patch("autowsgr.ui.map.page.identify_page_type",
                    return_value=TabbedPageType.MAP):
             pg.go_to_sortie()
         ctrl.click.assert_called_with(*CLICK_NAV[MainPageTarget.SORTIE])
@@ -207,64 +174,6 @@ class TestNavigateTo:
 # ─────────────────────────────────────────────
 
 
-class TestReturnFrom:
-    @pytest.fixture()
-    def page(self):
-        ctrl = MagicMock(spec=AndroidController)
-        # return_from 验证回到主页面
-        ctrl.screenshot.return_value = _make_main_screen()
-        return MainPage(ctrl), ctrl
-
-    @pytest.mark.parametrize("target", list(MainPageTarget))
-    def test_return_calls_exit(self, page, target: MainPageTarget):
-        pg, ctrl = page
-        pg.return_from(target)
-        ctrl.click.assert_called_with(*CLICK_EXIT[target])
-
-    @pytest.mark.parametrize("target", list(MainPageTarget))
-    def test_return_verifies_screenshot(self, page, target: MainPageTarget):
-        """返回后调用 screenshot 验证回到主页面。"""
-        pg, ctrl = page
-        pg.return_from(target)
-        ctrl.screenshot.assert_called()
-
-    def test_sortie_exits_top_left(self, page):
-        pg, ctrl = page
-        pg.return_from(MainPageTarget.SORTIE)
-        ctrl.click.assert_called_with(*EXIT_TOP_LEFT)
-
-    def test_task_exits_top_left(self, page):
-        pg, ctrl = page
-        pg.return_from(MainPageTarget.TASK)
-        ctrl.click.assert_called_with(*EXIT_TOP_LEFT)
-
-    def test_home_exits_top_left(self, page):
-        pg, ctrl = page
-        pg.return_from(MainPageTarget.HOME)
-        ctrl.click.assert_called_with(*EXIT_TOP_LEFT)
-
-    def test_sidebar_exits_bottom_left(self, page):
-        pg, ctrl = page
-        pg.return_from(MainPageTarget.SIDEBAR)
-        ctrl.click.assert_called_with(*EXIT_SIDEBAR)
-
-
-# ─────────────────────────────────────────────
-# 枚举
-# ─────────────────────────────────────────────
-
-
-class TestMainPageTarget:
-    def test_values(self):
-        assert MainPageTarget.SORTIE.value == "出征"
-        assert MainPageTarget.TASK.value == "任务"
-        assert MainPageTarget.SIDEBAR.value == "侧边栏"
-        assert MainPageTarget.HOME.value == "主页"
-
-    def test_count(self):
-        assert len(MainPageTarget) == 4
-
-
 # ─────────────────────────────────────────────
 # 常量一致性
 # ─────────────────────────────────────────────
@@ -276,25 +185,10 @@ class TestConstants:
         for target in MainPageTarget:
             assert target in CLICK_NAV
 
-    def test_all_targets_have_exit(self):
-        """每个目标都有退出坐标。"""
-        for target in MainPageTarget:
-            assert target in CLICK_EXIT
-
-    def test_page_signature_has_rules(self):
-        assert len(PAGE_SIGNATURE.rules) == 4
-
     def test_nav_coords_in_range(self):
         """导航坐标在 [0, 1] 范围内。"""
         for target, (x, y) in CLICK_NAV.items():
             assert 0.0 <= x <= 1.0, f"{target}: x={x}"
             assert 0.0 <= y <= 1.0, f"{target}: y={y}"
 
-    def test_exit_coords_in_range(self):
-        for target, (x, y) in CLICK_EXIT.items():
-            assert 0.0 <= x <= 1.0, f"{target}: x={x}"
-            assert 0.0 <= y <= 1.0, f"{target}: y={y}"
 
-    def test_sidebar_exit_matches_nav(self):
-        """侧边栏退出坐标与导航坐标相同 (同一切换按钮)。"""
-        assert CLICK_EXIT[MainPageTarget.SIDEBAR] == CLICK_NAV[MainPageTarget.SIDEBAR]

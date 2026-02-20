@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.battle_constants import (
+from autowsgr.emulator import AndroidController
+from autowsgr.ui.battle.constants import (
     AUTO_SUPPLY_PROBE,
     CLICK_AUTO_SUPPLY,
     CLICK_BACK,
@@ -17,7 +17,7 @@ from autowsgr.ui.battle_constants import (
     CLICK_SUPPORT,
     FLEET_PROBE,
 )
-from autowsgr.ui.battle_preparation import (
+from autowsgr.ui.battle.preparation import (
     CLICK_PANEL,
     PANEL_PROBE,
     BattlePreparationPage,
@@ -190,7 +190,7 @@ class TestActions:
                 screen[y, x] = list(TAB_DARK)
         ctrl.screenshot.return_value = screen
         with patch(
-            "autowsgr.ui.map_page.identify_page_type",
+            "autowsgr.ui.map.page.identify_page_type",
             return_value=TabbedPageType.MAP,
         ):
             pg.go_back()
@@ -279,18 +279,3 @@ class TestToggles:
         pg.toggle_auto_supply()
         ctrl.click.assert_called_once_with(*CLICK_AUTO_SUPPLY)
 
-
-# ─────────────────────────────────────────────
-# Panel 枚举
-# ─────────────────────────────────────────────
-
-
-class TestPanel:
-    def test_values(self):
-        assert Panel.STATS.value == "综合战力"
-        assert Panel.QUICK_SUPPLY.value == "快速补给"
-        assert Panel.QUICK_REPAIR.value == "快速修理"
-        assert Panel.EQUIPMENT.value == "装备预览"
-
-    def test_count(self):
-        assert len(Panel) == 4

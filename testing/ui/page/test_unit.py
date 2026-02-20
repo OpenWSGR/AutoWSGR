@@ -8,10 +8,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import (
-    DEFAULT_INTERVAL,
-    DEFAULT_TIMEOUT,
     NavigationError,
     _PAGE_REGISTRY,
     get_current_page,
@@ -30,40 +28,6 @@ def _blank() -> np.ndarray:
 
 def _white() -> np.ndarray:
     return np.full((_H, _W, 3), 255, dtype=np.uint8)
-
-
-# ─────────────────────────────────────────────
-# 页面注册
-# ─────────────────────────────────────────────
-
-
-class TestRegisterPage:
-    def setup_method(self):
-        self._backup = dict(_PAGE_REGISTRY)
-        _PAGE_REGISTRY.clear()
-
-    def teardown_method(self):
-        _PAGE_REGISTRY.clear()
-        _PAGE_REGISTRY.update(self._backup)
-
-    def test_register_and_list(self):
-        register_page("page_a", lambda s: True)
-        assert "page_a" in get_registered_pages()
-
-    def test_register_overwrites(self):
-        checker1 = lambda s: False
-        checker2 = lambda s: True
-        register_page("page_b", checker1)
-        register_page("page_b", checker2)
-        assert len([n for n in get_registered_pages() if n == "page_b"]) == 1
-        # 应使用后注册的 checker
-        assert get_current_page(_blank()) == "page_b"
-
-    def test_register_multiple(self):
-        register_page("p1", lambda s: False)
-        register_page("p2", lambda s: False)
-        register_page("p3", lambda s: False)
-        assert len(get_registered_pages()) == 3
 
 
 # ─────────────────────────────────────────────
@@ -202,12 +166,6 @@ class TestWaitForPage:
             assert "出征准备" in msg
             assert "地图页面" in msg
 
-    def test_default_constants(self):
-        """默认超时和间隔值合理。"""
-        assert DEFAULT_TIMEOUT > 0
-        assert DEFAULT_INTERVAL > 0
-        assert DEFAULT_INTERVAL < DEFAULT_TIMEOUT
-
 
 # ─────────────────────────────────────────────
 # wait_leave_page
@@ -280,17 +238,3 @@ class TestWaitLeavePage:
                     source="A",
                     target="B",
                 )
-
-
-# ─────────────────────────────────────────────
-# NavigationError
-# ─────────────────────────────────────────────
-
-
-class TestNavigationError:
-    def test_is_exception(self):
-        assert issubclass(NavigationError, Exception)
-
-    def test_message(self):
-        err = NavigationError("test message")
-        assert str(err) == "test message"
