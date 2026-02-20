@@ -6,7 +6,6 @@
 :mod:`autowsgr.vision.roi` 和 :mod:`autowsgr.vision.image_template` 中，
 本模块仅包含匹配引擎 :class:`ImageChecker`。
 
-为了向后兼容，本模块同时 re-export 所有数据类。
 
 使用方式::
 
@@ -33,16 +32,6 @@ from autowsgr.vision.image_template import (
 from autowsgr.vision.matcher import MatchStrategy
 from autowsgr.vision.roi import ROI
 
-# Re-export 数据类，保持 ``from image_matcher import X`` 兼容
-__all__ = [
-    "ROI",
-    "ImageTemplate",
-    "ImageMatchDetail",
-    "ImageMatchResult",
-    "ImageRule",
-    "ImageSignature",
-    "ImageChecker",
-]
 
 
 class ImageChecker:

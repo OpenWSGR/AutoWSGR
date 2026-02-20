@@ -404,10 +404,6 @@ class UI:
     def _add_node(self, node: Node) -> None:
         self.nodes[node.name] = node
 
-    def _dfs(self, u: Node) -> None:
-        """保留的 DFS 方法，用于兼容性"""
-        self._calculate_node_depths(u)
-
     def _list_walk_path(self, start: Node, end: Node) -> None:
         """打印从起点到终点的路径"""
         path = self.find_path(start, end)

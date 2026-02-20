@@ -252,6 +252,11 @@ class CombatPlan:
     nodes: dict[str, NodeDecision] = field(default_factory=dict)
     default_node: NodeDecision = field(default_factory=NodeDecision)
 
+    def __post_init__(self) -> None:
+        """\u5c06单个 repair_mode 展开为 6 个位置的列表，保证属性始终为 ``list[RepairMode]``。"""
+        if not isinstance(self.repair_mode, list):
+            self.repair_mode = [self.repair_mode] * 6
+
     @property
     def transitions(self) -> dict[CombatPhase, PhaseBranch]:
         """获取当前模式对应的状态转移图。"""

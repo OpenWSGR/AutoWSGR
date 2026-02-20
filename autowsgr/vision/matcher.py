@@ -39,18 +39,6 @@ from autowsgr.vision.pixel import (
     PixelSignature,
 )
 
-# 向后兼容: 确保 `from autowsgr.vision.matcher import *` 把数据类型也导出
-__all__ = [
-    "Color",
-    "MatchStrategy",
-    "PixelChecker",
-    "PixelDetail",
-    "PixelMatchResult",
-    "PixelRule",
-    "PixelSignature",
-]
-
-
 class PixelChecker:
     """像素特征检测引擎 — 视觉层核心 API。
 
