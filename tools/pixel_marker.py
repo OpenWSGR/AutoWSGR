@@ -11,6 +11,7 @@
 
     python tools/pixel_marker.py                          # 仅加载图片模式
     python tools/pixel_marker.py --serial emulator-5554   # 连接模拟器
+    python tools/pixel_marker.py --config user_settings.yaml  # 从配置文件加载
     python tools/pixel_marker.py --image screenshot.png   # 从文件加载
 
 快捷键::
@@ -41,7 +42,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 if TYPE_CHECKING:
-    pass
+    from autowsgr.emulator.controller import ADBController
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -150,9 +151,13 @@ PREVIEW_MAX_H = 540
 class PixelMarkerApp:
     """像素标注工具主窗口。"""
 
-    def __init__(self, serial: str | None = None, image_path: str | None = None) -> None:
+    def __init__(
+        self,
+        serial: str | None = None,
+        image_path: str | None = None,
+    ) -> None:
         self._serial = serial
-        self._controller: object | None = None  # ADBController (lazy)
+        self._controller: "ADBController | None" = None
         self._connected = False
 
         # 原始截图 (RGB, full resolution)
@@ -285,40 +290,81 @@ class PixelMarkerApp:
     # ── 设备连接 ──────────────────────────────────────────────────────────
 
     def _ensure_connected(self) -> bool:
-        """确保模拟器已连接。返回 True 表示连接就绪。"""
-        if self._connected:
+        """确保模拟器已连接。返回 True 表示连接就绪。
+
+        连接流程：
+        1. 若已连接，直接返回
+        2. 若指定了 serial，直接连接
+        3. 若未指定 serial 但 serial 为 None，则触发自动检测
+        """
+        if self._connected and self._controller is not None:
             return True
 
-        if self._serial is None:
-            # 弹窗让用户输入 serial
-            serial = simpledialog.askstring(
-                "连接模拟器",
-                "请输入 ADB serial（如 emulator-5554, 127.0.0.1:16384）:",
-                parent=self._root,
-            )
-            if not serial:
+        serial = self._serial
+
+        if not serial:
+            # 自动检测可用模拟器
+            try:
+                from autowsgr.emulator.detector import detect_emulators, prompt_user_select
+
+                candidates = detect_emulators()
+                if not candidates:
+                    messagebox.showerror(
+                        "未检测到模拟器",
+                        "未找到任何在线的 Android 设备或模拟器。\n\n"
+                        "请确保：\n"
+                        "1. 模拟器已启动\n"
+                        "2. ADB 服务可用\n"
+                        "3. 模拟器已授权连接"
+                    )
+                    self._status_var.set("未检测到模拟器")
+                    return False
+
+                if len(candidates) == 1:
+                    serial = candidates[0].serial
+                else:
+                    # 多个设备，让用户选择（会在当前 TTY 中交互）
+                    try:
+                        serial = prompt_user_select(candidates)
+                    except Exception as exc:
+                        # 非 TTY 环境，提示用户指定 serial
+                        serials = ", ".join(c.serial for c in candidates)
+                        messagebox.showerror(
+                            "无法自动选择",
+                            f"检测到多个在线设备：{serials}\n\n"
+                            f"请使用 --serial 参数指定目标设备。"
+                        )
+                        self._status_var.set("多个设备，需指定 serial")
+                        return False
+            except Exception as exc:
+                messagebox.showerror("自动检测失败", str(exc))
+                self._status_var.set("自动检测失败")
                 return False
-            self._serial = serial
 
         try:
             from autowsgr.emulator.controller import ADBController
             from autowsgr.infra.logger import setup_logger
 
-            # 确保 airtest 噪音被静默
-            setup_logger(level="WARNING")
+            # 只输出错误及以上等级（避免 airtest 噪音）
+            setup_logger(level="ERROR")
 
-            self._status_var.set(f"正在连接 {self._serial} ...")
+            self._status_var.set(f"正在连接 {serial} ...")
             self._root.update()
 
-            ctrl = ADBController(serial=self._serial, screenshot_timeout=15.0)
-            ctrl.connect()
+            ctrl = ADBController(serial=serial, screenshot_timeout=15.0)
+            info = ctrl.connect()
             self._controller = ctrl
             self._connected = True
-            self._status_var.set(f"已连接: {self._serial}")
+            self._serial = serial  # 保存成功的 serial
+            self._status_var.set(
+                f"已连接: {info.serial} ({info.resolution[0]}x{info.resolution[1]})"
+            )
             return True
         except Exception as exc:
-            messagebox.showerror("连接失败", f"无法连接设备: {exc}")
+            messagebox.showerror("连接失败", f"无法连接设备:\n{exc}")
             self._status_var.set("连接失败")
+            self._controller = None
+            self._connected = False
             return False
 
     # ── 截图 / 加载 ──────────────────────────────────────────────────────
@@ -329,9 +375,11 @@ class PixelMarkerApp:
         try:
             self._status_var.set("正在截图 ...")
             self._root.update()
-            screen = self._controller.screenshot()  # type: ignore[union-attr]
+            assert self._controller is not None
+            screen = self._controller.screenshot()
             self._set_image(screen)
-            self._status_var.set(f"截图完成: {screen.shape[1]}x{screen.shape[0]}")
+            h, w = screen.shape[:2]
+            self._status_var.set(f"截图完成: {w}x{h}")
         except Exception as exc:
             messagebox.showerror("截图失败", str(exc))
             self._status_var.set("截图失败")
@@ -595,18 +643,39 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="AutoWSGR 像素特征标注工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+示例::
+
+    # 仅图片模式（不连接模拟器）
+    python tools/pixel_marker.py
+
+    # 指定 serial 连接到模拟器
+    python tools/pixel_marker.py --serial emulator-5554
+
+    # 从本地截图文件加载
+    python tools/pixel_marker.py --image screenshot.png
+
+    # 组合使用
+    python tools/pixel_marker.py --serial 127.0.0.1:16384 --image screenshot.png
+
+    # 自动检测单个模拟器（无需指定 serial）
+    python tools/pixel_marker.py
+        """,
     )
     parser.add_argument(
         "--serial", "-s",
-        help="ADB serial 地址（如 emulator-5554）",
+        help="ADB serial 地址（如 emulator-5554、127.0.0.1:16384）。不指定则自动检测。",
     )
     parser.add_argument(
         "--image", "-i",
-        help="从文件加载截图（PNG/JPG）",
+        help="从文件加载本地截图（PNG/JPG）",
     )
     args = parser.parse_args()
 
-    app = PixelMarkerApp(serial=args.serial, image_path=args.image)
+    app = PixelMarkerApp(
+        serial=args.serial,
+        image_path=args.image,
+    )
     app.run()
 
 

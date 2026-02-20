@@ -18,6 +18,9 @@
     │   ├── NetworkError
     │   ├── DockFullError
     │   └── ResourceError
+    ├── CombatError
+    │   ├── CombatRecognitionTimeout
+    │   └── CombatDecisionError
     └── CriticalError
 """
 
@@ -124,6 +127,27 @@ class DockFullError(GameError):
 
 class ResourceError(GameError):
     """资源不足。"""
+
+
+# ── 战斗系统异常 ──
+
+
+class CombatError(AutoWSGRError):
+    """战斗系统错误。"""
+
+
+class CombatRecognitionTimeout(CombatError):
+    """战斗状态识别超时。"""
+
+    def __init__(self, candidates: list[str] | None = None, timeout: float = 0) -> None:
+        self.candidates = candidates or []
+        self.timeout = timeout
+        names = ", ".join(self.candidates)
+        super().__init__(f"战斗状态识别超时 ({timeout:.1f}s): [{names}]")
+
+
+class CombatDecisionError(CombatError):
+    """战斗决策错误（规则配置问题等）。"""
 
 
 # ── 不可恢复错误 ──
