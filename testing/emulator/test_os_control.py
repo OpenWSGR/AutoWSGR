@@ -11,11 +11,11 @@ import pytest
 
 from autowsgr.emulator.os_control import (
     EmulatorProcessManager,
-    LinuxEmulatorManager,
-    MacEmulatorManager,
-    WindowsEmulatorManager,
     create_emulator_manager,
 )
+from autowsgr.emulator._os_windows import WindowsEmulatorManager
+from autowsgr.emulator._os_macos import MacEmulatorManager
+from autowsgr.emulator._os_linux import LinuxEmulatorManager
 from autowsgr.infra.config import EmulatorConfig
 from autowsgr.infra.exceptions import EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType, OSType

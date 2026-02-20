@@ -22,11 +22,11 @@ from autowsgr.emulator.detector import (
 )
 from autowsgr.emulator.os_control import (
     EmulatorProcessManager,
-    LinuxEmulatorManager,
-    MacEmulatorManager,
-    WindowsEmulatorManager,
     create_emulator_manager,
 )
+from autowsgr.emulator._os_windows import WindowsEmulatorManager
+from autowsgr.emulator._os_macos import MacEmulatorManager
+from autowsgr.emulator._os_linux import LinuxEmulatorManager
 
 __all__ = [
     # controller
