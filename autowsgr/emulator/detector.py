@@ -30,6 +30,8 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import os
+import winreg
 import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -38,9 +40,7 @@ from loguru import logger
 
 from autowsgr.infra import EmulatorConnectionError
 from autowsgr.types import EmulatorType
-
-if TYPE_CHECKING:
-    from autowsgr.infra import EmulatorConfig
+from autowsgr.infra import EmulatorConfig
 
 
 # ── serial → EmulatorType 识别规则 ──
@@ -94,9 +94,6 @@ def _registry_adb_candidates_windows() -> list[str]:
     仅读取注册表，不做路径存在性判断（由调用方统一检查）。
     找不到对应注册表键时静默跳过，不抛出异常。
     """
-    import os
-    import winreg
-
     candidates: list[str] = []
 
     # ── 雷电模拟器 ──
@@ -164,8 +161,6 @@ def _find_adb() -> str:
     FileNotFoundError
         找不到 adb 可执行文件。
     """
-    import os
-
     if path := shutil.which("adb"):
         return path
 

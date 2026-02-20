@@ -1,20 +1,4 @@
-"""模拟器进程管理 — 在宿主操作系统上控制模拟器的启动/停止/状态查询。
-
-各操作系统有专属实现（分文件存放）：
-
-- **Windows**: :mod:`autowsgr.emulator._os_windows`
-- **macOS**: :mod:`autowsgr.emulator._os_macos`
-- **Linux (WSL)**: :mod:`autowsgr.emulator._os_linux`
-
-使用方式::
-
-    from autowsgr.emulator.os_control import create_emulator_manager
-
-    manager = create_emulator_manager(config)
-    manager.start()
-    manager.wait_until_online(timeout=120)
-    manager.stop()
-"""
+"""模拟器进程管理抽象基类。"""
 
 from __future__ import annotations
 
@@ -22,7 +6,6 @@ import time
 from abc import ABC, abstractmethod
 
 from autowsgr.infra import EmulatorConfig, EmulatorError
-from autowsgr.types import OSType
 
 
 class EmulatorProcessManager(ABC):
@@ -96,49 +79,3 @@ class EmulatorProcessManager(ABC):
             if time.monotonic() - start_time > timeout:
                 raise EmulatorError(f"模拟器启动超时 ({timeout}s)")
             time.sleep(1)
-
-
-# ── 工厂函数 ──
-
-
-def create_emulator_manager(
-    config: EmulatorConfig,
-    os_type: OSType | None = None,
-) -> EmulatorProcessManager:
-    """根据当前操作系统创建对应的模拟器进程管理器。
-
-    Parameters
-    ----------
-    config:
-        模拟器配置。
-    os_type:
-        操作系统类型，为 None 时自动检测。
-
-    Returns
-    -------
-    EmulatorProcessManager
-        对应操作系统的管理器实例。
-
-    Raises
-    ------
-    EmulatorError
-        不支持的操作系统。
-    """
-    if os_type is None:
-        os_type = OSType.auto()
-
-    match os_type:
-        case OSType.windows:
-            from autowsgr.emulator._os_windows import WindowsEmulatorManager
-
-            return WindowsEmulatorManager(config)
-        case OSType.macos:
-            from autowsgr.emulator._os_macos import MacEmulatorManager
-
-            return MacEmulatorManager(config)
-        case OSType.linux:
-            from autowsgr.emulator._os_linux import LinuxEmulatorManager
-
-            return LinuxEmulatorManager(config)
-        case _:
-            raise EmulatorError(f"不支持的操作系统: {os_type}")

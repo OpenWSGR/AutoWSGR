@@ -7,7 +7,8 @@ import subprocess
 
 from loguru import logger
 
-from .os_control import EmulatorProcessManager
+from airtest.core.android.adb import ADB
+from .base import EmulatorProcessManager
 from autowsgr.infra import EmulatorConfig, EmulatorError, EmulatorNotFoundError
 from autowsgr.types import OSType
 
@@ -87,8 +88,6 @@ class LinuxEmulatorManager(EmulatorProcessManager):
     def _adb_devices() -> list[str]:
         """列出通过 ADB 连接的设备。"""
         try:
-            from airtest.core.android.adb import ADB
-
             adb = ADB().get_adb_path()
             result = subprocess.run(
                 [adb, "devices"],

@@ -23,11 +23,11 @@ from .detector import (
 )
 from .os_control import (
     EmulatorProcessManager,
+    WindowsEmulatorManager,
+    MacEmulatorManager,
+    LinuxEmulatorManager,
     create_emulator_manager,
 )
-from ._os_windows import WindowsEmulatorManager
-from ._os_macos import MacEmulatorManager
-from ._os_linux import LinuxEmulatorManager
 
 __all__ = [
     # controller

@@ -131,7 +131,7 @@ class TestWindowsEmulatorManager:
         )
         mgr = WindowsEmulatorManager(config)
         fake_output = "映像名称  PID  会话名  会话#  内存使用\nHD-Player.exe  1234  Console  1  100,000 K".encode("gbk")
-        with patch("autowsgr.emulator._os_windows.subprocess.check_output", return_value=fake_output):
+        with patch("autowsgr.emulator.os_control.windows.subprocess.check_output", return_value=fake_output):
             assert mgr.is_running() is True
 
     def test_others_tasklist_check_not_running(self):
@@ -224,7 +224,7 @@ class TestLinuxEmulatorManager:
     def test_adb_devices_empty(self):
         """_adb_devices 在异常时返回空列表。"""
         with patch(
-            "autowsgr.emulator._os_linux.LinuxEmulatorManager._adb_devices",
+            "autowsgr.emulator.os_control.linux.LinuxEmulatorManager._adb_devices",
             return_value=[],
         ):
             config = EmulatorConfig(

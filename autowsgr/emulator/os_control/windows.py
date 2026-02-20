@@ -9,7 +9,7 @@ import subprocess
 
 from loguru import logger
 
-from .os_control import EmulatorProcessManager
+from .base import EmulatorProcessManager
 from autowsgr.infra import EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType
 
