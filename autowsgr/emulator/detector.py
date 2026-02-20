@@ -34,7 +34,6 @@ import os
 import winreg
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 from loguru import logger
 

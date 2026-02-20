@@ -23,18 +23,14 @@
 from __future__ import annotations
 
 import time
+import cv2
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from .detector import detect_emulators, prompt_user_select, resolve_serial
 
 import numpy as np
 from loguru import logger
-
-if TYPE_CHECKING:
-    from autowsgr.infra import EmulatorConfig
-
-from autowsgr.infra import EmulatorConnectionError
-from .detector import resolve_serial
+from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
 from airtest.core.api import connect_device
 from airtest.core.api import device as get_device
 from airtest.core.error import AdbError, DeviceConnectionError
@@ -246,7 +242,6 @@ class ADBController(AndroidController):
             resolved = resolve_serial(self._config)
         else:
             # 无配置时，尝试纯 adb devices 自动检测（单设备场景）
-            from autowsgr.emulator.detector import detect_emulators, EmulatorCandidate
             candidates = detect_emulators()
             if len(candidates) == 1:
                 resolved = candidates[0].serial
@@ -254,7 +249,6 @@ class ADBController(AndroidController):
             elif len(candidates) == 0:
                 resolved = ""  # 交给 airtest "Android:///" 兜底
             else:
-                from autowsgr.emulator.detector import prompt_user_select
                 resolved = prompt_user_select(candidates)
         self._serial = resolved or None
 
@@ -294,7 +288,6 @@ class ADBController(AndroidController):
         # 当设备处于横屏时 display_info 仍返回物理竖屏尺寸，
         # 实际截图尺寸才反映真实坐标系，必须以此为准。
         try:
-            import cv2
             raw = self._device.snapshot(quality=99)
             if raw is not None:
                 h_s, w_s = raw.shape[:2]
@@ -340,8 +333,6 @@ class ADBController(AndroidController):
     # ── 截图 ──
 
     def screenshot(self) -> np.ndarray:
-        import cv2
-
         dev = self._require_device()
         start = time.monotonic()
         while True:
