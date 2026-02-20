@@ -223,24 +223,5 @@ def go_main_page(ctrl: AndroidController) -> None:  # noqa: D401
         return
 
     # 尝试智能导航
-    try:
-        goto_page(ctrl, "主页面")
-        return
-    except NavigationError:
-        logger.warning("[OPS] 智能导航回主页失败，尝试暴力回退")
-
-    # TODO: 暴力回退策略依赖 go_main_page，待 goto_page 覆盖所有页面后删除
-    # 暴力回退: 反复点击左上角
-    for attempt in range(GO_MAIN_MAX_CLICKS):
-        ctrl.click(*BACK_BUTTON)
-        time.sleep(1.0)
-        screen = ctrl.screenshot()
-        if MainPage.is_current_page(screen):
-            logger.info(
-                "[OPS] 暴力回退成功 (第 {} 次点击)", attempt + 1,
-            )
-            return
-
-    raise NavigationError(
-        f"回退 {GO_MAIN_MAX_CLICKS} 次后仍未到达主页面"
-    )
+    goto_page(ctrl, "主页面")
+        
