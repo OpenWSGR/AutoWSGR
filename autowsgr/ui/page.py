@@ -48,6 +48,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ui.overlay import NetworkError, OverlayType, detect_overlay, dismiss_overlay  # noqa: F401
+from autowsgr.vision import ImageChecker
 
 
 # ---------------------------------------------------------------------------
@@ -315,6 +316,84 @@ def click_and_wait_for_page(
     raise NavigationError(
         f"导航失败 (已重试 {config.max_retries} 次): {source or '?'} → {target or '?'}"
     ) from last_err
+
+
+# ---------------------------------------------------------------------------
+# 确认弹窗操作 (Legacy confirm_operation 风格)
+# ---------------------------------------------------------------------------
+
+
+def confirm_operation(
+    ctrl: AndroidController,
+    *,
+    must_confirm: bool = False,
+    delay: float = 0.5,
+    confidence: float = 0.9,
+    timeout: float = 0.0,
+) -> bool:
+    """等待并点击弹出在屏幕中央的各种确认按钮。
+
+    与 Legacy ``Timer.confirm_operation`` 行为一致:
+    在 *timeout* 时限内反复截图寻找任意确认按钮模板，
+    找到后精确重定位并点击。
+
+    Parameters
+    ----------
+    ctrl:
+        Android 设备控制器实例。
+    must_confirm:
+        为 ``True`` 时，超时未找到确认按钮则抛出异常。
+    delay:
+        点击确认按钮后的睡眠延时 (秒)。
+    confidence:
+        模板匹配置信度阈值。
+    timeout:
+        等待确认弹窗出现的最大时限 (秒); ≤0 仅检查当前帧。
+
+    Returns
+    -------
+    bool
+        ``True`` 为找到并点击了确认按钮，``False`` 为未找到。
+
+    Raises
+    ------
+    NavigationError
+        *must_confirm* 为 ``True`` 且超时仍未找到确认按钮。
+    """
+    from autowsgr.ops.image_resources import Templates
+
+    confirm_templates = Templates.Confirm.all()
+    deadline = time.monotonic() + max(timeout, 0)
+
+    while True:
+        screen = ctrl.screenshot()
+        detail = ImageChecker.find_any(
+            screen, confirm_templates, confidence=confidence,
+        )
+        if detail is not None:
+            # 精确重定位 (Legacy 二次匹配风格)
+            screen2 = ctrl.screenshot()
+            detail2 = ImageChecker.find_any(
+                screen2, confirm_templates, confidence=confidence,
+            )
+            if detail2 is not None:
+                detail = detail2
+            ctrl.click(*detail.center)
+            logger.info(
+                "[UI] 确认操作: 点击 '{}' ({:.4f}, {:.4f})",
+                detail.template_name,
+                *detail.center,
+            )
+            time.sleep(delay)
+            return True
+
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.3)
+
+    if must_confirm:
+        raise NavigationError("确认操作超时: 未找到确认按钮")
+    return False
 
 
 def click_and_wait_leave_page(
