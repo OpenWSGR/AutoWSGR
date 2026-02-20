@@ -1,23 +1,10 @@
 """浴室页面 UI 控制器。
 
-覆盖游戏 **浴室** (修理舰船) 页面的导航交互。
+已完成
 
 页面入口:
     - 主页面 → 后院 → 浴室
     - 出征准备 → 右上角 🔧 → 浴室 (跨级快捷通道)
-
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ ◁  浴室                                       [选择修理] ⊕ │
-    ├──────────────────────────────────────────────────────────────┤
-    │                                                              │
-    │  修理位 1:  ■■■■□□  修理中  剩余 03:42                     │
-    │  修理位 2:  空闲                                            │
-    │  修理位 3:  空闲                                            │
-    │  修理位 4:  空闲        (可能需要扩建)                       │
-    │                                                              │
-    └──────────────────────────────────────────────────────────────┘
 
 导航目标:
 
@@ -26,13 +13,8 @@
 跨级通道:
 
 - 从出征准备页面可直接进入浴室 (旧代码的 cross-edge)
-- 浴室可直接返回主页面 (跨级跳过后院)
+- 浴室可直接返回战斗准备页面 (旧代码的 cross-edge)
 
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)，由 960×540 绝对坐标换算。
-
-.. note::
-    页面像素签名暂未采集 (TODO)。当前仅声明拓扑关系和操作接口。
 
 使用方式::
 
@@ -49,7 +31,6 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
@@ -81,12 +62,6 @@ PAGE_SIGNATURE = PixelSignature(
 
 CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """回退按钮 (◁)。
-
-.. note::
-    回退目标取决于入口路径:
-    - 从后院进入 → 返回后院
-    - 从出征准备跨级进入 → 返回主页面 (旧代码行为)
-    当前实现统一使用 ◁ 按钮。
 """
 
 CLICK_CHOOSE_REPAIR: tuple[float, float] = (0.9375, 0.0556)
@@ -162,10 +137,8 @@ class BathPage:
     def go_back(self) -> None:
         """点击回退按钮 (◁)。
 
-        回退目标取决于入口路径:
-
         - 从后院进入 → 返回后院
-        - 从出征准备跨级进入 → 可能返回主页面
+        - 从出征准备跨级进入 → 返回出征准备
 
         使用后院签名验证。若返回主页面也能通过 (已离开浴室) 判定。
 
@@ -182,12 +155,5 @@ class BathPage:
             self._ctrl,
             BathPage.is_current_page,
             source="浴室",
-            target="后院/主页面",
+            target="后院/出征准备",
         )
-
-    # ── 选择修理子页面操作 ────────────────────────────────────────────────
-
-    def click_first_repair_ship(self) -> None:
-        """选择修理页面 → 点击第一个舰船 (修理时间最长的排在首位)。"""
-        logger.info("[UI] 浴室 (选择修理) → 点击第一个舰船")
-        self._ctrl.click(*CLICK_FIRST_REPAIR_SHIP)

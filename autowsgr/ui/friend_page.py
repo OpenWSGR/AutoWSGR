@@ -1,28 +1,10 @@
 """好友页面 UI 控制器。
 
-覆盖游戏 **好友** 页面的导航交互。
+已完成
 
 页面入口:
     主页面 → 侧边栏 → 好友
 
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ ◁  好友                                                     │
-    ├──────────────────────────────────────────────────────────────┤
-    │                                                              │
-    │  好友 1 — Lv.XX                         [访问]              │
-    │  好友 2 — Lv.XX                         [访问]              │
-    │  好友 3 — Lv.XX                         [访问]              │
-    │  ...                                                        │
-    │                                                              │
-    └──────────────────────────────────────────────────────────────┘
-
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)。
-
-.. note::
-    页面像素签名暂未采集 (TODO)。当前仅声明拓扑关系和操作接口。
 
 使用方式::
 
@@ -41,7 +23,6 @@ from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     MatchStrategy,
-    PixelChecker,
     PixelRule,
     PixelSignature,
 )

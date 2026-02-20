@@ -1,23 +1,11 @@
 """建造页面 UI 控制器。
 
+已完成，需测试
+
 覆盖游戏 **建造** 页面及其标签组 (建造/解体/开发/废弃) 的交互。
 
 页面入口:
     主页面 → 侧边栏 → 建造
-
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ ◁   [建造]  解体   开发   废弃                              │
-    ├──────────────────────────────────────────────────────────────┤
-    │                                                              │
-    │                     建造内容区域                              │
-    │                                                              │
-    │  空闲  │  空闲  │  空闲  │  空闲                             │
-    │                                                              │
-    └──────────────────────────────────────────────────────────────┘
-
-    [ ] = 当前选中标签
 
 标签组:
     建造/解体/开发/废弃 四个标签共享相同的顶部导航栏。
@@ -25,9 +13,6 @@
 
 坐标体系:
     所有坐标为相对值 (0.0–1.0)。
-
-.. note::
-    页面像素签名暂未采集 (TODO)。当前仅声明拓扑关系和操作接口。
 
 使用方式::
 
@@ -48,7 +33,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.image_resources import Templates
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
     get_active_tab_index,

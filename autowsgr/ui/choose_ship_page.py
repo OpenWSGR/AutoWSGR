@@ -1,29 +1,6 @@
 """选船页面 UI 控制器。
 
-覆盖 **选船** 页面的界面交互。
-
-页面入口:
-    出征准备 → 点击舰船槽位 → 选船页面
-
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ 🔍 搜索框                                      [标签1-4]    │
-    ├──────────────────────────────────────────────────────────────┤
-    │                                                              │
-    │  ┌────┐  ┌────┐  ┌────┐  ┌────┐  ┌────┐  ┌────┐         │
-    │  │ 舰1 │  │ 舰2 │  │ 舰3 │  │ 舰4 │  │ 舰5 │  │ 舰6 │         │
-    │  └────┘  └────┘  └────┘  └────┘  └────┘  └────┘         │
-    │                                                              │
-    │  [移除]  [第一结果]                                          │
-    └──────────────────────────────────────────────────────────────┘
-
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)，从 960×540 基准换算。
-
-.. note::
-    页面像素签名尚未采集 (TODO)。
-    图像模板页标签检测 (choose_ship_image/1-4.PNG) 位于 ops 层。
+已完成，需测试
 
 使用方式::
 
@@ -41,6 +18,13 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 
+from autowsgr.vision import (
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 点击坐标 (960×540 基准)
@@ -57,6 +41,20 @@ CLICK_REMOVE_SHIP: tuple[float, float] = (83 / 960, 167 / 540)
 
 CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
 """搜索结果列表中的第一个结果。"""
+
+PAGE_SIGNATURE = PixelSignature(
+    name="舰船选择页面",
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.8602, 0.9069, (27, 121, 211), tolerance=30.0),
+        PixelRule.of(0.9656, 0.9083, (26, 120, 210), tolerance=30.0),
+        PixelRule.of(0.8578, 0.5556, (54, 54, 54), tolerance=30.0),
+        PixelRule.of(0.8594, 0.6750, (54, 54, 54), tolerance=30.0),
+        PixelRule.of(0.9656, 0.5583, (54, 54, 54), tolerance=30.0),
+        PixelRule.of(0.9688, 0.6833, (54, 54, 54), tolerance=30.0),
+        PixelRule.of(0.6406, 0.0569, (23, 37, 64), tolerance=30.0),
+    ],
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -94,8 +92,8 @@ class ChooseShipPage:
         screen:
             截图 (H×W×3, RGB)。
         """
-        # TODO: 采集像素签名后实现
-        return False
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return result.matched
 
     # ── 操作 ──────────────────────────────────────────────────────────────
 

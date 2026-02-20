@@ -1,31 +1,6 @@
 """主页面 UI 控制器。
 
-覆盖游戏 **主页面** (母港界面) 的导航交互。
-
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ Lv.  提督名      🛢 油  🔩 弹  🧱 钢  🎯 铝    💎 x  ⊕  │
-    │ 🏠                                                          │
-    │ 🏛(home)                                   ┌────────────┐  │
-    │                                             │  活动横幅  │  │
-    │                                             └────────────┘  │
-    │                 (秘书舰立绘)                                 │
-    │                                                              │
-    │                                                              │
-    │                                              剩余 N 天      │
-    │ ≡   ✉   ★                        任务   船坞    出征      │
-    └──────────────────────────────────────────────────────────────┘
-
-4 个导航控件:
-
-- **出征** (右下): 进入地图选择页面 (map_page)，退出控件在左上角 ◁
-- **任务** (中下): 进入任务页面 (task_page)，退出控件在左上角 ◁
-- **侧边栏** (左下 ≡): 打开侧边栏 (sidebar_page)，退出控件在左下角 (同一按钮)
-- **主页** (左侧 🏛): 进入主页 (home_page)，退出控件在左上角 ◁
-
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)，与分辨率无关。
+已完成
 
 使用方式::
 
@@ -47,7 +22,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     Color,
     MatchStrategy,

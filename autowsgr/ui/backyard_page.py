@@ -1,36 +1,6 @@
 """后院页面 UI 控制器。
 
-覆盖游戏 **后院** (主页图标入口/休息区) 的导航交互。
-
-页面入口:
-    主页面 → 点击主页图标 🏛
-
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ ◁  后院                                                     │
-    ├──────────────────────────────────────────────────────────────┤
-    │                                                              │
-    │         ┌──────────┐                                        │
-    │         │  浴 室   │  (修理区域)                             │
-    │         └──────────┘                                        │
-    │                                                              │
-    │                              ┌──────────┐                   │
-    │                              │  食 堂   │  (料理/补给)       │
-    │                              └──────────┘                   │
-    │                                                              │
-    └──────────────────────────────────────────────────────────────┘
-
-导航目标:
-
-- **浴室**: 进入修理舰船页面
-- **食堂**: 进入料理/食堂页面
-
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)，由 960×540 绝对坐标换算。
-
-.. note::
-    页面像素签名暂未采集 (TODO)。当前仅声明拓扑关系和操作接口。
+已完成
 
 使用方式::
 
@@ -49,7 +19,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
