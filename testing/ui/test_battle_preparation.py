@@ -8,15 +8,17 @@ import numpy as np
 import pytest
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.battle_preparation import (
+from autowsgr.ui.battle_constants import (
     AUTO_SUPPLY_PROBE,
     CLICK_AUTO_SUPPLY,
     CLICK_BACK,
     CLICK_FLEET,
-    CLICK_PANEL,
     CLICK_START_BATTLE,
     CLICK_SUPPORT,
     FLEET_PROBE,
+)
+from autowsgr.ui.battle_preparation import (
+    CLICK_PANEL,
     PANEL_PROBE,
     BattlePreparationPage,
     Panel,

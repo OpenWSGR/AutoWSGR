@@ -73,10 +73,12 @@ from autowsgr.ui.bath_page import BathPage
 from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
 from autowsgr.ui.build_page import BuildPage, BuildTab
 from autowsgr.ui.canteen_page import CanteenPage
+from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
 from autowsgr.ui.friend_page import FriendPage
 from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
 from autowsgr.ui.main_page import MainPage, MainPageTarget
-from autowsgr.ui.map_page import MAP_DATABASE, MapIdentity, MapPage, MapPanel
+from autowsgr.ui.map_data import MAP_DATABASE, MapIdentity
+from autowsgr.ui.map_page import MapPage, MapPanel
 from autowsgr.ui.mission_page import MissionPage
 from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
 
@@ -126,6 +128,7 @@ register_page("食堂页面", CanteenPage.is_current_page)
 register_page("建造页面", BuildPage.is_current_page)
 register_page("强化页面", IntensifyPage.is_current_page)
 register_page("好友页面", FriendPage.is_current_page)
+register_page("决战页面", DecisiveBattlePage.is_current_page)
 
 __all__ = [
     # ── 控制器 ──
@@ -136,6 +139,7 @@ __all__ = [
     "BuildPage",
     "BuildTab",
     "CanteenPage",
+    "DecisiveBattlePage",
     "FriendPage",
     "IntensifyPage",
     "IntensifyTab",

@@ -1,57 +1,45 @@
 """出征准备页面 UI 控制器。
 
 覆盖 **出征准备** 页面的全部界面交互。
-
-页面布局::
-
-    ┌──────────────────────────────────────────────────────────────┐
-    │ ◁  出征准备                               🔧 修理舰船      │
-    │                                                              │
-    │  [1队]  2队   3队   4队    预  ⊕  ♛                        │
-    │                                                              │
-    │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐        │
-    │  │ 舰1 │ │ 舰2 │ │ 舰3 │ │ 舰4 │ │ 舰5 │ │ 舰6 │        │
-    │  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘        │
-    │                                                              │
-    │  [综合战力]  快速补给  快速修理  装备预览                   │
-    │                                                              │
-    │  ☑ 自动补给                        [ 开始出征 ]            │
-    └──────────────────────────────────────────────────────────────┘
-
-    [ ] = 当前选中项
-
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)，与分辨率无关。
-    分为 **探测坐标** (采样颜色用于状态检测) 和 **点击坐标** (执行操作)。
-
-使用方式::
-
-    from autowsgr.ui.battle_preparation import BattlePreparationPage, Panel
-
-    page = BattlePreparationPage(ctrl)
-
-    # 状态查询 (静态方法，只需截图)
-    screen = ctrl.screenshot()
-    if BattlePreparationPage.is_current_page(screen):
-        fleet = BattlePreparationPage.get_selected_fleet(screen)
-        panel = BattlePreparationPage.get_active_panel(screen)
-
-    # 执行动作
-    page.select_fleet(2)
-    page.quick_supply()
-    page.start_battle()
+坐标与颜色常量见 :mod:`autowsgr.ui.battle_constants`。
 """
 
 from __future__ import annotations
 
 import enum
+import time
 
 import numpy as np
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
+from autowsgr.ui.battle_constants import (
+    AUTO_SUPPLY_ON,
+    AUTO_SUPPLY_PROBE,
+    BLOOD_BAR_PROBE,
+    BLOOD_BLACK,
+    BLOOD_EMPTY,
+    BLOOD_GREEN,
+    BLOOD_RED,
+    BLOOD_TOLERANCE,
+    BLOOD_YELLOW,
+    CLICK_AUTO_SUPPLY,
+    CLICK_BACK,
+    CLICK_FLEET,
+    CLICK_SHIP_SLOT,
+    CLICK_START_BATTLE,
+    CLICK_SUPPORT,
+    FLEET_ACTIVE,
+    FLEET_PROBE,
+    PANEL_ACTIVE,
+    STATE_TOLERANCE,
+    SUPPORT_DISABLE,
+    SUPPORT_ENABLE,
+    SUPPORT_EXHAUSTED,
+    SUPPORT_PROBE,
+)
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.vision.matcher import Color, PixelChecker
+from autowsgr.vision.matcher import PixelChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,35 +56,6 @@ class Panel(enum.Enum):
     EQUIPMENT = "装备预览"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 选中态参考颜色 (RGB)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_FLEET_ACTIVE = Color.of(16, 133, 228)
-"""舰队标签选中态颜色 — 明亮蓝色。"""
-
-_PANEL_ACTIVE = Color.of(30, 139, 240)
-"""面板标签选中态颜色 — 明亮蓝色。"""
-
-_AUTO_SUPPLY_ON = Color.of(13, 140, 233)
-"""自动补给启用态颜色 — 蓝色勾选框。"""
-
-_STATE_TOLERANCE = 30.0
-"""状态检测颜色容差。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 探测坐标 — 采样颜色判断状态
-# ═══════════════════════════════════════════════════════════════════════════════
-
-FLEET_PROBE: dict[int, tuple[float, float]] = {
-    1: (0.0750, 0.1731),
-    2: (0.1974, 0.1778),
-    3: (0.3271, 0.1694),
-    4: (0.4479, 0.1713),
-}
-"""舰队标签探测点。选中项探测颜色 ≈ (16, 133, 228)。"""
-
 PANEL_PROBE: dict[Panel, tuple[float, float]] = {
     Panel.STATS:        (0.1214, 0.7907),
     Panel.QUICK_SUPPLY: (0.2625, 0.7944),
@@ -105,28 +64,6 @@ PANEL_PROBE: dict[Panel, tuple[float, float]] = {
 }
 """面板标签探测点。选中项探测颜色 ≈ (30, 139, 240)。"""
 
-SUPPORT_PROBE: tuple[float, float] = (0.6521, 0.1843)
-"""战役支援探测点。"""
-
-AUTO_SUPPLY_PROBE: tuple[float, float] = (0.0552, 0.9343)
-"""自动补给探测点。启用态探测颜色 ≈ (13, 140, 233)。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 点击坐标 — 执行操作
-# ═══════════════════════════════════════════════════════════════════════════════
-
-CLICK_BACK: tuple[float, float] = (0.022, 0.058)
-"""回退按钮 (◁)。"""
-
-CLICK_FLEET: dict[int, tuple[float, float]] = {
-    1: (0.088, 0.170),
-    2: (0.197, 0.170),
-    3: (0.327, 0.170),
-    4: (0.448, 0.170),
-}
-"""舰队标签点击位置。"""
-
 CLICK_PANEL: dict[Panel, tuple[float, float]] = {
     Panel.STATS:        (0.155, 0.793),
     Panel.QUICK_SUPPLY: (0.286, 0.793),
@@ -134,15 +71,6 @@ CLICK_PANEL: dict[Panel, tuple[float, float]] = {
     Panel.EQUIPMENT:    (0.548, 0.793),
 }
 """面板标签点击位置。"""
-
-CLICK_SUPPORT: tuple[float, float] = (0.640, 0.180)
-"""战役支援点击位置。"""
-
-CLICK_AUTO_SUPPLY: tuple[float, float] = (0.095, 0.935)
-"""自动补给复选框点击位置。"""
-
-CLICK_START_BATTLE: tuple[float, float] = (0.850, 0.935)
-"""「开始出征」按钮点击位置。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -155,119 +83,67 @@ class BattlePreparationPage:
 
     **状态查询** 为 ``staticmethod``，只需截图即可调用。
     **操作动作** 为实例方法，通过注入的控制器执行。
-
-    Parameters
-    ----------
-    ctrl:
-        Android 设备控制器实例。
     """
 
     def __init__(self, ctrl: AndroidController) -> None:
         self._ctrl = ctrl
 
-    # ── 页面识别 ──────────────────────────────────────────────────────────
+    # ── 页面识别 ──
 
     @staticmethod
     def is_current_page(screen: np.ndarray) -> bool:
-        """判断截图是否为出征准备页面。
-
-        检测逻辑:
-
-        1. 舰队标签区 (4 个探测点) 恰好有 1 个为选中蓝色
-        2. 面板标签区 (4 个探测点) 恰好有 1 个为选中蓝色
-
-        此组合在其他页面中不会同时出现，能可靠识别本页面。
-
-        Parameters
-        ----------
-        screen:
-            截图 (H×W×3, RGB)。
-        """
+        """判断截图是否为出征准备页面。"""
         fleet_active = sum(
-            1 for (x, y) in FLEET_PROBE.values()
+            1
+            for (x, y) in FLEET_PROBE.values()
             if PixelChecker.get_pixel(screen, x, y).near(
-                _FLEET_ACTIVE, _STATE_TOLERANCE,
+                FLEET_ACTIVE, STATE_TOLERANCE
             )
         )
         if fleet_active != 1:
             return False
 
         panel_active = sum(
-            1 for (x, y) in PANEL_PROBE.values()
+            1
+            for (x, y) in PANEL_PROBE.values()
             if PixelChecker.get_pixel(screen, x, y).near(
-                _PANEL_ACTIVE, _STATE_TOLERANCE,
+                PANEL_ACTIVE, STATE_TOLERANCE
             )
         )
         return panel_active == 1
 
-    # ── 状态查询 ──────────────────────────────────────────────────────────
+    # ── 状态查询 ──
 
     @staticmethod
     def get_selected_fleet(screen: np.ndarray) -> int | None:
-        """获取当前选中的舰队编号。
-
-        Parameters
-        ----------
-        screen:
-            截图 (H×W×3, RGB)。
-
-        Returns
-        -------
-        int | None
-            选中的舰队编号 (1–4)，无法确定时返回 ``None``。
-        """
+        """获取当前选中的舰队编号 (1–4)。"""
         for fleet_id, (x, y) in FLEET_PROBE.items():
             pixel = PixelChecker.get_pixel(screen, x, y)
-            if pixel.near(_FLEET_ACTIVE, _STATE_TOLERANCE):
+            if pixel.near(FLEET_ACTIVE, STATE_TOLERANCE):
                 return fleet_id
         return None
 
     @staticmethod
     def get_active_panel(screen: np.ndarray) -> Panel | None:
-        """获取当前激活的底部面板。
-
-        Parameters
-        ----------
-        screen:
-            截图 (H×W×3, RGB)。
-
-        Returns
-        -------
-        Panel | None
-            当前面板，或 ``None``。
-        """
+        """获取当前激活的底部面板。"""
         for panel, (x, y) in PANEL_PROBE.items():
             pixel = PixelChecker.get_pixel(screen, x, y)
-            if pixel.near(_PANEL_ACTIVE, _STATE_TOLERANCE):
+            if pixel.near(PANEL_ACTIVE, STATE_TOLERANCE):
                 return panel
         return None
 
     @staticmethod
     def is_auto_supply_enabled(screen: np.ndarray) -> bool:
-        """检测自动补给是否启用。
-
-        Parameters
-        ----------
-        screen:
-            截图 (H×W×3, RGB)。
-        """
+        """检测自动补给是否启用。"""
         x, y = AUTO_SUPPLY_PROBE
         return PixelChecker.get_pixel(screen, x, y).near(
-            _AUTO_SUPPLY_ON, _STATE_TOLERANCE,
+            AUTO_SUPPLY_ON, STATE_TOLERANCE
         )
 
-    # ── 动作 — 回退 / 出征 ───────────────────────────────────────────────
+    # ── 动作 — 回退 / 出征 ──
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回地图页面。
-
-        点击后反复截图验证，确认已到达地图页面。
-
-        Raises
-        ------
-        NavigationError
-            超时仍在出征准备页面。
-        """
+        """点击回退按钮 (◁)，返回地图页面。"""
         from autowsgr.ui.map_page import MapPage
 
         logger.info("[UI] 出征准备 → 回退")
@@ -284,36 +160,17 @@ class BattlePreparationPage:
         logger.info("[UI] 出征准备 → 开始出征")
         self._ctrl.click(*CLICK_START_BATTLE)
 
-    # ── 动作 — 舰队选择 ──────────────────────────────────────────────────
+    # ── 动作 — 舰队/面板选择 ──
 
     def select_fleet(self, fleet: int) -> None:
-        """选择舰队。
-
-        Parameters
-        ----------
-        fleet:
-            舰队编号 (1–4)。
-
-        Raises
-        ------
-        ValueError
-            编号不在 1–4 范围内。
-        """
+        """选择舰队 (1–4)。"""
         if fleet not in CLICK_FLEET:
             raise ValueError(f"舰队编号必须为 1–4，收到: {fleet}")
         logger.info("[UI] 出征准备 → 选择 {}队", fleet)
         self._ctrl.click(*CLICK_FLEET[fleet])
 
-    # ── 动作 — 面板切换 ──────────────────────────────────────────────────
-
     def select_panel(self, panel: Panel) -> None:
-        """切换底部面板标签。
-
-        Parameters
-        ----------
-        panel:
-            目标面板。
-        """
+        """切换底部面板标签。"""
         logger.info("[UI] 出征准备 → {}", panel.value)
         self._ctrl.click(*CLICK_PANEL[panel])
 
@@ -325,25 +182,95 @@ class BattlePreparationPage:
         """点击「快速修理」标签。"""
         self.select_panel(Panel.QUICK_REPAIR)
 
-    # ── 动作 — 开关 ──────────────────────────────────────────────────────
+    # ── 动作 — 开关 ──
 
     def toggle_battle_support(self) -> None:
-        """切换战役支援开关。
-        TODO: 暂时无效，暂时不管
-        .. note::
-            此方法仅点击开关区域，不判断当前状态。
-            需要配合截图 + 状态查询确认最终状态。
-            
-        """
+        """切换战役支援开关。"""
         logger.info("[UI] 出征准备 → 切换战役支援")
         self._ctrl.click(*CLICK_SUPPORT)
 
     def toggle_auto_supply(self) -> None:
-        """切换自动补给开关。
-        TODO: 暂时无效，暂时不管
-        .. note::
-            此方法仅点击复选框，不判断当前状态。
-            如需确保特定状态，先用 :meth:`is_auto_supply_enabled` 检查。
-        """
+        """切换自动补给开关。"""
         logger.info("[UI] 出征准备 → 切换自动补给")
         self._ctrl.click(*CLICK_AUTO_SUPPLY)
+
+    # ── 状态查询 — 舰船血量 ──
+
+    @staticmethod
+    def detect_ship_damage(screen: np.ndarray) -> dict[int, int]:
+        """检测 6 个舰船槽位的血量状态。
+
+        Returns
+        -------
+        dict[int, int]
+            槽位号 (1–6) → 血量状态:
+            ``0``: 绿血, ``1``: 黄血, ``2``: 红血, ``3``: 维修中, ``-1``: 无舰船
+        """
+        result: dict[int, int] = {}
+        for slot, (x, y) in BLOOD_BAR_PROBE.items():
+            pixel = PixelChecker.get_pixel(screen, x, y)
+            if pixel.near(BLOOD_EMPTY, BLOOD_TOLERANCE):
+                result[slot] = -1
+            elif pixel.near(BLOOD_GREEN, BLOOD_TOLERANCE):
+                result[slot] = 0
+            elif pixel.near(BLOOD_YELLOW, BLOOD_TOLERANCE):
+                result[slot] = 1
+            elif pixel.near(BLOOD_RED, BLOOD_TOLERANCE):
+                result[slot] = 2
+            elif pixel.near(BLOOD_BLACK, BLOOD_TOLERANCE):
+                result[slot] = 3
+            else:
+                logger.debug("[UI] 舰船 {} 血量颜色未匹配: {}", slot, pixel)
+                result[slot] = 0
+        return result
+
+    # ── 状态查询 — 战役支援 ──
+
+    @staticmethod
+    def is_support_enabled(screen: np.ndarray) -> bool:
+        """检测战役支援是否启用。灰色 (次数用尽) 也视为已启用。"""
+        x, y = SUPPORT_PROBE
+        pixel = PixelChecker.get_pixel(screen, x, y)
+        d_enable = pixel.distance(SUPPORT_ENABLE)
+        d_disable = pixel.distance(SUPPORT_DISABLE)
+        d_exhausted = pixel.distance(SUPPORT_EXHAUSTED)
+        if d_enable > d_exhausted and d_disable > d_exhausted:
+            return True
+        return d_enable < d_disable
+
+    # ── 动作 — 补给/修理 ──
+
+    def supply(self, ship_ids: list[int] | None = None) -> None:
+        """切换到补给面板并补给指定舰船。"""
+        if ship_ids is None:
+            ship_ids = [1, 2, 3, 4, 5, 6]
+        self.select_panel(Panel.QUICK_SUPPLY)
+        time.sleep(0.5)
+        for sid in ship_ids:
+            if sid not in CLICK_SHIP_SLOT:
+                logger.warning("[UI] 无效槽位: {}", sid)
+                continue
+            self._ctrl.click(*CLICK_SHIP_SLOT[sid])
+            time.sleep(0.3)
+        logger.info("[UI] 出征准备 → 补给 {}", ship_ids)
+
+    def repair_slots(self, positions: list[int]) -> None:
+        """切换到快速修理面板并修理指定位置的舰船。"""
+        if not positions:
+            return
+        self.select_panel(Panel.QUICK_REPAIR)
+        time.sleep(0.8)
+        for pos in positions:
+            if pos not in BLOOD_BAR_PROBE:
+                logger.warning("[UI] 无效修理位置: {}", pos)
+                continue
+            self._ctrl.click(*BLOOD_BAR_PROBE[pos])
+            time.sleep(1.5)
+            logger.info("[UI] 出征准备 → 修理位置 {}", pos)
+
+    def click_ship_slot(self, slot: int) -> None:
+        """点击指定舰船槽位 (1–6)。"""
+        if slot not in CLICK_SHIP_SLOT:
+            raise ValueError(f"舰船槽位必须为 1–6，收到: {slot}")
+        logger.info("[UI] 出征准备 → 点击舰船位 {}", slot)
+        self._ctrl.click(*CLICK_SHIP_SLOT[slot])

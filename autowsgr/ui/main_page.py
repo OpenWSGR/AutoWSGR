@@ -52,6 +52,7 @@ from loguru import logger
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision.matcher import (
+    Color,
     MatchStrategy,
     PixelChecker,
     PixelRule,
@@ -88,6 +89,26 @@ PAGE_SIGNATURE = PixelSignature(
     ],
 )
 """主页面像素签名 — 检测资源栏 + 角落特征。"""
+
+EXPEDITION_READY_PROBE: tuple[float, float] = (0.9719, 0.8407)
+"""远征完成探测点 — 主页面右下角远征通知。
+
+换算自旧代码 (933, 454) ÷ (960, 540)。
+远征完成时显示红色 ≈ (255, 89, 45)。
+"""
+
+_EXPEDITION_READY_COLOR = Color.of(255, 89, 45)
+"""远征完成通知颜色 (RGB)。"""
+
+_EXPEDITION_READY_TOLERANCE = 40.0
+"""远征通知检测容差。"""
+
+TASK_READY_PROBE: tuple[float, float] = (0.7229, 0.8463)
+"""任务可领取探测点 — 主页面任务按钮上方。
+
+换算自旧代码 (694, 457) ÷ (960, 540)。
+有可领取任务时显示红色 ≈ (255, 89, 45)。
+"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -157,6 +178,40 @@ class MainPage:
         """
         result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
         return result.matched
+
+    # ── 状态查询 ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def has_expedition_ready(screen: np.ndarray) -> bool:
+        """检测是否有远征完成可收取。
+
+        主页面右下角出现红色通知点时返回 ``True``。
+
+        Parameters
+        ----------
+        screen:
+            截图 (H×W×3, RGB)。
+        """
+        x, y = EXPEDITION_READY_PROBE
+        return PixelChecker.get_pixel(screen, x, y).near(
+            _EXPEDITION_READY_COLOR, _EXPEDITION_READY_TOLERANCE,
+        )
+
+    @staticmethod
+    def has_task_ready(screen: np.ndarray) -> bool:
+        """检测是否有任务奖励可领取。
+
+        主页面任务按钮上方出现红色通知点时返回 ``True``。
+
+        Parameters
+        ----------
+        screen:
+            截图 (H×W×3, RGB)。
+        """
+        x, y = TASK_READY_PROBE
+        return PixelChecker.get_pixel(screen, x, y).near(
+            _EXPEDITION_READY_COLOR, _EXPEDITION_READY_TOLERANCE,
+        )
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 

@@ -81,6 +81,16 @@ CLICK_BACK: tuple[float, float] = (0.022, 0.058)
     具体行为待实际确认。
 """
 
+CLICK_RECIPE: dict[int, tuple[float, float]] = {
+    1: (0.3313, 0.5111),
+    2: (0.4375, 0.2593),
+    3: (0.5792, 0.4019),
+}
+"""菜谱点击坐标 (1–3)。
+
+换算自旧代码: (318, 276), (420, 140), (556, 217) ÷ (960, 540)。
+"""
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面控制器
@@ -135,3 +145,23 @@ class CanteenPage:
             source="食堂",
             target="后院",
         )
+
+    # ── 操作 ──────────────────────────────────────────────────────────────
+
+    def select_recipe(self, position: int) -> None:
+        """点击选择菜谱。
+
+        Parameters
+        ----------
+        position:
+            菜谱编号 (1–3)。
+
+        Raises
+        ------
+        ValueError
+            编号不在 1–3 范围内。
+        """
+        if position not in CLICK_RECIPE:
+            raise ValueError(f"菜谱编号必须为 1–3，收到: {position}")
+        logger.info("[UI] 食堂 → 选择菜谱 {}", position)
+        self._ctrl.click(*CLICK_RECIPE[position])

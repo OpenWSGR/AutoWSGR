@@ -97,6 +97,7 @@ CHOOSE_REPAIR_PAGE = "选择修理页面"
 BUILD_PAGE = "建造页面"
 INTENSIFY_PAGE = "强化页面"
 FRIEND_PAGE = "好友页面"
+DECISIVE_BATTLE_PAGE = "决战页面"
 
 ALL_PAGES: list[str] = [
     MAIN_PAGE,
@@ -111,8 +112,9 @@ ALL_PAGES: list[str] = [
     BUILD_PAGE,
     INTENSIFY_PAGE,
     FRIEND_PAGE,
+    DECISIVE_BATTLE_PAGE,
 ]
-"""所有已声明的页面名称 (12 个)。
+"""所有已声明的页面名称 (13 个)。
 
 .. note::
     建造页面内的标签切换 (解体/开发/废弃) 由 ``BuildPage.switch_tab()`` 管理，
@@ -207,7 +209,17 @@ NAV_GRAPH: list[NavEdge] = [
     # ── 好友 → 侧边栏 ────────────────────────────────────────────────
     NavEdge(FRIEND_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
             EdgeType.CHILD, "好友 ◁ 返回侧边栏"),
-]
+    # ── 地图决战面板 → 决战页面 ──────────────────────────────────────
+    #    先切到 MapPanel.DECISIVE，再点击章节图标进入。
+    #    坐标换算自旧代码 enter_decisive_battle → timer.click(115, 113)，
+    #    参考分辨率 960×540。
+    NavEdge(MAP_PAGE, DECISIVE_BATTLE_PAGE, (115 / 960, 113 / 540),
+            EdgeType.CHILD, "地图决战面板 → 决战总览页"),
+
+    # ── 决战页面 → 主页面 (跨级直通) ─────────────────────────────────
+    #    决战页左上角 ◁ 直接跳回主页面，跳过地图页面。
+    NavEdge(DECISIVE_BATTLE_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
+            EdgeType.CROSS, "决战页面 ◁ 直接返回主页面 (跨级)"),]
 """完整导航图 — 所有已知页面间的有向边。
 
 边中标注 ``TODO`` 的坐标为估计值，待实际游戏截图确认后精确化。

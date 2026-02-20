@@ -8,12 +8,11 @@ import numpy as np
 import pytest
 
 from autowsgr.emulator.controller import AndroidController
-from autowsgr.ui.map_page import (
+from autowsgr.ui.map_data import (
     CHAPTER_MAP_COUNTS,
     CHAPTER_NAV_DELAY,
     CHAPTER_SPACING,
     CLICK_BACK,
-    CLICK_PANEL,
     EXPEDITION_NOTIF_PROBE,
     MAP_DATABASE,
     SIDEBAR_BRIGHTNESS_THRESHOLD,
@@ -22,9 +21,12 @@ from autowsgr.ui.map_page import (
     SIDEBAR_SCAN_Y_RANGE,
     TOTAL_CHAPTERS,
     MapIdentity,
+    parse_map_title,
+)
+from autowsgr.ui.map_page import (
+    CLICK_PANEL,
     MapPage,
     MapPanel,
-    parse_map_title,
 )
 from autowsgr.ui.tabbed_page import (
     TAB_BLUE,

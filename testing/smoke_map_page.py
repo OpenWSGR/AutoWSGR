@@ -36,7 +36,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from autowsgr.emulator.controller import ADBController
 from autowsgr.infra.logger import save_image, setup_logger
-from autowsgr.ui.map_page import MAP_DATABASE, MapPage, MapPanel
+from autowsgr.ui.map_data import MAP_DATABASE
+from autowsgr.ui.map_page import MapPage, MapPanel
 from autowsgr.vision.matcher import PixelChecker
 from autowsgr.vision.ocr import OCREngine
 
@@ -189,7 +190,7 @@ def main() -> None:
 
         try:
             screen = ctrl.screenshot()
-            from autowsgr.ui.map_page import TITLE_CROP_REGION
+            from autowsgr.ui.map_data import TITLE_CROP_REGION
 
             x1, y1, x2, y2 = TITLE_CROP_REGION
             cropped = PixelChecker.crop(screen, x1, y1, x2, y2)
