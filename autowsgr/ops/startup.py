@@ -60,26 +60,28 @@ _OVERLAY_DISMISS_DELAY: float = 1.0
 # 启动画面签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# TODO: 以下像素坐标与颜色值需要在实际游戏截图中校准。
-# 游戏加载完成后会出现「点击进入」画面，特征为深蓝色背景 + 底部版本号区域。
-# 建议使用 tools/pixel_marker.py 在真实截图上采集特征点。
+# 游戏加载完成后会出现「点击进入」画面，特征为底部横幅区域偏暖黄色调。
+# TODO 这个特征不对
 
 SIG_START_SCREEN = PixelSignature(
     name="game_start_screen",
     strategy=MatchStrategy.ALL,
     rules=[
-        # 左上角战舰少女 logo 区域（深蓝背景）
-        PixelRule.of(0.05, 0.05, (10, 20, 45), tolerance=40.0),
-        # 底部版本号文字区域（白色文字）
-        PixelRule.of(0.5, 0.95, (200, 200, 200), tolerance=50.0),
+        PixelRule.of(0.7531, 0.5403, (237, 223, 101), tolerance=30.0),
+        PixelRule.of(0.7539, 0.5514, (236, 220, 107), tolerance=30.0),
+        PixelRule.of(0.8320, 0.5444, (244, 232, 114), tolerance=30.0),
+        PixelRule.of(0.8320, 0.5528, (245, 230, 113), tolerance=30.0),
+        PixelRule.of(0.7828, 0.5403, (241, 215, 96), tolerance=30.0),
+        PixelRule.of(0.7844, 0.5556, (239, 227, 119), tolerance=30.0),
+        PixelRule.of(0.8016, 0.5403, (243, 230, 115), tolerance=30.0),
+        PixelRule.of(0.8039, 0.5556, (237, 229, 122), tolerance=30.0),
+        PixelRule.of(0.8195, 0.5389, (244, 231, 116), tolerance=30.0),
+        PixelRule.of(0.8219, 0.5528, (239, 222, 108), tolerance=30.0),
+        PixelRule.of(0.7719, 0.5403, (239, 219, 98), tolerance=30.0),
+        PixelRule.of(0.7719, 0.5500, (236, 222, 100), tolerance=30.0),
     ],
 )
 """游戏「点击进入」启动画面像素签名。
-
-.. warning::
-    此签名为占位值，需要根据实际游戏截图校准。
-    使用 ``tools/pixel_marker.py`` 采集精确特征点。
-"""
 
 #: 「点击进入」画面点击目标（屏幕中央）
 _CLICK_START_SCREEN: tuple[float, float] = (0.5, 0.5)
