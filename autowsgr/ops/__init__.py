@@ -23,6 +23,7 @@
     ├── exercise.py        ← 演习战斗
     ├── normal_fight.py    ← 常规战斗 (多节点地图)
     ├── campaign.py        ← 战役战斗 (单点)
+    ├── fight.py           ← 简易战斗接口 (ctrl + engine + plan)
     ├── reward.py          ← 任务奖励
     ├── cook.py            ← 食堂做菜
     ├── destroy.py         ← 解装舰船
@@ -70,6 +71,9 @@ from autowsgr.ops.normal_fight import (
 # ── 战役 ──
 from autowsgr.ops.campaign import CampaignRunner
 
+# ── 简易战斗接口 ──
+from autowsgr.ops.fight import run_fight, run_fight_n
+
 # ── 图像模板资源 ──
 from autowsgr.ops.image_resources import Templates
 
@@ -105,6 +109,9 @@ __all__ = [
     "run_normal_fight_from_yaml",
     # 战役
     "CampaignRunner",
+    # 简易战斗接口
+    "run_fight",
+    "run_fight_n",
     # 图像模板资源
     "Templates",
 ]

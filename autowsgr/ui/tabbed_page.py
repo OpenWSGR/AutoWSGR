@@ -70,6 +70,7 @@ from typing import Callable
 import cv2
 import numpy as np
 
+from autowsgr.types import PageName
 from autowsgr.vision import Color, PixelChecker
 
 
@@ -81,11 +82,11 @@ from autowsgr.vision import Color, PixelChecker
 class TabbedPageType(enum.Enum):
     """标签页面类型。"""
 
-    MAP = "地图页面"
-    BUILD = "建造页面"
-    INTENSIFY = "强化页面"
-    MISSION = "任务页面"
-    FRIEND = "好友页面"
+    MAP = PageName.MAP
+    BUILD = PageName.BUILD
+    INTENSIFY = PageName.INTENSIFY
+    MISSION = PageName.MISSION
+    FRIEND = PageName.FRIEND
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

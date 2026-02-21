@@ -13,6 +13,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.navigate import goto_page
+from autowsgr.types import PageName
 from autowsgr.ui.bath_page import BathPage
 
 _STEP_DELAY: float = 1.0
@@ -26,7 +27,7 @@ _STEP_DELAY: float = 1.0
 
 def repair_in_bath(ctrl: AndroidController) -> None:
     """使用浴室修理修理时间最长的舰船。"""
-    goto_page(ctrl, "浴室页面")
+    goto_page(ctrl, PageName.BATH)
 
     page = BathPage(ctrl)
     page.go_to_choose_repair()

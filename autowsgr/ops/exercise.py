@@ -17,7 +17,7 @@ from autowsgr.combat.engine import CombatEngine, run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.infra import ExerciseConfig
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, Formation, RepairMode
+from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.map.page import MapPage
 from autowsgr.ui.map.data import MapPanel
@@ -89,14 +89,14 @@ class ExerciseRunner:
             time.sleep(2.0)
 
         logger.info("[OPS] 演习完成, 共 {} 次", len(self._results))
-        goto_page(self._ctrl, "主页面")
+        goto_page(self._ctrl, PageName.MAIN)
         return self._results
 
     # ── 导航 ──
 
     def _enter_exercise_page(self) -> None:
         """导航到地图页面的演习面板。"""
-        goto_page(self._ctrl, "地图页面")
+        goto_page(self._ctrl, PageName.MAP)
         map_page = MapPage(self._ctrl)
         map_page.switch_panel(MapPanel.EXERCISE)
         time.sleep(1.0)

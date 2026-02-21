@@ -358,6 +358,37 @@ class ConditionFlag(StrEnum):
     SL = "SL"
     """需要 / 进行了 SL 操作"""
     
+class PageName(StrEnum):
+    """游戏页面名称。"""
+
+    MAIN = "主页面"
+    """主页面"""
+    MAP = "地图页面"
+    """地图页面"""
+    BATTLE_PREP = "出征准备"
+    """出征准备"""
+    SIDEBAR = "侧边栏"
+    """侧边栏"""
+    MISSION = "任务页面"
+    """任务页面"""
+    BACKYARD = "后院页面"
+    """后院页面"""
+    BATH = "浴室页面"
+    """浴室页面"""
+    CANTEEN = "食堂页面"
+    """食堂页面"""
+    CHOOSE_REPAIR = "选择修理页面"
+    """选择修理页面"""
+    BUILD = "建造页面"
+    """建造页面"""
+    INTENSIFY = "强化页面"
+    """强化页面"""
+    FRIEND = "好友页面"
+    """好友页面"""
+    DECISIVE_BATTLE = "决战页面"
+    """决战页面"""
+
+
 class MapEntrance(StrEnum):
     """地图入口。"""
 

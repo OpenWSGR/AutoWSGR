@@ -21,9 +21,9 @@ from loguru import logger
 from autowsgr.combat.callbacks import CombatResult
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, Formation, RepairMode
-from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.ui.map.page import MapPage
+from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode
+from autowsgr.ui import BattlePreparationPage, RepairStrategy
+from autowsgr.ui import MapPage
 
 if TYPE_CHECKING:
     from autowsgr.combat.engine import CombatEngine
@@ -172,7 +172,7 @@ class CampaignRunner:
 
     def _enter_battle(self) -> None:
         """导航到战役面板并选择战役。"""
-        goto_page(self._ctrl, "地图页面")
+        goto_page(self._ctrl, PageName.MAP)
         map_page = MapPage(self._ctrl)
         map_page.enter_campaign(
             map_index=self._map_index,

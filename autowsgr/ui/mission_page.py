@@ -19,6 +19,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.image_resources import Templates
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
 from autowsgr.vision import ImageChecker
@@ -84,8 +85,8 @@ class MissionPage:
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=MainPage.is_current_page,
-            source="任务页面",
-            target="主页面",
+            source=PageName.MISSION,
+            target=PageName.MAIN,
         )
 
     # ── 操作 ──────────────────────────────────────────────────────────────

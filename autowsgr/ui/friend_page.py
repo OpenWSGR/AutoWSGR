@@ -20,6 +20,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     MatchStrategy,
@@ -107,5 +108,5 @@ class FriendPage:
             click_coord=CLICK_BACK,
             checker=SidebarPage.is_current_page,
             source="好友",
-            target="侧边栏",
+            target=PageName.SIDEBAR,
         )

@@ -41,6 +41,7 @@ from autowsgr.ui.battle.constants import (
     SUPPORT_PROBE,
 )
 from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.types import PageName
 from autowsgr.vision import PixelChecker, PixelSignature, PixelRule, MatchStrategy
 
 if TYPE_CHECKING:
@@ -167,8 +168,8 @@ class BattlePreparationPage:
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=MapPage.is_current_page,
-            source="出征准备",
-            target="地图页面",
+            source=PageName.BATTLE_PREP,
+            target=PageName.MAP,
         )
 
     def start_battle(self) -> None:

@@ -19,6 +19,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     MatchStrategy,
@@ -165,5 +166,5 @@ class BackyardPage:
             click_coord=CLICK_BACK,
             checker=MainPage.is_current_page,
             source="后院",
-            target="主页面",
+            target=PageName.MAIN,
         )

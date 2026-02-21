@@ -41,6 +41,7 @@ from autowsgr.ui.map.data import (
     parse_map_title,
 )
 from autowsgr.ui.map.ops import _MapPageOpsMixin
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
@@ -171,8 +172,8 @@ class MapPage(_MapPageOpsMixin):
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=MainPage.is_current_page,
-            source="地图页面",
-            target="主页面",
+            source=PageName.MAP,
+            target=PageName.MAIN,
         )
 
     # ── 动作 — 面板切换 ──────────────────────────────────────────────────
@@ -348,5 +349,5 @@ class MapPage(_MapPageOpsMixin):
             click_coord=CLICK_ENTER_SORTIE,
             checker=BattlePreparationPage.is_current_page,
             source=f"地图-出征 {chapter}-{map_num}",
-            target="出征准备",
+            target=PageName.BATTLE_PREP,
         )

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from autowsgr.ops.decisive._config import DecisiveConfig
+from autowsgr.ops.decisive._config import DecisiveConfig, MapData
 from autowsgr.ops.decisive._state import DecisiveState
 
 
@@ -153,6 +153,37 @@ class DecisiveLogic:
             status >= self.config.repair_level
             for status in self.state.ship_stats[1:]
             if status > 0
+        )
+
+    def is_stage_end(self, node: str | None = None) -> bool:
+        """判断当前节点是否为该小关的终止节点。
+
+        根据 ``MapData`` 中的 ``map_end`` 数据判断，
+        替代原先硬编码 ``> "J"`` 的逻辑。
+
+        Parameters
+        ----------
+        node:
+            要检查的节点字母；为 ``None`` 时使用 ``state.node``。
+        """
+        if node is None:
+            node = self.state.node
+        return MapData.is_stage_end(
+            self.config.chapter, self.state.stage, node,
+        )
+
+    def is_key_point(self, node: str | None = None) -> bool:
+        """判断当前节点是否为关键点 (需夜战)。
+
+        Parameters
+        ----------
+        node:
+            要检查的节点字母；为 ``None`` 时使用 ``state.node``。
+        """
+        if node is None:
+            node = self.state.node
+        return MapData.is_key_point(
+            self.config.chapter, self.state.stage, node,
         )
 
     # ── 编队计算 ───────────────────────────────────────────────────────

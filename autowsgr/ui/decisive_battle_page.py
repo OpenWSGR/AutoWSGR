@@ -49,6 +49,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision import MatchStrategy, PixelChecker, PixelRule, PixelSignature
 
@@ -58,7 +59,7 @@ from autowsgr.vision import MatchStrategy, PixelChecker, PixelRule, PixelSignatu
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="决战页面",
+    name=PageName.DECISIVE_BATTLE,
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.8016, 0.8458, (20, 44, 78),  tolerance=30.0),
@@ -206,8 +207,8 @@ class DecisiveBattlePage:
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=MainPage.is_current_page,
-            source="决战页面",
-            target="主页面",
+            source=PageName.DECISIVE_BATTLE,
+            target=PageName.MAIN,
         )
 
     # ── 章节 OCR 识别 ────────────────────────────────────────────────────

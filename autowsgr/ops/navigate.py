@@ -10,6 +10,7 @@ import time
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.navigation import find_path
 from autowsgr.ui.page import (
     NavigationError,
@@ -86,17 +87,17 @@ def _get_page_checker(page_name: str):
     from autowsgr.ui.sidebar_page import SidebarPage
 
     _CHECKERS = {
-        "主页面": MainPage.is_current_page,
-        "地图页面": MapPage.is_current_page,
-        "出征准备": BattlePreparationPage.is_current_page,
-        "侧边栏": SidebarPage.is_current_page,
-        "任务页面": MissionPage.is_current_page,
-        "后院页面": BackyardPage.is_current_page,
-        "浴室页面": BathPage.is_current_page,
-        "食堂页面": CanteenPage.is_current_page,
-        "建造页面": BuildPage.is_current_page,
-        "强化页面": IntensifyPage.is_current_page,
-        "好友页面": FriendPage.is_current_page,
+        PageName.MAIN: MainPage.is_current_page,
+        PageName.MAP: MapPage.is_current_page,
+        PageName.BATTLE_PREP: BattlePreparationPage.is_current_page,
+        PageName.SIDEBAR: SidebarPage.is_current_page,
+        PageName.MISSION: MissionPage.is_current_page,
+        PageName.BACKYARD: BackyardPage.is_current_page,
+        PageName.BATH: BathPage.is_current_page,
+        PageName.CANTEEN: CanteenPage.is_current_page,
+        PageName.BUILD: BuildPage.is_current_page,
+        PageName.INTENSIFY: IntensifyPage.is_current_page,
+        PageName.FRIEND: FriendPage.is_current_page,
     }
     return _CHECKERS.get(page_name)
 

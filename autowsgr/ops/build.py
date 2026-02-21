@@ -11,6 +11,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.navigate import goto_page
+from autowsgr.types import PageName
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +33,7 @@ def collect_built_ships(
     """收取已建造完成的舰船或装备。"""
     from autowsgr.ui.build_page import BuildPage, BuildTab
 
-    goto_page(ctrl, "建造页面")
+    goto_page(ctrl, PageName.BUILD)
     page = BuildPage(ctrl)
 
     if build_type == "equipment":

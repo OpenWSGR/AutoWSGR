@@ -2,6 +2,9 @@
 logs/
 .vscode/
 
+# 测试图片包
+test_pkg/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

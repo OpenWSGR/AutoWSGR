@@ -351,10 +351,54 @@ class CombatEngine(PhaseHandlersMixin):
     def _detect_ship_stats(self, mode: str) -> list[int]:
         """检测我方舰队血量状态。
 
-        当前返回维持原有 ship_stats，后续可接入像素检测。
+        Parameters
+        TODO: 空位探测没做
+        ----------
+        mode:
+            ``"prepare"`` — 出征准备页检测 (委托 BattlePreparationPage)。
+            ``"sumup"`` — 战斗结算页检测 (像素颜色匹配)。
+
+        Returns
+        -------
+        list[int]
+            长度 7 的列表 (index 0 占位)，值含义:
+            0=绿血, 1=黄血, 2=红血, 3=维修中, -1=空位。
         """
-        # TODO: 接入 BattlePreparationPage.detect_ship_damage 的像素检测逻辑
-        return self._ship_stats[:]
+        from autowsgr.ui.battle.constants import (
+            BLOOD_TOLERANCE,
+            RESULT_BLOOD_BAR_PROBE,
+            RESULT_BLOOD_GREEN,
+            RESULT_BLOOD_RED,
+            RESULT_BLOOD_YELLOW,
+        )
+        from autowsgr.vision import PixelChecker
+
+        if mode != "sumup":
+            return self._ship_stats[:]
+
+        screen = self._device.screenshot()
+        result = [0] * 7  # index 0 占位
+
+        for slot, (x, y) in RESULT_BLOOD_BAR_PROBE.items():
+            pixel = PixelChecker.get_pixel(screen, x, y)
+
+            # 结算页只有绿/黄/红三种状态 (无空位/维修中)
+            if pixel.near(RESULT_BLOOD_GREEN, BLOOD_TOLERANCE):
+                result[slot] = 0
+            elif pixel.near(RESULT_BLOOD_YELLOW, BLOOD_TOLERANCE):
+                result[slot] = 1
+            elif pixel.near(RESULT_BLOOD_RED, BLOOD_TOLERANCE):
+                result[slot] = 2
+            else:
+                # 未匹配时使用战前状态回退
+                result[slot] = self._ship_stats[slot] if slot < len(self._ship_stats) else 0
+                logger.debug(
+                    "结算页舰船 {} 血量颜色未匹配: {}, 使用战前值: {}",
+                    slot, pixel, result[slot],
+                )
+
+        logger.info("结算页血量检测: {}", result[1:])
+        return result
 
     def _get_ship_drop(self) -> str | None:
         """获取舰船掉落（当前未实现 OCR，返回 None）。"""

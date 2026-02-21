@@ -14,7 +14,7 @@
     ┌──────────────────────────────────────────────────────────────────┐
     │  1. 决战总览页 (DecisiveBattlePage)                             │
     │     ↓ 点击「出征」                                               │
-    │  2. 决战地图页 (DecisiveMapPage)      ← 本包核心                │
+    │  2. 决战地图页 (DecisiveMapController)  ← 地图页 UI 操作         │
     │     ├─ overlay: 战备舰队获取           ← 选择购买舰船/技能        │
     │     ├─ overlay: 确认退出 (撤退/暂离)   ← 撤退或暂离当前章节      │
     │     └─ overlay: 选择前进点             ← 多路径分支选择           │
@@ -29,12 +29,28 @@
 ::
 
     decisive/
-    ├── __init__.py       ← 本文件 (统一导出)
-    ├── _state.py         ← DecisivePhase, DecisiveState
-    ├── _config.py        ← DecisiveConfig
-    ├── _overlay.py       ← 签名/坐标常量/检测函数/DecisiveOverlay
-    ├── _logic.py         ← FleetSelection, DecisiveLogic (纯决策)
-    └── _controller.py    ← DecisiveResult, DecisiveController (状态机)
+    ├── __init__.py           ← 本文件 (统一导出)
+    ├── _state.py             ← DecisivePhase, DecisiveState
+    ├── _config.py            ← DecisiveConfig, MapData
+    ├── _logic.py             ← FleetSelection, DecisiveLogic (纯决策)
+    └── _controller.py        ← DecisiveResult, DecisiveController (状态机编排)
+
+UI 层 (autowsgr.ui.decisive)::
+
+    ui/decisive/
+    ├── overlay.py            ← 签名/坐标常量/检测函数/DecisiveOverlay
+    └── map_controller.py     ← DecisiveMapController (地图页 UI 操作)
+
+架构分层
+========
+
+::
+
+    DecisiveController (编排器)
+    ├── DecisiveLogic          ← 纯逻辑决策 (选船/编队/修理判断/小关结束)
+    ├── DecisiveMapController  ← 地图页 UI 操作 (overlay/出征/撤退/修理)
+    ├── BattlePreparationPage  ← 出征准备页 UI (编队/修理/出征)
+    └── DecisiveBattlePage     ← 决战总览页 UI (章节导航/重置)
 
 使用示例
 ========
@@ -58,10 +74,11 @@
     results = controller.run_for_times(3)
 """
 
-from autowsgr.ops.decisive._config import DecisiveConfig
+from autowsgr.ops.decisive._config import DecisiveConfig, MapData
 from autowsgr.ops.decisive._controller import DecisiveController, DecisiveResult
 from autowsgr.ops.decisive._logic import DecisiveLogic, FleetSelection
-from autowsgr.ops.decisive._overlay import (
+from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
+from autowsgr.ui.decisive import (
     ADVANCE_CARD_POSITIONS,
     CLICK_ADVANCE_CONFIRM,
     CLICK_BUY_EXP,
@@ -79,6 +96,7 @@ from autowsgr.ops.decisive._overlay import (
     RESOURCE_AREA,
     SHIP_NAME_X_RANGES,
     SHIP_NAME_Y_RANGE,
+    DecisiveMapController,
     DecisiveOverlay,
     detect_decisive_overlay,
     get_overlay_signature,
@@ -87,11 +105,11 @@ from autowsgr.ops.decisive._overlay import (
     is_decisive_map_page,
     is_fleet_acquisition,
 )
-from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
 
 __all__ = [
-    # 配置
+    # 配置 & 地图数据
     "DecisiveConfig",
+    "MapData",
     # 状态
     "DecisivePhase",
     "DecisiveState",
@@ -124,6 +142,8 @@ __all__ = [
     # 逻辑
     "FleetSelection",
     "DecisiveLogic",
+    # 地图控制器
+    "DecisiveMapController",
     # 控制器
     "DecisiveResult",
     "DecisiveController",

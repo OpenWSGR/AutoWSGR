@@ -22,6 +22,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     Color,
@@ -51,7 +52,7 @@ class MainPageTarget(enum.Enum):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="主页面",
+    name=PageName.MAIN,
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.6453, 0.9375, (52, 115, 168), tolerance=30.0),
@@ -200,7 +201,7 @@ class MainPage:
             self._ctrl,
             click_coord=CLICK_NAV[target],
             checker=target_checker[target],
-            source="主页面",
+            source=PageName.MAIN,
             target=target.value,
         )
 

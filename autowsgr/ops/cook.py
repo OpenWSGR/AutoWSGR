@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.navigate import goto_page
+from autowsgr.types import PageName
 from autowsgr.ui.canteen_page import CanteenPage
 
 
@@ -25,6 +26,6 @@ def cook(
     force_cook:
         当有菜正在生效时是否继续做菜。
     """
-    goto_page(ctrl, "食堂页面")
+    goto_page(ctrl, PageName.CANTEEN)
     page = CanteenPage(ctrl)
     return page.cook(position, force_cook=force_cook)

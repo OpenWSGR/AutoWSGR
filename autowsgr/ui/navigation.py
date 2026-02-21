@@ -34,6 +34,8 @@ import enum
 from collections import deque
 from dataclasses import dataclass
 
+from autowsgr.types import PageName
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 边类型
@@ -81,39 +83,24 @@ class NavEdge:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 页面名称常量
+# 页面名称常量 — 从 PageName 枚举导出，保持向后兼容
 # ═══════════════════════════════════════════════════════════════════════════════
-# ── 与 register_page() 一致 ──
 
-MAIN_PAGE = "主页面"
-MAP_PAGE = "地图页面"
-BATTLE_PREP = "出征准备"
-SIDEBAR_PAGE = "侧边栏"
-MISSION_PAGE = "任务页面"
-BACKYARD_PAGE = "后院页面"
-BATH_PAGE = "浴室页面"
-CANTEEN_PAGE = "食堂页面"
-CHOOSE_REPAIR_PAGE = "选择修理页面"
-BUILD_PAGE = "建造页面"
-INTENSIFY_PAGE = "强化页面"
-FRIEND_PAGE = "好友页面"
-DECISIVE_BATTLE_PAGE = "决战页面"
+MAIN_PAGE = PageName.MAIN
+MAP_PAGE = PageName.MAP
+BATTLE_PREP = PageName.BATTLE_PREP
+SIDEBAR_PAGE = PageName.SIDEBAR
+MISSION_PAGE = PageName.MISSION
+BACKYARD_PAGE = PageName.BACKYARD
+BATH_PAGE = PageName.BATH
+CANTEEN_PAGE = PageName.CANTEEN
+CHOOSE_REPAIR_PAGE = PageName.CHOOSE_REPAIR
+BUILD_PAGE = PageName.BUILD
+INTENSIFY_PAGE = PageName.INTENSIFY
+FRIEND_PAGE = PageName.FRIEND
+DECISIVE_BATTLE_PAGE = PageName.DECISIVE_BATTLE
 
-ALL_PAGES: list[str] = [
-    MAIN_PAGE,
-    MAP_PAGE,
-    BATTLE_PREP,
-    SIDEBAR_PAGE,
-    MISSION_PAGE,
-    BACKYARD_PAGE,
-    BATH_PAGE,
-    CANTEEN_PAGE,
-    CHOOSE_REPAIR_PAGE,
-    BUILD_PAGE,
-    INTENSIFY_PAGE,
-    FRIEND_PAGE,
-    DECISIVE_BATTLE_PAGE,
-]
+ALL_PAGES: list[PageName] = list(PageName)
 """所有已声明的页面名称 (13 个)。
 
 .. note::

@@ -28,6 +28,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.page import NavConfig, click_and_wait_for_page, wait_for_page
 from autowsgr.vision import (
     Color,
@@ -196,7 +197,7 @@ class SidebarPage:
                 self._ctrl,
                 click_coord=CLICK_NAV[target],
                 checker=target_checker[target],
-                source="侧边栏",
+                source=PageName.SIDEBAR,
                 target=target.value,
             )
 
@@ -237,7 +238,7 @@ class SidebarPage:
                     timeout=config.timeout,
                     interval=config.interval,
                     handle_overlays=config.handle_overlays,
-                    source="侧边栏",
+                    source=PageName.SIDEBAR,
                     target=target.value,
                 )
                 return
@@ -283,6 +284,6 @@ class SidebarPage:
             self._ctrl,
             click_coord=CLICK_CLOSE,
             checker=MainPage.is_current_page,
-            source="侧边栏",
-            target="主页面",
+            source=PageName.SIDEBAR,
+            target=PageName.MAIN,
         )

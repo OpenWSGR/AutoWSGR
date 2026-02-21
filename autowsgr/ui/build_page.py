@@ -33,6 +33,7 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ops.image_resources import Templates
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
@@ -235,8 +236,8 @@ class BuildPage:
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=SidebarPage.is_current_page,
-            source="建造页面",
-            target="侧边栏",
+            source=PageName.BUILD,
+            target=PageName.SIDEBAR,
         )
 
     # ── 建造操作 ──────────────────────────────────────────────────────────

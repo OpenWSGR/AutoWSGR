@@ -31,6 +31,7 @@ from autowsgr.ui.page import (
     confirm_operation,
     wait_for_page,
 )
+from autowsgr.types import PageName
 from autowsgr.vision import ImageChecker, PixelChecker
 from autowsgr.emulator import AndroidController
 
@@ -121,7 +122,7 @@ class _MapPageOpsMixin:
             self._ctrl,
             checker=BattlePreparationPage.is_current_page,
             source=f"地图-战役 {campaign_name}",
-            target="出征准备",
+            target=PageName.BATTLE_PREP,
         )
 
     # ── 动作 — 进入决战 (地图 → 决战页面) ────────────────────────────────
@@ -150,7 +151,7 @@ class _MapPageOpsMixin:
             click_coord=CLICK_ENTER_DECISIVE,
             checker=DecisiveBattlePage.is_current_page,
             source="地图-决战面板",
-            target="决战页面",
+            target=PageName.DECISIVE_BATTLE,
         )
 
     # ── 动作 — 演习面板操作 ──────────────────────────────────────────────
@@ -294,7 +295,7 @@ class _MapPageOpsMixin:
                 self._ctrl,
                 checker=MapPage.is_current_page,
                 source=f"远征收取",
-                target="地图页面",
+                target=PageName.MAP,
             )
 
             collected += 1

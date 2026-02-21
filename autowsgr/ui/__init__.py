@@ -68,21 +68,22 @@
 """
 
 # ── 控制器 ─────────────────────────────────────────────────────────────
-from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
-from autowsgr.ui.bath_page import BathPage
-from autowsgr.ui.battle.preparation import BattlePreparationPage, Panel
-from autowsgr.ui.build_page import BuildPage, BuildTab
-from autowsgr.ui.canteen_page import CanteenPage
-from autowsgr.ui.choose_ship_page import ChooseShipPage
-from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
-from autowsgr.ui.friend_page import FriendPage
-from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
-from autowsgr.ui.main_page import MainPage, MainPageTarget
-from autowsgr.ui.map.data import MAP_DATABASE, MapIdentity
-from autowsgr.ui.map.page import MapPage
-from autowsgr.ui.map.data import MapPanel
-from autowsgr.ui.mission_page import MissionPage
-from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
+from .backyard_page import BackyardPage, BackyardTarget
+from .bath_page import BathPage
+from .battle import BattlePreparationPage, Panel, RepairStrategy
+from .build_page import BuildPage, BuildTab
+from .canteen_page import CanteenPage
+from .choose_ship_page import ChooseShipPage
+from .decisive_battle_page import DecisiveBattlePage
+from .decisive import DecisiveMapController, DecisiveOverlay
+from .friend_page import FriendPage
+from .intensify_page import IntensifyPage, IntensifyTab
+from .main_page import MainPage, MainPageTarget
+from .map.data import MAP_DATABASE, MapIdentity
+from .map.page import MapPage
+from .map.data import MapPanel
+from .mission_page import MissionPage
+from .sidebar_page import SidebarPage, SidebarTarget
 
 # ── 标签页统一检测层 ──────────────────────────────────────────────
 from autowsgr.ui.tabbed_page import (
@@ -119,18 +120,20 @@ from autowsgr.ui.page import (
 )
 
 # ── 注册所有页面识别器 ──
-register_page("主页面", MainPage.is_current_page)
-register_page("地图页面", MapPage.is_current_page)
-register_page("出征准备", BattlePreparationPage.is_current_page)
-register_page("侧边栏", SidebarPage.is_current_page)
-register_page("任务页面", MissionPage.is_current_page)
-register_page("后院页面", BackyardPage.is_current_page)
-register_page("浴室页面", BathPage.is_current_page)
-register_page("食堂页面", CanteenPage.is_current_page)
-register_page("建造页面", BuildPage.is_current_page)
-register_page("强化页面", IntensifyPage.is_current_page)
-register_page("好友页面", FriendPage.is_current_page)
-register_page("决战页面", DecisiveBattlePage.is_current_page)
+from autowsgr.types import PageName
+
+register_page(PageName.MAIN, MainPage.is_current_page)
+register_page(PageName.MAP, MapPage.is_current_page)
+register_page(PageName.BATTLE_PREP, BattlePreparationPage.is_current_page)
+register_page(PageName.SIDEBAR, SidebarPage.is_current_page)
+register_page(PageName.MISSION, MissionPage.is_current_page)
+register_page(PageName.BACKYARD, BackyardPage.is_current_page)
+register_page(PageName.BATH, BathPage.is_current_page)
+register_page(PageName.CANTEEN, CanteenPage.is_current_page)
+register_page(PageName.BUILD, BuildPage.is_current_page)
+register_page(PageName.INTENSIFY, IntensifyPage.is_current_page)
+register_page(PageName.FRIEND, FriendPage.is_current_page)
+register_page(PageName.DECISIVE_BATTLE, DecisiveBattlePage.is_current_page)
 
 __all__ = [
     # ── 控制器 ──
@@ -143,6 +146,8 @@ __all__ = [
     "CanteenPage",
     "ChooseShipPage",
     "DecisiveBattlePage",
+    "DecisiveMapController",
+    "DecisiveOverlay",
     "FriendPage",
     "IntensifyPage",
     "IntensifyTab",
@@ -153,6 +158,7 @@ __all__ = [
     "MapPanel",
     "MissionPage",
     "Panel",
+    "RepairStrategy",
     "SidebarPage",
     "SidebarTarget",
     # ── 标签页统一检测 ──

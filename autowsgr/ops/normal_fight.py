@@ -18,7 +18,7 @@ from autowsgr.combat.engine import CombatEngine, run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan
 from autowsgr.combat.recognition import make_enemy_callbacks
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, RepairMode
+from autowsgr.types import ConditionFlag, PageName, RepairMode
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.map.page import MapPage
 
@@ -169,7 +169,7 @@ class NormalFightRunner:
 
     def _enter_fight(self) -> None:
         """导航到目标地图并进入。"""
-        goto_page(self._ctrl, "地图页面")
+        goto_page(self._ctrl, PageName.MAP)
         map_page = MapPage(self._ctrl, self._ocr)
         map_page.enter_sortie(self._plan.chapter, self._plan.map_id)
 

@@ -22,6 +22,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
@@ -174,6 +175,6 @@ class IntensifyPage:
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=SidebarPage.is_current_page,
-            source="强化页面",
-            target="侧边栏",
+            source=PageName.INTENSIFY,
+            target=PageName.SIDEBAR,
         )
