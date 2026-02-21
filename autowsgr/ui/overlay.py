@@ -201,8 +201,11 @@ def dismiss_sign(ctrl: AndroidController) -> None:
     ctrl:
         Android 控制器。
     """
+    from .page import confirm_operation
+    
     logger.info("[UI] 每日签到: 关闭")
     ctrl.click(*_CLICK_SIGN_CONFIRM)
+    confirm_operation(ctrl, must_confirm=True, timeout=5.0)
 
 
 # ---------------------------------------------------------------------------

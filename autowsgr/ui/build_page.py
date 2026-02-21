@@ -32,10 +32,10 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.ops.image_resources import Templates
 from autowsgr.types import PageName
-from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.ui.tabbed_page import (
+from autowsgr.image_resources import Templates
+from .page import click_and_wait_for_page
+from .tabbed_page import (
     TabbedPageType,
     get_active_tab_index,
     identify_page_type,

@@ -10,7 +10,7 @@ import time
 
 from loguru import logger
 
-from autowsgr.ops.image_resources import Templates
+from autowsgr.image_resources import Templates
 from autowsgr.ui.map.data import (
     CAMPAIGN_POSITIONS,
     CLICK_CHALLENGE,

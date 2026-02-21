@@ -9,22 +9,16 @@ from __future__ import annotations
 import enum
 import time
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
+from autowsgr.ui.battle.blood import classify_blood
 from autowsgr.ui.battle.constants import (
     AUTO_SUPPLY_ON,
     AUTO_SUPPLY_PROBE,
     BLOOD_BAR_PROBE,
-    BLOOD_BLACK,
-    BLOOD_EMPTY,
-    BLOOD_GREEN,
-    BLOOD_RED,
-    BLOOD_TOLERANCE,
-    BLOOD_YELLOW,
     CLICK_AUTO_SUPPLY,
     CLICK_BACK,
     CLICK_FLEET,
@@ -41,11 +35,8 @@ from autowsgr.ui.battle.constants import (
     SUPPORT_PROBE,
 )
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.types import PageName
-from autowsgr.vision import PixelChecker, PixelSignature, PixelRule, MatchStrategy
-
-if TYPE_CHECKING:
-    from autowsgr.vision import OCREngine
+from autowsgr.types import PageName, ShipDamageState
+from autowsgr.vision import PixelChecker, PixelSignature, PixelRule, MatchStrategy, OCREngine
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -118,8 +109,9 @@ class BattlePreparationPage:
     **操作动作** 为实例方法，通过注入的控制器执行。
     """
 
-    def __init__(self, ctrl: AndroidController) -> None:
+    def __init__(self, ctrl: AndroidController, ocr: OCREngine | None = None) -> None:
         self._ctrl = ctrl
+        self._ocr = ocr
 
     # ── 页面识别 ──
 
@@ -214,31 +206,22 @@ class BattlePreparationPage:
     # ── 状态查询 — 舰船血量 ──
 
     @staticmethod
-    def detect_ship_damage(screen: np.ndarray) -> dict[int, int]:
+    def detect_ship_damage(screen: np.ndarray) -> dict[int, ShipDamageState]:
         """检测 6 个舰船槽位的血量状态。
 
         Returns
         -------
-        dict[int, int]
-            槽位号 (1–6) → 血量状态:
-            ``0``: 绿血, ``1``: 黄血, ``2``: 红血, ``3``: 维修中, ``-1``: 无舰船
+        dict[int, ShipDamageState]
+            槽位号 (0–5) → 血量状态。
         """
-        result: dict[int, int] = {}
+        result: dict[int, ShipDamageState] = {}
         for slot, (x, y) in BLOOD_BAR_PROBE.items():
             pixel = PixelChecker.get_pixel(screen, x, y)
-            if pixel.near(BLOOD_EMPTY, BLOOD_TOLERANCE):
-                result[slot] = -1
-            elif pixel.near(BLOOD_GREEN, BLOOD_TOLERANCE):
-                result[slot] = 0
-            elif pixel.near(BLOOD_YELLOW, BLOOD_TOLERANCE):
-                result[slot] = 1
-            elif pixel.near(BLOOD_RED, BLOOD_TOLERANCE):
-                result[slot] = 2
-            elif pixel.near(BLOOD_BLACK, BLOOD_TOLERANCE):
-                result[slot] = 3
-            else:
-                logger.debug("[UI] 舰船 {} 血量颜色未匹配: {}", slot, pixel)
-                result[slot] = 0
+            result[slot] = classify_blood(pixel)
+        logger.debug(
+            "[准备页] 血量检测: {}",
+            " | ".join(f"槽{i}={result[i].name}" for i in range(len(result))),
+        )
         return result
 
     # ── 状态查询 — 战役支援 ──
@@ -260,7 +243,7 @@ class BattlePreparationPage:
     def supply(self, ship_ids: list[int] | None = None) -> None:
         """切换到补给面板并补给指定舰船。"""
         if ship_ids is None:
-            ship_ids = [1, 2, 3, 4, 5, 6]
+            ship_ids = [0, 1, 2, 3, 4, 5]
         self.select_panel(Panel.QUICK_SUPPLY)
         time.sleep(0.5)
         for sid in ship_ids:
@@ -286,9 +269,9 @@ class BattlePreparationPage:
             logger.info("[UI] 出征准备 → 修理位置 {}", pos)
 
     def click_ship_slot(self, slot: int) -> None:
-        """点击指定舰船槽位 (1–6)。"""
+        """点击指定舰船槽位 (0–5)。"""
         if slot not in CLICK_SHIP_SLOT:
-            raise ValueError(f"舰船槽位必须为 1–6，收到: {slot}")
+            raise ValueError(f"舰船槽位必须为 0–5，收到: {slot}")
         logger.info("[UI] 出征准备 → 点击舰船位 {}", slot)
         self._ctrl.click(*CLICK_SHIP_SLOT[slot])
 
@@ -313,13 +296,13 @@ class BattlePreparationPage:
 
         positions: list[int] = []
         for slot, dmg in damage.items():
-            if dmg <= 0 or dmg == 3:
+            if dmg == ShipDamageState.NO_SHIP or dmg == ShipDamageState.NORMAL:
                 continue
-            if strategy is RepairStrategy.ALWAYS and dmg >= 1:
+            if strategy is RepairStrategy.ALWAYS and dmg >= ShipDamageState.MODERATE:
                 positions.append(slot)
-            elif strategy is RepairStrategy.MODERATE and dmg >= 1:
+            elif strategy is RepairStrategy.MODERATE and dmg >= ShipDamageState.MODERATE:
                 positions.append(slot)
-            elif strategy is RepairStrategy.SEVERE and dmg >= 2:
+            elif strategy is RepairStrategy.SEVERE and dmg >= ShipDamageState.SEVERE:
                 positions.append(slot)
 
         if positions:
@@ -338,21 +321,16 @@ class BattlePreparationPage:
         self,
         fleet_id: int,
         ship_names: Sequence[str | None],
-        *,
-        ocr: OCREngine | None = None,
     ) -> None:
         """更换编队全部舰船。
-
+        TODO: 需测试
         Parameters
         ----------
         fleet_id:
             舰队编号 (2–4)。1 队不支持更换。
         ship_names:
-            舰船名列表 (按槽位 1–6)。``None`` 或 ``""`` 表示该位留空。
-        ocr:
-            OCR 引擎 (搜索时用于匹配舰船名)。
+            舰船名列表 (按槽位 0–5)。``None`` 或 ``""`` 表示该位留空。
         """
-        from autowsgr.ui.choose_ship_page import ChooseShipPage
 
         if fleet_id == 1:
             raise ValueError("不支持更换 1 队舰船编成")
@@ -367,9 +345,9 @@ class BattlePreparationPage:
         damage = self.detect_ship_damage(screen)
 
         # 先移除所有已有舰船
-        for slot in range(1, 7):
-            if damage.get(slot, -1) != -1:
-                self._change_single_ship(1, None, slot_occupied=True)
+        for slot in range(6):
+            if damage.get(slot, ShipDamageState.NO_SHIP) != ShipDamageState.NO_SHIP:
+                self._change_single_ship(0, None, slot_occupied=True)
                 time.sleep(0.3)
 
         # 检测移除后状态
@@ -377,10 +355,10 @@ class BattlePreparationPage:
         damage = self.detect_ship_damage(screen)
 
         # 逐个放入目标舰船
-        for slot in range(1, 7):
-            name = names[slot - 1]
-            occupied = damage.get(slot, -1) != -1
-            self._change_single_ship(slot, name, ocr=ocr, slot_occupied=occupied)
+        for slot in range(6):
+            name = names[slot]
+            occupied = damage.get(slot, ShipDamageState.NO_SHIP) != ShipDamageState.NO_SHIP
+            self._change_single_ship(slot, name, slot_occupied=occupied)
             time.sleep(0.3)
 
         logger.info("[UI] {} 队编成更换完成", fleet_id)
@@ -390,7 +368,6 @@ class BattlePreparationPage:
         slot: int,
         name: str | None,
         *,
-        ocr: OCREngine | None = None,
         slot_occupied: bool = True,
     ) -> None:
         """更换/移除指定位置的单艘舰船。"""
@@ -416,9 +393,11 @@ class BattlePreparationPage:
         choose_page.dismiss_keyboard()
         time.sleep(0.8)
 
-        if ocr is not None:
-            screen = self._ctrl.screenshot()
-            ship_name = ocr.recognize_ship_name(screen, [name])
+        screen = self._ctrl.screenshot()
+        if self._ocr is None:
+            logger.warning("[UI] 未提供 OCR 引擎，无法验证舰船名称")
+        else:
+            ship_name = self._ocr.recognize_ship_name(screen, [name])
             if ship_name != name:
                 logger.warning("[UI] 未精确匹配 '{}', OCR 识别: '{}'", name, ship_name)
 

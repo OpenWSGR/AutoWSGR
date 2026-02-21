@@ -47,7 +47,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.ui.overlay import NetworkError, OverlayType, detect_overlay, dismiss_overlay  # noqa: F401
+from autowsgr.ui.overlay import detect_overlay, dismiss_overlay  # noqa: F401
 from autowsgr.vision import ImageChecker
 
 
@@ -360,7 +360,7 @@ def confirm_operation(
     NavigationError
         *must_confirm* 为 ``True`` 且超时仍未找到确认按钮。
     """
-    from autowsgr.ops.image_resources import Templates
+    from autowsgr.image_resources import Templates
 
     confirm_templates = Templates.Confirm.all()
     deadline = time.monotonic() + max(timeout, 0)

@@ -20,7 +20,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.ops.image_resources import Templates
+from autowsgr.image_resources import Templates
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     ImageChecker,
