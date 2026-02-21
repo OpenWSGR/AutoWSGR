@@ -93,8 +93,8 @@ CLICK_PANEL: dict[Panel, tuple[float, float]] = {
     Panel.EQUIPMENT:    (0.548, 0.793),
 }
 
-PAGE_SIGNATURE = unnamed_page = PixelSignature(
-    name="unnamed_page",
+PAGE_SIGNATURE = PixelSignature(
+    name=PageName.BATTLE_PREP,
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.0758, 0.7806, (46, 61, 80), tolerance=30.0),

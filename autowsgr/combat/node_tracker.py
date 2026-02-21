@@ -70,18 +70,7 @@ class MapNodeData:
 
     从 YAML 文件加载并转换为相对坐标。
 
-    支持两种 YAML 格式:
-
-    **旧格式** (纯坐标)::
-
-        A: !!python/tuple
-        - 757
-        - 288
-        B: !!python/tuple
-        - 682
-        - 101
-
-    **新格式** (含路由信息)::
+    **标准格式** (含路由信息)::
 
         "0":
           position: [200, 350]
@@ -234,7 +223,7 @@ class NodeTracker:
         """
         templates = get_template("ship_icon")
         detail: ImageMatchDetail | None = ImageChecker.find_any(
-            screen, templates, confidence=0.8,
+            screen, templates, confidence=0.7,
         )
         if detail is not None:
             self._ship_position = detail.center

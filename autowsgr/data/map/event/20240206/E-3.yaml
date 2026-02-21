@@ -1,42 +1,42 @@
-A: !!python/tuple
+A:
 - 112
 - 380
-B: !!python/tuple
+B:
 - 321
 - 111
-C: !!python/tuple
+C:
 - 285
 - 232
-D: !!python/tuple
+D:
 - 254
 - 472
-E: !!python/tuple
+E:
 - 262
 - 344
-F: !!python/tuple
+F:
 - 418
 - 324
-G: !!python/tuple
+G:
 - 479
 - 466
-H: !!python/tuple
+H:
 - 576
 - 324
-I: !!python/tuple
+I:
 - 545
 - 188
-J: !!python/tuple
+J:
 - 682
 - 103
-K: !!python/tuple
+K:
 - 710
 - 215
-L: !!python/tuple
+L:
 - 664
 - 492
-M: !!python/tuple
+M:
 - 886
 - 196
-N: !!python/tuple
+N:
 - 753
 - 388

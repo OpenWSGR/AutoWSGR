@@ -58,7 +58,7 @@ from autowsgr.ui import MapPage
 
 
 # ── 默认值 ──
-_DEFAULT_TIMES = 1
+_DEFAULT_TIMES = 5
 
 
 def _build_7_4_6ss_plan() -> CombatPlan:
