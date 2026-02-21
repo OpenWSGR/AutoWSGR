@@ -152,6 +152,13 @@ class CombatTemplates:
     )
     """演习结束后出现的演习页面。原 ``identify_images/exercise_page1.png``。"""
 
+    # ── 地图追踪 ──────────────────────────────────────────────────────────────
+    SHIP_ICON_1 = _LazyTemplate("combat/ship_icon_1.png", "ship_icon_1")
+    """地图上黄色小船图标 (样式1)。原 ``fight_image/7.PNG``。"""
+
+    SHIP_ICON_2 = _LazyTemplate("combat/ship_icon_2.png", "ship_icon_2")
+    """地图上黄色小船图标 (样式2)。原 ``fight_image/8.PNG``。"""
+
     # ── 战果评级 ──────────────────────────────────────────────────────────────
     class Result:
         """战果评级模板。"""
@@ -210,6 +217,10 @@ def _build_map() -> dict[str, list[ImageTemplate]]:
         "get_ship": [T.GET_SHIP],
         "get_item": [T.GET_ITEM],
         "get_ship_or_item": [T.GET_SHIP, T.GET_ITEM],
+        # 地图追踪
+        "ship_icon": [T.SHIP_ICON_1, T.SHIP_ICON_2],
+        "ship_icon_1": [T.SHIP_ICON_1],
+        "ship_icon_2": [T.SHIP_ICON_2],
         # 战斗终止态
         "end_map_page": [T.END_MAP_PAGE],
         "end_battle_page": [T.END_BATTLE_PAGE],

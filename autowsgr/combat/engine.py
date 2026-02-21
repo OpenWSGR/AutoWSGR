@@ -38,6 +38,7 @@ from autowsgr.combat.callbacks import CombatResult
 from autowsgr.combat.handlers import PhaseHandlersMixin
 from autowsgr.combat.history import CombatEvent, CombatHistory, EventType, FightResult
 from autowsgr.combat.image_resources import get_template
+from autowsgr.combat.node_tracker import MapNodeData, NodeTracker
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.combat.recognition import recognize_enemy_ships, recognize_enemy_formation
 from autowsgr.combat.recognizer import (
@@ -93,6 +94,9 @@ class CombatEngine(PhaseHandlersMixin):
         self._history = CombatHistory()
         self._node_count = 0
 
+        # 节点跟踪器 (仅常规战模式有效，由 fight() 初始化)
+        self._tracker: NodeTracker | None = None
+
         # 节点级临时状态
         self._formation_by_rule: Formation | None = None
 
@@ -127,6 +131,25 @@ class CombatEngine(PhaseHandlersMixin):
             self._make_image_matcher(),
         )
         self._reset()
+
+        # 常规战模式下加载地图节点数据并初始化节点追踪器
+        if plan.mode == CombatMode.NORMAL:
+            map_data = MapNodeData.load(plan.chapter, plan.map_id)
+            if map_data is not None:
+                self._tracker = NodeTracker(map_data)
+                logger.info(
+                    "节点追踪器已加载: {}-{} ({} 个节点)",
+                    plan.chapter, plan.map_id, len(map_data),
+                )
+            else:
+                self._tracker = None
+                logger.warning(
+                    "无法加载地图数据 {}-{}，节点追踪将不可用",
+                    plan.chapter, plan.map_id,
+                )
+        else:
+            self._tracker = None
+
         if initial_ship_stats is not None:
             self._ship_stats = initial_ship_stats[:]
 
@@ -148,6 +171,7 @@ class CombatEngine(PhaseHandlersMixin):
                 result.flag = ConditionFlag.SL
                 break
             elif decision == ConditionFlag.FIGHT_END:
+                logger.debug("战斗已结束，日志: {}", self._history)
                 result.flag = ConditionFlag.OPERATION_SUCCESS
                 break
 
@@ -172,6 +196,10 @@ class CombatEngine(PhaseHandlersMixin):
         self._enemies = {}
         self._enemy_formation = ""
         self._formation_by_rule = None
+
+        # 重置节点追踪器
+        if self._tracker is not None:
+            self._tracker.reset()
 
         if self._plan.mode == CombatMode.NORMAL:
             self._phase = CombatPhase.PROCEED
@@ -225,9 +253,17 @@ class CombatEngine(PhaseHandlersMixin):
                 CombatPhase.PROCEED,
                 CombatPhase.FIGHT_CONDITION,
             ) or self._last_action == "detour":
+                tracker = self._tracker
 
                 def _speed_up() -> None:
                     click_speed_up(self._device, battle_mode=False)
+                    # 在地图移动期间追踪船位并更新节点
+                    if tracker is not None:
+                        screen = self._device.screenshot()
+                        tracker.update_ship_position(screen)
+                        new_node = tracker.update_node()
+                        if new_node != self._node:
+                            self._node = new_node
 
                 return _speed_up
 
@@ -243,6 +279,18 @@ class CombatEngine(PhaseHandlersMixin):
 
     def _after_match(self, phase: CombatPhase) -> None:
         """匹配到状态后的信息收集。"""
+        # 当匹配到索敌/前进时，舰船已停在某个节点上，做最终节点校准
+        if phase in (
+            CombatPhase.SPOT_ENEMY_SUCCESS,
+            CombatPhase.FORMATION,
+            CombatPhase.FIGHT_CONDITION,
+        ) and self._tracker is not None:
+            screen = self._device.screenshot()
+            self._tracker.update_ship_position(screen)
+            new_node = self._tracker.update_node()
+            if new_node != self._node:
+                self._node = new_node
+
         if phase == CombatPhase.SPOT_ENEMY_SUCCESS:
             self._enemies = self._get_enemy_info()
             self._enemy_formation = self._get_enemy_formation()
