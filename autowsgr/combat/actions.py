@@ -1,7 +1,5 @@
 """战斗操作函数 — 封装所有战斗中的点击与检测操作。
 
-note. 该模块应该在测试 handlers.py 被测试
-
 包含:
   - 坐标常量 (Coords)
   - UI 点击操作 (click_*)
@@ -391,7 +389,6 @@ def detect_ship_stats(
     pre_battle_stats: list[ShipDamageState],
 ) -> list[ShipDamageState]:
     """战斗结算页检测我方舰队血量状态。
-    note. 已通过测试
     Parameters
     ----------
     device:

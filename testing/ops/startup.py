@@ -5,10 +5,10 @@
 用法::
 
     # 自动检测设备
-    python testing/interactive/restart_game_e2e.py
+    python testing/ops/startup.py
 
     # 指定设备 serial
-    python testing/interactive/restart_game_e2e.py 127.0.0.1:16384
+    python testing/ops/startup.py 127.0.0.1:16384
 
 可选参数::
 

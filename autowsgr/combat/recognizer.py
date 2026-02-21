@@ -153,9 +153,6 @@ class CombatRecognizer:
     - 超时控制
     - 匹配后延时
 
-    内部直接调用 :class:`~autowsgr.vision.ImageChecker` 进行模板匹配，
-    无需外部注入回调函数。
-
     Parameters
     ----------
     device:

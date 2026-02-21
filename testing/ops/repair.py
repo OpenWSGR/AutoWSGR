@@ -3,13 +3,13 @@
 运行方式::
 
     # 交互模式 (默认)
-    python testing/ops/repair/e2e.py
+    python testing/ops/repair.py
 
     # 自动执行
-    python testing/ops/repair/e2e.py --auto
+    python testing/ops/repair.py --auto
 
     # 指定设备
-    python testing/ops/repair/e2e.py emulator-5554 --auto --debug
+    python testing/ops/repair.py emulator-5554 --auto --debug
 
 前置条件：
     游戏位于 **任意已知页面** (主页面、地图页面等)，且存在待修理舰船
@@ -26,7 +26,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from autowsgr.infra import setup_logger
 from testing.ui._framework import UIControllerTestRunner, connect_device, info, parse_e2e_args, reset_to_main_page

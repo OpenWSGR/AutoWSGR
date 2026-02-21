@@ -3,13 +3,13 @@
 运行方式::
 
     # 交互模式 (默认)
-    python testing/ops/reward/e2e.py
+    python testing/ops/reward.py
 
     # 自动执行
-    python testing/ops/reward/e2e.py --auto
+    python testing/ops/reward.py --auto
 
     # 指定设备
-    python testing/ops/reward/e2e.py emulator-5554 --auto --debug
+    python testing/ops/reward.py emulator-5554 --auto --debug
 
 前置条件：
     游戏位于 **主页面** (母港/秘书舰界面)，且存在未领取的任务奖励
@@ -26,7 +26,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from autowsgr.infra import setup_logger
 from testing.ui._framework import UIControllerTestRunner, connect_device, ensure_page, info, parse_e2e_args, reset_to_main_page

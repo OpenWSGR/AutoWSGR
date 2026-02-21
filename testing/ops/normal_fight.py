@@ -5,13 +5,13 @@
 用法::
 
     # 自动检测设备，默认 1 次
-    python testing/interactive/normal_fight.py
+    python testing/ops/normal_fight.py
 
     # 指定设备 serial 和次数
-    python testing/interactive/normal_fight.py 127.0.0.1:16384 3
+    python testing/ops/normal_fight.py 127.0.0.1:16384 3
 
     # 使用自定义 YAML 计划
-    python testing/interactive/normal_fight.py --plan examples/plans/normal_fight/7-46SS-all.yaml
+    python testing/ops/normal_fight.py --plan examples/plans/normal_fight/7-46SS-all.yaml
 
 可选参数::
 

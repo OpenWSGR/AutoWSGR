@@ -5,16 +5,16 @@
 用法::
 
     # 自动检测设备，困难驱逐 ×1
-    python testing/interactive/campaign.py
+    python testing/ops/campaign.py
 
     # 指定设备 serial
-    python testing/interactive/campaign.py 127.0.0.1:16384
+    python testing/ops/campaign.py 127.0.0.1:16384
 
     # 指定战役名和次数（serial 留空用自动检测）
-    python testing/interactive/campaign.py "" 困难航母 3
+    python testing/ops/campaign.py "" 困难航母 3
 
     # 全参数
-    python testing/interactive/campaign.py 127.0.0.1:16384 简单驱逐 2
+    python testing/ops/campaign.py 127.0.0.1:16384 简单驱逐 2
 
 可选参数::
 
