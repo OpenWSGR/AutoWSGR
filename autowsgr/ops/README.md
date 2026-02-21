@@ -62,7 +62,7 @@ python testing/ops/campaign.py "" 简单驱逐 2
 
 ```bash
 python testing/ops/expedition.py
-python testing/ops/expedition.py 127.0.0.1:16384 --auto
+python testing/ops/expedition.py 127.0.0.1:16384
 ```
 
 ### decisive 测试 ❌
@@ -79,23 +79,36 @@ python testing/ops/expedition.py 127.0.0.1:16384 --auto
 
 ### build 测试 ❌
 
-未做
+```bash
+python testing/ops/build.py
+python testing/ops/build.py 127.0.0.1:16384
+```
 
 ### repair 测试 ❌
 
-未做
+```bash
+python testing/ops/repair.py
+python testing/ops/repair.py 127.0.0.1:16384
+```
 
 ### destroy 测试 ❌
 
-未做
+```bash
+python testing/ops/destroy.py
+python testing/ops/destroy.py 127.0.0.1:16384
+```
 
 ### cook 测试 ❌
 
-未做
+```bash
+python testing/ops/cook.py
+python testing/ops/cook.py 127.0.0.1:16384
+```
 
 ### reward 测试 ✅
 
 ```bash
 python testing/ops/reward.py
+python testing/ops/reward.py 127.0.0.1:16384
 python testing/ops/reward.py 127.0.0.1:16384 --auto
 ```
