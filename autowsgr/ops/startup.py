@@ -1,5 +1,8 @@
 """游戏启动与初始化操作。
 
+note. 已通过测试
+TODO: 处理游戏更新提示
+
 提供从零开始到稳定运行于主页面的完整启动流程：
 
 1. 检测游戏是否在前台运行
@@ -29,8 +32,8 @@ from loguru import logger
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import GameAPP, PageName
 from autowsgr.ui.main_page import MainPage
-from autowsgr.ui.overlay import OverlayType, detect_overlay, dismiss_overlay
-from autowsgr.vision import MatchStrategy, PixelChecker, PixelRule, PixelSignature
+from autowsgr.ui.overlay import detect_overlay, dismiss_overlay
+from autowsgr.ui.start_screen_page import StartScreenPage
 
 if TYPE_CHECKING:
     from autowsgr.emulator import AndroidController
@@ -54,37 +57,6 @@ _OVERLAY_DISMISS_TIMEOUT: float = 10.0
 
 _OVERLAY_DISMISS_DELAY: float = 1.0
 """消除浮层后的等待时间 (秒)。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 启动画面签名
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# 游戏加载完成后会出现「点击进入」画面，特征为底部横幅区域偏暖黄色调。
-# TODO 这个特征不对
-
-SIG_START_SCREEN = PixelSignature(
-    name="game_start_screen",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.7531, 0.5403, (237, 223, 101), tolerance=30.0),
-        PixelRule.of(0.7539, 0.5514, (236, 220, 107), tolerance=30.0),
-        PixelRule.of(0.8320, 0.5444, (244, 232, 114), tolerance=30.0),
-        PixelRule.of(0.8320, 0.5528, (245, 230, 113), tolerance=30.0),
-        PixelRule.of(0.7828, 0.5403, (241, 215, 96), tolerance=30.0),
-        PixelRule.of(0.7844, 0.5556, (239, 227, 119), tolerance=30.0),
-        PixelRule.of(0.8016, 0.5403, (243, 230, 115), tolerance=30.0),
-        PixelRule.of(0.8039, 0.5556, (237, 229, 122), tolerance=30.0),
-        PixelRule.of(0.8195, 0.5389, (244, 231, 116), tolerance=30.0),
-        PixelRule.of(0.8219, 0.5528, (239, 222, 108), tolerance=30.0),
-        PixelRule.of(0.7719, 0.5403, (239, 219, 98), tolerance=30.0),
-        PixelRule.of(0.7719, 0.5500, (236, 222, 100), tolerance=30.0),
-    ],
-)
-# 游戏「点击进入」启动画面像素签名。
-
-#: 「点击进入」画面点击目标（屏幕中央）
-_CLICK_START_SCREEN: tuple[float, float] = (0.5, 0.5)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -131,26 +103,6 @@ def is_on_main_page(ctrl: AndroidController) -> bool:
     return result
 
 
-def is_on_start_screen(ctrl: AndroidController) -> bool:
-    """截图并检测当前是否在游戏「点击进入」启动画面。
-
-    .. note::
-        依赖 :data:`SIG_START_SCREEN` 签名，需先校准。
-
-    Parameters
-    ----------
-    ctrl:
-        Android 设备控制器。
-
-    Returns
-    -------
-    bool
-        ``True`` 表示当前在启动画面。
-    """
-    screen = ctrl.screenshot()
-    return PixelChecker.check_signature(screen, SIG_START_SCREEN).matched
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 浮层处理
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -193,24 +145,6 @@ def dismiss_login_overlays(
     logger.warning("[Startup] 浮层消除超时 ({:.0f}s)，继续执行", timeout)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 启动画面处理
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def click_start_screen(ctrl: AndroidController) -> None:
-    """点击「点击进入」启动画面，进入游戏。
-
-    Parameters
-    ----------
-    ctrl:
-        Android 设备控制器。
-    """
-    logger.info("[Startup] 点击启动画面，进入游戏")
-    ctrl.click(*_CLICK_START_SCREEN)
-    time.sleep(2.0)
-
-
 def wait_for_game_ui(
     ctrl: AndroidController,
     *,
@@ -243,13 +177,8 @@ def wait_for_game_ui(
     while time.monotonic() < deadline:
         screen = ctrl.screenshot()
 
-        # 已到达某个游戏页面
-        if get_current_page(screen) is not None:
-            logger.info("[Startup] 已识别到游戏页面")
-            return True
-
         # 出现「点击进入」画面
-        if PixelChecker.check_signature(screen, SIG_START_SCREEN).matched:
+        if StartScreenPage.is_current_page(screen):
             logger.info("[Startup] 检测到启动画面")
             return True
 
@@ -304,10 +233,9 @@ def start_game(
     if not wait_for_game_ui(ctrl, timeout=startup_timeout):
         raise TimeoutError(f"游戏启动超时 ({startup_timeout}s)，未检测到任何已知页面")
 
-    # 若在启动画面，点击进入
-    if is_on_start_screen(ctrl):
-        click_start_screen(ctrl)
-        # 再等待一次，进入游戏主流程
+    # 若在启动画面，点击进入，然后等待进入主流程（检测登录浮层）
+    if StartScreenPage.is_current_page(ctrl.screenshot()):
+        StartScreenPage(ctrl).click_enter()
         if not wait_for_game_ui(ctrl, timeout=30.0):
             raise TimeoutError("点击启动画面后超时，未进入游戏")
 

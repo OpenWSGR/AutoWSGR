@@ -21,7 +21,7 @@ from loguru import logger
 from autowsgr.combat.callbacks import CombatResult
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode
+from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, RepairStrategy
 from autowsgr.ui import MapPage
 
@@ -182,7 +182,7 @@ class CampaignRunner:
 
     # ── 出征准备 ──
 
-    def _prepare_for_battle(self) -> list[int]:
+    def _prepare_for_battle(self) -> list[ShipDamageState]:
         """出征准备: 修理、出征。
 
         Returns
@@ -202,7 +202,7 @@ class CampaignRunner:
         # 检测战前血量
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
-        ship_stats = [0] + [damage.get(i, 0) for i in range(1, 7)]
+        ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
 
         # 出征
         page.start_battle()
@@ -212,7 +212,7 @@ class CampaignRunner:
 
     # ── 战斗 ──
 
-    def _do_combat(self, ship_stats: list[int]) -> CombatResult:
+    def _do_combat(self, ship_stats: list[ShipDamageState]) -> CombatResult:
         """构建 CombatPlan 并执行战斗。"""
         plan = CombatPlan(
             name=f"战役-{self._campaign_name}",

@@ -27,7 +27,7 @@ from autowsgr.emulator import AndroidController
 from autowsgr.infra import DecisiveConfig
 from autowsgr.ops.decisive._logic import DecisiveLogic
 from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
-from autowsgr.types import Formation
+from autowsgr.types import Formation, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.decisive import DecisiveMapController, DecisiveOverlay
 from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
@@ -293,7 +293,7 @@ class DecisiveController:
         # 检测战前血量
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
-        self._state.ship_stats = [0] + [damage.get(i, 0) for i in range(1, 7)]
+        self._state.ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
 
         # 出征
         page.start_battle()

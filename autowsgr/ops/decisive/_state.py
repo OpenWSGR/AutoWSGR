@@ -5,6 +5,8 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass, field
 
+from autowsgr.types import ShipDamageState
+
 
 class DecisivePhase(enum.Enum):
     """决战过程的宏观阶段。
@@ -84,7 +86,7 @@ class DecisiveState:
     fleet:
         当前编队舰船列表 (索引 0 留空, 1–6 为位置)。
     ship_stats:
-        舰船血量状态 (0=正常, 1=中破, 2=大破, -1=无船)。
+        舰船血量状态。
     """
 
     chapter: int = 6
@@ -94,7 +96,7 @@ class DecisiveState:
     score: int = 10
     ships: set[str] = field(default_factory=set)
     fleet: list[str] = field(default_factory=lambda: [""] * 7)
-    ship_stats: list[int] = field(default_factory=lambda: [-1] * 7)
+    ship_stats: list[ShipDamageState] = field(default_factory=lambda: [ShipDamageState.NO_SHIP] * 6)
 
     def reset(self) -> None:
         """重置状态 (保留 chapter)。"""

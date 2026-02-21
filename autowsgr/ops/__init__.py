@@ -82,9 +82,6 @@ from autowsgr.ops.normal_fight import (
 # ── 战役 ──
 from autowsgr.ops.campaign import CampaignRunner
 
-# ── 简易战斗接口 ──
-from autowsgr.ops.fight import run_fight, run_fight_n
-
 
 __all__ = [
     # 启动
@@ -124,7 +121,4 @@ __all__ = [
     "run_normal_fight_from_yaml",
     # 战役
     "CampaignRunner",
-    # 简易战斗接口
-    "run_fight",
-    "run_fight_n",
 ]

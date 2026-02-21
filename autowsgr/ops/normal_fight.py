@@ -8,24 +8,16 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from autowsgr.combat.callbacks import CombatResult
-from autowsgr.combat.engine import CombatEngine, run_combat
-from autowsgr.combat.plan import CombatMode, CombatPlan
-from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, PageName, RepairMode
-from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.ui.map.page import MapPage
-
-if TYPE_CHECKING:
-    from autowsgr.combat.recognizer import ImageMatcherFunc
-    from autowsgr.emulator import AndroidController
-    from autowsgr.vision import OCREngine
-
+from autowsgr.combat import CombatResult, CombatMode, CombatPlan
+from autowsgr.combat.engine import run_combat
+from autowsgr.ops import goto_page
+from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
+from autowsgr.ui import BattlePreparationPage, RepairStrategy, MapPage
+from autowsgr.emulator import AndroidController
+from autowsgr.vision import EasyOCREngine
 
 class NormalFightRunner:
     """常规战斗执行器。"""
@@ -34,13 +26,9 @@ class NormalFightRunner:
         self,
         ctrl: AndroidController,
         plan: CombatPlan,
-        image_matcher: ImageMatcherFunc,
-        *,
-        ocr: OCREngine | None = None,
     ) -> None:
         self._ctrl = ctrl
         self._plan = plan
-        self._ocr = ocr
 
         # 确保 plan 模式是 NORMAL
         if plan.mode != CombatMode.NORMAL:
@@ -50,8 +38,6 @@ class NormalFightRunner:
             )
             plan.mode = CombatMode.NORMAL
 
-        # 战斗引擎回调
-        self._image_matcher = image_matcher
         self._results: list[CombatResult] = []
 
     # ── 公共接口 ──
@@ -135,12 +121,12 @@ class NormalFightRunner:
     def _enter_fight(self) -> None:
         """导航到目标地图并进入。"""
         goto_page(self._ctrl, PageName.MAP)
-        map_page = MapPage(self._ctrl, self._ocr)
+        map_page = MapPage(self._ctrl, EasyOCREngine.create())
         map_page.enter_sortie(self._plan.chapter, self._plan.map_id)
 
     # ── 出征准备 ──
 
-    def _prepare_for_battle(self) -> list[int]:
+    def _prepare_for_battle(self) -> list[ShipDamageState]:
         """出征准备: 舰队选择、修理、检测血量。
 
         Returns
@@ -149,7 +135,7 @@ class NormalFightRunner:
             战前血量状态。
         """
         time.sleep(1.0)
-        page = BattlePreparationPage(self._ctrl)
+        page = BattlePreparationPage(self._ctrl, EasyOCREngine.create())
 
         # 选择舰队
         page.select_fleet(self._plan.fleet_id)
@@ -160,7 +146,6 @@ class NormalFightRunner:
             page.change_fleet(
                 self._plan.fleet_id,
                 self._plan.fleet,
-                ocr=self._ocr,
             )
             time.sleep(0.5)
 
@@ -183,7 +168,9 @@ class NormalFightRunner:
         # 检测战前血量
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
-        ship_stats = [0] + [damage.get(i, 0) for i in range(1, 7)]
+        ship_stats = [
+            damage.get(i, ShipDamageState.NORMAL) for i in range(6)
+        ]
 
         # 出征
         page.start_battle()
@@ -193,12 +180,11 @@ class NormalFightRunner:
 
     # ── 战斗 ──
 
-    def _do_combat(self, ship_stats: list[int]) -> CombatResult:
+    def _do_combat(self, ship_stats: list[ShipDamageState]) -> CombatResult:
         """构建 CombatEngine 并执行战斗。"""
         return run_combat(
             self._ctrl,
             self._plan,
-            self._image_matcher,
             ship_stats=ship_stats,
         )
 
@@ -217,16 +203,13 @@ class NormalFightRunner:
 def run_normal_fight(
     ctrl: AndroidController,
     plan: CombatPlan,
-    image_matcher: ImageMatcherFunc,
     *,
     times: int = 1,
     gap: float = 0.0,
-    ocr: OCREngine | None = None,
 ) -> list[CombatResult]:
     """执行常规战的便捷函数。"""
     runner = NormalFightRunner(
-        ctrl, plan, image_matcher,
-        ocr=ocr,
+        ctrl, plan,
     )
     return runner.run_for_times(times, gap=gap)
 
@@ -234,11 +217,10 @@ def run_normal_fight(
 def run_normal_fight_from_yaml(
     ctrl: AndroidController,
     yaml_path: str,
-    image_matcher: ImageMatcherFunc,
     *,
     times: int = 1,
     **kwargs,
 ) -> list[CombatResult]:
     """从 YAML 文件加载计划并执行常规战。"""
     plan = CombatPlan.from_yaml(yaml_path)
-    return run_normal_fight(ctrl, plan, image_matcher, times=times, **kwargs)
+    return run_normal_fight(ctrl, plan, times=times, **kwargs)

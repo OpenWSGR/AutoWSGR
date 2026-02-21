@@ -23,7 +23,6 @@ from autowsgr.ui.map.page import MapPage
 from autowsgr.ui.map.data import MapPanel
 
 if TYPE_CHECKING:
-    from autowsgr.combat.recognizer import ImageMatcherFunc
     from autowsgr.emulator import AndroidController
 
 
@@ -39,13 +38,9 @@ class ExerciseRunner:
         self,
         ctrl: AndroidController,
         config: ExerciseConfig,
-        image_matcher: ImageMatcherFunc | None = None,
     ) -> None:
         self._ctrl = ctrl
         self._config = config
-        if image_matcher is None:
-            raise ValueError("必须提供 image_matcher")
-        self._image_matcher = image_matcher
         self._results: list[CombatResult] = []
 
     # ── 公共接口 ──
@@ -148,18 +143,15 @@ class ExerciseRunner:
         return run_combat(
             self._ctrl,
             plan,
-            self._image_matcher,
         )
 
 
 def run_exercise(
     ctrl: AndroidController,
     config: ExerciseConfig | None = None,
-    *,
-    image_matcher: ImageMatcherFunc | None = None,
 ) -> list[CombatResult]:
     """执行演习的便捷函数。"""
     if config is None:
         config = ExerciseConfig()
-    runner = ExerciseRunner(ctrl, config, image_matcher)
+    runner = ExerciseRunner(ctrl, config)
     return runner.run()
