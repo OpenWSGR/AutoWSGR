@@ -1,26 +1,11 @@
 """敌方编成识别 — DLL 舰类识别 + OCR 阵型识别。
 
-整合 C++ DLL（``ApiDll``）和 OCR 引擎，提供完整的敌方情报识别能力，
-替代旧代码中分散在 ``get_game_info.py`` 的逻辑。
-
-主要功能:
+包含核心识别函数:
 
 - :func:`recognize_enemy_ships` — 6 张缩略图 → DLL → 舰类计数
 - :func:`recognize_enemy_formation` — OCR 识别阵型文字
-- :func:`make_enemy_callbacks` — 工厂函数，生成可直接注入 ``CombatEngine`` 的回调
 
-使用方式::
-
-    from autowsgr.combat.recognition import make_enemy_callbacks
-
-    get_info, get_formation = make_enemy_callbacks(ctrl, ocr)
-    engine = CombatEngine(
-        device=ctrl,
-        plan=plan,
-        image_matcher=matcher,
-        get_enemy_info=get_info,
-        get_enemy_formation=get_formation,
-    )
+这些函数由 :mod:`~autowsgr.combat.actions` 中的高级接口调用。
 """
 
 from __future__ import annotations
@@ -31,7 +16,6 @@ import numpy as np
 from loguru import logger
 from PIL import Image
 
-from autowsgr.combat.callbacks import GetEnemyFormationFunc, GetEnemyInfoFunc
 from autowsgr.vision import ApiDll, get_api_dll, ROI
 
 if TYPE_CHECKING:
@@ -209,56 +193,3 @@ def recognize_enemy_formation(
 # 回调工厂
 # ═══════════════════════════════════════════════════════════════════════════════
 
-
-def make_enemy_callbacks(
-    ctrl: AndroidController,
-    ocr: OCREngine | None = None,
-    *,
-    mode: str = "fight",
-    dll: ApiDll | None = None,
-) -> tuple[GetEnemyInfoFunc, GetEnemyFormationFunc]:
-    """创建可注入 ``CombatEngine`` 的敌方识别回调。
-
-    返回的回调在被调用时自动截图并执行识别。
-
-    Parameters
-    ----------
-    ctrl:
-        设备控制器（提供截图能力）。
-    ocr:
-        OCR 引擎（阵型识别用，为 None 则跳过阵型识别）。
-    mode:
-        识别模式，传给 :func:`recognize_enemy_ships`。
-    dll:
-        DLL 实例。
-
-    Returns
-    -------
-    tuple[GetEnemyInfoFunc, GetEnemyFormationFunc]
-        ``(get_enemy_info, get_enemy_formation)`` 回调二元组。
-
-    Examples
-    --------
-    ::
-
-        get_info, get_formation = make_enemy_callbacks(ctrl, ocr)
-        result = run_combat(
-            ctrl, plan, matcher,
-            get_enemy_info=get_info,
-            get_enemy_formation=get_formation,
-        )
-    """
-    if dll is None:
-        dll = get_api_dll()
-
-    def get_enemy_info() -> dict[str, int]:
-        screen = ctrl.screenshot()
-        return recognize_enemy_ships(screen, mode=mode, dll=dll)
-
-    def get_enemy_formation() -> str:
-        if ocr is None:
-            return ""
-        screen = ctrl.screenshot()
-        return recognize_enemy_formation(screen, ocr)
-
-    return get_enemy_info, get_enemy_formation

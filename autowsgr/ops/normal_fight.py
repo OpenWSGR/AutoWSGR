@@ -16,22 +16,12 @@ from loguru import logger
 from autowsgr.combat.callbacks import CombatResult
 from autowsgr.combat.engine import CombatEngine, run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan
-from autowsgr.combat.recognition import make_enemy_callbacks
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.map.page import MapPage
 
 if TYPE_CHECKING:
-    from autowsgr.combat.callbacks import (
-        ClickImageFunc,
-        DetectResultGradeFunc,
-        DetectShipStatsFunc,
-        GetEnemyFormationFunc,
-        GetEnemyInfoFunc,
-        GetShipDropFunc,
-        ImageExistFunc,
-    )
     from autowsgr.combat.recognizer import ImageMatcherFunc
     from autowsgr.emulator import AndroidController
     from autowsgr.vision import OCREngine
@@ -47,13 +37,6 @@ class NormalFightRunner:
         image_matcher: ImageMatcherFunc,
         *,
         ocr: OCREngine | None = None,
-        get_enemy_info: GetEnemyInfoFunc | None = None,
-        get_enemy_formation: GetEnemyFormationFunc | None = None,
-        detect_ship_stats: DetectShipStatsFunc | None = None,
-        detect_result_grade: DetectResultGradeFunc | None = None,
-        get_ship_drop: GetShipDropFunc | None = None,
-        image_exist: ImageExistFunc | None = None,
-        click_image: ClickImageFunc | None = None,
     ) -> None:
         self._ctrl = ctrl
         self._plan = plan
@@ -69,24 +52,6 @@ class NormalFightRunner:
 
         # 战斗引擎回调
         self._image_matcher = image_matcher
-
-        # 若未提供敌方识别回调, 自动用 DLL + OCR 创建
-        if get_enemy_info is None and get_enemy_formation is None:
-            auto_info, auto_formation = make_enemy_callbacks(
-                ctrl, ocr, mode="fight",
-            )
-            self._get_enemy_info = auto_info
-            self._get_enemy_formation = auto_formation
-        else:
-            self._get_enemy_info = get_enemy_info
-            self._get_enemy_formation = get_enemy_formation
-
-        self._detect_ship_stats = detect_ship_stats
-        self._detect_result_grade = detect_result_grade
-        self._get_ship_drop = get_ship_drop
-        self._image_exist = image_exist
-        self._click_image = click_image
-
         self._results: list[CombatResult] = []
 
     # ── 公共接口 ──
@@ -235,13 +200,6 @@ class NormalFightRunner:
             self._plan,
             self._image_matcher,
             ship_stats=ship_stats,
-            get_enemy_info=self._get_enemy_info,
-            get_enemy_formation=self._get_enemy_formation,
-            detect_ship_stats=self._detect_ship_stats,
-            detect_result_grade=self._detect_result_grade,
-            get_ship_drop=self._get_ship_drop,
-            image_exist=self._image_exist,
-            click_image=self._click_image,
         )
 
     # ── 结果处理 ──
@@ -264,25 +222,11 @@ def run_normal_fight(
     times: int = 1,
     gap: float = 0.0,
     ocr: OCREngine | None = None,
-    get_enemy_info: GetEnemyInfoFunc | None = None,
-    get_enemy_formation: GetEnemyFormationFunc | None = None,
-    detect_ship_stats: DetectShipStatsFunc | None = None,
-    detect_result_grade: DetectResultGradeFunc | None = None,
-    get_ship_drop: GetShipDropFunc | None = None,
-    image_exist: ImageExistFunc | None = None,
-    click_image: ClickImageFunc | None = None,
 ) -> list[CombatResult]:
     """执行常规战的便捷函数。"""
     runner = NormalFightRunner(
         ctrl, plan, image_matcher,
         ocr=ocr,
-        get_enemy_info=get_enemy_info,
-        get_enemy_formation=get_enemy_formation,
-        detect_ship_stats=detect_ship_stats,
-        detect_result_grade=detect_result_grade,
-        get_ship_drop=get_ship_drop,
-        image_exist=image_exist,
-        click_image=click_image,
     )
     return runner.run_for_times(times, gap=gap)
 

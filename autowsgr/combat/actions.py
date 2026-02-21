@@ -1,15 +1,26 @@
 """战斗操作函数 — 封装所有战斗中的点击与检测操作。
 
-这个文件中的函数应该在测试 handlers 中被测试
+包含:
+  - 坐标常量 (Coords)
+  - UI 点击操作 (click_*)
+  - 血量检测辅助 (check_blood)
+  - 图像检查与识别 (image_exist, click_image, get_ship_drop)
 
+所有函数为无状态的纯操作，接收必要的对象参数后直接作用。
 """
 
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
+
+from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.types import FightCondition, Formation
+
+if TYPE_CHECKING:
+    from autowsgr.vision import ImageChecker
 
 
 
@@ -204,3 +215,225 @@ def check_blood(ship_stats: list[int], proceed_stop: int | list[int]) -> bool:
         if stat >= rule:
             return False
     return True
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 图像检查与识别函数（接收 device 和 template_key，内部完成匹配）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def image_exist(device: AndroidController, template_key: str, confidence: float) -> bool:
+    """检查模板是否存在于当前截图中。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+    template_key:
+        模板标识符。
+    confidence:
+        匹配置信度 (0.0-1.0)。
+
+    Returns
+    -------
+    bool
+        ``True`` = 模板存在，``False`` = 不存在。
+    """
+    from autowsgr.combat.image_resources import get_template
+    from autowsgr.vision import ImageChecker
+
+    screen = device.screenshot()
+    templates = get_template(template_key)
+    return ImageChecker.find_any(screen, templates, confidence=confidence) is not None
+
+
+def click_image(device: AndroidController, template_key: str, timeout: float) -> bool:
+    """等待并点击模板图像中心。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+    template_key:
+        模板标识符。
+    timeout:
+        最大等待时间（秒）。
+
+    Returns
+    -------
+    bool
+        ``True`` = 成功点击，``False`` = 超时未找到。
+    """
+    from autowsgr.combat.image_resources import get_template
+    from autowsgr.vision import ImageChecker
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        screen = device.screenshot()
+        templates = get_template(template_key)
+        detail = ImageChecker.find_any(screen, templates, confidence=0.8)
+        if detail is not None:
+            device.click(*detail.center)
+            return True
+        time.sleep(0.3)
+    return False
+
+
+def get_ship_drop(device: AndroidController) -> str | None:
+    """获取掉落舰船名称。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+
+    Returns
+    -------
+    str | None
+        掉落的舰船名称，或 ``None`` 如果未获取到。
+    """
+    # TODO: OCR 实现获取掉落舰船名
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 敌方识别函数
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def get_enemy_info(device: AndroidController, mode: str = "fight") -> dict[str, int]:
+    """识别敌方舰类编成。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+    mode:
+        战斗模式 (``"fight"`` 或 ``"exercise"``)。
+
+    Returns
+    -------
+    dict[str, int]
+        敌方编成信息，如 ``{"BB": 2, "CV": 1, ...}``。
+    """
+    from autowsgr.combat.recognition import recognize_enemy_ships
+
+    screen = device.screenshot()
+    return recognize_enemy_ships(screen, mode=mode)
+
+
+def get_enemy_formation(device: AndroidController, ocr_engine) -> str:
+    """OCR 识别敌方阵型。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+    ocr_engine:
+        OCR 引擎实例（可为 ``None``）。
+
+    Returns
+    -------
+    str
+        敌方阵型名称，如 ``"单纵阵"``；若无 OCR 引擎则返回空字符串。
+    """
+    from autowsgr.combat.recognition import recognize_enemy_formation
+
+    if ocr_engine is None:
+        return ""
+    screen = device.screenshot()
+    return recognize_enemy_formation(screen, ocr_engine)
+
+
+def detect_result_grade(device: AndroidController) -> str:
+    """从战果结算截图识别评级 (SS/S/A/B/C/D)。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+
+    Returns
+    -------
+    str
+        战果等级。
+
+    Raises
+    ------
+    CombatRecognitionTimeout
+        无法识别到有效的等级。
+    """
+    from autowsgr.combat.image_resources import get_template
+    from autowsgr.combat.recognizer import RESULT_GRADE_TEMPLATES, CombatRecognitionTimeout
+    from autowsgr.vision import ImageChecker
+
+    retry = 0
+    while retry < 5:
+        screen = device.screenshot()
+        for grade, key in RESULT_GRADE_TEMPLATES.items():
+            templates = get_template(key)
+            if ImageChecker.find_any(screen, templates, confidence=0.8) is not None:
+                return grade
+        time.sleep(0.25)
+        retry += 1
+    raise CombatRecognitionTimeout("战果等级识别超时: 5 次尝试未识别到有效等级")
+
+
+def detect_ship_stats(device: AndroidController, mode: str, current_stats: list[int] | None = None) -> list[int]:
+    """检测我方舰队血量状态。
+
+    Parameters
+    ----------
+    device:
+        设备控制器。
+    mode:
+        检测模式：
+        - ``"prepare"`` 过时（返回空列表）
+        - ``"sumup"`` 战斗结算页检测（像素颜色匹配）
+    current_stats:
+        当前血量状态（仅在模式为 ``"prepare"`` 时使用回退）。
+
+    Returns
+    -------
+    list[int]
+        长度 7 的列表（索引 0 占位），值含义：
+        0=绿血, 1=黄血, 2=红血, 3=维修中, -1=空位。
+    """
+    from autowsgr.ui.battle.constants import (
+        BLOOD_TOLERANCE,
+        RESULT_BLOOD_BAR_PROBE,
+        RESULT_BLOOD_GREEN,
+        RESULT_BLOOD_RED,
+        RESULT_BLOOD_YELLOW,
+    )
+    from autowsgr.vision import PixelChecker
+
+    if mode != "sumup":
+        return current_stats[:] if current_stats else [0] * 7
+
+    screen = device.screenshot()
+    result = [0] * 7  # index 0 占位
+
+    for slot, (x, y) in RESULT_BLOOD_BAR_PROBE.items():
+        pixel = PixelChecker.get_pixel(screen, x, y)
+
+        # 结算页只有绿/黄/红三种状态 (无空位/维修中)
+        if pixel.near(RESULT_BLOOD_GREEN, BLOOD_TOLERANCE):
+            result[slot] = 0
+        elif pixel.near(RESULT_BLOOD_YELLOW, BLOOD_TOLERANCE):
+            result[slot] = 1
+        elif pixel.near(RESULT_BLOOD_RED, BLOOD_TOLERANCE):
+            result[slot] = 2
+        else:
+            # 未匹配时使用战前状态回退
+            if current_stats and slot < len(current_stats):
+                result[slot] = current_stats[slot]
+            else:
+                result[slot] = 0
+            logger.debug(
+                "结算页舰船 {} 血量颜色未匹配，使用战前值: {}",
+                slot, result[slot],
+            )
+
+    logger.info("结算页血量检测: {}", result[1:])
+    return result

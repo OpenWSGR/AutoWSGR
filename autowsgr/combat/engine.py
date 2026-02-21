@@ -33,11 +33,17 @@ from typing import TYPE_CHECKING, Callable
 
 from loguru import logger
 
-from autowsgr.combat.actions import click_speed_up, click_start_march
+from autowsgr.combat.actions import (
+    click_speed_up,
+    click_start_march,
+    detect_result_grade,
+    detect_ship_stats,
+    get_enemy_formation,
+    get_enemy_info,
+)
 from autowsgr.combat.callbacks import CombatResult
 from autowsgr.combat.handlers import PhaseHandlersMixin
 from autowsgr.combat.history import CombatEvent, CombatHistory, EventType, FightResult
-from autowsgr.combat.image_resources import get_template
 from autowsgr.combat.node_tracker import MapNodeData, NodeTracker
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.combat.recognition import recognize_enemy_ships, recognize_enemy_formation
@@ -48,7 +54,6 @@ from autowsgr.combat.recognizer import (
 )
 from autowsgr.combat.state import CombatPhase, resolve_successors
 from autowsgr.types import ConditionFlag, Formation
-from autowsgr.vision import ImageChecker
 
 if TYPE_CHECKING:
     from autowsgr.emulator.controller import AndroidController
@@ -292,13 +297,13 @@ class CombatEngine(PhaseHandlersMixin):
                 self._node = new_node
 
         if phase == CombatPhase.SPOT_ENEMY_SUCCESS:
-            self._enemies = self._get_enemy_info()
-            self._enemy_formation = self._get_enemy_formation()
+            self._enemies = get_enemy_info(self._device, mode="exercise" if self._plan.mode == CombatMode.EXERCISE else "fight")
+            self._enemy_formation = get_enemy_formation(self._device, self._ocr)
             logger.info("敌方编成: {} 阵型: {}", self._enemies, self._enemy_formation)
 
         elif phase == CombatPhase.RESULT:
-            grade = self._detect_result_grade()
-            self._ship_stats = self._detect_ship_stats("sumup")
+            grade = detect_result_grade(self._device)
+            self._ship_stats = detect_ship_stats(self._device, "sumup", self._ship_stats)
             fight_result = FightResult(grade=grade, ship_stats=self._ship_stats[:])
             self._history.add(CombatEvent(
                 event_type=EventType.RESULT,
@@ -342,116 +347,12 @@ class CombatEngine(PhaseHandlersMixin):
         """战斗历史。"""
         return self._history
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # 自包含识别能力 — 参考旧代码 Timer 内置方法
-    # ═══════════════════════════════════════════════════════════════════════════
-
     def _make_image_matcher(self):
         """构建给 CombatRecognizer 用的 image_matcher 回调。"""
         from autowsgr.combat.image_resources import resolve_image_matcher
+        from autowsgr.vision import ImageChecker
 
         return resolve_image_matcher(ImageChecker.find_any)
-
-    def _image_exist(self, template_key: str, confidence: float) -> bool:
-        """检查模板是否存在于当前截图中（等价旧代码 ``timer.image_exist``）。"""
-        screen = self._device.screenshot()
-        templates = get_template(template_key)
-        return ImageChecker.find_any(screen, templates, confidence=confidence) is not None
-
-    def _click_image(self, template_key: str, timeout: float) -> bool:
-        """等待并点击模板图像中心（等价旧代码 ``timer.click_image``）。"""
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            screen = self._device.screenshot()
-            templates = get_template(template_key)
-            detail = ImageChecker.find_any(screen, templates, confidence=0.8)
-            if detail is not None:
-                self._device.click(*detail.center)
-                return True
-            time.sleep(0.3)
-        return False
-
-    def _get_enemy_info(self) -> dict[str, int]:
-        """识别敌方舰类编成（等价旧代码 ``get_enemy_condition``）。"""
-        screen = self._device.screenshot()
-        mode = "exercise" if self._plan and self._plan.mode == CombatMode.EXERCISE else "fight"
-        return recognize_enemy_ships(screen, mode=mode)
-
-    def _get_enemy_formation(self) -> str:
-        """OCR 识别敌方阵型（等价旧代码 ``get_enemy_formation``）。"""
-        if self._ocr is None:
-            return ""
-        screen = self._device.screenshot()
-        return recognize_enemy_formation(screen, self._ocr)
-
-    def _detect_result_grade(self) -> str:
-        """从战果结算截图识别评级 (SS/S/A/B/C/D)。"""
-        while retry := 0 < 5:
-            screen = self._device.screenshot()
-            for grade, key in RESULT_GRADE_TEMPLATES.items():
-                templates = get_template(key)
-                if ImageChecker.find_any(screen, templates, confidence=0.8) is not None:
-                    return grade
-            time.sleep(0.25)
-            retry += 1
-        raise CombatRecognitionTimeout("战果等级识别超时: 5 次尝试未识别到有效等级")
-
-    def _detect_ship_stats(self, mode: str) -> list[int]:
-        """检测我方舰队血量状态。
-
-        Parameters
-        TODO: 空位探测没做
-        ----------
-        mode:
-            ``"prepare"`` — 出征准备页检测 (委托 BattlePreparationPage)。
-            ``"sumup"`` — 战斗结算页检测 (像素颜色匹配)。
-
-        Returns
-        -------
-        list[int]
-            长度 7 的列表 (index 0 占位)，值含义:
-            0=绿血, 1=黄血, 2=红血, 3=维修中, -1=空位。
-        """
-        from autowsgr.ui.battle.constants import (
-            BLOOD_TOLERANCE,
-            RESULT_BLOOD_BAR_PROBE,
-            RESULT_BLOOD_GREEN,
-            RESULT_BLOOD_RED,
-            RESULT_BLOOD_YELLOW,
-        )
-        from autowsgr.vision import PixelChecker
-
-        if mode != "sumup":
-            return self._ship_stats[:]
-
-        screen = self._device.screenshot()
-        result = [0] * 7  # index 0 占位
-
-        for slot, (x, y) in RESULT_BLOOD_BAR_PROBE.items():
-            pixel = PixelChecker.get_pixel(screen, x, y)
-
-            # 结算页只有绿/黄/红三种状态 (无空位/维修中)
-            if pixel.near(RESULT_BLOOD_GREEN, BLOOD_TOLERANCE):
-                result[slot] = 0
-            elif pixel.near(RESULT_BLOOD_YELLOW, BLOOD_TOLERANCE):
-                result[slot] = 1
-            elif pixel.near(RESULT_BLOOD_RED, BLOOD_TOLERANCE):
-                result[slot] = 2
-            else:
-                # 未匹配时使用战前状态回退
-                result[slot] = self._ship_stats[slot] if slot < len(self._ship_stats) else 0
-                logger.debug(
-                    "结算页舰船 {} 血量颜色未匹配: {}, 使用战前值: {}",
-                    slot, pixel, result[slot],
-                )
-
-        logger.info("结算页血量检测: {}", result[1:])
-        return result
-
-    def _get_ship_drop(self) -> str | None:
-        """获取舰船掉落（当前未实现 OCR，返回 None）。"""
-        # TODO: 接入 OCR 识别掉落舰船名
-        return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -21,11 +21,14 @@ from autowsgr.combat.actions import (
     click_enter_fight,
     click_fight_condition,
     click_formation,
+    click_image,
     click_night_battle,
     click_proceed,
     click_result,
     click_retreat,
     click_skip_missile_animation,
+    get_ship_drop,
+    image_exist,
 )
 from autowsgr.combat.history import CombatEvent, EventType, FightResult
 from autowsgr.combat.plan import CombatMode, NodeDecision
@@ -56,9 +59,6 @@ class PhaseHandlersMixin:
         _history: CombatHistory
         _node_count: int
         _formation_by_rule: Formation | None
-        _image_exist: Callable
-        _click_image: Callable
-        _get_ship_drop: Callable
     """
 
     # 类型提示 (供 IDE/mypy 在 Mixin 上下文使用)
@@ -174,7 +174,7 @@ class PhaseHandlersMixin:
             return ConditionFlag.FIGHT_END
 
         # 检查迂回按钮是否可用
-        can_detour = self._image_exist("bypass", 0.8)
+        can_detour = image_exist(self._device, "bypass", 0.8)
         want_detour = can_detour and decision.detour
 
         # 阵型规则优先
@@ -213,7 +213,7 @@ class PhaseHandlersMixin:
 
         # 执行迂回
         if want_detour:
-            clicked = self._click_image("bypass", 2.5)
+            clicked = click_image(self._device, "bypass", 2.5)
             if clicked:
                 logger.info("执行迂回")
             else:
@@ -229,7 +229,7 @@ class PhaseHandlersMixin:
 
         # 远程导弹支援
         if decision.long_missile_support:
-            clicked = self._click_image("missile_support", 2.5)
+            clicked = click_image(self._device, "missile_support", 2.5)
             if clicked:
                 logger.info("开启远程导弹支援")
             else:
@@ -354,7 +354,7 @@ class PhaseHandlersMixin:
 
     def _handle_get_ship(self) -> ConditionFlag:
         """处理获取舰船。"""
-        ship_name = self._get_ship_drop()
+        ship_name = get_ship_drop(self._device)
         if ship_name:
             logger.info("获得舰船: {}", ship_name)
 
@@ -396,7 +396,7 @@ class PhaseHandlersMixin:
 
     def _handle_flagship_severe_damage(self) -> ConditionFlag:
         """处理旗舰大破。"""
-        self._click_image("flagship_damage", 2.0)
+        click_image(self._device, "flagship_damage", 2.0)
         time.sleep(0.25)
 
         self._history.add(CombatEvent(
