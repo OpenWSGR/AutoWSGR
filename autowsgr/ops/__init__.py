@@ -30,8 +30,19 @@
     ├── expedition.py      ← 远征收取
     ├── build.py           ← 建造/收取
     ├── repair.py          ← 浴室修理
+    ├── startup.py         ← 游戏启动与导航到主页面
     └── image_resources.py ← 图像模板资源注册中心
 """
+
+# ── 启动 ──
+from autowsgr.ops.startup import (
+    ensure_game_ready,
+    go_main_page,
+    is_game_running,
+    is_on_main_page,
+    restart_game,
+    start_game,
+)
 
 # ── 导航 ──
 from autowsgr.ops.navigate import goto_page, identify_current_page
@@ -78,6 +89,13 @@ from autowsgr.ops.fight import run_fight, run_fight_n
 from autowsgr.ops.image_resources import Templates
 
 __all__ = [
+    # 启动
+    "ensure_game_ready",
+    "go_main_page",
+    "is_game_running",
+    "is_on_main_page",
+    "restart_game",
+    "start_game",
     # 导航
     "goto_page",
     "identify_current_page",

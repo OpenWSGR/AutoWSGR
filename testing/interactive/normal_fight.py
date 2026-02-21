@@ -55,7 +55,8 @@ from autowsgr.emulator import ADBController
 from autowsgr.infra import setup_logger
 from autowsgr.ops.fight import run_fight
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, FightCondition, Formation, RepairMode
+from autowsgr.ops.startup import ensure_game_ready
+from autowsgr.types import ConditionFlag, FightCondition, Formation, GameAPP, PageName, RepairMode
 from autowsgr.ui.battle.preparation import BattlePreparationPage
 from autowsgr.ui.map.page import MapPage
 
@@ -112,7 +113,7 @@ def _build_7_4_6ss_plan() -> CombatPlan:
         mode=CombatMode.NORMAL,
         chapter=7,
         map_id=4,
-        fleet_id=1,
+        fleet_id=2,
         repair_mode=RepairMode.moderate_damage,
         fight_condition=FightCondition(4),
         selected_nodes=["B", "E", "D", "L", "M", "K"],
@@ -200,6 +201,9 @@ def main() -> None:
         logger.error("连接设备失败: {}", exc)
         sys.exit(1)
 
+    # ── 初始化：确保游戏已就绪 ──
+    ensure_game_ready(ctrl, GameAPP.official)
+
     # ── 初始化引擎 ──
     engine = CombatEngine(ctrl)
 
@@ -209,7 +213,7 @@ def main() -> None:
         logger.info("第 {}/{} 次战斗", i + 1, times)
 
         # 导航到出征地图页 → 选择地图 → 进入准备页
-        goto_page(ctrl, "地图页面")
+        goto_page(ctrl, PageName.MAP)
         map_page = MapPage(ctrl)
         map_page.enter_sortie(chapter=plan.chapter, map_num=plan.map_id)
 
