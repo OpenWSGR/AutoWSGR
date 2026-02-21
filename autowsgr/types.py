@@ -205,6 +205,19 @@ class GameAPP(StrEnum):
                 raise ValueError(f"没有为 {self} 设置包名，请手动指定")
 
 
+class ShipDamageState(IntEnum):
+    """舰船血量状态。"""
+
+    NORMAL = 0
+    """正常（绿血）。"""
+    MODERATE = 1
+    """中破（黄血）。"""
+    SEVERE = 2
+    """大破（红血或空血）。"""
+    NO_SHIP = -1
+    """无舰船（蓝色空位）。"""
+
+
 class RepairMode(IntEnum):
     """修理策略。"""
 
