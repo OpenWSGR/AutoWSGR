@@ -20,12 +20,12 @@
     result = engine.fight(plan)
 """
 
-from autowsgr.combat.callbacks import CombatResult
-from autowsgr.combat.state import CombatPhase
-from autowsgr.combat.rules import RuleEngine, RuleResult
-from autowsgr.combat.plan import CombatPlan, NodeDecision
-from autowsgr.combat.history import CombatHistory, CombatEvent
-from autowsgr.combat.engine import CombatEngine
+from .plan import CombatMode, CombatPlan, NodeDecision
+from .callbacks import CombatResult
+from .state import CombatPhase
+from .rules import RuleEngine, RuleResult
+from .history import CombatHistory, CombatEvent
+from .engine import CombatEngine
 
 __all__ = [
     "CombatPhase",
@@ -37,4 +37,5 @@ __all__ = [
     "CombatHistory",
     "CombatEvent",
     "CombatEngine",
+    "CombatMode",
 ]
