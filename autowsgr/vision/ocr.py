@@ -170,9 +170,14 @@ class OCREngine(ABC):
 
     # ── 工厂方法 ──
 
+    _instances: dict[str, OCREngine] = {}
+    """已创建的引擎单例缓存，key 为 ``"<engine>:<gpu>"``。"""
+
     @classmethod
     def create(cls, engine: str = "easyocr", gpu: bool = False) -> OCREngine:
-        """创建 OCR 引擎实例。
+        """创建或获取 OCR 引擎实例（单例）。
+
+        首次调用时创建引擎实例并缓存，后续相同参数的调用直接返回缓存实例。
 
         Parameters
         ----------
@@ -185,9 +190,16 @@ class OCREngine(ABC):
         -------
         OCREngine
         """
+        cache_key = f"{engine}:{gpu}"
+        if cache_key in cls._instances:
+            logger.debug("[OCR] 复用已有 {} 实例（gpu={}）", engine, gpu)
+            return cls._instances[cache_key]
+
         if engine == "easyocr":
             logger.info("[OCR] 初始化 EasyOCR（gpu={}）", gpu)
-            return EasyOCREngine(gpu=gpu)
+            instance = EasyOCREngine(gpu=gpu)
+            cls._instances[cache_key] = instance
+            return instance
         raise ValueError(f"不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr")
 
 

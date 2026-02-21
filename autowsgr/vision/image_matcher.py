@@ -38,6 +38,27 @@ from .roi import ROI
 TEMPLATE_SOURCE_RESOLUTION: tuple[int, int] = (960, 540)
 """模板图片采集时的屏幕分辨率 (width, height)。"""
 
+# ── 模块级配置 ──
+
+_show_image_detail: bool = False
+"""是否输出逐模板匹配的 DEBUG 日志。由 :func:`configure` 或 ``setup_logger`` 设置。"""
+
+
+def configure(*, show_image_detail: bool = False) -> None:
+    """配置 ImageChecker 的日志行为。
+
+    通常由 ``setup_logger`` 在应用启动时根据 ``LogConfig.show_image_detail`` 调用，
+    也可在测试或调试时手动调用。
+
+    Parameters
+    ----------
+    show_image_detail:
+        是否输出每条模板匹配的 DEBUG 日志（置信度/坐标等）。
+        默认 ``False``，仅显示签名级别的匹配结果。
+    """
+    global _show_image_detail
+    _show_image_detail = show_image_detail
+
 
 class ImageChecker:
     """基于模板匹配的图像检测引擎。
@@ -60,10 +81,11 @@ class ImageChecker:
         template_img: np.ndarray,
         screen_w: int,
         screen_h: int,
+        source_resolution: tuple[int, int] | None = None,
     ) -> np.ndarray:
         """根据截图分辨率动态缩放模板图片。
 
-        若截图分辨率与 :data:`TEMPLATE_SOURCE_RESOLUTION` 一致则原样返回；
+        若截图分辨率与模板采集分辨率一致则原样返回；
         否则按宽高比缩放模板，使其像素尺寸与截图中的目标元素匹配。
 
         Parameters
@@ -72,13 +94,16 @@ class ImageChecker:
             模板图像 (H×W×3 或 H×W, uint8)。
         screen_w, screen_h:
             截图的宽度和高度 (像素)。
+        source_resolution:
+            模板采集时的屏幕分辨率 ``(width, height)``。
+            为 ``None`` 时使用全局 :data:`TEMPLATE_SOURCE_RESOLUTION` 作为后备。
 
         Returns
         -------
         np.ndarray
             缩放后的模板图像（分辨率一致时返回原对象，无拷贝）。
         """
-        src_w, src_h = TEMPLATE_SOURCE_RESOLUTION
+        src_w, src_h = source_resolution or TEMPLATE_SOURCE_RESOLUTION
         if screen_w == src_w and screen_h == src_h:
             return template_img
 
@@ -113,17 +138,18 @@ class ImageChecker:
         cropped = roi.crop(screen)
         ch, cw = cropped.shape[:2]
 
-        # 分辨率适配：按截图实际尺寸缩放模板
+        # 分辨率适配：按截图实际尺寸缩放模板（使用模板自身的采集分辨率）
         tmpl_img = ImageChecker._scale_template_if_needed(
-            template.image, w, h,
+            template.image, w, h, source_resolution=template.source_resolution,
         )
         th, tw_ = tmpl_img.shape[:2]
 
         if th > ch or tw_ > cw:
-            logger.debug(
-                "[ImageMatcher] 模板 '{}' ({}x{}) 大于搜索区域 ({}x{})，跳过",
-                template.name, tw_, th, cw, ch,
-            )
+            if _show_image_detail:
+                logger.debug(
+                    "[ImageMatcher] 模板 '{}' ({}x{}) 大于搜索区域 ({}x{})，跳过",
+                    template.name, tw_, th, cw, ch,
+                )
             return None
 
         screen_gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
@@ -140,10 +166,11 @@ class ImageChecker:
             best_loc = max_loc
 
         if best_val < confidence:
-            logger.debug(
-                "[ImageMatcher] 模板 '{}' 未匹配 (confidence={:.3f} < {:.3f})",
-                template.name, best_val, confidence,
-            )
+            if _show_image_detail:
+                logger.debug(
+                    "[ImageMatcher] 模板 '{}' 未匹配 (confidence={:.3f} < {:.3f})",
+                    template.name, best_val, confidence,
+                )
             return None
 
         local_x, local_y = best_loc
@@ -153,10 +180,11 @@ class ImageChecker:
         rel_x2, rel_y2 = (abs_x + tw_) / w, (abs_y + th) / h
         rel_cx, rel_cy = (rel_x1 + rel_x2) / 2, (rel_y1 + rel_y2) / 2
 
-        logger.debug(
-            "[ImageMatcher] 模板 '{}' ✓ confidence={:.3f} center=({:.4f},{:.4f})",
-            template.name, best_val, rel_cx, rel_cy,
-        )
+        if _show_image_detail:
+            logger.debug(
+                "[ImageMatcher] 模板 '{}' ✓ confidence={:.3f} center=({:.4f},{:.4f})",
+                template.name, best_val, rel_cx, rel_cy,
+            )
         return ImageMatchDetail(
             template_name=template.name, confidence=best_val,
             center=(rel_cx, rel_cy), top_left=(rel_x1, rel_y1),
@@ -182,10 +210,11 @@ class ImageChecker:
                     best = detail
 
         matched = len(all_details) > 0
-        logger.debug(
-            "[ImageMatcher] 规则 '{}' {} ({}/{} 模板匹配)",
-            rule.name, "✓" if matched else "✗", len(all_details), len(rule),
-        )
+        if _show_image_detail:
+            logger.debug(
+                "[ImageMatcher] 规则 '{}' {} ({}/{} 模板匹配)",
+                rule.name, "✓" if matched else "✗", len(all_details), len(rule),
+            )
         return ImageMatchResult(
             matched=matched, rule_name=rule.name,
             best=best, all_details=tuple(all_details),
@@ -290,9 +319,9 @@ class ImageChecker:
         cropped = roi.crop(screen)
         ch, cw = cropped.shape[:2]
 
-        # 分辨率适配
+        # 分辨率适配（使用模板自身的采集分辨率）
         tmpl_img = ImageChecker._scale_template_if_needed(
-            template.image, w, h,
+            template.image, w, h, source_resolution=template.source_resolution,
         )
         th, tw_ = tmpl_img.shape[:2]
 

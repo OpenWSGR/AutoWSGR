@@ -46,11 +46,23 @@ class ImageTemplate:
     name: str
     image: np.ndarray
     source: str = ""
+    source_resolution: tuple[int, int] = (960, 540)
+    """模板图片采集时的屏幕分辨率 (width, height)。
+
+    匹配引擎会根据此值与实际截图分辨率的比值动态缩放模板，
+    默认 ``(960, 540)``，与全局 :data:`TEMPLATE_SOURCE_RESOLUTION` 一致。
+    """
 
     # ── 构造 ──
 
     @classmethod
-    def from_file(cls, path: str | Path, *, name: str | None = None) -> ImageTemplate:
+    def from_file(
+        cls,
+        path: str | Path,
+        *,
+        name: str | None = None,
+        source_resolution: tuple[int, int] = (960, 540),
+    ) -> ImageTemplate:
         """从文件加载模板。
 
         Parameters
@@ -59,6 +71,8 @@ class ImageTemplate:
             图片文件路径。
         name:
             模板名称，默认为文件名（不含扩展名）。
+        source_resolution:
+            模板采集时的屏幕分辨率 (width, height)，默认 ``(960, 540)``。
 
         Raises
         ------
@@ -77,7 +91,12 @@ class ImageTemplate:
 
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         template_name = name or p.stem
-        return cls(name=template_name, image=rgb, source=str(p))
+        return cls(
+            name=template_name,
+            image=rgb,
+            source=str(p),
+            source_resolution=source_resolution,
+        )
 
     @classmethod
     def from_ndarray(
@@ -86,6 +105,7 @@ class ImageTemplate:
         name: str = "unnamed",
         *,
         is_bgr: bool = False,
+        source_resolution: tuple[int, int] = (960, 540),
     ) -> ImageTemplate:
         """从 numpy 数组创建模板。
 
@@ -97,10 +117,17 @@ class ImageTemplate:
             模板名称。
         is_bgr:
             如果为 True，将自动从 BGR 转为 RGB。
+        source_resolution:
+            模板采集时的屏幕分辨率 (width, height)，默认 ``(960, 540)``。
         """
         if is_bgr:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        return cls(name=name, image=image.copy(), source="ndarray")
+        return cls(
+            name=name,
+            image=image.copy(),
+            source="ndarray",
+            source_resolution=source_resolution,
+        )
 
     @property
     def height(self) -> int:
@@ -117,7 +144,9 @@ class ImageTemplate:
 
     def __repr__(self) -> str:
         h, w = self.shape
-        return f"ImageTemplate(name='{self.name}', size={w}x{h}, source='{self.source}')"
+        res = self.source_resolution
+        res_str = f", source_resolution={res!r}" if res != (960, 540) else ""
+        return f"ImageTemplate(name='{self.name}', size={w}x{h}, source='{self.source}'{res_str})"
 
 
 # ── 模板匹配结果 ──

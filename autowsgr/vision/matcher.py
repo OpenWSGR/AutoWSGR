@@ -39,6 +39,28 @@ from .pixel import (
     PixelSignature,
 )
 
+# ── 模块级配置 ──
+
+_show_pixel_detail: bool = False
+"""是否输出逐像素规则的 DEBUG 日志。由 :func:`configure` 或 ``setup_logger`` 设置。"""
+
+
+def configure(*, show_pixel_detail: bool = False) -> None:
+    """配置 PixelChecker 的日志行为。
+
+    TODO: 这个实现太 TM 恶心了，必须换掉
+    通常由 ``setup_logger`` 在应用启动时根据 ``LogConfig.show_pixel_detail`` 调用，
+    也可在测试或调试时手动调用。
+
+    Parameters
+    ----------
+    show_pixel_detail:
+        是否输出每条像素规则的期望/实际/距离 DEBUG 日志。
+        默认 ``False``，仅显示签名级别的匹配结果。
+    """
+    global _show_pixel_detail
+    _show_pixel_detail = show_pixel_detail
+
 class PixelChecker:
     """像素特征检测引擎 — 视觉层核心 API。
 
@@ -136,26 +158,28 @@ class PixelChecker:
                     )
                 )
 
-            logger.debug(
-                "[Matcher] '{}' [{:.4f},{:.4f}] 期望{} 实际{} 距离={:.1f} {}",
-                signature.name,
-                rule.x,
-                rule.y,
-                rule.color.as_rgb_tuple(),
-                actual.as_rgb_tuple(),
-                dist,
-                "✓" if is_match else f"✗(容差={rule.tolerance})",
-            )
+            if _show_pixel_detail:
+                logger.debug(
+                    "[Matcher] '{}' [{:.4f},{:.4f}] 期望{} 实际{} 距离={:.1f} {}",
+                    signature.name,
+                    rule.x,
+                    rule.y,
+                    rule.color.as_rgb_tuple(),
+                    actual.as_rgb_tuple(),
+                    dist,
+                    "✓" if is_match else f"✗(容差={rule.tolerance})",
+                )
 
             # 短路优化
             if signature.strategy == MatchStrategy.ALL and not is_match:
                 if not with_details:
-                    logger.debug(
-                        "[Matcher] '{}' ✗ 短路退出 — ALL 首次失败于 [{:.4f},{:.4f}]",
-                        signature.name,
-                        rule.x,
-                        rule.y,
-                    )
+                    if _show_pixel_detail:
+                        logger.debug(
+                            "[Matcher] '{}' ✗ 短路退出 — ALL 首次失败于 [{:.4f},{:.4f}]",
+                            signature.name,
+                            rule.x,
+                            rule.y,
+                        )
                     return PixelMatchResult(
                         matched=False,
                         signature_name=signature.name,
@@ -164,12 +188,13 @@ class PixelChecker:
                     )
             elif signature.strategy == MatchStrategy.ANY and is_match:
                 if not with_details:
-                    logger.debug(
-                        "[Matcher] '{}' ✓ 短路退出 — ANY 首次成功于 [{:.4f},{:.4f}]",
-                        signature.name,
-                        rule.x,
-                        rule.y,
-                    )
+                    if _show_pixel_detail:
+                        logger.debug(
+                            "[Matcher] '{}' ✓ 短路退出 — ANY 首次成功于 [{:.4f},{:.4f}]",
+                            signature.name,
+                            rule.x,
+                            rule.y,
+                        )
                     return PixelMatchResult(
                         matched=True,
                         signature_name=signature.name,
