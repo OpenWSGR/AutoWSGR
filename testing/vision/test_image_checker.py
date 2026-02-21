@@ -313,3 +313,173 @@ class TestCrop:
         # 修改裁切结果不影响原图
         cropped[0, 0] = [255, 0, 0]
         assert screen[0, 0, 0] == 100
+
+
+# ─────────────────────────────────────────────
+# 多分辨率模板适配
+# ─────────────────────────────────────────────
+
+
+class TestMultiResolutionScaling:
+    """测试 per-template source_resolution 适配逻辑。"""
+
+    def test_default_resolution_no_scaling_on_960x540(self):
+        """默认 source_resolution=(960,540) 在 960×540 截图上不缩放。"""
+        screen = solid_screen(200, 200, 200)  # 960×540
+        tmpl = make_template(seed=80, h=30, w=40, name="default_res")
+        screen = embed_template_in_screen(screen, tmpl, x=100, y=100)
+
+        detail = ImageChecker.find_template(screen, tmpl, confidence=0.9)
+        assert detail is not None
+        assert detail.confidence > 0.9
+
+    def test_1080p_template_scaled_to_540p_screen(self):
+        """source_resolution=(1920,1080) 的模板在 960×540 截图上应自动缩小。"""
+        import numpy as np
+
+        # 创建 960×540 截图
+        screen = solid_screen(200, 200, 200, h=540, w=960)
+
+        # 模板采集自 1080p: 60×80 像素 → 在 540p 下应缩放为 30×40
+        rng = np.random.RandomState(81)
+        big_img = rng.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        from autowsgr.vision import ImageTemplate
+        tmpl_1080 = ImageTemplate(
+            name="hd_tmpl", image=big_img, source="test",
+            source_resolution=(1920, 1080),
+        )
+
+        # 手动缩小模板并嵌入截图 (模拟实际匹配场景)
+        import cv2
+        scaled = cv2.resize(big_img, (40, 30), interpolation=cv2.INTER_AREA)
+        tmpl_display = ImageTemplate(name="ld_tmpl", image=scaled, source="test")
+        screen = embed_template_in_screen(screen, tmpl_display, x=200, y=150)
+
+        # 1080p 模板应能匹配 540p 截图（引擎自动缩放）
+        detail = ImageChecker.find_template(screen, tmpl_1080, confidence=0.85)
+        assert detail is not None
+        assert detail.confidence > 0.85
+
+    def test_540p_template_scaled_to_1080p_screen(self):
+        """source_resolution=(960,540) 的模板在 1920×1080 截图上应自动放大。"""
+        import numpy as np
+
+        # 创建 1920×1080 截图
+        screen = solid_screen(200, 200, 200, h=1080, w=1920)
+
+        # 模板采集自 540p: 30×40 像素 → 在 1080p 下应缩放为 60×80
+        rng = np.random.RandomState(82)
+        small_img = rng.randint(0, 256, (30, 40, 3), dtype=np.uint8)
+        from autowsgr.vision import ImageTemplate
+        tmpl_540 = ImageTemplate(
+            name="ld_tmpl", image=small_img, source="test",
+            source_resolution=(960, 540),
+        )
+
+        # 手动放大模板并嵌入截图
+        import cv2
+        scaled = cv2.resize(small_img, (80, 60), interpolation=cv2.INTER_LINEAR)
+        screen[300:360, 400:480] = scaled
+
+        detail = ImageChecker.find_template(screen, tmpl_540, confidence=0.85)
+        assert detail is not None
+
+    def test_mixed_resolution_templates_on_same_screen(self):
+        """同一截图上同时使用不同 source_resolution 的模板。"""
+        import numpy as np
+        import cv2
+        from autowsgr.vision import ImageTemplate
+
+        # 1280×720 截图
+        screen = solid_screen(200, 200, 200, h=720, w=1280)
+
+        # 模板 A: 采集自 960×540 (30×40) → 在 720p 下缩放为 40×53
+        rng_a = np.random.RandomState(83)
+        img_a = rng_a.randint(0, 256, (30, 40, 3), dtype=np.uint8)
+        tmpl_a = ImageTemplate(
+            name="tmpl_a", image=img_a, source="test",
+            source_resolution=(960, 540),
+        )
+        scale_x_a, scale_y_a = 1280 / 960, 720 / 540
+        scaled_a = cv2.resize(
+            img_a,
+            (max(1, round(40 * scale_x_a)), max(1, round(30 * scale_y_a))),
+            interpolation=cv2.INTER_LINEAR,
+        )
+        sa_h, sa_w = scaled_a.shape[:2]
+        screen[50: 50 + sa_h, 100: 100 + sa_w] = scaled_a
+
+        # 模板 B: 采集自 1920×1080 (60×80) → 在 720p 下缩放为 40×53
+        rng_b = np.random.RandomState(84)
+        img_b = rng_b.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        tmpl_b = ImageTemplate(
+            name="tmpl_b", image=img_b, source="test",
+            source_resolution=(1920, 1080),
+        )
+        scale_x_b, scale_y_b = 1280 / 1920, 720 / 1080
+        scaled_b = cv2.resize(
+            img_b,
+            (max(1, round(80 * scale_x_b)), max(1, round(60 * scale_y_b))),
+            interpolation=cv2.INTER_AREA,
+        )
+        sb_h, sb_w = scaled_b.shape[:2]
+        screen[400: 400 + sb_h, 600: 600 + sb_w] = scaled_b
+
+        # 两个不同分辨率的模板都应能匹配
+        detail_a = ImageChecker.find_template(screen, tmpl_a, confidence=0.85)
+        assert detail_a is not None, "540p template should match on 720p screen"
+
+        detail_b = ImageChecker.find_template(screen, tmpl_b, confidence=0.85)
+        assert detail_b is not None, "1080p template should match on 720p screen"
+
+    def test_source_resolution_preserved_in_template(self):
+        """ImageTemplate 应保留 source_resolution 元数据。"""
+        import numpy as np
+        from autowsgr.vision import ImageTemplate
+
+        # 默认
+        img = np.zeros((10, 10, 3), dtype=np.uint8)
+        t1 = ImageTemplate(name="t1", image=img)
+        assert t1.source_resolution == (960, 540)
+
+        # 自定义
+        t2 = ImageTemplate(name="t2", image=img, source_resolution=(1920, 1080))
+        assert t2.source_resolution == (1920, 1080)
+
+        # from_ndarray
+        t3 = ImageTemplate.from_ndarray(img, "t3", source_resolution=(1280, 720))
+        assert t3.source_resolution == (1280, 720)
+
+    def test_repr_shows_non_default_resolution(self):
+        """非默认分辨率应在 repr 中显示。"""
+        import numpy as np
+        from autowsgr.vision import ImageTemplate
+
+        img = np.zeros((10, 10, 3), dtype=np.uint8)
+        t_default = ImageTemplate(name="t", image=img)
+        assert "source_resolution" not in repr(t_default)
+
+        t_custom = ImageTemplate(name="t", image=img, source_resolution=(1920, 1080))
+        assert "source_resolution=(1920, 1080)" in repr(t_custom)
+
+    def test_scale_template_if_needed_with_source_resolution(self):
+        """_scale_template_if_needed 应使用传入的 source_resolution。"""
+        import numpy as np
+
+        tmpl_img = np.zeros((60, 80, 3), dtype=np.uint8)
+
+        # source_resolution=(1920,1080), screen=960×540 → 缩放到 40×30
+        scaled = ImageChecker._scale_template_if_needed(
+            tmpl_img, 960, 540, source_resolution=(1920, 1080),
+        )
+        assert scaled.shape == (30, 40, 3)
+
+        # source_resolution=(960,540), screen=960×540 → 不缩放
+        same = ImageChecker._scale_template_if_needed(
+            tmpl_img, 960, 540, source_resolution=(960, 540),
+        )
+        assert same is tmpl_img  # 应返回原对象
+
+        # source_resolution=None → fallback to global (960,540)
+        same2 = ImageChecker._scale_template_if_needed(tmpl_img, 960, 540)
+        assert same2 is tmpl_img

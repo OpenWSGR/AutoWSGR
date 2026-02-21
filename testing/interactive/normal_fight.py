@@ -51,10 +51,8 @@ from loguru import logger
 from autowsgr.combat import CombatMode, CombatPlan, NodeDecision, RuleEngine, CombatEngine
 from autowsgr.emulator import ADBController
 from autowsgr.infra import setup_logger
-from autowsgr.vision import EasyOCREngine
-from autowsgr.ops import goto_page, ensure_game_ready, run_fight
-from autowsgr.types import ConditionFlag, FightCondition, Formation, GameAPP, PageName, RepairMode
-from autowsgr.ui import MapPage
+from autowsgr.ops import ensure_game_ready, NormalFightRunner
+from autowsgr.types import ConditionFlag, FightCondition, Formation, GameAPP, RepairMode
 
 
 # ── 默认值 ──
@@ -201,7 +199,7 @@ def main() -> None:
     ensure_game_ready(ctrl, GameAPP.official)
 
     # ── 初始化引擎 ──
-    engine = CombatEngine(ctrl)
+    runner = NormalFightRunner(ctrl, plan)
 
     # ── 运行战斗 ──
     results: list = []
@@ -209,13 +207,7 @@ def main() -> None:
         logger.info("第 {}/{} 次战斗", i + 1, times)
 
         # 导航到出征地图页 → 选择地图 → 进入准备页
-        goto_page(ctrl, PageName.MAP)
-        map_page = MapPage(ctrl, EasyOCREngine.create())
-        map_page.enter_sortie(chapter=plan.chapter, map_num=plan.map_id)
-
-        # 执行战斗
-        result = run_fight(ctrl, engine, plan)
-        results.append(result)
+        result = runner.run()
 
         logger.info(
             "  战斗结果: {} 血量={}",

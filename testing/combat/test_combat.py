@@ -27,7 +27,7 @@ from autowsgr.combat.history import (
 )
 from autowsgr.combat.plan import CombatPlan, NodeDecision, CombatMode
 from autowsgr.combat.actions import check_blood
-from autowsgr.types import Formation
+from autowsgr.types import Formation, RepairMode, ShipDamageState
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -399,30 +399,44 @@ class TestCheckBlood:
     """check_blood 测试。"""
 
     def test_all_green_continues(self):
-        stats = [0, 0, 0, 0, 0, 0, 0]
-        assert check_blood(stats, 2) is True
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.NORMAL, S.NORMAL, S.NORMAL, S.NORMAL, S.NORMAL]
+        assert check_blood(stats, R.severe_damage) is True
 
     def test_severe_damage_stops(self):
-        stats = [0, 0, 0, 2, 0, 0, 0]
-        assert check_blood(stats, 2) is False
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.NORMAL, S.SEVERE, S.NORMAL, S.NORMAL, S.NORMAL]
+        assert check_blood(stats, R.severe_damage) is False
 
     def test_moderate_damage_with_severe_rule(self):
-        stats = [0, 0, 0, 1, 0, 0, 0]
-        assert check_blood(stats, 2) is True
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.NORMAL, S.MODERATE, S.NORMAL, S.NORMAL, S.NORMAL]
+        assert check_blood(stats, R.severe_damage) is True
 
     def test_no_ship_ignored(self):
-        stats = [0, 0, 0, 0, -1, -1, -1]
-        assert check_blood(stats, 2) is True
-
-    def test_ignore_rule(self):
-        stats = [0, 0, 2, 0, 0, 0, 0]
-        assert check_blood(stats, [-1, -1, -1, -1, -1, -1]) is True
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.NORMAL, S.NORMAL, S.NO_SHIP, S.NO_SHIP, S.NO_SHIP]
+        assert check_blood(stats, R.severe_damage) is True
 
     def test_per_position_rules(self):
-        stats = [0, 0, 1, 2, 0, 0, 0]
-        rules = [2, 1, 2, 2, 2, 2]
-        assert check_blood(stats, rules) is False  # position 2 has damage 1 >= rule 1
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.MODERATE, S.SEVERE, S.NORMAL, S.NORMAL, S.NORMAL]
+        rules = [R.severe_damage, R.moderate_damage, R.severe_damage, R.severe_damage, R.severe_damage, R.severe_damage]
+        assert check_blood(stats, rules) is False  # position 1 has MODERATE >= moderate_damage
 
-    def test_repairing_stops(self):
-        stats = [0, 0, 0, 3, 0, 0, 0]
-        assert check_blood(stats, 2) is False  # 3 >= 2
+    def test_severe_always_stops(self):
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.NORMAL, S.SEVERE, S.NORMAL, S.NORMAL, S.NORMAL]
+        assert check_blood(stats, R.severe_damage) is False
+
+    def test_moderate_stops_with_moderate_rule(self):
+        S = ShipDamageState
+        R = RepairMode
+        stats = [S.NORMAL, S.MODERATE, S.NORMAL, S.NORMAL, S.NORMAL, S.NORMAL]
+        assert check_blood(stats, R.moderate_damage) is False

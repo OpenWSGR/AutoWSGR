@@ -159,7 +159,7 @@ def run_test(
             flag_str = r.flag.value
             node_count = r.node_count
             info(f"  [{i + 1}] flag={flag_str}  节点数={node_count}  "
-                 f"血量={r.ship_stats[1:]}")
+                 f"血量={r.ship_stats}")
         success_count = sum(
             1 for r in results if r.flag == ConditionFlag.OPERATION_SUCCESS
         )

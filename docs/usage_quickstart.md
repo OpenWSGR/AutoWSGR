@@ -161,7 +161,7 @@ config = CampaignConfig(
     night=True,           # 进入夜战
 )
 
-results = run_campaign(ctrl, config, image_matcher)
+results = run_campaign(ctrl, config)
 print(f"战役结果: {results[0].flag}")
 ```
 
@@ -177,7 +177,7 @@ from autowsgr.ops import run_normal_fight
 plan = CombatPlan.from_yaml("plans/normal_fight/5-4.yaml")
 
 # 执行 5 次
-results = run_normal_fight(ctrl, plan, image_matcher, times=5)
+results = run_normal_fight(ctrl, plan, times=5)
 
 for i, r in enumerate(results):
     print(f"第 {i+1} 次: {r.flag.value}")

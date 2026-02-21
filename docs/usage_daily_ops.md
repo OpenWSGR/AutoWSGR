@@ -241,7 +241,7 @@ collect_rewards(ctrl)
 
 # 3. 执行 3 次战役
 config = CampaignConfig(map_index=3, difficulty="hard")
-results = run_campaign(ctrl, config, image_matcher, times=3)
+results = run_campaign(ctrl, config, times=3)
 
 # 4. 浴室修理
 repair_in_bath(ctrl)
@@ -267,7 +267,7 @@ campaign_config = CampaignConfig(
     difficulty="hard",
     max_times=3,
 )
-run_campaign(ctrl, campaign_config, image_matcher)
+run_campaign(ctrl, campaign_config)
 
 # 收取可能完成的远征
 collect_expedition(ctrl)
@@ -276,7 +276,6 @@ collect_expedition(ctrl)
 run_normal_fight_from_yaml(
     ctrl,
     "plans/normal_fight/5-4.yaml",
-    image_matcher,
     times=10,
 )
 ```
@@ -298,7 +297,7 @@ exercise_config = ExerciseConfig(
     formation=2,
     night=False,
 )
-run_exercise(ctrl, exercise_config, image_matcher=image_matcher)
+run_exercise(ctrl, exercise_config)
 
 # 远征循环
 while True:

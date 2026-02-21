@@ -147,13 +147,12 @@ from autowsgr.ops import run_normal_fight, run_normal_fight_from_yaml
 results = run_normal_fight_from_yaml(
     ctrl,
     "plans/normal_fight/5-4.yaml",
-    image_matcher,
     times=5,
 )
 
 # 方式二: 编程构建
 plan = CombatPlan.from_yaml("plans/normal_fight/5-4.yaml")
-results = run_normal_fight(ctrl, plan, image_matcher, times=5)
+results = run_normal_fight(ctrl, plan, times=5)
 ```
 
 ### 使用 Runner 类（更多控制）
@@ -164,7 +163,6 @@ from autowsgr.ops.normal_fight import NormalFightRunner
 runner = NormalFightRunner(
     ctrl,
     plan,
-    image_matcher,
     ocr=ocr_engine,              # 可选: 章节导航用
     get_enemy_info=my_enemy_cb,  # 可选: 敌方编成识别
 )
@@ -204,7 +202,7 @@ config = CampaignConfig(
     max_times=3,           # 最多打 3 次
 )
 
-results = run_campaign(ctrl, config, image_matcher)
+results = run_campaign(ctrl, config)
 ```
 
 ### 使用 Runner 类
@@ -212,7 +210,7 @@ results = run_campaign(ctrl, config, image_matcher)
 ```python
 from autowsgr.ops.campaign import CampaignRunner
 
-runner = CampaignRunner(ctrl, config, image_matcher)
+runner = CampaignRunner(ctrl, config)
 
 # 执行指定次数
 results = runner.run_for_times(5)
@@ -258,7 +256,7 @@ config = ExerciseConfig(
     robot=True,             # 优先挑战机器人
 )
 
-results = run_exercise(ctrl, config, image_matcher=image_matcher)
+results = run_exercise(ctrl, config)
 ```
 
 ### 使用 Runner 类
@@ -266,7 +264,7 @@ results = run_exercise(ctrl, config, image_matcher=image_matcher)
 ```python
 from autowsgr.ops.exercise import ExerciseRunner
 
-runner = ExerciseRunner(ctrl, config, image_matcher)
+runner = ExerciseRunner(ctrl, config)
 results = runner.run()
 ```
 
@@ -403,7 +401,6 @@ for i, r in enumerate(results):
 
 | 回调 | 签名 | 用途 |
 |------|------|------|
-| `image_matcher` | `(screen, key, confidence) → bool` | 识别战斗阶段 |
 | `get_enemy_info` | `(screen) → dict` | 获取敌方编成 |
 | `get_enemy_formation` | `(screen) → Formation` | 获取敌方阵型 |
 | `detect_ship_stats` | `(screen) → list[int]` | 检测我方血量 |
@@ -420,7 +417,7 @@ def my_enemy_info(screen):
     return {"CV": 1, "DD": 3, "SS": 2}
 
 runner = NormalFightRunner(
-    ctrl, plan, image_matcher,
+    ctrl, plan,
     get_enemy_info=my_enemy_info,
 )
 results = runner.run_for_times(5)

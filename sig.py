@@ -1,50 +1,53 @@
-决战控制-战备舰队获取 = PixelSignature(
-    name="决战控制-战备舰队获取",
+绿血特征 = PixelSignature(
+    name="绿血特征",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.4953, 0.1083, (253, 251, 255), tolerance=30.0),
-        PixelRule.of(0.5305, 0.1014, (254, 254, 254), tolerance=30.0),
-        PixelRule.of(0.4031, 0.1028, (255, 252, 255), tolerance=30.0),
-        PixelRule.of(0.4492, 0.1181, (254, 254, 254), tolerance=30.0),
+        PixelRule.of(0.0563, 0.5944, (77, 171, 135), tolerance=30.0),
+        PixelRule.of(0.0750, 0.5986, (74, 171, 102), tolerance=30.0),
+        PixelRule.of(0.0969, 0.5986, (75, 166, 107), tolerance=30.0),
+        PixelRule.of(0.1117, 0.5958, (69, 169, 107), tolerance=30.0),
+        PixelRule.of(0.1258, 0.5986, (82, 175, 130), tolerance=30.0),
+        PixelRule.of(0.1398, 0.5986, (66, 162, 114), tolerance=30.0),
+        PixelRule.of(0.1758, 0.5986, (78, 173, 115), tolerance=30.0),
+        PixelRule.of(0.1945, 0.5986, (71, 161, 109), tolerance=30.0),
+        PixelRule.of(0.2070, 0.6000, (80, 171, 112), tolerance=30.0),
+        PixelRule.of(0.2195, 0.6014, (77, 165, 140), tolerance=30.0),
+        PixelRule.of(0.2367, 0.5986, (85, 176, 141), tolerance=30.0),
+        PixelRule.of(0.2539, 0.5986, (80, 169, 121), tolerance=30.0),
     ],
 )
 
-决战控制-主要 = PixelSignature(
-    name="决战控制-主要",
+空血特征 = PixelSignature(
+    name="空血特征",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.0641, 0.0667, (218, 130, 20), tolerance=30.0),
-        PixelRule.of(0.7969, 0.9194, (34, 143, 246), tolerance=30.0),
-        PixelRule.of(0.9555, 0.9208, (34, 143, 246), tolerance=30.0),
-        PixelRule.of(0.7055, 0.9236, (34, 143, 246), tolerance=30.0),
-        PixelRule.of(0.1227, 0.0750, (215, 142, 14), tolerance=30.0),
+        PixelRule.of(0.0914, 0.4014, (54, 55, 59), tolerance=30.0),
+        PixelRule.of(0.1141, 0.4028, (52, 56, 59), tolerance=30.0),
+        PixelRule.of(0.1375, 0.4028, (54, 54, 56), tolerance=30.0),
+        PixelRule.of(0.1453, 0.2625, (62, 63, 67), tolerance=30.0),
+        PixelRule.of(0.1789, 0.2667, (73, 73, 73), tolerance=30.0),
+        PixelRule.of(0.2281, 0.2639, (77, 76, 84), tolerance=30.0),
+        PixelRule.of(0.1234, 0.5444, (59, 67, 56), tolerance=30.0),
+        PixelRule.of(0.1664, 0.5444, (49, 52, 57), tolerance=30.0),
+        PixelRule.of(0.2391, 0.5444, (48, 47, 52), tolerance=30.0),
+        PixelRule.of(0.3102, 0.5417, (91, 81, 80), tolerance=30.0),
+        PixelRule.of(0.3320, 0.2625, (71, 71, 71), tolerance=30.0),
     ],
 )
 
-决战控制-撤退 = PixelSignature(
-    name="决战控制-撤退",
+红血特征 = PixelSignature(
+    name="红血特征",
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.3430, 0.5667, (29, 124, 214), tolerance=30.0),
-        PixelRule.of(0.4180, 0.5694, (29, 124, 214), tolerance=30.0),
-        PixelRule.of(0.5813, 0.5667, (152, 36, 36), tolerance=30.0),
-        PixelRule.of(0.6578, 0.5639, (156, 38, 38), tolerance=30.0),
-        PixelRule.of(0.4953, 0.4875, (225, 225, 225), tolerance=30.0),
-        PixelRule.of(0.5023, 0.2819, (7, 117, 194), tolerance=30.0),
+        PixelRule.of(0.0664, 0.2625, (156, 1, 0), tolerance=30.0),
+        PixelRule.of(0.0781, 0.2639, (173, 20, 25), tolerance=30.0),
+        PixelRule.of(0.0906, 0.2639, (184, 34, 36), tolerance=30.0),
+        PixelRule.of(0.1070, 0.2639, (157, 14, 10), tolerance=30.0),
+        PixelRule.of(0.0672, 0.4014, (155, 3, 0), tolerance=30.0),
+        PixelRule.of(0.0750, 0.4014, (166, 4, 1), tolerance=30.0),
+        PixelRule.of(0.0695, 0.5403, (177, 26, 19), tolerance=30.0),
+        PixelRule.of(0.0844, 0.5403, (187, 31, 32), tolerance=30.0),
+        PixelRule.of(0.0984, 0.5403, (183, 36, 28), tolerance=30.0),
     ],
 )
 
-决战控制-选择前进 = PixelSignature(
-    name="决战控制-选择前进",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.4484, 0.8333, (37, 146, 249), tolerance=30.0),
-        PixelRule.of(0.4484, 0.8833, (28, 136, 237), tolerance=30.0),
-        PixelRule.of(0.5492, 0.8306, (38, 147, 250), tolerance=30.0),
-        PixelRule.of(0.5516, 0.8833, (28, 136, 237), tolerance=30.0),
-        PixelRule.of(0.7008, 0.9028, (13, 49, 85), tolerance=30.0),
-        PixelRule.of(0.7031, 0.9514, (9, 45, 79), tolerance=30.0),
-        PixelRule.of(0.8695, 0.9042, (13, 49, 85), tolerance=30.0),
-        PixelRule.of(0.8727, 0.9514, (9, 45, 79), tolerance=30.0),
-    ],
-)
