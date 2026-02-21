@@ -48,17 +48,13 @@ except Exception:
 
 from loguru import logger
 
-from autowsgr.combat.engine import CombatEngine
-from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
-from autowsgr.combat.rules import RuleEngine
+from autowsgr.combat import CombatMode, CombatPlan, NodeDecision, RuleEngine, CombatEngine
 from autowsgr.emulator import ADBController
 from autowsgr.infra import setup_logger
-from autowsgr.ops.fight import run_fight
-from autowsgr.ops.navigate import goto_page
-from autowsgr.ops.startup import ensure_game_ready
+from autowsgr.vision import EasyOCREngine
+from autowsgr.ops import goto_page, ensure_game_ready, run_fight
 from autowsgr.types import ConditionFlag, FightCondition, Formation, GameAPP, PageName, RepairMode
-from autowsgr.ui.battle.preparation import BattlePreparationPage
-from autowsgr.ui.map.page import MapPage
+from autowsgr.ui import MapPage
 
 
 # ── 默认值 ──
@@ -214,7 +210,7 @@ def main() -> None:
 
         # 导航到出征地图页 → 选择地图 → 进入准备页
         goto_page(ctrl, PageName.MAP)
-        map_page = MapPage(ctrl)
+        map_page = MapPage(ctrl, EasyOCREngine.create())
         map_page.enter_sortie(chapter=plan.chapter, map_num=plan.map_id)
 
         # 执行战斗
