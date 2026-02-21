@@ -81,7 +81,7 @@ SIG_START_SCREEN = PixelSignature(
         PixelRule.of(0.7719, 0.5500, (236, 222, 100), tolerance=30.0),
     ],
 )
-"""游戏「点击进入」启动画面像素签名。
+# 游戏「点击进入」启动画面像素签名。
 
 #: 「点击进入」画面点击目标（屏幕中央）
 _CLICK_START_SCREEN: tuple[float, float] = (0.5, 0.5)

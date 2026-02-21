@@ -1,8 +1,5 @@
 """战斗状态处理器 — 各状态节点的决策逻辑。
 
-``PhaseHandlersMixin`` 为 :class:`~autowsgr.combat.engine.CombatEngine`
-提供各阶段的处理器方法（``_handle_*``），
-将决策逻辑从主循环中分离以降低文件复杂度。
 
 每个 ``_handle_*`` 方法对应一个 :class:`~autowsgr.combat.state.CombatPhase`，
 执行该阶段所需的决策和操作，并返回 :class:`~autowsgr.types.ConditionFlag`
@@ -12,7 +9,6 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from loguru import logger
 
@@ -30,16 +26,12 @@ from autowsgr.combat.actions import (
     get_ship_drop,
     image_exist,
 )
-from autowsgr.combat.history import CombatEvent, EventType, FightResult
-from autowsgr.combat.plan import CombatMode, NodeDecision
-from autowsgr.combat.rules import RuleResult
-from autowsgr.combat.state import CombatPhase
+from .history import CombatEvent, EventType, CombatHistory
+from .plan import  NodeDecision, CombatPlan
+from .rules import RuleResult
+from .state import CombatPhase
 from autowsgr.types import ConditionFlag, Formation
-
-if TYPE_CHECKING:
-    from autowsgr.combat.history import CombatHistory
-    from autowsgr.combat.plan import CombatPlan
-    from autowsgr.emulator.controller import AndroidController
+from autowsgr.emulator import AndroidController
 
 
 class PhaseHandlersMixin:

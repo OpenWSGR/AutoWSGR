@@ -11,14 +11,6 @@
 数据来源:
   - 地图节点坐标: ``autowsgr/data/map/normal/{chapter}-{map}.yaml``
   - 小船图标模板: ``autowsgr/data/images/combat/ship_icon_{1,2}.png``
-
-坐标系统:
-  - YAML 文件中存储的是以 960×540 为基准的绝对像素坐标
-  - 运行时统一转换为相对坐标 (0.0–1.0) 以适配不同分辨率
-
-旧代码参考:
-  - ``NormalFightInfo._update_ship_position()`` — 模板匹配定位黄色小船
-  - ``NormalFightInfo._update_ship_point()`` — 节点判定算法
 """
 
 from __future__ import annotations

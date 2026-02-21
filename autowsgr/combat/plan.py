@@ -5,30 +5,6 @@
 
 ``CombatPlan`` 聚合多个节点的决策，并提供 YAML 加载能力。
 
-YAML 配置示例::
-
-    name: "5-4 周常"
-    chapter: 5
-    map: 4
-    fleet_id: 1
-    selected_nodes: ["A", "B", "C", "F"]
-    fight_condition: 4
-    repair_mode: 2
-
-    node_defaults:
-      formation: 2
-      night: false
-      proceed: true
-      proceed_stop: 2
-
-    node_args:
-      A:
-        formation: 4
-        enemy_rules:
-          - ["(BB >= 3)", "retreat"]
-      F:
-        formation: 1
-        night: true
 """
 
 from __future__ import annotations

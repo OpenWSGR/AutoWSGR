@@ -1,63 +1,35 @@
 """战斗引擎 — 状态机主循环。
-
-``CombatEngine`` 是战斗系统的核心，驱动以下完整流程::
-
-    状态识别 → 决策 → 操作 → 状态转移 → 重复
-
-它将旧代码中 ``FightPlan.fight()`` + ``FightPlan._make_decision()`` +
-``FightInfo.update_state()`` + ``DecisionBlock.make_decision()`` 的逻辑
-统一到一个清晰的状态机循环中。
-
-设计要点:
-  1. **自包含**: 图像匹配、敌方识别、战果检测等全部由引擎内部完成
-  2. **数据驱动**: 节点决策全部来自 ``CombatPlan`` (YAML 配置)
-  3. **安全规则**: 使用 ``RuleEngine`` 替代 ``eval()``
-  4. **完整历史**: 所有事件通过 ``CombatHistory`` 记录
-
-模块拆分::
-
-    callbacks.py  — CombatResult 与类型签名
-    handlers.py   — 各状态处理器 (PhaseHandlersMixin)
-    engine.py     — 主循环与状态识别 (本文件)
-
-使用方式::
-
-    engine = CombatEngine(device)
-    result = engine.fight(plan)
 """
 
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 from loguru import logger
 
-from autowsgr.combat.actions import (
+from .actions import (
     click_speed_up,
-    click_start_march,
     detect_result_grade,
     detect_ship_stats,
     get_enemy_formation,
     get_enemy_info,
 )
-from autowsgr.combat.callbacks import CombatResult
-from autowsgr.combat.handlers import PhaseHandlersMixin
-from autowsgr.combat.history import CombatEvent, CombatHistory, EventType, FightResult
-from autowsgr.combat.node_tracker import MapNodeData, NodeTracker
-from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
-from autowsgr.combat.recognition import recognize_enemy_ships, recognize_enemy_formation
-from autowsgr.combat.recognizer import (
+from .callbacks import CombatResult
+from .handlers import PhaseHandlersMixin
+from .history import CombatEvent, CombatHistory, EventType, FightResult
+from .node_tracker import MapNodeData, NodeTracker
+from .plan import CombatMode, CombatPlan, NodeDecision
+from .recognizer import (
     CombatRecognitionTimeout,
     CombatRecognizer,
-    RESULT_GRADE_TEMPLATES,
 )
-from autowsgr.combat.state import CombatPhase, resolve_successors
+from .state import CombatPhase, resolve_successors
 from autowsgr.types import ConditionFlag, Formation
 
-if TYPE_CHECKING:
-    from autowsgr.emulator.controller import AndroidController
-    from autowsgr.vision import OCREngine
+
+from autowsgr.emulator import AndroidController
+from autowsgr.vision import OCREngine
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -363,7 +335,6 @@ class CombatEngine(PhaseHandlersMixin):
 def run_combat(
     device: AndroidController,
     plan: CombatPlan,
-    image_matcher=None,
     *,
     ship_stats: list[int] | None = None,
     **_kwargs,
