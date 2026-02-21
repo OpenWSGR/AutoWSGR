@@ -321,10 +321,14 @@ class CombatEngine(PhaseHandlersMixin):
 
     def _make_image_matcher(self):
         """构建给 CombatRecognizer 用的 image_matcher 回调。"""
-        from autowsgr.combat.image_resources import resolve_image_matcher
+        from autowsgr.image_resources import TemplateKey
         from autowsgr.vision import ImageChecker
 
-        return resolve_image_matcher(ImageChecker.find_any)
+        def _match(screen, template_key: TemplateKey, confidence: float) -> bool:
+            templates = template_key.templates
+            return ImageChecker.find_any(screen, templates, confidence=confidence) is not None
+
+        return _match
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

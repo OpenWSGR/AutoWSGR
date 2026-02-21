@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
+from autowsgr.image_resources import TemplateKey
 from autowsgr.types import FightCondition, Formation
 
 if TYPE_CHECKING:
@@ -222,7 +223,7 @@ def check_blood(ship_stats: list[int], proceed_stop: int | list[int]) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def image_exist(device: AndroidController, template_key: str, confidence: float) -> bool:
+def image_exist(device: AndroidController, template_key: TemplateKey, confidence: float) -> bool:
     """检查模板是否存在于当前截图中。
 
     Parameters
@@ -239,15 +240,17 @@ def image_exist(device: AndroidController, template_key: str, confidence: float)
     bool
         ``True`` = 模板存在，``False`` = 不存在。
     """
-    from autowsgr.combat.image_resources import get_template
+    from autowsgr.image_resources import TemplateKey as _TK
     from autowsgr.vision import ImageChecker
 
     screen = device.screenshot()
-    templates = get_template(template_key)
+    if isinstance(template_key, str):
+        template_key = _TK(template_key)
+    templates = template_key.templates
     return ImageChecker.find_any(screen, templates, confidence=confidence) is not None
 
 
-def click_image(device: AndroidController, template_key: str, timeout: float) -> bool:
+def click_image(device: AndroidController, template_key: TemplateKey, timeout: float) -> bool:
     """等待并点击模板图像中心。
 
     Parameters
@@ -264,13 +267,15 @@ def click_image(device: AndroidController, template_key: str, timeout: float) ->
     bool
         ``True`` = 成功点击，``False`` = 超时未找到。
     """
-    from autowsgr.combat.image_resources import get_template
+    from autowsgr.image_resources import TemplateKey as _TK
     from autowsgr.vision import ImageChecker
 
+    if isinstance(template_key, str):
+        template_key = _TK(template_key)
     deadline = time.time() + timeout
     while time.time() < deadline:
         screen = device.screenshot()
-        templates = get_template(template_key)
+        templates = template_key.templates
         detail = ImageChecker.find_any(screen, templates, confidence=0.8)
         if detail is not None:
             device.click(*detail.center)
@@ -363,15 +368,15 @@ def detect_result_grade(device: AndroidController) -> str:
     CombatRecognitionTimeout
         无法识别到有效的等级。
     """
-    from autowsgr.combat.image_resources import get_template
-    from autowsgr.combat.recognizer import RESULT_GRADE_TEMPLATES, CombatRecognitionTimeout
+    from autowsgr.combat.recognizer import CombatRecognitionTimeout
+    from autowsgr.image_resources.keys import RESULT_GRADE_KEYS
     from autowsgr.vision import ImageChecker
 
     retry = 0
     while retry < 5:
         screen = device.screenshot()
-        for grade, key in RESULT_GRADE_TEMPLATES.items():
-            templates = get_template(key)
+        for grade, key in RESULT_GRADE_KEYS.items():
+            templates = key.templates
             if ImageChecker.find_any(screen, templates, confidence=0.8) is not None:
                 return grade
         time.sleep(0.25)

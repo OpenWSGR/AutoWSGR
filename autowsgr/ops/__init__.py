@@ -85,8 +85,6 @@ from autowsgr.ops.campaign import CampaignRunner
 # ── 简易战斗接口 ──
 from autowsgr.ops.fight import run_fight, run_fight_n
 
-# ── 图像模板资源 ──
-from autowsgr.ops.image_resources import Templates
 
 __all__ = [
     # 启动
@@ -129,6 +127,4 @@ __all__ = [
     # 简易战斗接口
     "run_fight",
     "run_fight_n",
-    # 图像模板资源
-    "Templates",
 ]

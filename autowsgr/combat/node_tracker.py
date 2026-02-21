@@ -22,7 +22,7 @@ from typing import Any
 
 from loguru import logger
 
-from autowsgr.combat.image_resources import get_template
+from autowsgr.image_resources import TemplateKey
 from autowsgr.vision import ImageChecker, ImageMatchDetail, ImageTemplate
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -221,7 +221,7 @@ class NodeTracker:
         tuple[float, float] | None
             检测到的相对坐标 ``(x, y)``；未检测到返回 ``None``。
         """
-        templates = get_template("ship_icon")
+        templates = TemplateKey.SHIP_ICON.templates
         detail: ImageMatchDetail | None = ImageChecker.find_any(
             screen, templates, confidence=0.7,
         )

@@ -30,6 +30,7 @@ from .history import CombatEvent, EventType, CombatHistory
 from .plan import  NodeDecision, CombatPlan
 from .rules import RuleResult
 from .state import CombatPhase
+from autowsgr.image_resources import TemplateKey
 from autowsgr.types import ConditionFlag, Formation
 from autowsgr.emulator import AndroidController
 
@@ -166,7 +167,7 @@ class PhaseHandlersMixin:
             return ConditionFlag.FIGHT_END
 
         # 检查迂回按钮是否可用
-        can_detour = image_exist(self._device, "bypass", 0.8)
+        can_detour = image_exist(self._device, TemplateKey.BYPASS, 0.8)
         want_detour = can_detour and decision.detour
 
         # 阵型规则优先
@@ -205,7 +206,7 @@ class PhaseHandlersMixin:
 
         # 执行迂回
         if want_detour:
-            clicked = click_image(self._device, "bypass", 2.5)
+            clicked = click_image(self._device, TemplateKey.BYPASS, 2.5)
             if clicked:
                 logger.info("执行迂回")
             else:
@@ -221,7 +222,7 @@ class PhaseHandlersMixin:
 
         # 远程导弹支援
         if decision.long_missile_support:
-            clicked = click_image(self._device, "missile_support", 2.5)
+            clicked = click_image(self._device, TemplateKey.MISSILE_SUPPORT, 2.5)
             if clicked:
                 logger.info("开启远程导弹支援")
             else:
@@ -388,7 +389,7 @@ class PhaseHandlersMixin:
 
     def _handle_flagship_severe_damage(self) -> ConditionFlag:
         """处理旗舰大破。"""
-        click_image(self._device, "flagship_damage", 2.0)
+        click_image(self._device, TemplateKey.FLAGSHIP_DAMAGE, 2.0)
         time.sleep(0.25)
 
         self._history.add(CombatEvent(

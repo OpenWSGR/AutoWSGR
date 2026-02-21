@@ -22,6 +22,7 @@ from loguru import logger
 
 from autowsgr.combat.state import CombatPhase
 from autowsgr.emulator.controller import AndroidController
+from autowsgr.image_resources import TemplateKey
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -46,78 +47,66 @@ class PhaseSignature:
         匹配到此状态后的额外等待时间（秒），用于等待 UI 动画完成。
     """
 
-    template_key: str
+    template_key: TemplateKey | None
     default_timeout: float = 15.0
     confidence: float = 0.8
     after_match_delay: float = 0.0
 
-    # template_key 命名规则:
-    #   与 autowsgr/combat/image_resources.py 中 PHASE_TEMPLATE_MAP 的键一一对应。
-    #   单模板:   "formation"、"proceed"、"night_battle" …
-    #   多模板任一: "get_ship_or_item"
-    #   战果评级: "grade_ss"、"grade_s" …
-
-
-# 各状态对应的视觉签名
-# template_key 命名规则:
-#   与 autowsgr/combat/image_resources.py 中 PHASE_TEMPLATE_MAP 的键一一对应。
-#   单模板: "formation"、"proceed" 等
-#   多模板任一匹配: "get_ship_or_item" 等
 
 PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
     CombatPhase.PROCEED: PhaseSignature(
-        template_key="proceed",
+        template_key=TemplateKey.PROCEED,
         default_timeout=7.5,
         after_match_delay=0.5,
     ),
     CombatPhase.FIGHT_CONDITION: PhaseSignature(
-        template_key="fight_condition",
+        template_key=TemplateKey.FIGHT_CONDITION,
         default_timeout=22.5,
     ),
     CombatPhase.SPOT_ENEMY_SUCCESS: PhaseSignature(
-        template_key="spot_enemy",
+        template_key=TemplateKey.SPOT_ENEMY,
         default_timeout=22.5,
     ),
     CombatPhase.FORMATION: PhaseSignature(
-        template_key="formation",
+        template_key=TemplateKey.FORMATION,
         default_timeout=22.5,
     ),
     CombatPhase.MISSILE_ANIMATION: PhaseSignature(
-        template_key="missile_animation",
+        template_key=TemplateKey.MISSILE_ANIMATION,
         default_timeout=3.0,
     ),
     CombatPhase.FIGHT_PERIOD: PhaseSignature(
-        template_key="fight_period",
+        template_key=TemplateKey.FIGHT_PERIOD,
         default_timeout=30.0,
     ),
     CombatPhase.NIGHT_PROMPT: PhaseSignature(
-        template_key="night_battle",
+        template_key=TemplateKey.NIGHT_BATTLE,
         default_timeout=150.0,
         after_match_delay=1.75,
     ),
     CombatPhase.RESULT: PhaseSignature(
-        template_key="result",
+        template_key=TemplateKey.RESULT,
         default_timeout=90.0,
     ),
     CombatPhase.GET_SHIP: PhaseSignature(
-        template_key="get_ship_or_item",
+        template_key=TemplateKey.GET_SHIP_OR_ITEM,
         default_timeout=5.0,
         after_match_delay=1.0,
     ),
     CombatPhase.FLAGSHIP_SEVERE_DAMAGE: PhaseSignature(
-        template_key="flagship_damage",
+        template_key=TemplateKey.FLAGSHIP_DAMAGE,
         default_timeout=7.5,
     ),
     CombatPhase.MAP_PAGE: PhaseSignature(
-        template_key="end_map_page",
+        template_key=TemplateKey.END_MAP_PAGE,
         default_timeout=7.5,
     ),
     CombatPhase.BATTLE_PAGE: PhaseSignature(
-        template_key="end_battle_page",
+        template_key=TemplateKey.END_BATTLE_PAGE,
         default_timeout=7.5,
     ),
     CombatPhase.EXERCISE_PAGE: PhaseSignature(
-        template_key="end_exercise_page",
+        template_key=TemplateKey.END_EXERCISE_PAGE,
         default_timeout=7.5,
     ),
 }
@@ -135,15 +124,17 @@ BATTLE_MODE_OVERRIDES: dict[CombatPhase, dict[str, float]] = {
 # 结果识别模板
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 战果等级对应的模板键（均在 PHASE_TEMPLATE_MAP 中注册）
-RESULT_GRADE_TEMPLATES: dict[str, str] = {
-    "SS": "grade_ss",
-    "S": "grade_s",
-    "A": "grade_a",
-    "B": "grade_b",
-    "C": "grade_c",
-    "D": "grade_d",
+RESULT_GRADE_KEYS: dict[str, TemplateKey] = {
+    "SS": TemplateKey.GRADE_SS,
+    "S": TemplateKey.GRADE_S,
+    "A": TemplateKey.GRADE_A,
+    "B": TemplateKey.GRADE_B,
+    "C": TemplateKey.GRADE_C,
+    "D": TemplateKey.GRADE_D,
 }
+
+# 向后兼容别名
+RESULT_GRADE_TEMPLATES = {k: v.value for k, v in RESULT_GRADE_KEYS.items()}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -166,7 +157,7 @@ class CombatRecognizer:
         设备控制器（用于截图）。
     image_matcher:
         图像匹配回调函数。签名:
-        ``(screen: ndarray, template_key: str, confidence: float) → bool``
+        ``(screen: ndarray, template_key: TemplateKey, confidence: float) → bool``
     mode_overrides:
         模式特定的签名覆盖（如战役模式下的超时调整）。
     """
@@ -185,7 +176,7 @@ class CombatRecognizer:
         """获取状态的视觉签名（含模式覆盖）。"""
         base = PHASE_SIGNATURES.get(phase)
         if base is None:
-            return PhaseSignature(template_key="", default_timeout=10.0)
+            return PhaseSignature(template_key=None, default_timeout=10.0)
 
         overrides = self._overrides.get(phase)
         if overrides is None:
@@ -257,7 +248,7 @@ class CombatRecognizer:
             screen = self._device.screenshot()
 
             for phase, sig, _ in phase_sigs:
-                if not sig.template_key:
+                if sig.template_key is None:
                     continue
                 if self._match(screen, sig.template_key, min_confidence):
                     # 匹配后延时
@@ -295,7 +286,7 @@ class CombatRecognizer:
         """
         for phase in candidates:
             sig = self.get_signature(phase)
-            if not sig.template_key:
+            if sig.template_key is None:
                 continue
             if self._match(screen, sig.template_key, sig.confidence):
                 return phase
@@ -308,7 +299,7 @@ class CombatRecognizer:
 
 from typing import Callable, Protocol
 
-ImageMatcherFunc = Callable[[np.ndarray, str, float], bool]
+ImageMatcherFunc = Callable[[np.ndarray, TemplateKey, float], bool]
 """图像匹配函数签名: ``(screen, template_key, confidence) → matched``"""
 
 BeforeMatchCallback = Callable[[], None]
