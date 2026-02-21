@@ -53,6 +53,9 @@ def setup_logger(
     rotation: str = "10 MB",
     retention: str = "7 days",
     save_images: bool = False,
+    show_pixel_detail: bool = False,
+    show_image_detail: bool = False,
+    show_screenshot_detail: bool = False,
 ) -> None:
     """配置全局 loguru logger。
 
@@ -73,8 +76,29 @@ def setup_logger(
         日志文件保留时长。
     save_images:
         是否开启截图自动保存（保存至 log_dir/images/）。
+    show_pixel_detail:
+        是否输出逐像素规则匹配的 DEBUG 日志（期望/实际/距离等）。
+        默认 ``False``，仅输出签名级别的结果。
+    show_image_detail:
+        是否输出逐模板匹配的 DEBUG 日志（置信度/坐标等）。
+        默认 ``False``，仅输出签名级别的结果。
+    show_screenshot_detail:
+        是否输出每次截图的完成日志（尺寸/耗时）。
+        默认 ``False``，避免在 DEBUG 模式下刷屏。
     """
     global _image_dir
+
+    # 同步像素检测细节日志开关
+    from autowsgr.vision.matcher import configure as _configure_matcher
+    _configure_matcher(show_pixel_detail=show_pixel_detail)
+
+    # 同步图像模板匹配细节日志开关
+    from autowsgr.vision.image_matcher import configure as _configure_image_matcher
+    _configure_image_matcher(show_image_detail=show_image_detail)
+
+    # 同步截图完成细节日志开关
+    from autowsgr.emulator.controller import configure as _configure_controller
+    _configure_controller(show_screenshot_detail=show_screenshot_detail)
 
     # 移除默认 handler，避免重复输出
     logger.remove()

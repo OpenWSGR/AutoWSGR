@@ -36,6 +36,22 @@ from airtest.core.api import device as get_device
 from airtest.core.error import AdbError, DeviceConnectionError
 from airtest.core.android import Android
 
+# ── 日志开关（由 infra.logger.setup_logger 写入）──────────────────────────────
+_show_screenshot_detail: bool = False
+
+
+def configure(*, show_screenshot_detail: bool = False) -> None:
+    """配置 controller 模块的日志行为。
+
+    Parameters
+    ----------
+    show_screenshot_detail:
+        ``True`` 时输出每次截图的完成日志（尺寸/耗时）；
+        ``False``（默认）时静默该日志，避免刷屏。
+    """
+    global _show_screenshot_detail
+    _show_screenshot_detail = show_screenshot_detail
+
 
 @dataclass(frozen=True, slots=True)
 class DeviceInfo:
@@ -356,10 +372,11 @@ class ADBController(AndroidController):
                         w, h, *self._resolution,
                     )
                     self._resolution = (w, h)
-                logger.debug(
-                    "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
-                    w, h, elapsed,
-                )
+                if _show_screenshot_detail:
+                    logger.debug(
+                        "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
+                        w, h, elapsed,
+                    )
                 return rgb
             if time.monotonic() - start > self._screenshot_timeout:
                 raise EmulatorConnectionError(

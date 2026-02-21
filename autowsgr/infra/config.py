@@ -101,6 +101,10 @@ class LogConfig(BaseModel):
     show_match_fight_stage: bool = True
     show_decisive_battle_info: bool = True
     show_ocr_info: bool = True
+    show_pixel_detail: bool = False
+    """像素规则逐条匹配日志（调试时可置 True 查看每个像素点的期望/实际/距离）。"""
+    show_image_detail: bool = False
+    """图像模板逐条匹配日志（调试时可置 True 查看每个模板的置信度/坐标）。"""
 
     @model_validator(mode="after")
     def _set_log_dir(self) -> LogConfig:
