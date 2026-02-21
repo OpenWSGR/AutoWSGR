@@ -34,7 +34,7 @@
 ### DecisiveConfig
 
 ```python
-from autowsgr.ops.decisive import DecisiveConfig
+from autowsgr.infra import DecisiveConfig
 
 config = DecisiveConfig(
     chapter=6,                    # 决战章节 (1~6)
@@ -298,7 +298,8 @@ db = DecisiveBattle(timer)
 db.run_for_times(3)
 
 # ── v2 ──
-from autowsgr.ops.decisive import DecisiveConfig, DecisiveController
+from autowsgr.ops.decisive import DecisiveController
+from autowsgr.infra import DecisiveConfig
 
 config = DecisiveConfig(chapter=6, level1=[...], level2=[...])
 controller = DecisiveController(ctrl, config, image_matcher=matcher)

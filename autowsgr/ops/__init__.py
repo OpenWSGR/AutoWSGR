@@ -66,7 +66,7 @@ from autowsgr.ops.build import BuildRecipe, build_ship, collect_built_ships
 from autowsgr.ops.repair import repair_in_bath
 
 # ── 决战 ──
-from autowsgr.ops.decisive import DecisiveConfig, DecisiveController, DecisiveResult
+from autowsgr.ops.decisive import DecisiveController, DecisiveResult
 
 # ── 演习 ──
 from autowsgr.ops.exercise import ExerciseRunner, run_exercise
@@ -114,7 +114,6 @@ __all__ = [
     # 浴室修理
     "repair_in_bath",
     # 决战
-    "DecisiveConfig",
     "DecisiveController",
     "DecisiveResult",
     # 演习

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import sys
 from enum import Enum
+from dataclasses import dataclass
 
 
 # ── 枚举基类 ──
@@ -261,6 +262,24 @@ class Formation(IntEnum):
         """阵型按钮的相对坐标 (x, y)。"""
         return 0.597, self.value * 0.185 - 0.037
 
+
+@dataclass
+class FleetSelection:
+    """战备舰队获取界面中单个可选项的信息。
+
+    Attributes
+    ----------
+    name:
+        舰船或技能名称。
+    cost:
+        购买所需分数。
+    click_position:
+        卡片点击位置 (相对坐标)。
+    """
+
+    name: str
+    cost: int
+    click_position: tuple[float, float]
 
 class SearchEnemyAction(StrEnum):
     """索敌后可执行的动作。"""

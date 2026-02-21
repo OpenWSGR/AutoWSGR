@@ -13,6 +13,7 @@ from .config import (
     NodeConfig,
     OCRConfig,
     UserConfig,
+    DecisiveConfig,
 )
 from .exceptions import (
     ActionFailedError,
@@ -50,6 +51,7 @@ __all__ = [
     "NodeConfig",
     "OCRConfig",
     "UserConfig",
+    "DecisiveConfig",
     # exceptions
     "ActionFailedError",
     "AutoWSGRError",

@@ -24,7 +24,7 @@ from loguru import logger
 from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.emulator import AndroidController
-from autowsgr.ops.decisive._config import DecisiveConfig
+from autowsgr.infra import DecisiveConfig
 from autowsgr.ops.decisive._logic import DecisiveLogic
 from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
 from autowsgr.types import Formation

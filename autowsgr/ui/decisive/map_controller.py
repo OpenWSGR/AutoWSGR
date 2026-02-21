@@ -14,13 +14,10 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
 
-from autowsgr.ops.decisive._config import DecisiveConfig
-from autowsgr.ops.decisive._logic import FleetSelection
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     CLICK_ADVANCE_CONFIRM,
@@ -43,13 +40,11 @@ from autowsgr.ui.decisive.overlay import (
     is_decisive_map_page,
 )
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.vision import ApiDll, PixelChecker, ROI, get_api_dll
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from autowsgr.emulator import AndroidController
-    from autowsgr.vision import OCREngine
+from autowsgr.vision import ApiDll, PixelChecker, ROI, get_api_dll, OCREngine
+from autowsgr.types import FleetSelection
+from autowsgr.infra import DecisiveConfig
+from collections.abc import Callable
+from autowsgr.emulator import AndroidController
 
 
 class DecisiveMapController:

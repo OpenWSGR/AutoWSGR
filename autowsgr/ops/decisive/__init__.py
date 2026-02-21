@@ -31,8 +31,8 @@
     decisive/
     ├── __init__.py           ← 本文件 (统一导出)
     ├── _state.py             ← DecisivePhase, DecisiveState
-    ├── _config.py            ← DecisiveConfig, MapData
-    ├── _logic.py             ← FleetSelection, DecisiveLogic (纯决策)
+    ├── _config.py            ← MapData
+    ├── _logic.py             ← DecisiveLogic (纯决策)
     └── _controller.py        ← DecisiveResult, DecisiveController (状态机编排)
 
 UI 层 (autowsgr.ui.decisive)::
@@ -57,7 +57,8 @@ UI 层 (autowsgr.ui.decisive)::
 
 ::
 
-    from autowsgr.ops.decisive import DecisiveController, DecisiveConfig
+    from autowsgr.ops.decisive import DecisiveController
+    from autowsgr.infra import DecisiveConfig
 
     config = DecisiveConfig(
         chapter=6,
@@ -74,10 +75,11 @@ UI 层 (autowsgr.ui.decisive)::
     results = controller.run_for_times(3)
 """
 
-from autowsgr.ops.decisive._config import DecisiveConfig, MapData
-from autowsgr.ops.decisive._controller import DecisiveController, DecisiveResult
-from autowsgr.ops.decisive._logic import DecisiveLogic, FleetSelection
-from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
+from autowsgr.types import FleetSelection
+from ._config import MapData
+from ._controller import DecisiveController, DecisiveResult
+from ._logic import DecisiveLogic
+from ._state import DecisivePhase, DecisiveState
 from autowsgr.ui.decisive import (
     ADVANCE_CARD_POSITIONS,
     CLICK_ADVANCE_CONFIRM,
