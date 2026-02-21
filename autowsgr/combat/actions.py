@@ -1,37 +1,16 @@
 """战斗操作函数 — 封装所有战斗中的点击与检测操作。
 
-将旧代码中分散在各处的坐标点击、图像检测等操作集中封装，
-使战斗引擎的决策逻辑与 UI 操作解耦。
+这个文件中的函数应该在测试 handlers 中被测试
 
-所有坐标均使用 **相对值** (0.0–1.0)，由 ``AndroidController`` 自动转换。
-
-坐标值来源 (960×540 分辨率映射):
-  - ``(677, 492)`` → ``(0.705, 0.911)`` 撤退按钮
-  - ``(855, 501)`` → ``(0.891, 0.928)`` 进入战斗按钮
-  - ``(325, 350)`` → ``(0.339, 0.648)`` 前进 / 追击按钮
-  - ``(615, 350)`` → ``(0.641, 0.648)`` 回港 / 撤退(夜战)按钮
-  - ``(915, 515)`` → ``(0.953, 0.954)`` 点击战果继续
-  - ``(900, 500)`` → ``(0.938, 0.926)`` 开始出征
-  - ``(250, 520)`` → ``(0.260, 0.963)`` 移动加速点击
-  - ``(380, 520)`` → ``(0.396, 0.963)`` 战役加速 / 跳过导弹
 """
 
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
-from loguru import logger
-
-if TYPE_CHECKING:
-    from autowsgr.emulator.controller import AndroidController
-
+from autowsgr.emulator.controller import AndroidController
 from autowsgr.types import FightCondition, Formation
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 坐标常量（相对值，基于 960×540）
-# ═══════════════════════════════════════════════════════════════════════════════
 
 
 class Coords:
@@ -77,50 +56,6 @@ class Coords:
     FLAGSHIP_CONFIRM = (0.500, 0.500)
     """旗舰大破确认（点击图片）。"""
 
-    # ── 演习阵型选择 ──
-    @staticmethod
-    def exercise_formation(formation: int) -> tuple[float, float]:
-        """演习中阵型按钮坐标。
-
-        旧代码: ``click(573, formation * 100 - 20)``
-        """
-        return 0.597, (formation * 100 - 20) / 540
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 血条检测位置
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class BloodBarPositions:
-    """血条检测像素位置（绝对坐标，用于像素颜色判断）。
-
-    基于 960×540 分辨率，分两组:
-      - 出征准备/结算界面（横排）
-      - 战果结算/MVP界面（纵排）
-    """
-
-    # [slot_index] → (x, y) 绝对坐标, 1-based (index 0 = None)
-    PREPARE_PAGE: list[tuple[int, int] | None] = [
-        None,
-        (56, 322),
-        (168, 322),
-        (280, 322),
-        (392, 322),
-        (504, 322),
-        (616, 322),
-    ]
-
-    RESULT_PAGE: list[tuple[int, int] | None] = [
-        None,
-        (60, 142),
-        (60, 217),
-        (60, 292),
-        (60, 367),
-        (60, 442),
-        (60, 517),
-    ]
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 操作函数
@@ -160,24 +95,8 @@ def click_formation(device: AndroidController, formation: Formation) -> None:
     time.sleep(2.0)
 
 
-def click_exercise_formation(device: AndroidController, formation: Formation) -> None:
-    """选择演习阵型（使用演习专用坐标）。
-
-    Parameters
-    ----------
-    device:
-        设备控制器。
-    formation:
-        目标阵型。
-    """
-    x, y = Coords.exercise_formation(formation.value)
-    device.click(x, y)
-    time.sleep(2.0)
-
-
 def click_fight_condition(device: AndroidController, condition: FightCondition) -> None:
     """选择战况。
-
     Parameters
     ----------
     device:
@@ -254,8 +173,6 @@ def click_skip_missile_animation(device: AndroidController) -> None:
 
 def check_blood(ship_stats: list[int], proceed_stop: int | list[int]) -> bool:
     """检查血量是否满足继续前进条件。
-
-    与旧代码 ``check_blood(blood, rule)`` 对应。
 
     Parameters
     ----------

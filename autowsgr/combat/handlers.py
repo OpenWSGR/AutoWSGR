@@ -19,7 +19,6 @@ from loguru import logger
 from autowsgr.combat.actions import (
     check_blood,
     click_enter_fight,
-    click_exercise_formation,
     click_fight_condition,
     click_formation,
     click_night_battle,
@@ -137,7 +136,9 @@ class PhaseHandlersMixin:
     # ── 各状态处理器 ─────────────────────────────────────────────────────────
 
     def _handle_fight_condition(self) -> ConditionFlag:
-        """处理战况选择。"""
+        """处理战况选择。
+        TODO: 需测试
+        """
         condition = self._plan.fight_condition
         click_fight_condition(self._device, condition)
         self._last_action = str(condition.value)
@@ -296,10 +297,7 @@ class PhaseHandlersMixin:
                 formation = decision.formation_when_spot_enemy_fails
 
         # 选择阵型
-        if self._plan.mode == CombatMode.EXERCISE:
-            click_exercise_formation(self._device, formation)
-        else:
-            click_formation(self._device, formation)
+        click_formation(self._device, formation)
 
         self._last_action = str(formation.value)
         self._history.add(CombatEvent(
