@@ -12,16 +12,12 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from loguru import logger
 
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.image_resources import TemplateKey
-from autowsgr.types import FightCondition, Formation
-
-if TYPE_CHECKING:
-    from autowsgr.vision import ImageChecker
+from autowsgr.types import FightCondition, Formation, RepairMode, ShipDamageState
 
 
 
@@ -183,35 +179,39 @@ def click_skip_missile_animation(device: AndroidController) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def check_blood(ship_stats: list[int], proceed_stop: int | list[int]) -> bool:
+def check_blood(
+    ship_stats: list[ShipDamageState],
+    proceed_stop: RepairMode | list[RepairMode],
+) -> bool:
     """检查血量是否满足继续前进条件。
 
     Parameters
     ----------
     ship_stats:
-        我方血量状态。索引 0 未用, 1-6 对应 6 个位置。
-        值含义: 0=正常, 1=中破, 2=大破, -1=无船, 3=修理中。
+        我方血量状态（0-indexed，长度 6）。
     proceed_stop:
         停止条件。可以是:
-        - 单个整数: 所有位置一致的阈值
+        - 单个 RepairMode: 所有位置一致的阈值
         - 列表(6个): 每个位置不同的阈值
-        值含义: -1=忽略, 其他=达到此破损等级则停止。
+
+        ``RepairMode.moderate_damage`` (1) 表示中破及以上停止,
+        ``RepairMode.severe_damage`` (2) 表示大破及以上停止。
 
     Returns
     -------
     bool
         ``True`` = 可以继续前进，``False`` = 应当回港。
     """
-    if isinstance(proceed_stop, int):
+    if isinstance(proceed_stop, RepairMode):
         rules = [proceed_stop] * 6
     else:
         rules = proceed_stop
 
-    for i in range(min(len(ship_stats) - 1, len(rules))):
-        stat = ship_stats[i + 1]  # 1-based
-        rule = rules[i]  # 0-based
+    for i in range(min(len(ship_stats), len(rules))):
+        stat = ship_stats[i]
+        rule = rules[i]
 
-        if stat == -1 or rule == -1:
+        if stat == ShipDamageState.NO_SHIP:
             continue
         if stat >= rule:
             return False
@@ -384,61 +384,39 @@ def detect_result_grade(device: AndroidController) -> str:
     raise CombatRecognitionTimeout("战果等级识别超时: 5 次尝试未识别到有效等级")
 
 
-def detect_ship_stats(device: AndroidController, mode: str, current_stats: list[int] | None = None) -> list[int]:
-    """检测我方舰队血量状态。
-
+def detect_ship_stats(
+    device: AndroidController,
+    pre_battle_stats: list[ShipDamageState],
+) -> list[ShipDamageState]:
+    """战斗结算页检测我方舰队血量状态。
+    note. 已通过测试
     Parameters
     ----------
     device:
         设备控制器。
-    mode:
-        检测模式：
-        - ``"prepare"`` 过时（返回空列表）
-        - ``"sumup"`` 战斗结算页检测（像素颜色匹配）
-    current_stats:
-        当前血量状态（仅在模式为 ``"prepare"`` 时使用回退）。
+    pre_battle_stats:
+        战斗开始前的血量状态（0-indexed，长度 6）。
+        若对应位置为 :attr:`ShipDamageState.NO_SHIP`，则无论检测结果如何
+        都保持无舰船状态。
 
     Returns
     -------
-    list[int]
-        长度 7 的列表（索引 0 占位），值含义：
-        0=绿血, 1=黄血, 2=红血, 3=维修中, -1=空位。
+    list[ShipDamageState]
+        长度 6 的列表（0-indexed）。
     """
-    from autowsgr.ui.battle.constants import (
-        BLOOD_TOLERANCE,
-        RESULT_BLOOD_BAR_PROBE,
-        RESULT_BLOOD_GREEN,
-        RESULT_BLOOD_RED,
-        RESULT_BLOOD_YELLOW,
-    )
+    from autowsgr.combat.recognition import RESULT_BLOOD_BAR_PROBE
+    from autowsgr.ui.battle.blood import classify_blood
     from autowsgr.vision import PixelChecker
 
-    if mode != "sumup":
-        return current_stats[:] if current_stats else [0] * 7
-
     screen = device.screenshot()
-    result = [0] * 7  # index 0 占位
+    result: list[ShipDamageState] = [ShipDamageState.NORMAL] * 6
 
     for slot, (x, y) in RESULT_BLOOD_BAR_PROBE.items():
+        if pre_battle_stats[slot] == ShipDamageState.NO_SHIP:
+            result[slot] = ShipDamageState.NO_SHIP
+            continue
         pixel = PixelChecker.get_pixel(screen, x, y)
+        result[slot] = classify_blood(pixel)
 
-        # 结算页只有绿/黄/红三种状态 (无空位/维修中)
-        if pixel.near(RESULT_BLOOD_GREEN, BLOOD_TOLERANCE):
-            result[slot] = 0
-        elif pixel.near(RESULT_BLOOD_YELLOW, BLOOD_TOLERANCE):
-            result[slot] = 1
-        elif pixel.near(RESULT_BLOOD_RED, BLOOD_TOLERANCE):
-            result[slot] = 2
-        else:
-            # 未匹配时使用战前状态回退
-            if current_stats and slot < len(current_stats):
-                result[slot] = current_stats[slot]
-            else:
-                result[slot] = 0
-            logger.debug(
-                "结算页舰船 {} 血量颜色未匹配，使用战前值: {}",
-                slot, result[slot],
-            )
-
-    logger.info("结算页血量检测: {}", result[1:])
+    logger.info("结算页血量检测: {}", [s.name for s in result])
     return result

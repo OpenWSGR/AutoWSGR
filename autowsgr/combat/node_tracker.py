@@ -1,5 +1,7 @@
 """舰船位置追踪与节点判定。
 
+note. 已通过测试
+
 在常规战（多节点地图）的战斗移动阶段，地图上有一个黄色小船图标
 沿航线移动，表示舰队当前位置。通过模板匹配追踪小船图标的位置，
 再结合预先标注的地图节点坐标数据，使用欧几里得距离判定舰队
@@ -207,9 +209,8 @@ class NodeTracker:
 
     def update_ship_position(self, screen) -> tuple[float, float] | None:
         """在战斗移动界面通过模板匹配更新黄色小船的位置。
-
+        TODO: 提高稳定性
         尝试匹配 ``ship_icon_1`` 和 ``ship_icon_2`` 两个模板图像
-        （对应旧代码 ``fight_image[7]`` 和 ``fight_image[8]``）。
 
         Parameters
         ----------
@@ -223,14 +224,10 @@ class NodeTracker:
         """
         templates = TemplateKey.SHIP_ICON.templates
         detail: ImageMatchDetail | None = ImageChecker.find_any(
-            screen, templates, confidence=0.7,
+            screen, templates, confidence=0.75,
         )
         if detail is not None:
             self._ship_position = detail.center
-            logger.debug(
-                "[NodeTracker] 舰船位置: ({:.4f}, {:.4f})",
-                detail.center[0], detail.center[1],
-            )
             return detail.center
         return None
 

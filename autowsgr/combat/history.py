@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
+from autowsgr.types import ShipDamageState
+
 
 class EventType(Enum):
     """战斗事件类型。"""
@@ -89,7 +91,7 @@ class CombatEvent:
     action: str = ""
     result: str = ""
     enemies: dict[str, int] | None = None
-    ship_stats: list[int] | None = None
+    ship_stats: list[ShipDamageState] | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
@@ -123,7 +125,9 @@ class FightResult:
 
     mvp: int = 0
     grade: str = ""
-    ship_stats: list[int] = field(default_factory=lambda: [0] * 7)
+    ship_stats: list[ShipDamageState] = field(
+        default_factory=lambda: [ShipDamageState.NORMAL] * 6,
+    )
 
     _GRADE_ORDER = ["D", "C", "B", "A", "S", "SS"]
 

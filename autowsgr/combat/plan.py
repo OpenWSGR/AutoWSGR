@@ -50,7 +50,7 @@ class NodeDecision:
     proceed:
         是否继续前进。
     proceed_stop:
-        达到此破损等级时停止前进 (1=中破, 2=大破)。
+        达到此破损等级时停止前进。
     enemy_rules:
         索敌规则引擎（按敌方舰种判断）。
     formation_rules:
@@ -72,7 +72,7 @@ class NodeDecision:
     formation: Formation = Formation.double_column
     night: bool = False
     proceed: bool = True
-    proceed_stop: int | list[int] = 2
+    proceed_stop: RepairMode | list[RepairMode] = RepairMode.severe_damage
     enemy_rules: RuleEngine | None = None
     formation_rules: RuleEngine | None = None
     detour: bool = False
@@ -101,18 +101,11 @@ class NodeDecision:
         if config.formation_when_spot_enemy_fails is not None:
             formation_when_fail = Formation(config.formation_when_spot_enemy_fails)
 
-        # proceed_stop 处理
-        proceed_stop: int | list[int]
-        if isinstance(config.proceed_stop, list):
-            proceed_stop = [int(x) for x in config.proceed_stop]
-        else:
-            proceed_stop = int(config.proceed_stop)
-
         return cls(
             formation=Formation(config.formation),
             night=config.night,
             proceed=config.proceed,
-            proceed_stop=proceed_stop,
+            proceed_stop=config.proceed_stop,
             enemy_rules=enemy_rules,
             formation_rules=formation_rules,
             detour=config.detour,

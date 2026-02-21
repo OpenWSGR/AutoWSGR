@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 from loguru import logger
@@ -23,6 +24,7 @@ from loguru import logger
 from autowsgr.combat.state import CombatPhase
 from autowsgr.emulator.controller import AndroidController
 from autowsgr.image_resources import TemplateKey
+from autowsgr.vision import ImageChecker
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -151,13 +153,13 @@ class CombatRecognizer:
     - 超时控制
     - 匹配后延时
 
+    内部直接调用 :class:`~autowsgr.vision.ImageChecker` 进行模板匹配，
+    无需外部注入回调函数。
+
     Parameters
     ----------
     device:
         设备控制器（用于截图）。
-    image_matcher:
-        图像匹配回调函数。签名:
-        ``(screen: ndarray, template_key: TemplateKey, confidence: float) → bool``
     mode_overrides:
         模式特定的签名覆盖（如战役模式下的超时调整）。
     """
@@ -165,12 +167,19 @@ class CombatRecognizer:
     def __init__(
         self,
         device: AndroidController,
-        image_matcher: ImageMatcherFunc,
         mode_overrides: dict[CombatPhase, dict[str, float]] | None = None,
     ) -> None:
         self._device = device
-        self._match = image_matcher
         self._overrides = mode_overrides or {}
+
+    @staticmethod
+    def _match_template(
+        screen: np.ndarray, key: TemplateKey, confidence: float,
+    ) -> bool:
+        """检查截图是否包含模板键对应的图像。"""
+        return ImageChecker.find_any(
+            screen, key.templates, confidence=confidence,
+        ) is not None
 
     def get_signature(self, phase: CombatPhase) -> PhaseSignature:
         """获取状态的视觉签名（含模式覆盖）。"""
@@ -194,7 +203,7 @@ class CombatRecognizer:
         self,
         candidates: list[tuple[CombatPhase, float | None]],
         *,
-        before_match: BeforeMatchCallback | None = None,
+        poll_action: Callable[[], None] | None = None,
     ) -> CombatPhase:
         """等待候选状态之一出现。
 
@@ -204,8 +213,8 @@ class CombatRecognizer:
         ----------
         candidates:
             ``(状态, 超时覆盖)`` 列表。超时为 ``None`` 使用签名默认值。
-        before_match:
-            每轮匹配前的回调（用于点击加速等操作）。
+        poll_action:
+            每轮匹配前执行的动作（如点击加速、节点追踪等）。
 
         Returns
         -------
@@ -242,15 +251,15 @@ class CombatRecognizer:
         )
 
         while time.time() < deadline:
-            if before_match is not None:
-                before_match()
+            if poll_action is not None:
+                poll_action()
 
             screen = self._device.screenshot()
 
             for phase, sig, _ in phase_sigs:
                 if sig.template_key is None:
                     continue
-                if self._match(screen, sig.template_key, min_confidence):
+                if self._match_template(screen, sig.template_key, min_confidence):
                     # 匹配后延时
                     if sig.after_match_delay > 0:
                         time.sleep(sig.after_match_delay)
@@ -288,22 +297,9 @@ class CombatRecognizer:
             sig = self.get_signature(phase)
             if sig.template_key is None:
                 continue
-            if self._match(screen, sig.template_key, sig.confidence):
+            if self._match_template(screen, sig.template_key, sig.confidence):
                 return phase
         return None
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 类型别名
-# ═══════════════════════════════════════════════════════════════════════════════
-
-from typing import Callable, Protocol
-
-ImageMatcherFunc = Callable[[np.ndarray, TemplateKey, float], bool]
-"""图像匹配函数签名: ``(screen, template_key, confidence) → matched``"""
-
-BeforeMatchCallback = Callable[[], None]
-"""每轮匹配前的回调函数。"""
 
 
 class CombatRecognitionTimeout(Exception):

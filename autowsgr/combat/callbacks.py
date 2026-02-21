@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from autowsgr.combat.history import CombatHistory
-from autowsgr.types import ConditionFlag
+from autowsgr.types import ConditionFlag, ShipDamageState
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -35,5 +35,7 @@ class CombatResult:
 
     flag: ConditionFlag = ConditionFlag.FIGHT_END
     history: CombatHistory = field(default_factory=CombatHistory)
-    ship_stats: list[int] = field(default_factory=lambda: [0] * 7)
+    ship_stats: list[ShipDamageState] = field(
+        default_factory=lambda: [ShipDamageState.NORMAL] * 6,
+    )
     node_count: int = 0

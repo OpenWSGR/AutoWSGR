@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import time
-from typing import Callable
 
 from loguru import logger
 
@@ -25,7 +24,7 @@ from .recognizer import (
     CombatRecognizer,
 )
 from .state import CombatPhase, resolve_successors
-from autowsgr.types import ConditionFlag, Formation
+from autowsgr.types import ConditionFlag, Formation, ShipDamageState
 
 
 from autowsgr.emulator import AndroidController
@@ -65,7 +64,7 @@ class CombatEngine(PhaseHandlersMixin):
         self._phase = CombatPhase.PROCEED
         self._last_action = "yes"
         self._node = "0"
-        self._ship_stats: list[int] = [0] * 7
+        self._ship_stats: list[ShipDamageState] = [ShipDamageState.NORMAL] * 6
         self._enemies: dict[str, int] = {}
         self._enemy_formation = ""
         self._history = CombatHistory()
@@ -84,7 +83,7 @@ class CombatEngine(PhaseHandlersMixin):
     def fight(
         self,
         plan: CombatPlan,
-        initial_ship_stats: list[int] | None = None,
+        initial_ship_stats: list[ShipDamageState] | None = None,
     ) -> CombatResult:
         """执行一次完整的战斗循环。
 
@@ -105,7 +104,6 @@ class CombatEngine(PhaseHandlersMixin):
         self._plan = plan
         self._recognizer = CombatRecognizer(
             self._device,
-            self._make_image_matcher(),
         )
         self._reset()
 
@@ -145,7 +143,10 @@ class CombatEngine(PhaseHandlersMixin):
             if decision == ConditionFlag.FIGHT_CONTINUE:
                 continue
             elif decision == ConditionFlag.SL:
+                # TODO: 这里出现了轻微的抽象泄露，因为 SL 需要调用 restart_game
                 result.flag = ConditionFlag.SL
+                from autowsgr.ops import restart_game
+                restart_game(self._device)
                 break
             elif decision == ConditionFlag.FIGHT_END:
                 logger.debug("战斗已结束，日志: {}", self._history)
@@ -210,21 +211,20 @@ class CombatEngine(PhaseHandlersMixin):
             [(c.name, t) for c, t in candidates],
         )
 
-        before_match = self._make_before_match_callback(last_phase)
+        # 构建轮询间动作（加速点击 + 节点追踪）
+        poll_action = self._get_poll_action(last_phase)
 
         new_phase = self._recognizer.wait_for_phase(
             candidates,
-            before_match=before_match,
+            poll_action=poll_action,
         )
 
         self._phase = new_phase
         self._after_match(new_phase)
         return new_phase
 
-    def _make_before_match_callback(
-        self, last_phase: CombatPhase
-    ) -> Callable[[], None] | None:
-        """创建每轮匹配前的回调 (加速点击)。"""
+    def _get_poll_action(self, last_phase: CombatPhase):
+        """根据当前状态和模式，返回每轮匹配前执行的动作。"""
         if self._plan.mode == CombatMode.NORMAL:
             if last_phase in (
                 CombatPhase.PROCEED,
@@ -275,7 +275,7 @@ class CombatEngine(PhaseHandlersMixin):
 
         elif phase == CombatPhase.RESULT:
             grade = detect_result_grade(self._device)
-            self._ship_stats = detect_ship_stats(self._device, "sumup", self._ship_stats)
+            self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
             fight_result = FightResult(grade=grade, ship_stats=self._ship_stats[:])
             self._history.add(CombatEvent(
                 event_type=EventType.RESULT,
@@ -319,20 +319,9 @@ class CombatEngine(PhaseHandlersMixin):
         """战斗历史。"""
         return self._history
 
-    def _make_image_matcher(self):
-        """构建给 CombatRecognizer 用的 image_matcher 回调。"""
-        from autowsgr.image_resources import TemplateKey
-        from autowsgr.vision import ImageChecker
-
-        def _match(screen, template_key: TemplateKey, confidence: float) -> bool:
-            templates = template_key.templates
-            return ImageChecker.find_any(screen, templates, confidence=confidence) is not None
-
-        return _match
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 兼容函数
+# 便捷函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -340,13 +329,8 @@ def run_combat(
     device: AndroidController,
     plan: CombatPlan,
     *,
-    ship_stats: list[int] | None = None,
-    **_kwargs,
+    ship_stats: list[ShipDamageState] | None = None,
 ) -> CombatResult:
-    """执行一次完整战斗的便捷函数 (兼容旧调用方式)。
-
-    现在 ``CombatEngine`` 已自包含所有识别能力，
-    ``image_matcher`` 和其余回调参数被忽略。
-    """
+    """执行一次完整战斗的便捷函数。"""
     engine = CombatEngine(device=device)
     return engine.fight(plan, initial_ship_stats=ship_stats)

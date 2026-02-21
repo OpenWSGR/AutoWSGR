@@ -31,7 +31,7 @@ from .plan import  NodeDecision, CombatPlan
 from .rules import RuleResult
 from .state import CombatPhase
 from autowsgr.image_resources import TemplateKey
-from autowsgr.types import ConditionFlag, Formation
+from autowsgr.types import ConditionFlag, Formation, ShipDamageState
 from autowsgr.emulator import AndroidController
 
 
@@ -46,7 +46,7 @@ class PhaseHandlersMixin:
         _plan: CombatPlan
         _node: str
         _last_action: str
-        _ship_stats: list[int]
+        _ship_stats: list[ShipDamageState]
         _enemies: dict[str, int]
         _enemy_formation: str
         _history: CombatHistory
@@ -59,7 +59,7 @@ class PhaseHandlersMixin:
     _plan: CombatPlan
     _node: str
     _last_action: str
-    _ship_stats: list[int]
+    _ship_stats: list[ShipDamageState]
     _enemies: dict[str, int]
     _enemy_formation: str
     _history: CombatHistory
