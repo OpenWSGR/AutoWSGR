@@ -25,7 +25,7 @@
 | `campaign` | 战役执行 | ✅ E2E 测试通过 |
 | `expedition` | 远征收取 | ✅ E2E 测试通过 |
 | `decisive` | 决战任务 | ❌ 未做 |
-| `exercise` | 演习对抗 | ❌ 未做 |
+| `exercise` | 演习对抗 | ✅ E2E 测试通过 |
 | `navigate` | 页面导航 | ❌ 未做 |
 | `build` | 建造收取 | ❌ 未做 |
 | `repair` | 修理 | ❌ 未做 |
@@ -69,9 +69,12 @@ python testing/ops/expedition.py 127.0.0.1:16384
 
 未做
 
-### exercise 测试 ❌
+### exercise 测试 ✅
 
-未做
+```bash
+python testing/ops/exercise.py --fleet 1
+python testing/ops/exercise.py --fleet 1 --rival 3
+```
 
 ### navigate 测试 ❌
 
