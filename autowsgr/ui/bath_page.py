@@ -222,7 +222,8 @@ class BathPage:
         from autowsgr.ui.page import wait_for_page
 
         logger.info("[UI] 浴室 → 打开选择修理 overlay")
-        self._ctrl.click(*CLICK_CHOOSE_REPAIR)
+        if not self.has_choose_repair_overlay(self._ctrl.screenshot()):
+            self._ctrl.click(*CLICK_CHOOSE_REPAIR)
         wait_for_page(
             self._ctrl,
             BathPage.has_choose_repair_overlay,
