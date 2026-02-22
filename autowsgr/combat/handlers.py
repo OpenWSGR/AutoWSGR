@@ -69,9 +69,6 @@ class PhaseHandlersMixin:
     def _make_decision(self, phase: CombatPhase) -> ConditionFlag:
         """根据当前状态做出决策并执行操作。
 
-        这是旧代码中 ``NormalFightPlan._make_decision()`` 与
-        ``DecisionBlock.make_decision()`` 的统一重写。
-
         Parameters
         ----------
         phase:

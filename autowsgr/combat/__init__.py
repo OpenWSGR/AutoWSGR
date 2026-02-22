@@ -27,7 +27,7 @@ from .state import CombatPhase
 from .rules import RuleEngine, RuleResult
 from .history import CombatHistory, CombatEvent
 from .node_tracker import MapNodeData, NodeTracker
-from .engine import CombatEngine
+from .engine import CombatEngine, run_combat
 
 __all__ = [
     "CombatPhase",
@@ -42,4 +42,5 @@ __all__ = [
     "NodeTracker",
     "CombatEngine",
     "CombatMode",
+    "run_combat",
 ]

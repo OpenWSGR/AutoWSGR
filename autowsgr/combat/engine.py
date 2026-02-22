@@ -182,11 +182,8 @@ class CombatEngine(PhaseHandlersMixin):
         if self._plan.mode == CombatMode.NORMAL:
             self._phase = CombatPhase.PROCEED
             self._last_action = "yes"
-        elif self._plan.mode == CombatMode.BATTLE:
+        elif self._plan.mode in [CombatMode.BATTLE, CombatMode.EXERCISE]:
             self._phase = CombatPhase.PROCEED
-            self._last_action = ""
-        elif self._plan.mode == CombatMode.EXERCISE:
-            self._phase = CombatPhase.SPOT_ENEMY_SUCCESS
             self._last_action = ""
 
     def _step(self) -> ConditionFlag:

@@ -1,29 +1,23 @@
 """演习战斗操作。
 
+TODO: 支持细化规则刷新对手
+TODO: 支持细化阵形规则
+TODO: 修船逻辑
 涉及跨页面操作: 主页面 → 地图页面(演习面板) → 出征准备 → 战斗 → 演习页面。
-
-旧代码参考: ``fight/exercise.py`` (NormalExercisePlan)
 """
 
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from autowsgr.combat.callbacks import CombatResult
-from autowsgr.combat.engine import CombatEngine, run_combat
-from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
+from autowsgr.combat import CombatResult, run_combat, CombatMode, CombatPlan, NodeDecision
 from autowsgr.infra import ExerciseConfig
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode
-from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.ui.map.page import MapPage
-from autowsgr.ui.map.data import MapPanel
-
-if TYPE_CHECKING:
-    from autowsgr.emulator import AndroidController
+from autowsgr.ui import BattlePreparationPage, RepairStrategy, MapPage, MapPanel
+from autowsgr.emulator import AndroidController
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -37,10 +31,10 @@ class ExerciseRunner:
     def __init__(
         self,
         ctrl: AndroidController,
-        config: ExerciseConfig,
+        fleet_id: int = 1,
     ) -> None:
         self._ctrl = ctrl
-        self._config = config
+        self._fleet_id = fleet_id
         self._results: list[CombatResult] = []
 
     # ── 公共接口 ──
@@ -53,39 +47,18 @@ class ExerciseRunner:
         list[CombatResult]
             每次演习的战斗结果列表。
         """
-        logger.info("[OPS] 开始演习 (最多 {} 次)", self._config.exercise_times)
         self._results = []
 
         # 1. 导航到演习面板
         self._enter_exercise_page()
-
-        for i in range(self._config.exercise_times):
-            logger.info("[OPS] 演习第 {}/{} 次", i + 1, self._config.exercise_times)
-
-            # 2. 选择对手
-            selected = self._select_rival(i)
-            if not selected:
-                logger.info("[OPS] 无可挑战的对手, 演习结束")
-                break
-
-            # 3. 出征准备
-            self._prepare_for_battle()
-
-            # 4. 执行战斗
-            result = self._do_combat()
-            self._results.append(result)
-
-            if result.flag == ConditionFlag.SL:
-                logger.warning("[OPS] 演习 SL, 重试")
-                self._enter_exercise_page()
-                continue
-
-            # 5. 等待回到演习页面
-            time.sleep(2.0)
-
-        logger.info("[OPS] 演习完成, 共 {} 次", len(self._results))
-        goto_page(self._ctrl, PageName.MAIN)
+        rivals_status = MapPage(self._ctrl).get_exercise_rival_status()
+        logger.info("[OPS] 当前可挑战对手: {}", rivals_status)
+        for index, rival in enumerate(rivals_status.rivals, start=1):
+            if rival:
+                logger.info("[OPS] 正在挑战对手 {}", index)
+                self._results.append(self._challenge_rival(index))
         return self._results
+
 
     # ── 导航 ──
 
@@ -97,14 +70,18 @@ class ExerciseRunner:
         time.sleep(1.0)
 
     # ── 对手选择 ──
-
-    def _select_rival(self, attempt: int) -> bool:
+    
+    def _challenge_rival(self, rival: int) -> CombatResult:
         """选择一个可挑战的对手。"""
-        rival_index = (attempt % 4) + 1
+        self._enter_exercise_page()
+        if rival < 1 or rival > 5:
+            raise ValueError(f"无效的对手索引: {rival} (应在 1–5 之间)")
+        logger.info("[OPS] 选择对手 {}", rival)
         map_page = MapPage(self._ctrl)
-        map_page.click_rival(rival_index)
-        time.sleep(1.5)
-        return True
+        map_page.select_exercise_rival(rival)
+        map_page.enter_exercise_battle()
+        self._prepare_for_battle()
+        return self._do_combat()
 
     # ── 出征准备 ──
 
@@ -114,14 +91,8 @@ class ExerciseRunner:
         page = BattlePreparationPage(self._ctrl)
 
         # 选择舰队
-        page.select_fleet(self._config.fleet_id)
+        page.select_fleet(self._fleet_id)
         time.sleep(0.5)
-
-        # 修理
-        if self._config.repair_mode == RepairMode.moderate_damage:
-            page.apply_repair(RepairStrategy.MODERATE)
-        elif self._config.repair_mode == RepairMode.severe_damage:
-            page.apply_repair(RepairStrategy.SEVERE)
 
         # 出征
         page.start_battle()
@@ -135,8 +106,8 @@ class ExerciseRunner:
             name="演习",
             mode=CombatMode.EXERCISE,
             default_node=NodeDecision(
-                formation=Formation(self._config.formation),
-                night=self._config.night,
+                formation=Formation.single_column,
+                night=True
             ),
         )
 
@@ -148,10 +119,12 @@ class ExerciseRunner:
 
 def run_exercise(
     ctrl: AndroidController,
-    config: ExerciseConfig | None = None,
+    fleet_id: int = 1,
+    rival: int | None = 1,
 ) -> list[CombatResult]:
     """执行演习的便捷函数。"""
-    if config is None:
-        config = ExerciseConfig()
-    runner = ExerciseRunner(ctrl, config)
-    return runner.run()
+    runner = ExerciseRunner(ctrl, fleet_id)
+    if rival is None:
+        return runner.run()
+    return [runner._challenge_rival(rival)]
+

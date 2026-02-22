@@ -179,6 +179,11 @@ BATTLE_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
 # ── 演习 ──
 
 EXERCISE_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
+    CombatPhase.PROCEED: [
+        CombatPhase.SPOT_ENEMY_SUCCESS,
+        CombatPhase.FORMATION,
+        CombatPhase.FIGHT_PERIOD,
+    ],
     CombatPhase.SPOT_ENEMY_SUCCESS: [
         CombatPhase.FORMATION,
         CombatPhase.FIGHT_PERIOD,
