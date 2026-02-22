@@ -21,6 +21,14 @@ class CombatPhase(Enum):
     每个枚举值代表战斗状态机中的一个离散状态。
     """
 
+    # ── 出征过渡 ──
+    START_FIGHT = auto()
+    """点击出征后的短暂过渡：检测船坞已满或进入战斗。"""
+
+    # ── 船坞已满 ──
+    DOCK_FULL = auto()
+    """出征时检测到船坞已满弹窗。"""
+
     # ── 航行 / 继续 ──
     PROCEED = auto()
     """继续前进 / 回港提示。"""
@@ -91,6 +99,15 @@ PhaseBranch = list[PhaseTarget] | dict[str, list[PhaseTarget]]
 # ── 常规战 ──
 
 NORMAL_FIGHT_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
+    CombatPhase.START_FIGHT: [
+        CombatPhase.FIGHT_CONDITION,
+        CombatPhase.SPOT_ENEMY_SUCCESS,
+        CombatPhase.FORMATION,
+        CombatPhase.FIGHT_PERIOD,
+        CombatPhase.MAP_PAGE,
+        CombatPhase.DOCK_FULL,
+    ],
+    CombatPhase.DOCK_FULL: [],
     CombatPhase.PROCEED: {
         "yes": [
             CombatPhase.FIGHT_CONDITION,
@@ -154,6 +171,13 @@ NORMAL_FIGHT_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
 # ── 战役 ──
 
 BATTLE_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
+    CombatPhase.START_FIGHT: [
+        CombatPhase.SPOT_ENEMY_SUCCESS,
+        CombatPhase.FORMATION,
+        CombatPhase.FIGHT_PERIOD,
+        CombatPhase.DOCK_FULL,
+    ],
+    CombatPhase.DOCK_FULL: [],
     CombatPhase.PROCEED: [
         CombatPhase.SPOT_ENEMY_SUCCESS,
         CombatPhase.FORMATION,
@@ -179,6 +203,11 @@ BATTLE_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
 # ── 演习 ──
 
 EXERCISE_TRANSITIONS: dict[CombatPhase, PhaseBranch] = {
+    CombatPhase.START_FIGHT: [
+        CombatPhase.SPOT_ENEMY_SUCCESS,
+        CombatPhase.FORMATION,
+        CombatPhase.FIGHT_PERIOD,
+    ],
     CombatPhase.PROCEED: [
         CombatPhase.SPOT_ENEMY_SUCCESS,
         CombatPhase.FORMATION,

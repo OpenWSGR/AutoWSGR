@@ -57,6 +57,9 @@ class TemplateKey(Enum):
     END_BATTLE_PAGE = "end_battle_page"
     END_EXERCISE_PAGE = "end_exercise_page"
 
+    # ── 船坞已满 ──
+    DOCK_FULL = "dock_full"
+
     # ── 战果评级 ──
     GRADE_SS = "grade_ss"
     GRADE_S = "grade_s"
@@ -106,6 +109,8 @@ def _build_map() -> dict[TemplateKey, list[ImageTemplate]]:
         TemplateKey.END_MAP_PAGE: [T.END_MAP_PAGE],
         TemplateKey.END_BATTLE_PAGE: [T.END_BATTLE_PAGE],
         TemplateKey.END_EXERCISE_PAGE: [T.END_EXERCISE_PAGE],
+        # 船坞已满
+        TemplateKey.DOCK_FULL: [T.DOCK_FULL],
         # 战果评级
         TemplateKey.GRADE_SS: [T.Result.SS],
         TemplateKey.GRADE_S: [T.Result.S],

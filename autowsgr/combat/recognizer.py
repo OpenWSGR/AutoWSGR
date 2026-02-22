@@ -61,6 +61,14 @@ PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
         default_timeout=7.5,
         after_match_delay=0.5,
     ),
+    CombatPhase.START_FIGHT: PhaseSignature(
+        template_key=None,  # 过渡态，不直接用模板匹配
+        default_timeout=3.0,
+    ),
+    CombatPhase.DOCK_FULL: PhaseSignature(
+        template_key=TemplateKey.DOCK_FULL,
+        default_timeout=3.0,
+    ),
     CombatPhase.FIGHT_CONDITION: PhaseSignature(
         template_key=TemplateKey.FIGHT_CONDITION,
         default_timeout=22.5,

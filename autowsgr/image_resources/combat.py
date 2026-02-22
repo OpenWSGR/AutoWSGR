@@ -77,6 +77,9 @@ class CombatTemplates:
     END_BATTLE_PAGE = LazyTemplate("combat/end_battle_page.png", "end_battle_page")
     END_EXERCISE_PAGE = LazyTemplate("combat/end_exercise_page.png", "end_exercise_page")
 
+    # ── 船坞已满 ──
+    DOCK_FULL = LazyTemplate("build/ship_full_depot.png", "dock_full")
+
     # ── 地图追踪 ──
     SHIP_ICON_1 = LazyTemplate("combat/ship_icon_1.png", "ship_icon_1", source_resolution=(1280, 720))
     SHIP_ICON_2 = LazyTemplate("combat/ship_icon_2.png", "ship_icon_2", source_resolution=(1280, 720))
