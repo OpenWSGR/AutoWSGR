@@ -83,7 +83,7 @@ class NavConfig:
         是否自动处理游戏浮层 (新闻公告等)。
     """
 
-    max_retries: int = 3
+    max_retries: int = 2
     retry_delay: float = 1.0
     timeout: float = 5.0
     interval: float = 0.5
@@ -278,44 +278,22 @@ def click_and_wait_for_page(
 ) -> np.ndarray:
     """点击 + 等待到达目标页面，内置重试。
 
-    执行 ``config.max_retries`` 轮「点击 → wait_for_page」，
-    每轮超时后等待 ``config.retry_delay`` 秒再次点击。
-
     Raises
     ------
     NavigationError
-        所有重试均超时。
+        点击后未到达目标页面。
     NetworkError
         遇到无法自动消除的浮层。
     """
-    last_err: NavigationError | None = None
-
-    for attempt in range(1, config.max_retries + 1):
-        if attempt > 1:
-            logger.warning(
-                "[UI] 点击重试 {}/{}: {} → {} (等 {:.1f}s)",
-                attempt, config.max_retries, source or "?", target or "?", config.retry_delay,
-            )
-            time.sleep(config.retry_delay)
-
-        ctrl.click(*click_coord)
-
-        try:
-            return wait_for_page(
-                ctrl, checker,
-                timeout=config.timeout,
-                interval=config.interval,
-                handle_overlays=config.handle_overlays,
-                source=source,
-                target=target,
-            )
-        except NavigationError as e:
-            last_err = e
-            logger.warning("[UI] 点击后超时 ({}/{}): {} → {}", attempt, config.max_retries, source or "?", target or "?")
-
-    raise NavigationError(
-        f"导航失败 (已重试 {config.max_retries} 次): {source or '?'} → {target or '?'}"
-    ) from last_err
+    ctrl.click(*click_coord)
+    return wait_for_page(
+        ctrl, checker,
+        timeout=config.timeout,
+        interval=config.interval,
+        handle_overlays=config.handle_overlays,
+        source=source,
+        target=target,
+    )
 
 
 # ---------------------------------------------------------------------------
