@@ -17,6 +17,7 @@ from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, RepairStrategy, MapPage
 from autowsgr.emulator import AndroidController
+from autowsgr.infra import UserConfig
 from autowsgr.vision import EasyOCREngine
 
 class NormalFightRunner:
@@ -26,9 +27,19 @@ class NormalFightRunner:
         self,
         ctrl: AndroidController,
         plan: CombatPlan,
+        *,
+        config: UserConfig | None = None,
     ) -> None:
         self._ctrl = ctrl
         self._plan = plan
+
+        # 从 config 读取拆船配置；无 config 时使用默认值
+        if config is not None:
+            self._dock_full_destroy = config.dock_full_destroy
+            self._destroy_ship_types = config.destroy_ship_types or None
+        else:
+            self._dock_full_destroy = True
+            self._destroy_ship_types = None
 
         # 确保 plan 模式是 NORMAL
         if plan.mode != CombatMode.NORMAL:
@@ -191,8 +202,34 @@ class NormalFightRunner:
     # ── 结果处理 ──
 
     def _handle_result(self, result: CombatResult) -> None:
-        """处理战斗结果。"""
+        """处理战斗结果。
+
+        DOCK_FULL 由战斗引擎在 START_FIGHT → DOCK_FULL 转移中检测并返回，
+        此处根据配置决定自动解装或保持标志交由上层处理。
+        """
+        if result.flag == ConditionFlag.DOCK_FULL:
+            self._handle_dock_full(result)
+            return
         logger.info("[OPS] 常规战结果: {}", result.flag.value)
+
+    def _handle_dock_full(self, result: CombatResult) -> None:
+        """船坞已满: 按配置自动解装并重试，或保持 DOCK_FULL 标志。"""
+        if self._dock_full_destroy:
+            from autowsgr.ops.destroy import destroy_ships
+
+            logger.warning("[OPS] 船坞已满，执行自动解装")
+            # 点击弹窗确认按钮 (legacy 坐标)
+            self._ctrl.click(0.38, 0.565)
+            destroy_ships(
+                self._ctrl,
+                ship_types=self._destroy_ship_types,
+            )
+            # 解装后标记为成功 (调用方可根据需要重试出征)
+            result.flag = ConditionFlag.OPERATION_SUCCESS
+            return
+
+        logger.warning("[OPS] 船坞已满, 未开启自动解装")
+        # result.flag 保持 DOCK_FULL, 由 run_for_times 终止循环
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -206,10 +243,13 @@ def run_normal_fight(
     *,
     times: int = 1,
     gap: float = 0.0,
+    config: UserConfig | None = None,
 ) -> list[CombatResult]:
     """执行常规战的便捷函数。"""
     runner = NormalFightRunner(
-        ctrl, plan,
+        ctrl,
+        plan,
+        config=config,
     )
     return runner.run_for_times(times, gap=gap)
 

@@ -77,9 +77,8 @@ def _build_7_4_6ss_plan() -> CombatPlan:
         enemy_rules=default_rules,
     )
 
-    # B 节点: 单纵阵 (对潜), 特殊规则
     b_rules = RuleEngine.from_legacy_rules([
-        ["SS != 2", "retreat"],
+        ["CL >= 3", "retreat"],
     ])
     node_b = NodeDecision(
         formation=Formation.single_column,
@@ -196,7 +195,7 @@ def main() -> None:
         sys.exit(1)
 
     # ── 初始化：确保游戏已就绪 ──
-    ensure_game_ready(ctrl, GameAPP.official)
+    # ensure_game_ready(ctrl, GameAPP.official)
 
     # ── 初始化引擎 ──
     runner = NormalFightRunner(ctrl, plan)
