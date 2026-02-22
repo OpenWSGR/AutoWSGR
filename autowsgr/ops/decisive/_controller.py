@@ -26,12 +26,13 @@ from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.emulator import AndroidController
 from autowsgr.infra import DecisiveConfig
 from autowsgr.ops.decisive._logic import DecisiveLogic
-from autowsgr.ops.decisive._state import DecisivePhase, DecisiveState
-from autowsgr.types import Formation, ShipDamageState
-from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.ui.decisive import DecisiveMapController, DecisiveOverlay
-from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
+from autowsgr.ops.decisive._state import DecisiveState
+from autowsgr.types import DecisivePhase, Formation, ShipDamageState
+from autowsgr.ui import BattlePreparationPage, RepairStrategy
+from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
+from autowsgr.ui.decisive.overlay import DecisiveOverlay
 from autowsgr.vision import ApiDll
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,6 +93,7 @@ class DecisiveController:
         self._dll = dll
         self._state = DecisiveState(chapter=config.chapter)
         self._logic = DecisiveLogic(config, self._state)
+        self._battle_page = DecisiveBattlePage(self._ctrl, ocr=self._ocr)
         self._map = DecisiveMapController(
             ctrl, config, ocr=ocr, dll=dll, image_matcher=image_matcher,
         )
@@ -135,11 +137,13 @@ class DecisiveController:
         """决战主状态机循环。
 
         状态转移::
-
-            ENTER_MAP -> [CHOOSE_FLEET] -> MAP_READY
-            MAP_READY -> ADVANCE_CHOICE | PREPARE_COMBAT
-            PREPARE_COMBAT -> IN_COMBAT -> NODE_RESULT
-            NODE_RESULT -> MAP_READY | STAGE_CLEAR | RETREAT | LEAVE
+            ENTER_MAP -> ADVANCE_CHOICE | MAP_READY
+            ADVANCE_CHOICE -> CHOOSE_FLEET
+            CHOSE_FLEET -> MAP_READY
+            MAP_READY -> PREPARE_COMBAT | IN_COMBAT | RETREAT | LEAVE
+            PREPARE_COMBAT -> IN_COMBAT | RETREAT | LEAVE
+            IN_COMBAT -> NODE_RESULT
+            NODE_RESULT -> STAGE_CLEAR | ADVANCE_CHOICE | CHOOSE_FLEET
             STAGE_CLEAR -> ENTER_MAP | CHAPTER_CLEAR
             RETREAT -> (reset) -> ENTER_MAP
             LEAVE -> FINISHED
@@ -200,18 +204,8 @@ class DecisiveController:
         self._state.node = "A"
 
         self._map.click_sortie()
-        screen = self._map.poll_for_map_or_overlay(timeout=15.0)
-        overlay = self._map.detect_overlay(screen)
+        self._state.phase = self._map.poll_for_map_or_overlay(timeout=15.0)
 
-        if overlay == DecisiveOverlay.FLEET_ACQUISITION:
-            self._state.phase = DecisivePhase.CHOOSE_FLEET
-        elif self._map.is_advance_choice(screen):
-            self._state.phase = DecisivePhase.ADVANCE_CHOICE
-        elif self._map.is_map_page(screen):
-            self._state.phase = DecisivePhase.MAP_READY
-        else:
-            logger.warning("[决战] 进入地图后页面状态未知, 尝试继续")
-            self._state.phase = DecisivePhase.MAP_READY
 
     def _handle_choose_fleet(self) -> None:
         """战备舰队获取：OCR 识别选项 → 购买决策 → 关闭弹窗。"""
@@ -325,7 +319,6 @@ class DecisiveController:
         result = run_combat(
             self._ctrl,
             plan,
-            self._image_matcher,
             ship_stats=self._state.ship_stats[:],
         )
 
@@ -404,12 +397,9 @@ class DecisiveController:
         logger.info("[决战] 重置章节 (Ex-{})", self._config.chapter)
         self._state.reset()
 
-        # 创建总览页控制器执行 UI 操作
-        overview = DecisiveBattlePage(self._ctrl, ocr=self._ocr)
-
         # 导航到目标章节
         try:
-            overview.navigate_to_chapter(self._config.chapter)
+            self._battle_page.navigate_to_chapter(self._config.chapter)
         except Exception:
             logger.warning("[决战] 章节导航失败, 假设已在目标章节")
 

@@ -25,7 +25,7 @@ from testing.ui._framework import UIControllerTestRunner, connect_device, ensure
 
 
 def run_test(runner: UIControllerTestRunner) -> None:
-    from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
+    from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
     from autowsgr.ui.main_page import MainPage
 
     db_page = DecisiveBattlePage(runner.ctrl)
@@ -64,7 +64,7 @@ def _navigate_to(ctrl, pause: float) -> None:
     """从任意已知页面导航到决战总览。"""
     import time
 
-    from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
+    from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
     from autowsgr.ui.main_page import MainPage, MainPageTarget
     from autowsgr.ui.map.page import MapPage
     from autowsgr.ui.map.data import MapPanel
@@ -96,7 +96,7 @@ def main() -> None:
 
     logger.info("=== 决战页面 e2e 测试开始 ===")
     ctrl = connect_device(args.serial)
-    from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
+    from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
     if not ensure_page(
         ctrl, DecisiveBattlePage.is_current_page,
         lambda: _navigate_to(ctrl, args.pause),

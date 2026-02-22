@@ -1,43 +1,15 @@
-"""决战页面 UI 控制器。
+"""决战总览页 UI 控制器。
 
-对应游戏 **决战地图总览页** — 从地图页「决战」面板点击对应章节后进入，
-呈现当前章节的地图布局、进攻方向、重置状态以及章节切换控件。
-
-导航关系::
-
-    地图页面 (决战 panel)
-        └──[点击进入]──▶  决战页面  (本页)
-                               ├── ◁ 左上角 ─▶ 主页面  (跨级直通)
-                               └── ◁/▷ 章节导航 ─▶ 停留本页
-
-入口:
-    从地图页「决战」面板进入由 :meth:`~autowsgr.ui.map.page.MapPage.enter_decisive`
-    完成 (属于 map_page 的职责)。
-
-章节导航坐标说明:
-    参考旧代码 ``_move_chapter``：
-    ``timer.click(788, 507)`` → 向前一章 (◁)
-    ``timer.click(900, 507)`` → 向后一章 (▷)
+对应游戏 **决战地图总览页** — 从地图页「决战」面板进入。
 
 使用方式::
 
-    from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
-    from autowsgr.ui.map.page import MapPage
+    from autowsgr.ui.decisive import DecisiveBattlePage
 
-    map_page = MapPage(ctrl, ocr=ocr)
-    decisive_page = DecisiveBattlePage(ctrl, ocr=ocr)
-
-    # 从地图进入决战页面 (由 map_page 负责)
-    map_page.enter_decisive()
-
-    # 导航到指定章节
-    decisive_page.navigate_to_chapter(6)
-
-    # 购买磁盘
-    decisive_page.buy_ticket(use='steel', times=3)
-
-    # 退出
-    decisive_page.go_back()
+    page = DecisiveBattlePage(ctrl, ocr=ocr)
+    stage = page.recognize_stage(screen, chapter=6)
+    page.enter_map()
+    page.go_back()
 """
 
 from __future__ import annotations
@@ -50,8 +22,15 @@ from loguru import logger
 
 from autowsgr.emulator import AndroidController
 from autowsgr.types import PageName
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
-from autowsgr.vision import MatchStrategy, PixelChecker, PixelRule, PixelSignature
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.vision import (
+    Color,
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+    OCREngine,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,52 +47,35 @@ PAGE_SIGNATURE = PixelSignature(
         PixelRule.of(0.0453, 0.0667, (38, 39, 43),  tolerance=30.0),
     ],
 )
-"""决战页面像素签名。
-
-特征点分布:
-    - (0.8016, 0.8458), (0.9695, 0.8500), (0.7641, 0.8611) —
-      底部章节导航/按钮栏深蓝色背景
-    - (0.0453, 0.0667) — 左上角回退区域深色背景
-"""
+"""决战页面像素签名。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 坐标常量
+# 坐标常量 (相对坐标 0.0–1.0, 参考分辨率 960×540)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# ── 通用导航 ──
 
 CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """左上角回退按钮 ◁ — 直接返回主页面。"""
 
-# ── 底部章节导航箭头 ──
-
 CLICK_PREV_CHAPTER: tuple[float, float] = (788 / 960, 507 / 540)
-"""向前一章 ◁ — 切换到编号较小的章节 (如 Ex-6 → Ex-5)。
-
-坐标换算自旧代码 ``_move_chapter`` → ``timer.click(788, 507)``，
-参考分辨率 960×540。
-"""
+"""向前一章 ◁ (如 Ex-6 → Ex-5)。"""
 
 CLICK_NEXT_CHAPTER: tuple[float, float] = (900 / 960, 507 / 540)
-"""向后一章 ▷ — 切换到编号较大的章节 (如 Ex-5 → Ex-6)。
+"""向后一章 ▷ (如 Ex-5 → Ex-6)。"""
 
-坐标换算自旧代码 ``_move_chapter`` → ``timer.click(900, 507)``，
-参考分辨率 960×540。
+CLICK_ENTER_MAP: tuple[float, float] = (500 / 960, 500 / 540)
+"""点击页面中央进入当前章节地图。
+
+旧代码: ``timer.click(500, 500)``。
 """
 
-# ── 章节编号 OCR 区域 ──
-
 CHAPTER_NUM_AREA: tuple[float, float, float, float] = (0.818, 0.810, 0.875, 0.867)
-"""章节编号文字裁切区域 (x1, y1, x2, y2)，用于 OCR 读取「Ex-N」文本。"""
+"""章节编号 OCR 裁切区域 (x1, y1, x2, y2)。"""
 
 # ── 磁盘购买 ──
 
 CLICK_BUY_TICKET_OPEN: tuple[float, float] = (458 * 0.75 / 960, 665 * 0.75 / 540)
-"""打开磁盘购买面板 (⊕ 按钮)。
-
-坐标换算自旧代码 ``buy_ticket`` → ``timer.click(458*0.75, 665*0.75)``。
-"""
+"""打开磁盘购买面板 (⊕ 按钮)。"""
 
 CLICK_BUY_RESOURCE: dict[str, tuple[float, float]] = {
     "oil":      (638 / 960, 184 / 540),
@@ -121,30 +83,39 @@ CLICK_BUY_RESOURCE: dict[str, tuple[float, float]] = {
     "steel":    (638 / 960, 279 / 540),
     "aluminum": (638 / 960, 321 / 540),
 }
-"""磁盘购买面板中各资源类型的点击位置。
-
-坐标换算自旧代码 ``buy_ticket`` 中的 position 字典。
-"""
+"""磁盘购买面板中各资源类型的点击位置。"""
 
 CLICK_BUY_CONFIRM: tuple[float, float] = (488 / 960, 405 / 540)
-"""磁盘购买确认按钮。
+"""磁盘购买确认按钮。"""
 
-坐标换算自旧代码 ``buy_ticket`` → ``timer.click(488, 405)``。
-"""
-
-# ── 杂项 ──
+# ── 其他常量 ──
 
 _CHAPTER_SWITCH_DELAY: float = 0.8
-"""章节切换后等待动画的延迟 (秒)。"""
+"""章节切换动画延迟 (秒)。"""
 
 _CHAPTER_NAV_MAX_ATTEMPTS: int = 8
 """章节导航最大尝试次数。"""
 
 MAX_CHAPTER: int = 6
-"""决战最大章节数。"""
-
 MIN_CHAPTER: int = 4
-"""决战最小可用章节数。"""
+
+# ── recognize_stage 检测点 ──
+
+_STAGE_CHECK_POINTS: dict[int, list[tuple[float, float]]] = {
+    4: [(0.381, 0.436), (0.596, 0.636), (0.778, 0.521)],
+    5: [(0.418, 0.378), (0.760, 0.477), (0.550, 0.750)],
+    6: [(0.606, 0.375), (0.532, 0.703), (0.862, 0.644)],
+}
+"""每章 3 个小关的像素检测点 (相对坐标)。
+
+若检测点颜色接近白色 (250, 244, 253) 表示该小关已通过。
+"""
+
+_STAGE_CHECK_COLOR: Color = Color.of(250, 244, 253)
+"""小关已通过标记颜色 (近白色)。"""
+
+_STAGE_CHECK_TOLERANCE: float = 30.0
+"""颜色匹配容差。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -153,7 +124,7 @@ MIN_CHAPTER: int = 4
 
 
 class DecisiveBattlePage:
-    """决战地图总览页控制器。
+    """决战总览页控制器。
 
     **状态查询** 为 ``staticmethod``，只需截图即可调用。
     **操作动作** 为实例方法，通过注入的控制器执行。
@@ -169,7 +140,7 @@ class DecisiveBattlePage:
     def __init__(
         self,
         ctrl: AndroidController,
-        ocr: "OCREngine | None" = None,
+        ocr: OCREngine | None = None,
     ) -> None:
         self._ctrl = ctrl
         self._ocr = ocr
@@ -178,28 +149,37 @@ class DecisiveBattlePage:
 
     @staticmethod
     def is_current_page(screen: np.ndarray) -> bool:
-        """判断截图是否为决战总览页。
+        """判断截图是否为决战总览页。"""
+        return PixelChecker.check_signature(screen, PAGE_SIGNATURE).matched
 
-        Parameters
-        ----------
-        screen:
-            截图 (H×W×3, RGB)。
+    # ── 小关进度识别 ──────────────────────────────────────────────────────
+
+    @staticmethod
+    def recognize_stage(screen: np.ndarray, chapter: int) -> int:
+        """识别当前决战章节的小关进度 (0–3)。
+
+        检查每个小关位置像素颜色，白色 (250,244,253) 为已通过。
+        返回当前正在进行的小关编号; 3 表示全部通过。
         """
-        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+        check_points = _STAGE_CHECK_POINTS.get(chapter)
+        if check_points is None:
+            logger.warning("[UI] 决战 recognize_stage: 未知章节 {}", chapter)
+            return 0
 
-    # ── 回退 ──────────────────────────────────────────────────────────────
+        for i, (rx, ry) in enumerate(check_points):
+            if not PixelChecker.check_pixel(
+                screen, rx, ry, _STAGE_CHECK_COLOR, _STAGE_CHECK_TOLERANCE,
+            ):
+                logger.info("[UI] 识别决战地图参数, 第 {} 小节正在进行", i)
+                return i
+
+        logger.info("[UI] 识别决战地图参数, 第 3 小节正在进行")
+        return 3
+
+    # ── 导航 ──────────────────────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击左上角 ◁，直接返回主页面。
-
-        决战页面的回退按钮越过地图页面，直接跳转至主页面。
-
-        Raises
-        ------
-        NavigationError
-            超时未到达主页面。
-        """
+        """点击左上角 ◁，直接返回主页面 (跨级)。"""
         from autowsgr.ui.main_page import MainPage
 
         logger.info("[UI] 决战页面 ◁ → 主页面")
@@ -211,26 +191,35 @@ class DecisiveBattlePage:
             target=PageName.MAIN,
         )
 
-    # ── 章节 OCR 识别 ────────────────────────────────────────────────────
+    def enter_map(self) -> None:
+        """从决战总览页进入当前章节的决战地图页。"""
+        from autowsgr.ui.decisive.overlay import (
+            detect_decisive_overlay,
+            is_decisive_map_page,
+        )
+        from autowsgr.ui.page import NavigationError
+
+        logger.info("[UI] 决战总览 → 进入地图")
+        self._ctrl.click(*CLICK_ENTER_MAP)
+
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            time.sleep(0.5)
+            screen = self._ctrl.screenshot()
+            if is_decisive_map_page(screen):
+                logger.info("[UI] 已进入决战地图页")
+                return
+            if detect_decisive_overlay(screen) is not None:
+                logger.info("[UI] 已进入决战地图页 (overlay)")
+                return
+        raise NavigationError("从决战总览进入地图超时")
+
+    # ── 章节 OCR ──────────────────────────────────────────────────────────
 
     def _read_chapter(self, screen: np.ndarray | None = None) -> int | None:
-        """通过 OCR 读取当前决战章节编号。
-
-        裁切 ``CHAPTER_NUM_AREA`` 区域，识别 ``Ex-N`` 文本并提取数字。
-
-        Parameters
-        ----------
-        screen:
-            截图；为 ``None`` 时自动截取。
-
-        Returns
-        -------
-        int | None
-            当前章节编号 (4–6)，识别失败返回 ``None``。
-        """
+        """通过 OCR 读取当前章节编号 (Ex-N → N)。"""
         if self._ocr is None:
             return None
-
         if screen is None:
             screen = self._ctrl.screenshot()
 
@@ -241,7 +230,6 @@ class DecisiveBattlePage:
             logger.debug("[UI] 决战章节 OCR 无结果")
             return None
 
-        # 提取最后一个数字 (如 "Ex-6" → 6)
         m = re.search(r"(\d)", result.text[::-1])
         if m:
             chapter = int(m.group(1))
@@ -254,19 +242,13 @@ class DecisiveBattlePage:
     # ── 章节导航 ──────────────────────────────────────────────────────────
 
     def go_prev_chapter(self) -> None:
-        """点击 ◁ 切换到前一章节 (如 Ex-6 → Ex-5)。
-
-        仅点击，不等待页面验证。调用后建议等待动画完成。
-        """
+        """点击 ◁ 切换到前一章节。"""
         logger.info("[UI] 决战页面 → 前一章节 ◁")
         self._ctrl.click(*CLICK_PREV_CHAPTER)
         time.sleep(_CHAPTER_SWITCH_DELAY)
 
     def go_next_chapter(self) -> None:
-        """点击 ▷ 切换到后一章节 (如 Ex-5 → Ex-6)。
-
-        仅点击，不等待页面验证。调用后建议等待动画完成。
-        """
+        """点击 ▷ 切换到后一章节。"""
         logger.info("[UI] 决战页面 → 后一章节 ▷")
         self._ctrl.click(*CLICK_NEXT_CHAPTER)
         time.sleep(_CHAPTER_SWITCH_DELAY)
@@ -275,7 +257,6 @@ class DecisiveBattlePage:
         """导航到指定决战章节。
 
         通过 OCR 读取当前章节编号，反复点击 ◁/▷ 直到到达目标。
-        参照旧代码 ``DecisiveBattle._move_chapter`` 的递归逻辑。
 
         Parameters
         ----------
@@ -314,12 +295,6 @@ class DecisiveBattlePage:
                 logger.info("[UI] 决战章节导航: 已到达 Ex-{}", target)
                 return
 
-            logger.info(
-                "[UI] 决战章节导航: Ex-{} → Ex-{}",
-                current,
-                target,
-            )
-
             if current > target:
                 self.go_prev_chapter()
             else:
@@ -339,15 +314,12 @@ class DecisiveBattlePage:
     ) -> None:
         """购买决战磁盘 (入场券)。
 
-        在决战页面打开磁盘购买面板，选择资源类型，点击指定次数后确认。
-        参照旧代码 ``DecisiveBattle.buy_ticket``。
-
         Parameters
         ----------
         use:
-            使用的资源类型: ``"oil"`` / ``"ammo"`` / ``"steel"`` / ``"aluminum"``。
+            资源类型: ``"oil"``/``"ammo"``/``"steel"``/``"aluminum"``。
         times:
-            单次资源点击次数 (每次消耗一定数量的资源换取磁盘)。
+            单次资源点击次数。
 
         Raises
         ------
@@ -360,19 +332,14 @@ class DecisiveBattlePage:
             )
 
         logger.info("[UI] 决战页面 → 购买磁盘 (资源: {}, 次数: {})", use, times)
-
-        # 打开购买面板
         self._ctrl.click(*CLICK_BUY_TICKET_OPEN)
         time.sleep(1.5)
 
-        # 点击资源类型 (多次)
         resource_pos = CLICK_BUY_RESOURCE[use]
         for _ in range(times):
             self._ctrl.click(*resource_pos)
             time.sleep(1.0)
 
-        # 确认购买
         self._ctrl.click(*CLICK_BUY_CONFIRM)
         time.sleep(1.0)
-
         logger.info("[UI] 决战磁盘购买完成")

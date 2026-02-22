@@ -74,8 +74,7 @@ from .battle import BattlePreparationPage, Panel, RepairStrategy
 from .build_page import BuildPage, BuildTab
 from .canteen_page import CanteenPage
 from .choose_ship_page import ChooseShipPage
-from .decisive_battle_page import DecisiveBattlePage
-from .decisive import DecisiveMapController, DecisiveOverlay
+from .decisive import DecisiveBattlePage, DecisiveMapController
 from .friend_page import FriendPage
 from .intensify_page import IntensifyPage, IntensifyTab
 from .main_page import MainPage, MainPageTarget
@@ -87,14 +86,7 @@ from .sidebar_page import SidebarPage, SidebarTarget
 
 # ── 标签页统一检测层 ──────────────────────────────────────────────
 from autowsgr.ui.tabbed_page import (
-    TAB_BLUE,
-    TAB_PROBES,
     TabbedPageType,
-    get_active_tab_index,
-    identify_page_type,
-    is_tabbed_page,
-    make_page_checker,
-    make_tab_checker,
 )
 
 # ── 浮层处理 ───────────────────────────────────────────────────────────
@@ -147,7 +139,7 @@ __all__ = [
     "ChooseShipPage",
     "DecisiveBattlePage",
     "DecisiveMapController",
-    "DecisiveOverlay",
+
     "FriendPage",
     "IntensifyPage",
     "IntensifyTab",
@@ -162,14 +154,7 @@ __all__ = [
     "SidebarPage",
     "SidebarTarget",
     # ── 标签页统一检测 ──
-    "TAB_BLUE",
-    "TAB_PROBES",
     "TabbedPageType",
-    "get_active_tab_index",
-    "identify_page_type",
-    "is_tabbed_page",
-    "make_page_checker",
-    "make_tab_checker",
     # ── 浮层 ──
     "NetworkError",
     "OverlayType",

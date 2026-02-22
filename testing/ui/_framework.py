@@ -472,7 +472,7 @@ def reset_to_main_page(ctrl: "ADBController", pause: float = 1.5) -> bool:
     from autowsgr.ui.battle.preparation import BattlePreparationPage
     from autowsgr.ui.build_page import BuildPage
     from autowsgr.ui.canteen_page import CanteenPage
-    from autowsgr.ui.decisive_battle_page import DecisiveBattlePage
+    from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
     from autowsgr.ui.friend_page import FriendPage
     from autowsgr.ui.intensify_page import IntensifyPage
     from autowsgr.ui.main_page import MainPage
