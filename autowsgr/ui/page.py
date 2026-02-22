@@ -8,9 +8,8 @@
 2. **导航验证** — :func:`wait_for_page` / :func:`wait_leave_page`
    反复截图检查，内置浮层消除，确认导航生效。
 
-3. **带重试的一步导航** — :func:`click_and_wait_for_page` /
+3. **导航** — :func:`click_and_wait_for_page` /
    :func:`click_and_wait_leave_page`
-   封装「点击 + 验证」，自动重试未响应的点击，保证到达或抛出异常。
 
 典型使用::
 

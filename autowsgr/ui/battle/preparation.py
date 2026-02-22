@@ -319,7 +319,7 @@ class BattlePreparationPage:
 
     def change_fleet(
         self,
-        fleet_id: int,
+        fleet_id: int | None,
         ship_names: Sequence[str | None],
     ) -> None:
         """更换编队全部舰船。
@@ -327,7 +327,7 @@ class BattlePreparationPage:
         Parameters
         ----------
         fleet_id:
-            舰队编号 (2–4)。1 队不支持更换。
+            舰队编号 (2–4)。1 队不支持更换。None 代表不指定舰队，仅更换舰船。
         ship_names:
             舰船名列表 (按槽位 0–5)。``None`` 或 ``""`` 表示该位留空。
         """

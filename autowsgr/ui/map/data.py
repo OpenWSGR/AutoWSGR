@@ -326,7 +326,7 @@ CLICK_ENTER_SORTIE: tuple[float, float] = (0.625, 0.556)
 
 # ── 决战面板进入 ──
 
-CLICK_ENTER_DECISIVE: tuple[float, float] = (115 / 960, 113 / 540)
+CLICK_ENTER_DECISIVE: tuple[float, float] = (0.12, 0.209)
 """从地图页「决战」面板点击进入决战总览页。"""
 
 # ── 出征地图节点 ──
