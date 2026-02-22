@@ -41,7 +41,7 @@ from autowsgr.ui.decisive.overlay import (
 )
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.vision import ApiDll, PixelChecker, ROI, get_api_dll, OCREngine
-from autowsgr.types import FleetSelection
+from autowsgr.types import FleetSelection, DecisivePhase
 from autowsgr.infra import DecisiveConfig
 from collections.abc import Callable
 from autowsgr.emulator import AndroidController
@@ -383,7 +383,7 @@ class DecisiveMapController:
         self,
         timeout: float = 15.0,
         interval: float = 0.5,
-    ) -> np.ndarray:
+    ) -> DecisivePhase:
         """轮询截图，直到出现地图页或任意 overlay。
 
         Returns
@@ -392,14 +392,19 @@ class DecisiveMapController:
             命中时的截图。超时时返回最后一张截图。
         """
         deadline = time.monotonic() + timeout
-        while True:
+        while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
-            if is_decisive_map_page(screen) or detect_decisive_overlay(screen) is not None:
-                return screen
-            if time.monotonic() >= deadline:
-                logger.warning("[地图控制器] 等待地图页/overlay 超时")
-                return screen
+            if is_decisive_map_page(screen):
+                return DecisivePhase.MAP_READY
+            overlay = detect_decisive_overlay(screen)
+            if overlay is not None:
+                if overlay == DecisiveOverlay.ADVANCE_CHOICE:
+                    return DecisivePhase.ADVANCE_CHOICE
+                if overlay == DecisiveOverlay.FLEET_ACQUISITION:
+                    return DecisivePhase.CHOOSE_FLEET
             time.sleep(interval)
+        # TODO: 细化错误类型
+        raise TimeoutError("等待地图页或 overlay 超时")
 
     def wait_for_overlay(
         self,
