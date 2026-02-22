@@ -350,11 +350,58 @@ RIVAL_POSITIONS: list[tuple[float, float]] = [
 ]
 """演习面板中 4 个对手位置的「挑战」按钮。"""
 
-CLICK_REFRESH_RIVALS: tuple[float, float] = (0.938, 0.056)
-"""演习面板 — 刷新对手按钮 (右上角)。"""
-
 CLICK_CHALLENGE: tuple[float, float] = (0.800, 0.500)
 """演习面板 — 通用挑战按钮。"""
+
+# ── 演习 — 对手挑战状态检测 ──
+
+EXERCISE_CHALLENGE_COLOR = Color.of(33, 132, 226)
+"""演习挑战按钮颜色 — 蓝色 (表示可挑战)。"""
+
+EXERCISE_CHALLENGE_TOLERANCE: float = 50.0
+"""演习挑战按钮颜色检测容差。"""
+
+EXERCISE_ARROW_GRAY = Color.of(177, 171, 176)
+"""演习列表上下箭头灰色 (表示已到顶/底端)。"""
+
+EXERCISE_ARROW_TOLERANCE: float = 60.0
+"""演习箭头灰色检测容差。"""
+
+EXERCISE_ARROW_UP_PROBE: tuple[float, float] = (933 / 960, 59 / 540)
+"""演习列表上箭头探测点 (~0.9719, 0.1093)。灰色说明已在顶部。"""
+
+EXERCISE_ARROW_DOWN_PROBE: tuple[float, float] = (933 / 960, 489 / 540)
+"""演习列表下箭头探测点 (~0.9719, 0.9056)。灰色说明已在底部。"""
+
+EXERCISE_CHALLENGE_PROBES: list[tuple[float, float]] = [
+    (770 / 960, (1 * 110 - 10) / 540),  # 位置 1: (~0.8021, 0.1852)
+    (770 / 960, (2 * 110 - 10) / 540),  # 位置 2: (~0.8021, 0.3889)
+    (770 / 960, (3 * 110 - 10) / 540),  # 位置 3: (~0.8021, 0.5926)
+    (770 / 960, (4 * 110 - 10) / 540),  # 位置 4: (~0.8021, 0.7963)
+]
+"""演习面板 4 个可见对手位置的挑战按钮探测点。
+
+屏幕一次显示 4 个对手, 第 5 个需要滚动才能看到。
+"""
+
+EXERCISE_SWIPE_TO_TOP: tuple[float, float, float, float] = (
+    800 / 960, 200 / 540, 800 / 960, 400 / 540,
+)
+"""演习列表滑动: 上滑至顶部 (起点→终点)。"""
+
+EXERCISE_SWIPE_TO_BOTTOM: tuple[float, float, float, float] = (
+    800 / 960, 400 / 540, 800 / 960, 200 / 540,
+)
+"""演习列表滑动: 下滑至底部 (起点→终点)。"""
+
+EXERCISE_CLICK_RIVAL_INFO: tuple[float, float] = (665 / 960, 400 / 540)
+"""演习对手信息页 — 刷新对手阵容按钮 (~0.6927, 0.7407)。"""
+
+EXERCISE_CLICK_START_BATTLE: tuple[float, float] = (804 / 960, 390 / 540)
+"""演习对手信息页 — 开始战斗按钮 (~0.8375, 0.7222)。"""
+
+EXERCISE_SWIPE_DELAY: float = 0.8
+"""演习列表滑动后等待动画的延迟 (秒)。"""
 
 # ── 远征 ──
 
