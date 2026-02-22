@@ -9,7 +9,6 @@
 - decisive
 - exercise
 - expedition
-- navigate
 - build
 - repair
 - destroy
@@ -26,11 +25,10 @@
 | `expedition` | 远征收取 | ✅ E2E 测试通过 |
 | `decisive` | 决战任务 | ❌ 未做 |
 | `exercise` | 演习对抗 | ✅ E2E 测试通过 |
-| `navigate` | 页面导航 | ❌ 未做 |
 | `build` | 建造收取 | ❌ 未做 |
-| `repair` | 修理 | ❌ 未做 |
-| `destroy` | 解装舰船 | ❌ 未做 |
-| `cook` | 舰食制作 | ❌ 未做 |
+| `repair` | 修理 | ❌ 部分测试通过 |
+| `destroy` | 解装舰船 | ✅ E2E 测试通过 |
+| `cook` | 舰食制作 | ✅ E2E 测试通过 |
 | `reward` | 任务奖励 | ✅ E2E 测试通过 |
 
 ---
@@ -76,10 +74,6 @@ python testing/ops/exercise.py --fleet 1
 python testing/ops/exercise.py --fleet 1 --rival 3
 ```
 
-### navigate 测试 ❌
-
-未做
-
 ### build 测试 ❌
 
 ```bash
@@ -89,23 +83,29 @@ python testing/ops/build.py 127.0.0.1:16384
 
 ### repair 测试 ❌
 
+#### 修复第一艘舰船 ✅
+
 ```bash
 python testing/ops/repair.py
 python testing/ops/repair.py 127.0.0.1:16384
 ```
 
-### destroy 测试 ❌
+#### 按照名称修复舰船 ❌
+
+未做
+
+### destroy 测试 ✅
 
 ```bash
 python testing/ops/destroy.py
 python testing/ops/destroy.py 127.0.0.1:16384
 ```
 
-### cook 测试 ❌
+### cook 测试 ✅
 
 ```bash
 python testing/ops/cook.py
-python testing/ops/cook.py 127.0.0.1:16384
+python testing/ops/cook.py 127.0.0.1:16384 2
 ```
 
 ### reward 测试 ✅
