@@ -42,6 +42,41 @@ class OCRResult:
     bbox: tuple[int, int, int, int] | None = None
 
 
+# ── 自定义异常 ──
+
+
+class ShipNameMismatchError(ValueError):
+    """当 OCR 识别到文本但编辑距离超过最大阈值时抛出。
+
+    Attributes
+    ----------
+    text:
+        OCR 识别出的原始文本。
+    best_candidate:
+        编辑距离最近的候选舰船名。
+    distance:
+        与 best_candidate 的 Levenshtein 距离。
+    max_threshold:
+        触发异常的最大编辑距离阈值。
+    """
+
+    def __init__(
+        self,
+        text: str,
+        best_candidate: str,
+        distance: int,
+        max_threshold: int,
+    ) -> None:
+        self.text = text
+        self.best_candidate = best_candidate
+        self.distance = distance
+        self.max_threshold = max_threshold
+        super().__init__(
+            f"OCR 识别到 '{text}'，与最近候选 '{best_candidate}' 编辑距离={distance} "
+            f"超过最大阈值 {max_threshold}，拒绝匹配"
+        )
+
+
 # ── 抽象基类 ──
 
 
@@ -51,7 +86,16 @@ class OCREngine(ABC):
     子类只需实现 :meth:`recognize` 方法。
     高层便捷方法 (recognize_single, recognize_number, recognize_ship_name)
     基于 recognize 构建，无需子类重写。
+
+    Parameters
+    ----------
+    verbose:
+        是否在 DEBUG 级别打印每次识别的细节日志。
+        为 False 时改用 TRACE 级别，减少日志噪音。
     """
+
+    verbose: bool = True
+    """控制 OCR 详情日志级别 (True → DEBUG, False → TRACE)。"""
 
     @abstractmethod
     def recognize(
@@ -87,11 +131,12 @@ class OCREngine(ABC):
         无结果时返回空文本、零置信度的 OCRResult。
         """
         results = self.recognize(image, allowlist)
+        _log = logger.debug if self.verbose else logger.trace
         if not results:
-            logger.debug("[OCR] recognize_single: 无结果")
+            _log("[OCR] recognize_single: 无结果")
             return OCRResult(text="", confidence=0.0)
         best = max(results, key=lambda r: r.confidence)
-        logger.debug("[OCR] recognize_single: '{}' (conf={:.2f})", best.text, best.confidence)
+        _log("[OCR] recognize_single: '{}' (conf={:.2f})", best.text, best.confidence)
         return best
 
     def recognize_number(
@@ -127,12 +172,13 @@ class OCREngine(ABC):
             multiplier = 1_000_000
             text = text[:-1]
 
+        _log = logger.debug if self.verbose else logger.trace
         try:
             value = int(float(text) * multiplier)
-            logger.debug("[OCR] recognize_number: '{}' → {}", result.text.strip(), value)
+            _log("[OCR] recognize_number: '{}' → {}", result.text.strip(), value)
             return value
         except (ValueError, TypeError):
-            logger.debug("[OCR] recognize_number: '{}' 解析失败", result.text.strip())
+            _log("[OCR] recognize_number: '{}' 解析失败", result.text.strip())
             return None
 
     def recognize_ship_name(
@@ -158,14 +204,75 @@ class OCREngine(ABC):
             匹配到的舰船名，或 None。
         """
         result = self.recognize_single(image)
+        _log = logger.debug if self.verbose else logger.trace
         if not result.text:
-            logger.debug("[OCR] recognize_ship_name: 无文本")
+            _log("[OCR] recognize_ship_name: 无文本")
             return None
         matched = _fuzzy_match(result.text, candidates, threshold)
-        logger.debug(
+        _log(
             "[OCR] recognize_ship_name: '{}' → '{}'",
             result.text, matched if matched else "\u672a匹配",
         )
+        return matched
+
+    def recognize_ship_names(
+        self,
+        image: np.ndarray,
+        candidates: list[str],
+        threshold: int = 3,
+        max_threshold: int | None = None,
+    ) -> list[str]:
+        """识别图像中的多个舰船名，对每个文本区域做模糊匹配与自动校正。
+
+        与 :meth:`recognize_ship_name` 的区别：本方法调用 :meth:`recognize` 获取
+        图像中所有文本区域，再逐一与候选列表做模糊匹配，适合一张图中包
+        含多个舰船名的场景。
+
+        Parameters
+        ----------
+        image:
+            包含舰船名的图像。
+        candidates:
+            候选舰船名列表。
+        threshold:
+            编辑距离软阈值：distance ≤ threshold 时接受自动校正后的名称。
+        max_threshold:
+            最大编辑距离硬阈值：若某段识别文本与所有候选的最小编辑距离
+            超过此值，则抛出 :exc:`ShipNameMismatchError`。
+            为 ``None`` 时禁用此检查，超阈值的文本仅被静默跳过。
+
+        Returns
+        -------
+        list[str]
+            识别并自动校正后的舰船名列表，按图像中的出现顺序，已去重。
+
+        Raises
+        ------
+        ShipNameMismatchError
+            当某段识别文本与所有候选的编辑距离均超过 max_threshold 时。
+        """
+        results = self.recognize(image)
+        _log = logger.debug if self.verbose else logger.trace
+        seen: set[str] = set()
+        matched: list[str] = []
+        for r in results:
+            text = r.text.strip()
+            if not text:
+                continue
+            best = _fuzzy_match(text, candidates, threshold)
+            if best is not None:
+                _log("[OCR] recognize_ship_names: '{}' → '{}'", text, best)
+                if best not in seen:
+                    seen.add(best)
+                    matched.append(best)
+            else:
+                if max_threshold is not None and candidates:
+                    best_candidate = min(candidates, key=lambda c: _edit_distance(text, c))
+                    dist = _edit_distance(text, best_candidate)
+                    if dist > max_threshold:
+                        raise ShipNameMismatchError(text, best_candidate, dist, max_threshold)
+                _log("[OCR] recognize_ship_names: '{}' 无匹配 (阈值={})，跳过", text, threshold)
+        _log("[OCR] recognize_ship_names: 共识别 {} 艰: {}", len(matched), matched)
         return matched
 
     # ── 工厂方法 ──

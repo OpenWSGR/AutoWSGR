@@ -46,7 +46,7 @@ from .pixel import (
     PixelSignature,
 )
 from .matcher import PixelChecker
-from .ocr import OCREngine, OCRResult, EasyOCREngine
+from .ocr import OCREngine, OCRResult, EasyOCREngine, ShipNameMismatchError
 from .roi import ROI
 
 __all__ = [
@@ -71,6 +71,7 @@ __all__ = [
     "OCREngine",
     "OCRResult",
     "EasyOCREngine",
+    "ShipNameMismatchError",
     # api_dll
     "ApiDll",
     "get_api_dll",
