@@ -434,10 +434,16 @@ class DecisivePhase(enum.Enum):
 
     状态转移图::
 
-        INIT → ENTER_MAP → [CHOOSE_FLEET] → MAP_READY
-        MAP_READY → ADVANCE_CHOICE | PREPARE_COMBAT
+        INIT → ENTER_MAP
+        ENTER_MAP → WAITING_FOR_MAP
+        WAITING_FOR_MAP → USE_LAST_FLEET | DOCK_FULL
+                        | CHOOSE_FLEET | ADVANCE_CHOICE | PREPARE_COMBAT
+        USE_LAST_FLEET → WAITING_FOR_MAP
+        DOCK_FULL → ENTER_MAP (解装后重进) | FINISHED (无法解装)
+        CHOOSE_FLEET → RETREAT | PREPARE_COMBAT
+        ADVANCE_CHOICE → CHOOSE_FLEET
         PREPARE_COMBAT → IN_COMBAT → NODE_RESULT
-        NODE_RESULT → MAP_READY | STAGE_CLEAR | RETREAT | LEAVE
+        NODE_RESULT →  STAGE_CLEAR | CHOOSE_FLEET | ADVANCE_CHOICE
         STAGE_CLEAR → ENTER_MAP (下一小关) | CHAPTER_CLEAR
         CHAPTER_CLEAR → FINISHED
         RETREAT → ENTER_MAP (重置后重来)
@@ -450,11 +456,14 @@ class DecisivePhase(enum.Enum):
     ENTER_MAP = enum.auto()
     """正在从总览页进入/重进地图。"""
 
+    WAITING_FOR_MAP = enum.auto()
+    """等待地图页加载 — 每轮截图检测一次，由主循环驱动重试。"""
+
+    USE_LAST_FLEET = enum.auto()
+    """选择上次舰队 — 进入已有进度的章节时弹出的确认按钮。"""
+
     CHOOSE_FLEET = enum.auto()
     """战备舰队获取 overlay 弹出，选择购买舰船。"""
-
-    MAP_READY = enum.auto()
-    """地图页就绪，可以出征"""
 
     ADVANCE_CHOICE = enum.auto()
     """选择前进点 overlay (分支路径)。"""
@@ -479,6 +488,9 @@ class DecisivePhase(enum.Enum):
 
     LEAVE = enum.auto()
     """暂离 (保存进度退出)。"""
+
+    DOCK_FULL = enum.auto()
+    """进入地图时检测到船坞已满。"""
 
     FINISHED = enum.auto()
     """本轮决战完成。"""

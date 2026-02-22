@@ -406,6 +406,8 @@ class DecisiveConfig:
     flagship_priority: list[str] = field(default_factory=list)
     repair_level: int = 2
     full_destroy: bool = False
+    destroy_ship_types: list[ShipType] = field(default_factory=list)
+    """解装时指定的舰种列表。空列表 = 不过滤，全部解装。"""
 
 # ── ConfigManager ──
 

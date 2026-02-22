@@ -139,6 +139,13 @@ class Error:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+class Decisive:
+    """决战相关模板。"""
+
+    USE_LAST_FLEET = LazyTemplate("decisive/use_last_fleet.png", "decisive_use_last_fleet")
+    """"使用上次舰队" 确认按钮 — 进入已有进度的章节时弹出。"""
+
+
 class Templates:
     """图像模板统一入口。
 
@@ -161,3 +168,4 @@ class Templates:
     Symbol = Symbol
     BackButton = BackButton
     Error = Error
+    Decisive = Decisive
