@@ -32,7 +32,7 @@ import numpy as np
 from loguru import logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.types import PageName
+from autowsgr.types import PageName, ShipType
 from autowsgr.image_resources import Templates
 from .page import click_and_wait_for_page
 from .tabbed_page import (
@@ -463,18 +463,39 @@ class BuildPage:
         time.sleep(1.0)
         logger.info("[UI] 建造已启动 ({})", build_type)
 
-    def destroy_all(self, *, remove_equipment: bool = True) -> None:
-        """完整的解体流程 (在解体标签上执行)。
+    def destroy_ships(
+        self,
+        ship_types: list[ShipType] | None = None,
+        *,
+        remove_equipment: bool = True,
+    ) -> None:
+        """在解体标签上执行完整解装流程。
 
         Parameters
         ----------
+        ship_types:
+            要解体的舰种列表。
+            ``None`` (默认) 表示不过滤舰种，直接快速选择全部。
+            传入非空列表时，先打开舰种过滤器按舰种筛选，再执行后续操作。
         remove_equipment:
-            是否卸下装备。
+            是否在解装前卸下装备。默认 ``True``。
         """
         _STEP_DELAY = 1.5
 
         self.destroy_click_add()
         time.sleep(_STEP_DELAY)
+
+        if ship_types:
+            # 按舰种过滤：打开过滤器 → 勾选各舰种 → 确认
+            self.destroy_open_type_filter()
+            time.sleep(_STEP_DELAY)
+            for ship_type in ship_types:
+                logger.debug("[UI] 解体 → 点击舰种: {}", ship_type.value)
+                self._ctrl.click(*ship_type.relative_position_in_destroy)
+                time.sleep(0.8)
+            self.destroy_confirm_filter()
+            time.sleep(_STEP_DELAY)
+
         self.destroy_quick_select()
         time.sleep(_STEP_DELAY)
         self.destroy_confirm_select()
@@ -487,4 +508,8 @@ class BuildPage:
         self.destroy_four_star_confirm()
         time.sleep(_STEP_DELAY)
 
-        logger.info("[UI] 解装操作完成 (卸下装备={})", remove_equipment)
+        logger.info(
+            "[UI] 解装完成 (舰种={}, 卸下装备={})",
+            [t.value for t in ship_types] if ship_types else "全部",
+            remove_equipment,
+        )
