@@ -29,13 +29,14 @@ from autowsgr.infra import setup_logger
 
 _STEPS = [
     "1. 连接设备",
-    "2. 调用 cook(ctrl, position=1, force_cook=False)",
+    "2. 调用 cook(ctrl, position=recipe, force_cook=False)",
     "3. 打印做菜结果",
 ]
 
 
 def main() -> None:
-    serial = sys.argv[1] if len(sys.argv) > 1 else None
+    serial = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].isdecimal() else None
+    recipe = int(sys.argv[2]) if len(sys.argv) > 2 else (int(sys.argv[1]) if sys.argv[1].isdecimal() else 1)
     setup_logger(log_dir=Path("logs/e2e/cook"), level="DEBUG", save_images=True)
 
     print("=" * 60)
@@ -43,6 +44,7 @@ def main() -> None:
     print("=" * 60)
     print()
     print("  测试步骤:")
+    
     for s in _STEPS:
         print(f"    {s}")
     print()
@@ -57,7 +59,7 @@ def main() -> None:
 
         from autowsgr.ops.cook import cook
 
-        result = cook(ctrl, position=1, force_cook=False)
+        result = cook(ctrl, position=recipe, force_cook=False)
         logger.info(f"cook() 返回: {result}")
         print(f"  [OK] cook() = {result}")
     except Exception as exc:

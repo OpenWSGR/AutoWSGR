@@ -181,6 +181,13 @@ class CanteenPage:
         logger.info("[UI] 食堂 → 关闭弹窗")
         self._ctrl.click(*CLICK_DISMISS_POPUP)
 
+    def click_to_skip_animation(self) -> None:
+        """点击屏幕任意位置跳过动画。
+
+        目前仅在做菜过程中使用，点击坐标为屏幕右下角。
+        """
+        logger.info("[UI] 食堂 → 点击跳过动画")
+        self._ctrl.click(0.9, 0.9)
     # ── 组合动作 — 做菜 ──
 
     _COOK_BUTTON_TIMEOUT: float = 7.5
@@ -234,5 +241,7 @@ class CanteenPage:
                 self.dismiss_popup()
                 return False
 
+        self.click_to_skip_animation()
         logger.info("[UI] 做菜完成 (菜谱 {})", position)
+    
         return True
