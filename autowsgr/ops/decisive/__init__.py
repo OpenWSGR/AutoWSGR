@@ -75,72 +75,21 @@ UI 层 (autowsgr.ui.decisive)::
     results = controller.run_for_times(3)
 """
 
-from autowsgr.types import FleetSelection
+from autowsgr.types import DecisivePhase, FleetSelection
 from ._config import MapData
 from ._controller import DecisiveController, DecisiveResult
 from ._logic import DecisiveLogic
-from ._state import DecisivePhase, DecisiveState
+from ._state import DecisiveState
 from autowsgr.ui.decisive import (
-    ADVANCE_CARD_POSITIONS,
-    CLICK_ADVANCE_CONFIRM,
-    CLICK_BUY_EXP,
-    CLICK_FLEET_CLOSE,
-    CLICK_FLEET_EDIT,
-    CLICK_FLEET_REFRESH,
-    CLICK_LEAVE,
-    CLICK_RETREAT_BUTTON,
-    CLICK_RETREAT_CONFIRM,
-    CLICK_SKILL,
-    CLICK_SORTIE,
-    COST_AREA,
-    FLEET_CARD_CLICK_Y,
-    FLEET_CARD_X_POSITIONS,
-    RESOURCE_AREA,
-    SHIP_NAME_X_RANGES,
-    SHIP_NAME_Y_RANGE,
     DecisiveMapController,
-    DecisiveOverlay,
-    detect_decisive_overlay,
-    get_overlay_signature,
-    is_advance_choice,
-    is_confirm_exit,
-    is_decisive_map_page,
-    is_fleet_acquisition,
 )
 
 __all__ = [
     # 配置 & 地图数据
-    "DecisiveConfig",
     "MapData",
     # 状态
     "DecisivePhase",
     "DecisiveState",
-    # Overlay
-    "DecisiveOverlay",
-    "detect_decisive_overlay",
-    "get_overlay_signature",
-    "is_decisive_map_page",
-    "is_fleet_acquisition",
-    "is_advance_choice",
-    "is_confirm_exit",
-    # 坐标常量
-    "CLICK_RETREAT_BUTTON",
-    "CLICK_SORTIE",
-    "CLICK_FLEET_EDIT",
-    "CLICK_BUY_EXP",
-    "CLICK_SKILL",
-    "CLICK_FLEET_REFRESH",
-    "CLICK_FLEET_CLOSE",
-    "FLEET_CARD_X_POSITIONS",
-    "FLEET_CARD_CLICK_Y",
-    "SHIP_NAME_X_RANGES",
-    "SHIP_NAME_Y_RANGE",
-    "COST_AREA",
-    "RESOURCE_AREA",
-    "CLICK_LEAVE",
-    "CLICK_RETREAT_CONFIRM",
-    "CLICK_ADVANCE_CONFIRM",
-    "ADVANCE_CARD_POSITIONS",
     # 逻辑
     "FleetSelection",
     "DecisiveLogic",

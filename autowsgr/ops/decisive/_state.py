@@ -2,65 +2,10 @@
 
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass, field
 
 from autowsgr.types import ShipDamageState
-
-
-class DecisivePhase(enum.Enum):
-    """决战过程的宏观阶段。
-
-    状态转移图::
-
-        INIT → ENTER_MAP → [CHOOSE_FLEET] → MAP_READY
-        MAP_READY → ADVANCE_CHOICE | PREPARE_COMBAT
-        PREPARE_COMBAT → IN_COMBAT → NODE_RESULT
-        NODE_RESULT → MAP_READY | STAGE_CLEAR | RETREAT | LEAVE
-        STAGE_CLEAR → ENTER_MAP (下一小关) | CHAPTER_CLEAR
-        CHAPTER_CLEAR → FINISHED
-        RETREAT → ENTER_MAP (重置后重来)
-        LEAVE → FINISHED
-    """
-
-    INIT = enum.auto()
-    """初始状态，未进入决战。"""
-
-    ENTER_MAP = enum.auto()
-    """正在从总览页进入/重进地图。"""
-
-    CHOOSE_FLEET = enum.auto()
-    """战备舰队获取 overlay 弹出，选择购买舰船。"""
-
-    MAP_READY = enum.auto()
-    """地图页就绪，可以出征或选择前进点。"""
-
-    ADVANCE_CHOICE = enum.auto()
-    """选择前进点 overlay (分支路径)。"""
-
-    PREPARE_COMBAT = enum.auto()
-    """出征准备页 — 编队、修理。"""
-
-    IN_COMBAT = enum.auto()
-    """战斗引擎运行中。"""
-
-    NODE_RESULT = enum.auto()
-    """节点战斗结束，决定下一步。"""
-
-    STAGE_CLEAR = enum.auto()
-    """小关通关（第 1/2/3 小节结束）。"""
-
-    CHAPTER_CLEAR = enum.auto()
-    """大关通关（3 个小节全部完成）。"""
-
-    RETREAT = enum.auto()
-    """撤退中 (清空进度重来)。"""
-
-    LEAVE = enum.auto()
-    """暂离 (保存进度退出)。"""
-
-    FINISHED = enum.auto()
-    """本轮决战完成。"""
+from autowsgr.types import DecisivePhase
 
 
 @dataclass

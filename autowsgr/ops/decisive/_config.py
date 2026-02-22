@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 地图静态数据
