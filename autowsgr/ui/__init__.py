@@ -51,10 +51,11 @@
 导航路径查找::
 
     from autowsgr.ui.navigation import find_path
+    from autowsgr.types import PageName
 
-    path = find_path("主页面", "建造页面")
+    path = find_path(PageName.MAIN, PageName.BUILD)
     for edge in path:
-        ctrl.click(*edge.click)
+        edge.action(ctrl)
 
 使用方式::
 

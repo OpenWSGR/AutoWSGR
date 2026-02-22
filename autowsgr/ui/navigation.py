@@ -1,55 +1,30 @@
-"""UI 导航树 — 声明式页面拓扑与路径查找。
+"""UI 导航图 — 基于页面控制器函数的声明式路径查找。
 
-本模块定义游戏全部页面之间的导航关系（树形 + 跨级直通边）。
-核心数据结构为有向图 ``NAV_GRAPH``，每条边包含：
-
-- **source** / **target** — 起止页面名称
-- **click** — 相对坐标 (rx, ry)
-- **edge_type** — ``"child"`` (父子关系) / ``"cross"`` (跨级直通边)
-
-导航路径查找:
-    两页面间的最优路径可通过 BFS / LCA 在 ``NAV_GRAPH`` 上查找。
-    旧 V1 代码使用树上 LCA 算法实现，V2 保留拓扑声明以便后续接入。
-
-页面命名约定:
-    - 使用中文短名与 ``__init__.py`` 中 ``register_page()`` 的名称一致。
-    - 如 ``"主页面"``、``"地图页面"``、``"出征准备"``。
-
-坐标体系:
-    所有坐标为相对值 (0.0–1.0)，由旧代码 960×540 绝对坐标换算:
-    ``rx = x / 960``, ``ry = y / 540``。
+每条边存储一个 **动作函数** ``action(ctrl)``，内部调用对应页面控制器的
+``navigate_to`` / ``go_back`` 等方法完成导航。
+坐标、重试、截图验证均由页面控制器自行处理，本模块仅描述拓扑。
 
 Usage::
 
-    from autowsgr.ui.navigation import NAV_GRAPH, find_path
+    from autowsgr.ui.navigation import find_path
 
-    path = find_path("主页面", "建造页面")
+    path = find_path(PageName.MAIN, PageName.BUILD)
     for edge in path:
-        ctrl.click(*edge.click)
+        edge.action(ctrl)
 """
 
 from __future__ import annotations
 
-import enum
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from autowsgr.types import PageName
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 边类型
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class EdgeType(enum.Enum):
-    """导航边类型。"""
-
-    CHILD = "child"
-    """父子关系 — 进入下级页面。"""
-
-    CROSS = "cross"
-    """跨级快捷通道 — 跳过中间页面。"""
+    from autowsgr.emulator import AndroidController
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -57,195 +32,200 @@ class EdgeType(enum.Enum):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class NavEdge:
     """导航图中的一条有向边。
 
     Attributes
     ----------
     source:
-        出发页面名称。
+        出发页面。
     target:
-        到达页面名称。
-    click:
-        点击坐标 (rx, ry)，相对值 0.0–1.0。
-    edge_type:
-        边类型。
+        到达页面。
+    action:
+        执行导航的函数 ``(ctrl) -> None``，内部调用页面控制器方法。
     description:
-        人类可读描述 (可选)。
+        人类可读描述。
     """
 
-    source: str
-    target: str
-    click: tuple[float, float]
-    edge_type: EdgeType
+    source: PageName
+    target: PageName
+    action: Callable[[AndroidController], None] = field(repr=False)
     description: str = ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 页面名称常量 — 从 PageName 枚举导出，保持向后兼容
+# 动作函数 — 延迟导入避免循环依赖
 # ═══════════════════════════════════════════════════════════════════════════════
 
-MAIN_PAGE = PageName.MAIN
-MAP_PAGE = PageName.MAP
-BATTLE_PREP = PageName.BATTLE_PREP
-SIDEBAR_PAGE = PageName.SIDEBAR
-MISSION_PAGE = PageName.MISSION
-BACKYARD_PAGE = PageName.BACKYARD
-BATH_PAGE = PageName.BATH
-CANTEEN_PAGE = PageName.CANTEEN
-CHOOSE_REPAIR_PAGE = PageName.CHOOSE_REPAIR  # 已废弃: 选择修理现为浴室页面 overlay
-BUILD_PAGE = PageName.BUILD
-INTENSIFY_PAGE = PageName.INTENSIFY
-FRIEND_PAGE = PageName.FRIEND
-DECISIVE_BATTLE_PAGE = PageName.DECISIVE_BATTLE
 
-ALL_PAGES: list[PageName] = list(PageName)
-"""所有已声明的页面名称 (13 个)。
+def _main_to_map(ctrl: AndroidController) -> None:
+    from autowsgr.ui.main_page import MainPage, MainPageTarget
+    MainPage(ctrl).navigate_to(MainPageTarget.SORTIE)
 
-.. note::
-    建造页面内的标签切换 (解体/开发/废弃) 由 ``BuildPage.switch_tab()`` 管理，
-    强化页面内的标签切换 (改修/技能) 由 ``IntensifyPage.switch_tab()`` 管理。
-    标签组成员不作为独立页面出现在导航图中。
-"""
+
+def _main_to_mission(ctrl: AndroidController) -> None:
+    from autowsgr.ui.main_page import MainPage, MainPageTarget
+    MainPage(ctrl).navigate_to(MainPageTarget.TASK)
+
+
+def _main_to_backyard(ctrl: AndroidController) -> None:
+    from autowsgr.ui.main_page import MainPage, MainPageTarget
+    MainPage(ctrl).navigate_to(MainPageTarget.HOME)
+
+
+def _main_to_sidebar(ctrl: AndroidController) -> None:
+    from autowsgr.ui.main_page import MainPage, MainPageTarget
+    MainPage(ctrl).navigate_to(MainPageTarget.SIDEBAR)
+
+
+def _map_to_main(ctrl: AndroidController) -> None:
+    from autowsgr.ui.map.page import MapPage
+    MapPage(ctrl).go_back()
+
+
+def _mission_to_main(ctrl: AndroidController) -> None:
+    from autowsgr.ui.mission_page import MissionPage
+    MissionPage(ctrl).go_back()
+
+
+def _backyard_to_main(ctrl: AndroidController) -> None:
+    from autowsgr.ui.backyard_page import BackyardPage
+    BackyardPage(ctrl).go_back()
+
+
+def _sidebar_to_main(ctrl: AndroidController) -> None:
+    from autowsgr.ui.sidebar_page import SidebarPage
+    SidebarPage(ctrl).close()
+
+
+def _map_to_decisive(ctrl: AndroidController) -> None:
+    from autowsgr.ui.map.page import MapPage
+    MapPage(ctrl).enter_decisive()
+
+
+def _battle_prep_to_map(ctrl: AndroidController) -> None:
+    from autowsgr.ui.battle.preparation import BattlePreparationPage
+    BattlePreparationPage(ctrl).go_back()
+
+
+def _backyard_to_bath(ctrl: AndroidController) -> None:
+    from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
+    BackyardPage(ctrl).navigate_to(BackyardTarget.BATH)
+
+
+def _backyard_to_canteen(ctrl: AndroidController) -> None:
+    from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
+    BackyardPage(ctrl).navigate_to(BackyardTarget.CANTEEN)
+
+
+def _bath_to_backyard(ctrl: AndroidController) -> None:
+    from autowsgr.ui.bath_page import BathPage
+    BathPage(ctrl).go_back()
+
+
+def _canteen_to_backyard(ctrl: AndroidController) -> None:
+    from autowsgr.ui.canteen_page import CanteenPage
+    CanteenPage(ctrl).go_back()
+
+
+def _sidebar_to_build(ctrl: AndroidController) -> None:
+    from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
+    SidebarPage(ctrl).navigate_to(SidebarTarget.BUILD)
+
+
+def _sidebar_to_intensify(ctrl: AndroidController) -> None:
+    from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
+    SidebarPage(ctrl).navigate_to(SidebarTarget.INTENSIFY)
+
+
+def _sidebar_to_friend(ctrl: AndroidController) -> None:
+    from autowsgr.ui.sidebar_page import SidebarPage, SidebarTarget
+    SidebarPage(ctrl).navigate_to(SidebarTarget.FRIEND)
+
+
+def _build_to_sidebar(ctrl: AndroidController) -> None:
+    from autowsgr.ui.build_page import BuildPage
+    BuildPage(ctrl).go_back()
+
+
+def _intensify_to_sidebar(ctrl: AndroidController) -> None:
+    from autowsgr.ui.intensify_page import IntensifyPage
+    IntensifyPage(ctrl).go_back()
+
+
+def _friend_to_sidebar(ctrl: AndroidController) -> None:
+    from autowsgr.ui.friend_page import FriendPage
+    FriendPage(ctrl).go_back()
+
+
+def _decisive_to_main(ctrl: AndroidController) -> None:
+    from autowsgr.ui.decisive import DecisiveBattlePage
+    DecisiveBattlePage(ctrl).go_back()
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 导航图 — 全部边
+# 导航图
 # ═══════════════════════════════════════════════════════════════════════════════
-
-_BACK_TOP_LEFT: tuple[float, float] = (0.022, 0.058)
-"""通用左上角回退按钮 (◁)。"""
 
 NAV_GRAPH: list[NavEdge] = [
-    # ── 主页面 → 一级子页面 ──────────────────────────────────────────
-    NavEdge(MAIN_PAGE, MAP_PAGE, (0.9375, 0.8889),
-            EdgeType.CHILD, "点击「出征」"),
-    NavEdge(MAIN_PAGE, MISSION_PAGE, (0.6833, 0.8889),
-            EdgeType.CHILD, "点击「任务」"),
-    NavEdge(MAIN_PAGE, BACKYARD_PAGE, (0.0469, 0.1481),
-            EdgeType.CHILD, "点击主页图标 (后院)"),
-    NavEdge(MAIN_PAGE, SIDEBAR_PAGE, (0.0438, 0.8963),
-            EdgeType.CHILD, "点击左下角 ≡ (侧边栏)"),
-
-    # ── 一级子页面 → 主页面 (回退) ──────────────────────────────────────
-    NavEdge(MAP_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "地图页面 ◁ 返回主页面"),
-    NavEdge(MISSION_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "任务页面 ◁ 返回主页面"),
-    NavEdge(BACKYARD_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "后院 ◁ 返回主页面"),
-    NavEdge(SIDEBAR_PAGE, MAIN_PAGE, (0.0438, 0.8963),
-            EdgeType.CHILD, "侧边栏 ≡ 关闭 (同一按钮切换)"),
-
-    # ── 地图页面 → 出征准备 ─────────────────────────────────────────────
-    #    注: 实际点击坐标取决于章节中具体地图节点位置，
-    #    此处仅声明拓扑关系，click 坐标需由 MapPage 动态确定。
-    NavEdge(MAP_PAGE, BATTLE_PREP, (0.6250, 0.5556),
-            EdgeType.CHILD, "点击地图节点进入出征准备 (坐标因图而异)"),
-
-    # ── 出征准备 → 地图页面 (回退) ──────────────────────────────────────
-    NavEdge(BATTLE_PREP, MAP_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "出征准备 ◁ 返回地图页面"),
-
-    # ── 出征准备 → 浴室 (跨级快捷通道) ─────────────────────────────────
-    NavEdge(BATTLE_PREP, BATH_PAGE, (0.875, 0.037),
-            EdgeType.CROSS, "出征准备右上角 🔧 → 浴室"),
-
-    # ── 后院 → 子页面 ──────────────────────────────────────────────────
-    NavEdge(BACKYARD_PAGE, BATH_PAGE, (0.3125, 0.3704),
-            EdgeType.CHILD, "后院 → 浴室 (修理舰船)"),
-    NavEdge(BACKYARD_PAGE, CANTEEN_PAGE, (0.7292, 0.7407),
-            EdgeType.CHILD, "后院 → 食堂"),
-
-    # ── 浴室 → 回退 ──────────────────────────────────────────────────
-    #    注: 选择修理为浴室页面的 overlay，不作为独立页面出现在导航图中。
-    #    使用 BathPage.go_to_choose_repair() 打开 overlay。
-    NavEdge(BATH_PAGE, BACKYARD_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "浴室 ◁ 返回后院"),
-    NavEdge(BATH_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CROSS, "浴室 ◁ 直接返回主页面 (跨级)"),
-
-    # ── 食堂 → 回退 ────────────────────────────────────────────────────
-    NavEdge(CANTEEN_PAGE, BACKYARD_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "食堂 ◁ 返回后院"),
-    NavEdge(CANTEEN_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CROSS, "食堂 ◁ 直接返回主页面 (跨级)"),
-
-    # ── 侧边栏 → 子页面 ──────────────────────────────────────────────
-    NavEdge(SIDEBAR_PAGE, BUILD_PAGE, (0.1563, 0.3704),
-            EdgeType.CHILD, "侧边栏 → 建造"),
-    NavEdge(SIDEBAR_PAGE, INTENSIFY_PAGE, (0.1563, 0.5000),
-            EdgeType.CHILD, "侧边栏 → 强化"),
-    NavEdge(SIDEBAR_PAGE, FRIEND_PAGE, (0.1563, 0.7593),
-            EdgeType.CHILD, "侧边栏 → 好友"),
-
-    # ── 建造页面 (含 建造/解体/开发/废弃 标签) ────────────────────────
-    #    标签切换由 BuildPage.switch_tab() 管理，不体现在导航图中。
-    NavEdge(BUILD_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "建造页面 ◁ 返回侧边栏"),
-
-    # ── 强化页面 (含 强化/改修/技能 标签) ──────────────────────────────
-    #    标签切换由 IntensifyPage.switch_tab() 管理，不体现在导航图中。
-    NavEdge(INTENSIFY_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "强化页面 ◁ 返回侧边栏"),
-
-    # ── 好友 → 侧边栏 ────────────────────────────────────────────────
-    NavEdge(FRIEND_PAGE, SIDEBAR_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "好友 ◁ 返回侧边栏"),
-    # ── 地图决战面板 → 决战页面 ──────────────────────────────────────
-    #    先切到 MapPanel.DECISIVE，再点击章节图标进入。
-    #    坐标换算自旧代码 enter_decisive_battle → timer.click(115, 113)，
-    #    参考分辨率 960×540。
-    NavEdge(MAP_PAGE, DECISIVE_BATTLE_PAGE, (115 / 960, 113 / 540),
-            EdgeType.CHILD, "地图决战面板 → 决战总览页"),
-
-    # ── 决战页面 → 主页面 (跨级直通) ─────────────────────────────────
-    #    决战页左上角 ◁ 直接跳回主页面，跳过地图页面。
-    NavEdge(DECISIVE_BATTLE_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CROSS, "决战页面 ◁ 直接返回主页面 (跨级)"),]
-"""完整导航图 — 所有已知页面间的有向边。
-
-边中标注 ``TODO`` 的坐标为估计值，待实际游戏截图确认后精确化。
-"""
+    # ── 主页面 ↔ 一级页面 ──
+    NavEdge(PageName.MAIN, PageName.MAP, _main_to_map, "主页面 → 地图"),
+    NavEdge(PageName.MAIN, PageName.MISSION, _main_to_mission, "主页面 → 任务"),
+    NavEdge(PageName.MAIN, PageName.BACKYARD, _main_to_backyard, "主页面 → 后院"),
+    NavEdge(PageName.MAIN, PageName.SIDEBAR, _main_to_sidebar, "主页面 → 侧边栏"),
+    NavEdge(PageName.MAP, PageName.MAIN, _map_to_main, "地图 → 主页面"),
+    NavEdge(PageName.MISSION, PageName.MAIN, _mission_to_main, "任务 → 主页面"),
+    NavEdge(PageName.BACKYARD, PageName.MAIN, _backyard_to_main, "后院 → 主页面"),
+    NavEdge(PageName.SIDEBAR, PageName.MAIN, _sidebar_to_main, "侧边栏 → 主页面"),
+    # ── 地图 → 子页面 ──
+    NavEdge(PageName.MAP, PageName.DECISIVE_BATTLE, _map_to_decisive, "地图 → 决战"),
+    # ── 出征准备 → 地图 ──
+    NavEdge(PageName.BATTLE_PREP, PageName.MAP, _battle_prep_to_map, "出征准备 → 地图"),
+    # ── 后院 ↔ 子页面 ──
+    NavEdge(PageName.BACKYARD, PageName.BATH, _backyard_to_bath, "后院 → 浴室"),
+    NavEdge(PageName.BACKYARD, PageName.CANTEEN, _backyard_to_canteen, "后院 → 食堂"),
+    NavEdge(PageName.BATH, PageName.BACKYARD, _bath_to_backyard, "浴室 → 后院"),
+    NavEdge(PageName.CANTEEN, PageName.BACKYARD, _canteen_to_backyard, "食堂 → 后院"),
+    # ── 侧边栏 ↔ 子页面 ──
+    NavEdge(PageName.SIDEBAR, PageName.BUILD, _sidebar_to_build, "侧边栏 → 建造"),
+    NavEdge(PageName.SIDEBAR, PageName.INTENSIFY, _sidebar_to_intensify, "侧边栏 → 强化"),
+    NavEdge(PageName.SIDEBAR, PageName.FRIEND, _sidebar_to_friend, "侧边栏 → 好友"),
+    NavEdge(PageName.BUILD, PageName.SIDEBAR, _build_to_sidebar, "建造 → 侧边栏"),
+    NavEdge(PageName.INTENSIFY, PageName.SIDEBAR, _intensify_to_sidebar, "强化 → 侧边栏"),
+    NavEdge(PageName.FRIEND, PageName.SIDEBAR, _friend_to_sidebar, "好友 → 侧边栏"),
+    # ── 决战 → 主页面 (跨级) ──
+    NavEdge(PageName.DECISIVE_BATTLE, PageName.MAIN, _decisive_to_main, "决战 → 主页面"),
+]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 查找辅助
+# 路径查找
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 按 source 索引，方便查找
-_adjacency: dict[str, list[NavEdge]] = {}
+_adjacency: dict[PageName, list[NavEdge]] = {}
 for _e in NAV_GRAPH:
     _adjacency.setdefault(_e.source, []).append(_e)
 
 
-def get_edges_from(page: str) -> list[NavEdge]:
-    """获取从 ``page`` 出发的所有边。"""
-    return list(_adjacency.get(page, []))
-
-
 def find_path(source: str, target: str) -> list[NavEdge] | None:
-    """BFS 查找从 ``source`` 到 ``target`` 的最短路径。
+    """BFS 查找从 *source* 到 *target* 的最短路径。
 
     Parameters
     ----------
-    source:
-        起始页面名称。
-    target:
-        目标页面名称。
+    source, target:
+        页面名称，可以是 :class:`PageName` 或等价字符串。
 
     Returns
     -------
     list[NavEdge] | None
-        路径上的边列表，不可达时返回 ``None``。
-        如果 ``source == target``，返回空列表。
+        路径上的边列表；``source == target`` 时返回空列表；不可达返回 ``None``。
     """
     if source == target:
         return []
 
     visited: set[str] = {source}
-    queue: deque[tuple[str, list[NavEdge]]] = deque()
-    queue.append((source, []))
+    queue: deque[tuple[str, list[NavEdge]]] = deque([(source, [])])
 
     while queue:
         current, path = queue.popleft()
@@ -259,12 +239,3 @@ def find_path(source: str, target: str) -> list[NavEdge] | None:
             queue.append((edge.target, new_path))
 
     return None
-
-
-def get_all_pages() -> list[str]:
-    """返回导航图中涉及的所有页面名称 (去重)。"""
-    pages: set[str] = set()
-    for edge in NAV_GRAPH:
-        pages.add(edge.source)
-        pages.add(edge.target)
-    return sorted(pages)
