@@ -120,6 +120,13 @@ class PhaseHandlersMixin:
         if phase == CombatPhase.FLAGSHIP_SEVERE_DAMAGE:
             return self._handle_flagship_severe_damage()
 
+        if phase == CombatPhase.DOCK_FULL:
+            return self._handle_dock_full()
+
+        if phase == CombatPhase.START_FIGHT:
+            # START_FIGHT 是纯过渡态，不需要操作——已在 _update_state 中转移到后继
+            return ConditionFlag.FIGHT_CONTINUE
+
         logger.error("未知状态: {}", phase.name)
         return ConditionFlag.SL
 
@@ -395,6 +402,20 @@ class PhaseHandlersMixin:
             action="回港",
         ))
         return ConditionFlag.FIGHT_END
+
+    def _handle_dock_full(self) -> ConditionFlag:
+        """处理船坞已满弹窗 — 返回 DOCK_FULL 标志交由上层处理。
+
+        此方法不执行任何点击操作（弹窗应由 ops 层决定如何处理），
+        仅记录事件并向引擎返回 DOCK_FULL 信号使其退出主循环。
+        """
+        logger.warning("[Combat] 检测到船坞已满，战斗无法开始")
+        self._history.add(CombatEvent(
+            event_type=EventType.AUTO_RETURN,
+            node=self._node,
+            action="船坞已满",
+        ))
+        return ConditionFlag.DOCK_FULL
 
     # ── Mixin 所需的方法签名 (由宿主类提供) ──
 

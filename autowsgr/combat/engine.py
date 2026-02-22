@@ -28,7 +28,34 @@ from autowsgr.types import ConditionFlag, Formation, ShipDamageState
 
 
 from autowsgr.emulator import AndroidController
-from autowsgr.vision import OCREngine
+from autowsgr.vision import ImageChecker, OCREngine
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 辅助
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _dismiss_resource_confirm(device: AndroidController) -> None:
+    """检测并关闭地图移动中弹出的资源获取/失去确认弹窗。
+
+    Legacy ``_before_match`` 在每轮轮询中用 ``confirm_image[3]`` 快速探测，
+    命中后调用 ``confirm_operation()`` 点掉。此处等价实现：仅对当前帧做
+    一次快速检测（不阻塞等待），找到任意确认按钮模板就点击。
+    """
+    from autowsgr.image_resources import Templates
+
+    screen = device.screenshot()
+    detail = ImageChecker.find_any(
+        screen, Templates.Confirm.all(), confidence=0.8,
+    )
+    if detail is not None:
+        device.click(*detail.center)
+        logger.info(
+            "[Combat] 点掉资源确认弹窗: '{}' ({:.4f}, {:.4f})",
+            detail.template_name, *detail.center,
+        )
+        time.sleep(0.25)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -142,6 +169,10 @@ class CombatEngine(PhaseHandlersMixin):
 
             if decision == ConditionFlag.FIGHT_CONTINUE:
                 continue
+            elif decision == ConditionFlag.DOCK_FULL:
+                logger.warning("战斗进入失败：船坞已满")
+                result.flag = ConditionFlag.DOCK_FULL
+                break
             elif decision == ConditionFlag.SL:
                 # TODO: 这里出现了轻微的抽象泄露，因为 SL 需要调用 restart_game
                 result.flag = ConditionFlag.SL
@@ -180,10 +211,10 @@ class CombatEngine(PhaseHandlersMixin):
             self._tracker.reset()
 
         if self._plan.mode == CombatMode.NORMAL:
-            self._phase = CombatPhase.PROCEED
+            self._phase = CombatPhase.START_FIGHT
             self._last_action = "yes"
         elif self._plan.mode in [CombatMode.BATTLE, CombatMode.EXERCISE]:
-            self._phase = CombatPhase.PROCEED
+            self._phase = CombatPhase.START_FIGHT
             self._last_action = ""
 
     def _step(self) -> ConditionFlag:
@@ -221,23 +252,32 @@ class CombatEngine(PhaseHandlersMixin):
         return new_phase
 
     def _get_poll_action(self, last_phase: CombatPhase):
-        """根据当前状态和模式，返回每轮匹配前执行的动作。"""
+        """根据当前状态和模式，返回每轮匹配前执行的动作。
+
+        NORMAL 模式下，在地图移动期间（``PROCEED`` / ``FIGHT_CONDITION`` /
+        迂回后）除了加速点击和节点追踪外，还会检测因获取/失去资源而
+        弹出的确认弹窗并点掉，与 Legacy ``_before_match`` 行为一致。
+        """
         if self._plan.mode == CombatMode.NORMAL:
             if last_phase in (
                 CombatPhase.PROCEED,
                 CombatPhase.FIGHT_CONDITION,
             ) or self._last_action == "detour":
                 tracker = self._tracker
+                device = self._device
 
                 def _speed_up() -> None:
-                    click_speed_up(self._device, battle_mode=False)
+                    click_speed_up(device, battle_mode=False)
                     # 在地图移动期间追踪船位并更新节点
                     if tracker is not None:
-                        screen = self._device.screenshot()
+                        screen = device.screenshot()
                         tracker.update_ship_position(screen)
                         new_node = tracker.update_node()
                         if new_node != self._node:
                             self._node = new_node
+
+                    # 检测地图移动中弹出的资源确认弹窗并点掉
+                    _dismiss_resource_confirm(device)
 
                 return _speed_up
 
