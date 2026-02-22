@@ -22,10 +22,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import cv2
+import numpy as np
+
 from loguru import logger
 
-from autowsgr.image_resources import TemplateKey
-from autowsgr.vision import ImageChecker, ImageMatchDetail, ImageTemplate
+from autowsgr.vision import (
+    MatchStrategy, PixelChecker, PixelRule, PixelSignature,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 常量
@@ -207,10 +211,95 @@ class NodeTracker:
         self._last_ship_position = None
         self._current_node = "0"
 
+    def _recheck_pixel(self, center: tuple[float, float], screen) -> bool:
+        """验证中心及其左右两侧的像素特征。
+
+        在检测到的 center 位置及其左右相对距离 0.03 的位置检查像素。
+        三个位置都需满足黄色小船的像素特征才认为匹配有效。
+
+        Parameters
+        ----------
+        center:
+            中心位置（相对坐标）。
+        screen:
+            当前截图。
+
+        Returns
+        -------
+        bool
+            三个位置都满足像素特征时返回 ``True``。
+        """
+        cx, cy = center
+
+        # 定义三个检查位置的像素规则
+        rules = [
+            PixelRule.of(cx, cy, (239, 219, 106), tolerance=40.0),           # 中心
+            PixelRule.of(cx - 0.03, cy, (231, 222, 101), tolerance=40.0),   # 左侧
+            PixelRule.of(cx + 0.03, cy, (231, 222, 101), tolerance=40.0),   # 右侧
+        ]
+
+        sig = PixelSignature(
+            name="小船像素验证",
+            strategy=MatchStrategy.ALL,
+            rules=rules,
+        )
+        return PixelChecker.check_signature(screen, sig).matched
+
+    @staticmethod
+    def _find_yellow_cluster(screen: np.ndarray) -> tuple[float, float] | None:
+        """在截图中查找最大的黄色像素簇，返回其质心的相对坐标。
+
+        黄色船体在 RGB 空间满足: R>200, G>180, 50<B<150。
+        找到所有满足条件的像素后，使用连通组件分析选取面积最大的簇，
+        过滤过小的噪点（面积 < 200 像素）。
+
+        Returns
+        -------
+        tuple[float, float] | None
+            最大黄色簇质心 ``(rel_x, rel_y)``；未找到返回 ``None``。
+        """
+        r, g, b = screen[:, :, 0], screen[:, :, 1], screen[:, :, 2]
+        mask = (
+            (r.astype(np.int16) > 200)
+            & (g.astype(np.int16) > 180)
+            & (b.astype(np.int16) > 50)
+            & (b.astype(np.int16) < 150)
+        ).astype(np.uint8)
+
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+            mask, connectivity=8,
+        )
+        # label 0 是背景，跳过
+        if num_labels <= 1:
+            return None
+
+        # 按面积降序排列（排除背景 label 0）
+        _MIN_AREA = 200
+        best_label = -1
+        best_area = 0
+        for label_id in range(1, num_labels):
+            area = int(stats[label_id, cv2.CC_STAT_AREA])
+            if area >= _MIN_AREA and area > best_area:
+                best_area = area
+                best_label = label_id
+
+        if best_label < 0:
+            return None
+
+        h, w = screen.shape[:2]
+        cx_abs, cy_abs = centroids[best_label]
+        return (cx_abs / w, cy_abs / h)
+
     def update_ship_position(self, screen) -> tuple[float, float] | None:
-        """在战斗移动界面通过模板匹配更新黄色小船的位置。
-        TODO: 提高稳定性
-        尝试匹配 ``ship_icon_1`` 和 ``ship_icon_2`` 两个模板图像
+        """在战斗移动界面检测黄色小船图标的位置。
+
+        小船图标是一个纯黄色水平条纹，在灰度空间内近乎均匀亮度，
+        传统模板匹配（灰度 ``TM_CCOEFF_NORMED``）容易产生大量假阳性。
+        因此改用 **颜色空间直接检测** 策略：
+
+        1. 在 RGB 空间筛选黄色像素（R>200, G>180, 50<B<150）；
+        2. 用连通组件分析找到最大的黄色簇；
+        3. 对簇质心执行像素验证确认。
 
         Parameters
         ----------
@@ -220,15 +309,24 @@ class NodeTracker:
         Returns
         -------
         tuple[float, float] | None
-            检测到的相对坐标 ``(x, y)``；未检测到返回 ``None``。
+            检测到的相对坐标 ``(x, y)``；未检测到或像素验证失败返回 ``None``。
         """
-        templates = TemplateKey.SHIP_ICON.templates
-        detail: ImageMatchDetail | None = ImageChecker.find_any(
-            screen, templates, confidence=0.75,
+        center = self._find_yellow_cluster(screen)
+        if center is None:
+            return None
+
+        if self._recheck_pixel(center, screen):
+            self._ship_position = center
+            logger.debug(
+                "[NodeTracker] 小船位置更新: ({:.3f}, {:.3f}) [黄色簇检测+像素验证]",
+                center[0], center[1],
+            )
+            return center
+
+        logger.debug(
+            "[NodeTracker] 黄色簇检测到但像素验证失败: ({:.3f}, {:.3f})",
+            center[0], center[1],
         )
-        if detail is not None:
-            self._ship_position = detail.center
-            return detail.center
         return None
 
     def update_node(self) -> str:
@@ -260,6 +358,10 @@ class NodeTracker:
         # 确定候选节点列表
         if current_data is not None and current_data.next_nodes:
             # 新格式：仅在 next_nodes 中搜索
+            logger.debug(
+                "[NodeTracker] 当前节点 '{}', 下一节点候选列表: {}",
+                self._current_node, current_data.next_nodes,
+            )
             candidate_names = current_data.next_nodes
         else:
             # 旧格式：搜索全部节点（排除 "0"）
@@ -279,8 +381,8 @@ class NodeTracker:
 
         if best_node != self._current_node:
             logger.info(
-                "[NodeTracker] 节点更新: {} → {} (距离 {:.4f})",
-                self._current_node, best_node, best_distance,
+                "[NodeTracker] 节点更新: {} → {} (距离 {:.4f}), 位置: ({:.3f}, {:.3f})",
+                self._current_node, best_node, best_distance, sx, sy
             )
             self._current_node = best_node
 
