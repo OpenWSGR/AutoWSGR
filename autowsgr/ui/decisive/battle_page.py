@@ -191,28 +191,10 @@ class DecisiveBattlePage:
             target=PageName.MAIN,
         )
 
-    def enter_map(self) -> None:
+    def click_enter_map(self) -> None:
         """从决战总览页进入当前章节的决战地图页。"""
-        from autowsgr.ui.decisive.overlay import (
-            detect_decisive_overlay,
-            is_decisive_map_page,
-        )
-        from autowsgr.ui.page import NavigationError
-
         logger.info("[UI] 决战总览 → 进入地图")
         self._ctrl.click(*CLICK_ENTER_MAP)
-
-        deadline = time.monotonic() + 10.0
-        while time.monotonic() < deadline:
-            time.sleep(0.5)
-            screen = self._ctrl.screenshot()
-            if is_decisive_map_page(screen):
-                logger.info("[UI] 已进入决战地图页")
-                return
-            if detect_decisive_overlay(screen) is not None:
-                logger.info("[UI] 已进入决战地图页 (overlay)")
-                return
-        raise NavigationError("从决战总览进入地图超时")
 
     # ── 章节 OCR ──────────────────────────────────────────────────────────
 

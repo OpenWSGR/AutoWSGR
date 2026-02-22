@@ -137,6 +137,8 @@ CLICK_BUY_EXP: tuple[float, float] = (75 / 960, 500 / 540)
 CLICK_SKILL: tuple[float, float] = (0.2143, 0.894)
 """副官技能按钮。"""
 
+CLICK_FORMATION: tuple[float, float] = (0.75, 0.925)
+
 # ── 战备舰队获取 overlay ──
 
 CLICK_FLEET_REFRESH: tuple[float, float] = (380 / 960, 500 / 540)
