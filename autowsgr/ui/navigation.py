@@ -94,7 +94,7 @@ MISSION_PAGE = PageName.MISSION
 BACKYARD_PAGE = PageName.BACKYARD
 BATH_PAGE = PageName.BATH
 CANTEEN_PAGE = PageName.CANTEEN
-CHOOSE_REPAIR_PAGE = PageName.CHOOSE_REPAIR
+CHOOSE_REPAIR_PAGE = PageName.CHOOSE_REPAIR  # 已废弃: 选择修理现为浴室页面 overlay
 BUILD_PAGE = PageName.BUILD
 INTENSIFY_PAGE = PageName.INTENSIFY
 FRIEND_PAGE = PageName.FRIEND
@@ -157,17 +157,13 @@ NAV_GRAPH: list[NavEdge] = [
     NavEdge(BACKYARD_PAGE, CANTEEN_PAGE, (0.7292, 0.7407),
             EdgeType.CHILD, "后院 → 食堂"),
 
-    # ── 浴室 → 回退 / 子页面 ─────────────────────────────────────────
+    # ── 浴室 → 回退 ──────────────────────────────────────────────────
+    #    注: 选择修理为浴室页面的 overlay，不作为独立页面出现在导航图中。
+    #    使用 BathPage.go_to_choose_repair() 打开 overlay。
     NavEdge(BATH_PAGE, BACKYARD_PAGE, _BACK_TOP_LEFT,
             EdgeType.CHILD, "浴室 ◁ 返回后院"),
-    NavEdge(BATH_PAGE, CHOOSE_REPAIR_PAGE, (0.9375, 0.0556),
-            EdgeType.CHILD, "浴室 → 选择修理"),
     NavEdge(BATH_PAGE, MAIN_PAGE, _BACK_TOP_LEFT,
             EdgeType.CROSS, "浴室 ◁ 直接返回主页面 (跨级)"),
-
-    # ── 选择修理 → 浴室 ─────────────────────────────────────────────
-    NavEdge(CHOOSE_REPAIR_PAGE, BATH_PAGE, _BACK_TOP_LEFT,
-            EdgeType.CHILD, "选择修理 ◁ 返回浴室"),
 
     # ── 食堂 → 回退 ────────────────────────────────────────────────────
     NavEdge(CANTEEN_PAGE, BACKYARD_PAGE, _BACK_TOP_LEFT,
