@@ -107,7 +107,7 @@ def _get_page_checker(page_name: str):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def goto_page(ctrl: AndroidController, target: str) -> None:
+def _goto_page(ctrl: AndroidController, target: str) -> None:
     """从当前页面导航到目标页面。
 
     利用导航图 BFS 查找最短路径，逐步执行:
@@ -173,4 +173,11 @@ def goto_page(ctrl: AndroidController, target: str) -> None:
 
     logger.info("[OPS] 已到达: {}", target)
 
-
+def goto_page(ctrl: AndroidController, target: str) -> None:
+    try:
+        _goto_page(ctrl, target)
+    except NavigationError as e:
+        logger.error("[OPS] 导航失败: {}", e)
+        current_page = identify_current_page(ctrl)
+        logger.info("[OPS] 当前页面: {}, 执行一次重试", current_page)
+        _goto_page(ctrl, target)
