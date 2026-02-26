@@ -88,20 +88,20 @@ NODE_POSITIONS = {
     6: (0.6352, 0.6653),
 }
 
-DIFFICULTY_HARD_SIGNATURE = PixelSignature(
-    name="difficulty_hard",
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.1208, 0.9093, (106, 30, 30), tolerance=30.0),
-    ],
-)
 DIFFICULTY_EASY_SIGNATURE = PixelSignature(
     name="difficulty_easy",
     strategy=MatchStrategy.ALL,
     rules=[
+        PixelRule.of(0.1208, 0.9093, (106, 30, 30), tolerance=30.0),
+    ],
+) # 难度切换标签为红色困难，则难度为简单；
+DIFFICULTY_HARD_SIGNATURE = PixelSignature(
+    name="difficulty_hard",
+    strategy=MatchStrategy.ALL,
+    rules=[
         PixelRule.of(0.1208, 0.9093, (44, 66, 111), tolerance=30.0),
     ],
-)
+) # 难度切换标签为蓝色简单，则难度为困难；
 
 """活动地图页面像素签名。"""
 
@@ -177,6 +177,7 @@ class BaseEventPage:
         _log.info("[UI] 活动地图: 关闭进入页浮层")
         self._ctrl.click(*CLICK_CLOSE_OVERLAY)
         wait_for_page(self._ctrl, self.is_current_page, timeout=5.0)
+        time.sleep(0.25)  # 等待页面稳定
 
     def _ensure_no_overlay(self) -> None:
         if self._detect_overlay(self._ctrl.screenshot()):
@@ -204,18 +205,19 @@ class BaseEventPage:
         
     # ── 出击 ──────────────────────────────────────────────────────────────
 
-    def start_fight(self, map: str, entrance: Literal['alpha', 'beta'] | None = None) -> None:
+    def start_fight(self, map: str, entrance: Literal['alpha', 'beta'] | None = None, skip_check: bool = False) -> None:
         """点击出击按钮，等待进入出征准备页面。"""
         # map 为 H1, E1 等
-        if len(map) != 2 or map[0] not in ("H", "E") or not map[1].isdigit() or int(map[1]) not in NODE_POSITIONS:
-            raise ValueError(f"无效的地图标识: {map}")
-        if entrance not in ("alpha", "beta", None):
-            raise ValueError(f"无效的入口标识: {entrance}")
-        difficulty, node_id = map[0], int(map[1])
-        self._change_difficulty(difficulty)
-        self._enter_node(node_id)
-        if entrance is not None:
-            self._select_entrance(entrance)
+        if not skip_check:
+            if len(map) != 2 or map[0] not in ("H", "E") or not map[1].isdigit() or int(map[1]) not in NODE_POSITIONS:
+                raise ValueError(f"无效的地图标识: {map}")
+            if entrance not in ("alpha", "beta", None):
+                raise ValueError(f"无效的入口标识: {entrance}")
+            difficulty, node_id = map[0], int(map[1])
+            self._change_difficulty(difficulty)
+            self._enter_node(node_id)
+            if entrance is not None:
+                self._select_entrance(entrance)
         
         from autowsgr.ui.battle.preparation import BattlePreparationPage
 
@@ -252,6 +254,7 @@ class BaseEventPage:
         target:
             ``"H"`` 或 ``"E"``。
         """
+        self._ensure_no_overlay()
         current = self._get_difficulty()
         if current == target:
             _log.debug("[UI] 活动地图: 当前已是 {} 难度", target)

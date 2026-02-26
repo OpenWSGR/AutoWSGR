@@ -77,6 +77,7 @@ class EventFightRunner:
         self._entrance = entrance
         self._fleet_id = fleet_id if fleet_id is not None else (plan.fleet_id or 1)
         self._fleet = fleet if fleet is not None else plan.fleet
+        self._skip_check = False  # 首次执行时检查难度和节点，后续重复执行时跳过检查以节省时间
 
         # 推导 map_code
         if map_code is not None:
@@ -136,6 +137,8 @@ class EventFightRunner:
         # 4. 处理结果
         self._handle_result(result)
 
+        self._skip_check = True
+        
         return result
 
     def run_for_times(
@@ -188,12 +191,12 @@ class EventFightRunner:
         """
         # 导航到活动地图页面
         goto_page(self._ctx, PageName.EVENT_MAP)
-        time.sleep(1.0)
+        time.sleep(0.25)
 
         # 委托 UI 层完成: 难度 / 节点 / 出击
         event_page = BaseEventPage(self._ctx)
         entrance: Literal["alpha", "beta"] | None = self._entrance  # type: ignore[assignment]
-        event_page.start_fight(self._map_code, entrance=entrance)
+        event_page.start_fight(self._map_code, entrance, self._skip_check)
 
     # ── 出征准备 ──
 
