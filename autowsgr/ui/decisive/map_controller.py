@@ -18,7 +18,6 @@ import time
 import cv2
 import numpy as np
 from autowsgr.infra.logger import get_logger
-from autowsgr.infra import save_image
 import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
@@ -227,8 +226,6 @@ class DecisiveMapController:
             x1 = max(0, int((icon_rel_x - 0.03) * w))
             x2 = min(w, int((icon_rel_x - 0.03 + 0.042) * w))
             col_crop = fresh_screen[0:h, x1:x2]
-            save_image(fresh_screen, f"node_screen_retry{retry}.png")
-            save_image(col_crop, f"node_crop_retry{retry}.png")
 
             # 3. DLL 识别
             try:
@@ -354,7 +351,6 @@ class DecisiveMapController:
 
         # DLL locate + 逐行 OCR 扫描
         screen = self._ctrl.screenshot()
-        save_image(screen, "fleet_check_list.png")
         available = _fleet_ocr.recognize_ships_in_list(self._ocr, screen)
 
         # 编队中的舰船也计入可用集合

@@ -24,7 +24,6 @@ from autowsgr.ops.decisive.base import DecisiveBase
 from autowsgr.types import DecisiveEntryStatus, DecisivePhase, ShipDamageState
 from autowsgr.ui import RepairStrategy
 from autowsgr.ui.decisive import DecisiveBattlePreparationPage
-from autowsgr.infra import save_image
 
 _log = get_logger("ops.decisive")
 
@@ -130,7 +129,6 @@ class DecisivePhaseHandlers(DecisiveBase):
         _log.info("[决战] 战备舰队获取")
         time.sleep(0.25)  # 等待动画稳定
         screen = self._map.screenshot()
-        save_image(screen, "choose_fleet_screen.png")
         score, selections = self._map.recognize_fleet_options(screen)
         self._state.score = score or self._state.score
 
@@ -182,7 +180,6 @@ class DecisivePhaseHandlers(DecisiveBase):
     def _handle_prepare_combat(self) -> None:
         """出征准备：编队 → 修理 → 出征。"""
         screen = self._ctrl.screenshot()
-        save_image(screen, "prepare_combat_screen.png")
         if self._state.node == 'U':
             self._state.node = self._map.recognize_node(screen)
         _log.info(
@@ -319,8 +316,6 @@ class DecisivePhaseHandlers(DecisiveBase):
         deadline = time.monotonic() + self._POST_COMBAT_TIMEOUT
         while time.monotonic() < deadline:
             time.sleep(self._POST_COMBAT_INTERVAL)
-            screen = self._ctrl.screenshot()
-            save_image(screen, "post_combat_screen.png")
             phase = self._map.detect_decisive_phase()
             if phase == DecisivePhase.PREPARE_COMBAT:
                 continue

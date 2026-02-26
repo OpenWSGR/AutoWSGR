@@ -18,7 +18,6 @@ import numpy as np
 from autowsgr.infra.logger import get_logger
 
 from autowsgr.emulator import AndroidController
-from autowsgr.infra import DecisiveConfig, save_image
 from autowsgr.types import FleetSelection
 from autowsgr.ui.decisive.overlay import (
     COST_AREA,
@@ -135,7 +134,6 @@ def use_skill(
     screen = ctrl.screenshot()
     crop = ship_area.crop(screen)
     result = ocr.recognize_ship_name(crop)
-    save_image(crop, "skill_result.png")
     acquired: list[str] = []
     if result is not None:
         acquired.append(result)
@@ -213,7 +211,6 @@ def locate_ship_rows(
     h, w = screen.shape[:2]
 
     # 转为 legacy 格式 (1280×720, BGR)
-    save_image(screen, "debug_list_screen.png")
     bgr_720p, scale_y, scale_x = _to_legacy_format(screen)
     list_720p = bgr_720p[:, :_LEGACY_LIST_WIDTH]  # legacy 裁剪宽度
 
