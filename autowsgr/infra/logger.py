@@ -47,6 +47,8 @@
     _log.debug("[Emulator] click({:.3f}, {:.3f})  {}", x, y, caller_info())
 """
 
+# TODO: 自定义图片保存路径
+
 from __future__ import annotations
 
 import inspect
@@ -65,7 +67,7 @@ from pathlib import Path
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # 全局图片存储目录（由 setup_logger 设置）
-_image_dir: Path | None = None
+_image_dir = "logs/images"
 
 # 项目根目录，用于将绝对路径转换为相对路径（Ctrl+点击用）
 _PROJECT_ROOT = Path(__file__).parent.parent
@@ -380,9 +382,10 @@ def save_image(
         保存的文件路径，未保存时返回 None。
     """
 
-    target_dir = img_dir or _image_dir
+    target_dir = str(img_dir or _image_dir)
+    target_dir = Path(target_dir)
     if target_dir is None:
-        return None
+        raise ValueError("未配置图片保存目录，请在 setup_logger 中设置 log_dir 并启用 save_images")
 
     target_dir.mkdir(parents=True, exist_ok=True)
     ts = _time.strftime("%H%M%S") + f"_{int(_time.monotonic() * 1000) % 1000:03d}"

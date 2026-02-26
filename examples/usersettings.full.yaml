@@ -37,7 +37,7 @@ ocr:
 # ═══════════════════════════════════════════
 log:
   level: DEBUG                     # DEBUG / INFO / WARNING / ERROR / CRITICAL
-  root: log                        # 日志保存根目录
+  root: logs                        # 日志保存根目录
   # dir: null                      # 日志保存路径; null = 自动按日期生成
 
   # 细粒度显示开关
