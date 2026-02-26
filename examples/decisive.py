@@ -6,7 +6,7 @@
 
 from autowsgr.scheduler import launch
 from autowsgr.infra import DecisiveConfig
-from autowsgr.ops.decisive import DecisiveController
+from autowsgr.ops import DecisiveController
 
 # 1. 启动
 ctx = launch('usersettings.yaml')

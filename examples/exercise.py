@@ -4,7 +4,7 @@
 """
 
 from autowsgr.scheduler import launch
-from autowsgr.ops.exercise import ExerciseRunner
+from autowsgr.ops import ExerciseRunner
 
 # 1. 启动
 ctx = launch('usersettings.yaml')

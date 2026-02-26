@@ -5,7 +5,7 @@
 """
 
 from autowsgr.scheduler import launch
-from autowsgr.ops.normal_fight import run_normal_fight_from_yaml
+from autowsgr.ops import run_normal_fight_from_yaml
 
 # 1. 启动 (加载配置 → 连接模拟器 → 启动游戏)
 ctx = launch('usersettings.yaml')

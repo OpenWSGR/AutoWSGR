@@ -4,7 +4,7 @@
 """
 
 from autowsgr.scheduler import launch
-from autowsgr.ops.campaign import CampaignRunner
+from autowsgr.ops import CampaignRunner
 
 # 1. 启动
 ctx = launch('usersettings.yaml')

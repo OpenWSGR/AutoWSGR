@@ -1,7 +1,7 @@
 #H5 夜战
 #带路：1战列
 event: "20260212"
-chapter: E
+chapter: H
 map: 5
 selected_nodes: [A, D, E]
 node_defaults:
