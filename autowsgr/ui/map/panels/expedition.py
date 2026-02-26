@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import time
 
-from autowsgr.infra.logger import get_logger
-
 from autowsgr.image_resources import Templates
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import PageName
 from autowsgr.ui.map.base import BaseMapPage
 from autowsgr.ui.map.data import (
     EXPEDITION_READY_COLOR,
     EXPEDITION_SLOT_PROBES,
     EXPEDITION_SLOT_TOLERANCE,
-    MapPanel,
 )
 from autowsgr.ui.page import confirm_operation, wait_for_page
-from autowsgr.types import PageName
 from autowsgr.vision import ImageChecker, PixelChecker
 
-_log = get_logger("ui")
+
+_log = get_logger('ui')
+
 
 class ExpeditionPanelMixin(BaseMapPage):
     """Mixin: 远征面板操作 — 远征收取。"""
@@ -43,7 +43,7 @@ class ExpeditionPanelMixin(BaseMapPage):
             actual = PixelChecker.get_pixel(screen, px, py)
             if actual.near(EXPEDITION_READY_COLOR, EXPEDITION_SLOT_TOLERANCE):
                 _log.debug(
-                    "[UI] 远征槽位 {} 就绪: 实际颜色 {} ≈ 黄色",
+                    '[UI] 远征槽位 {} 就绪: 实际颜色 {} ≈ 黄色',
                     i + 1,
                     actual.as_rgb_tuple(),
                 )
@@ -73,11 +73,11 @@ class ExpeditionPanelMixin(BaseMapPage):
             if slot_idx is None:
                 # 无黄色槽位 — 检查上方探测点是否仍报告有远征
                 if not self.has_expedition_notification(screen):
-                    _log.debug("[UI] 远征收取: 无就绪槽位且无通知，结束")
+                    _log.debug('[UI] 远征收取: 无就绪槽位且无通知，结束')
                     break
 
                 # 上方探测点仍亮 — 等待槽位刷新 (最多 10s)
-                _log.debug("[UI] 远征收取: 通知仍在，等待槽位刷新…")
+                _log.debug('[UI] 远征收取: 通知仍在，等待槽位刷新…')
                 deadline = time.monotonic() + 10.0
                 while time.monotonic() < deadline:
                     time.sleep(0.1)
@@ -86,21 +86,19 @@ class ExpeditionPanelMixin(BaseMapPage):
                     if slot_idx is not None:
                         break
                     if not self.has_expedition_notification(screen):
-                        _log.debug("[UI] 远征收取: 通知消失，结束")
+                        _log.debug('[UI] 远征收取: 通知消失，结束')
                         break
                 else:
                     from autowsgr.ui.page import NavigationError
 
-                    raise NavigationError(
-                        "远征收取超时: 通知仍在但 10s 内未检测到就绪槽位"
-                    )
+                    raise NavigationError('远征收取超时: 通知仍在但 10s 内未检测到就绪槽位')
 
                 if slot_idx is None:
                     break
 
             slot_pos = EXPEDITION_SLOT_PROBES[slot_idx]
             _log.info(
-                "[UI] 远征收取: 点击槽位 {} ({:.4f}, {:.4f})",
+                '[UI] 远征收取: 点击槽位 {} ({:.4f}, {:.4f})',
                 slot_idx + 1,
                 *slot_pos,
             )
@@ -135,11 +133,11 @@ class ExpeditionPanelMixin(BaseMapPage):
             wait_for_page(
                 self._ctrl,
                 checker=self.is_current_page,
-                source="远征收取",
+                source='远征收取',
                 target=PageName.MAP,
             )
 
             collected += 1
 
-        _log.info("[UI] 远征收取: {} 支", collected)
+        _log.info('[UI] 远征收取: {} 支', collected)
         return collected

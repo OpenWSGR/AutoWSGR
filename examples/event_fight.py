@@ -4,8 +4,9 @@
 策略文件自动从 ``autowsgr/data/plan/event/`` 解析，无需指定完整路径。
 """
 
-from autowsgr.scheduler import launch
 from autowsgr.ops import run_event_fight_from_yaml
+from autowsgr.scheduler import launch
+
 
 # 1. 启动
 ctx = launch('usersettings.yaml')

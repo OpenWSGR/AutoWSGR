@@ -1,7 +1,6 @@
 """Tests for autowsgr.vision.matcher — pixel-based detection engine."""
-from __future__ import annotations
 
-import math
+from __future__ import annotations
 
 import numpy as np
 import pytest
@@ -29,7 +28,9 @@ def solid_screen(r: int, g: int, b: int, h: int = 540, w: int = 960) -> np.ndarr
     return screen
 
 
-def patch_screen(screen: np.ndarray, patches: dict[tuple[int, int], tuple[int, int, int]]) -> np.ndarray:
+def patch_screen(
+    screen: np.ndarray, patches: dict[tuple[int, int], tuple[int, int, int]]
+) -> np.ndarray:
     """在截图指定坐标写入颜色 {(x,y): (r,g,b)}。"""
     s = screen.copy()
     for (x, y), rgb in patches.items():
@@ -90,7 +91,7 @@ class TestColor:
 
     def test_repr(self):
         c = Color(r=3, g=2, b=1)
-        assert "Color" in repr(c)
+        assert 'Color' in repr(c)
 
     def test_immutable(self):
         c = Color.of(10, 20, 30)
@@ -118,23 +119,23 @@ class TestPixelRule:
         assert r.tolerance == 15.0
 
     def test_from_dict_list_color(self):
-        d = {"x": 10, "y": 20, "color": [50, 60, 70]}
+        d = {'x': 10, 'y': 20, 'color': [50, 60, 70]}
         r = PixelRule.from_dict(d)
         assert r.x == 10 and r.color.r == 50
 
     def test_from_dict_with_tolerance(self):
-        d = {"x": 5, "y": 5, "color": [10, 20, 30], "tolerance": 40.0}
+        d = {'x': 5, 'y': 5, 'color': [10, 20, 30], 'tolerance': 40.0}
         r = PixelRule.from_dict(d)
         assert r.tolerance == 40.0
 
     def test_from_dict_dict_color(self):
-        d = {"x": 0, "y": 0, "color": {"r": 3, "g": 2, "b": 1}}
+        d = {'x': 0, 'y': 0, 'color': {'r': 3, 'g': 2, 'b': 1}}
         r = PixelRule.from_dict(d)
         assert r.color == Color(r=3, g=2, b=1)
 
     def test_from_dict_invalid_color_raises(self):
         with pytest.raises(ValueError):
-            PixelRule.from_dict({"x": 0, "y": 0, "color": "bad"})
+            PixelRule.from_dict({'x': 0, 'y': 0, 'color': 'bad'})
 
     def test_to_dict_round_trip(self):
         original = PixelRule.of(0.50, 0.85, (201, 129, 54), tolerance=25.0)
@@ -155,14 +156,14 @@ class TestPixelRule:
 
 class TestMatchStrategy:
     def test_values(self):
-        assert MatchStrategy.ALL.value == "all"
-        assert MatchStrategy.ANY.value == "any"
-        assert MatchStrategy.COUNT.value == "count"
+        assert MatchStrategy.ALL.value == 'all'
+        assert MatchStrategy.ANY.value == 'any'
+        assert MatchStrategy.COUNT.value == 'count'
 
     def test_from_string(self):
-        assert MatchStrategy("all") is MatchStrategy.ALL
-        assert MatchStrategy("any") is MatchStrategy.ANY
-        assert MatchStrategy("count") is MatchStrategy.COUNT
+        assert MatchStrategy('all') is MatchStrategy.ALL
+        assert MatchStrategy('any') is MatchStrategy.ANY
+        assert MatchStrategy('count') is MatchStrategy.COUNT
 
 
 # ─────────────────────────────────────────────
@@ -178,47 +179,47 @@ class TestPixelSignature:
         ]
 
     def test_list_rules_normalised_to_tuple(self):
-        sig = PixelSignature(name="test", rules=self._two_rules())
+        sig = PixelSignature(name='test', rules=self._two_rules())
         assert isinstance(sig.rules, tuple)
 
     def test_len(self):
-        sig = PixelSignature(name="test", rules=self._two_rules())
+        sig = PixelSignature(name='test', rules=self._two_rules())
         assert len(sig) == 2
 
     def test_default_strategy_all(self):
-        sig = PixelSignature(name="test", rules=self._two_rules())
+        sig = PixelSignature(name='test', rules=self._two_rules())
         assert sig.strategy == MatchStrategy.ALL
 
     def test_from_dict_minimal(self):
         d = {
-            "name": "main_page",
-            "rules": [
-                {"x": 0.10, "y": 0.20, "color": [50, 60, 70]},
+            'name': 'main_page',
+            'rules': [
+                {'x': 0.10, 'y': 0.20, 'color': [50, 60, 70]},
             ],
         }
         sig = PixelSignature.from_dict(d)
-        assert sig.name == "main_page"
+        assert sig.name == 'main_page'
         assert len(sig) == 1
         assert sig.strategy == MatchStrategy.ALL
 
     def test_from_dict_with_strategy(self):
         d = {
-            "name": "any_page",
-            "strategy": "any",
-            "rules": [{"x": 0.0, "y": 0.0, "color": [0, 0, 0]}],
+            'name': 'any_page',
+            'strategy': 'any',
+            'rules': [{'x': 0.0, 'y': 0.0, 'color': [0, 0, 0]}],
         }
         sig = PixelSignature.from_dict(d)
         assert sig.strategy == MatchStrategy.ANY
 
     def test_from_dict_with_threshold(self):
         d = {
-            "name": "count_sig",
-            "strategy": "count",
-            "threshold": 2,
-            "rules": [
-                {"x": 0.0, "y": 0.0, "color": [0, 0, 0]},
-                {"x": 0.1, "y": 0.0, "color": [1, 1, 1]},
-                {"x": 0.2, "y": 0.0, "color": [2, 2, 2]},
+            'name': 'count_sig',
+            'strategy': 'count',
+            'threshold': 2,
+            'rules': [
+                {'x': 0.0, 'y': 0.0, 'color': [0, 0, 0]},
+                {'x': 0.1, 'y': 0.0, 'color': [1, 1, 1]},
+                {'x': 0.2, 'y': 0.0, 'color': [2, 2, 2]},
             ],
         }
         sig = PixelSignature.from_dict(d)
@@ -226,7 +227,7 @@ class TestPixelSignature:
 
     def test_to_dict_round_trip(self):
         rules = self._two_rules()
-        sig = PixelSignature(name="pg", rules=rules, strategy=MatchStrategy.ANY)
+        sig = PixelSignature(name='pg', rules=rules, strategy=MatchStrategy.ANY)
         d = sig.to_dict()
         restored = PixelSignature.from_dict(d)
         assert restored.name == sig.name
@@ -241,23 +242,23 @@ class TestPixelSignature:
 
 class TestPixelMatchResult:
     def test_bool_true(self):
-        r = PixelMatchResult(matched=True, signature_name="x", matched_count=3, total_count=3)
+        r = PixelMatchResult(matched=True, signature_name='x', matched_count=3, total_count=3)
         assert bool(r) is True
 
     def test_bool_false(self):
-        r = PixelMatchResult(matched=False, signature_name="x", matched_count=0, total_count=3)
+        r = PixelMatchResult(matched=False, signature_name='x', matched_count=0, total_count=3)
         assert bool(r) is False
 
     def test_ratio_full_match(self):
-        r = PixelMatchResult(matched=True, signature_name="x", matched_count=3, total_count=3)
+        r = PixelMatchResult(matched=True, signature_name='x', matched_count=3, total_count=3)
         assert r.ratio == pytest.approx(1.0)
 
     def test_ratio_partial(self):
-        r = PixelMatchResult(matched=False, signature_name="x", matched_count=1, total_count=4)
+        r = PixelMatchResult(matched=False, signature_name='x', matched_count=1, total_count=4)
         assert r.ratio == pytest.approx(0.25)
 
     def test_ratio_zero_rules(self):
-        r = PixelMatchResult(matched=False, signature_name="x", matched_count=0, total_count=0)
+        r = PixelMatchResult(matched=False, signature_name='x', matched_count=0, total_count=0)
         assert r.ratio == pytest.approx(0.0)
 
 
@@ -294,11 +295,16 @@ class TestPixelCheckerSingle:
 
     def test_check_pixel_within_tolerance(self):
         screen = solid_screen(100, 100, 100)
-        assert PixelChecker.check_pixel(screen, 0.0, 0.0, Color.of(115, 108, 98), tolerance=30) is True
+        assert (
+            PixelChecker.check_pixel(screen, 0.0, 0.0, Color.of(115, 108, 98), tolerance=30) is True
+        )
 
     def test_check_pixel_outside_tolerance(self):
         screen = solid_screen(0, 0, 0)
-        assert PixelChecker.check_pixel(screen, 0.0, 0.0, Color.of(255, 255, 255), tolerance=30) is False
+        assert (
+            PixelChecker.check_pixel(screen, 0.0, 0.0, Color.of(255, 255, 255), tolerance=30)
+            is False
+        )
 
     def test_check_pixel_exact_tolerance_boundary(self):
         screen = solid_screen(0, 0, 0)
@@ -336,8 +342,8 @@ class TestPixelCheckerBatch:
     def test_check_pixels_mixed(self):
         screen = solid_screen(50, 60, 70)
         rules = [
-            PixelRule.of(0.0, 0.0, (50, 60, 70)),      # match
-            PixelRule.of(0.0, 0.0, (200, 200, 200)),   # mismatch
+            PixelRule.of(0.0, 0.0, (50, 60, 70)),  # match
+            PixelRule.of(0.0, 0.0, (200, 200, 200)),  # mismatch
         ]
         results = PixelChecker.check_pixels(screen, rules)
         assert results == [True, False]
@@ -354,21 +360,25 @@ class TestPixelCheckerBatch:
 
 class TestCheckSignatureAll:
     def _sig(self, rules: list[PixelRule]) -> PixelSignature:
-        return PixelSignature(name="test_all", rules=rules, strategy=MatchStrategy.ALL)
+        return PixelSignature(name='test_all', rules=rules, strategy=MatchStrategy.ALL)
 
     def test_all_match(self):
         screen = solid_screen(100, 100, 100)
-        sig = self._sig([PixelRule.of(0.0, 0.0, (100, 100, 100)), PixelRule.of(0.5, 0.5, (100, 100, 100))])
+        sig = self._sig(
+            [PixelRule.of(0.0, 0.0, (100, 100, 100)), PixelRule.of(0.5, 0.5, (100, 100, 100))]
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is True
         assert result.matched_count == 2
 
     def test_one_mismatch_fails_all(self):
         screen = solid_screen(100, 100, 100)
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (100, 100, 100)),   # pass
-            PixelRule.of(0.0, 0.0, (200, 200, 200)),   # fail
-        ])
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (100, 100, 100)),  # pass
+                PixelRule.of(0.0, 0.0, (200, 200, 200)),  # fail
+            ]
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is False
 
@@ -408,10 +418,12 @@ class TestCheckSignatureAll:
         """ALL 模式无详情时遇到第一个失败直接返回，不再检查后续规则。"""
         screen = solid_screen(0, 0, 0)
         # 第一条规则就失败
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (255, 255, 255)),  # fail
-            PixelRule.of(0.0, 0.0, (0, 0, 0)),        # would pass, but never checked
-        ])
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (255, 255, 255)),  # fail
+                PixelRule.of(0.0, 0.0, (0, 0, 0)),  # would pass, but never checked
+            ]
+        )
         result = PixelChecker.check_signature(screen, sig, with_details=False)
         assert result.matched is False
         # matched_count 为 0（第二条没机会匹配）
@@ -425,32 +437,38 @@ class TestCheckSignatureAll:
 
 class TestCheckSignatureAny:
     def _sig(self, rules: list[PixelRule]) -> PixelSignature:
-        return PixelSignature(name="test_any", rules=rules, strategy=MatchStrategy.ANY)
+        return PixelSignature(name='test_any', rules=rules, strategy=MatchStrategy.ANY)
 
     def test_first_rule_matches(self):
         screen = solid_screen(50, 50, 50)
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (50, 50, 50)),    # match
-            PixelRule.of(0.0, 0.0, (200, 200, 200)), # never reached
-        ])
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (50, 50, 50)),  # match
+                PixelRule.of(0.0, 0.0, (200, 200, 200)),  # never reached
+            ]
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is True
 
     def test_second_rule_matches(self):
         screen = solid_screen(50, 50, 50)
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (200, 200, 200)), # fail
-            PixelRule.of(0.0, 0.0, (50, 50, 50)),    # match
-        ])
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (200, 200, 200)),  # fail
+                PixelRule.of(0.0, 0.0, (50, 50, 50)),  # match
+            ]
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is True
 
     def test_none_matches(self):
         screen = solid_screen(50, 50, 50)
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (200, 200, 200)),
-            PixelRule.of(0.0, 0.0, (210, 210, 210)),
-        ])
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (200, 200, 200)),
+                PixelRule.of(0.0, 0.0, (210, 210, 210)),
+            ]
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is False
 
@@ -469,27 +487,35 @@ class TestCheckSignatureAny:
 class TestCheckSignatureCount:
     def _sig(self, rules: list[PixelRule], threshold: int) -> PixelSignature:
         return PixelSignature(
-            name="test_count", rules=rules,
-            strategy=MatchStrategy.COUNT, threshold=threshold,
+            name='test_count',
+            rules=rules,
+            strategy=MatchStrategy.COUNT,
+            threshold=threshold,
         )
 
     def test_meets_threshold(self):
         screen = solid_screen(0, 0, 0)
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (0, 0, 0)),      # match
-            PixelRule.of(0.0, 0.0, (0, 0, 0)),      # match
-            PixelRule.of(0.0, 0.0, (255, 0, 0), tolerance=1),  # fail
-        ], threshold=2)
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (0, 0, 0)),  # match
+                PixelRule.of(0.0, 0.0, (0, 0, 0)),  # match
+                PixelRule.of(0.0, 0.0, (255, 0, 0), tolerance=1),  # fail
+            ],
+            threshold=2,
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is True
 
     def test_below_threshold(self):
         screen = solid_screen(0, 0, 0)
-        sig = self._sig([
-            PixelRule.of(0.0, 0.0, (0, 0, 0)),     # match
-            PixelRule.of(0.0, 0.0, (255, 0, 0), tolerance=1),  # fail
-            PixelRule.of(0.0, 0.0, (255, 0, 0), tolerance=1),  # fail
-        ], threshold=2)
+        sig = self._sig(
+            [
+                PixelRule.of(0.0, 0.0, (0, 0, 0)),  # match
+                PixelRule.of(0.0, 0.0, (255, 0, 0), tolerance=1),  # fail
+                PixelRule.of(0.0, 0.0, (255, 0, 0), tolerance=1),  # fail
+            ],
+            threshold=2,
+        )
         result = PixelChecker.check_signature(screen, sig)
         assert result.matched is False
 
@@ -514,15 +540,15 @@ class TestIdentify:
 
     def test_identify_returns_first_match(self):
         screen = self._make_screen_with_marker((200, 0, 0))
-        page_a = PixelSignature(name="a", rules=[PixelRule.of(0.10, 0.10, (200, 0, 0))])
-        page_b = PixelSignature(name="b", rules=[PixelRule.of(0.10, 0.10, (200, 0, 0))])
+        page_a = PixelSignature(name='a', rules=[PixelRule.of(0.10, 0.10, (200, 0, 0))])
+        page_b = PixelSignature(name='b', rules=[PixelRule.of(0.10, 0.10, (200, 0, 0))])
         result = PixelChecker.identify(screen, [page_a, page_b])
         assert result is not None
-        assert result.signature_name == "a"  # returns first
+        assert result.signature_name == 'a'  # returns first
 
     def test_identify_returns_none_if_no_match(self):
         screen = solid_screen(50, 50, 50)
-        sig = PixelSignature(name="x", rules=[PixelRule.of(0.0, 0.0, (200, 200, 200))])
+        sig = PixelSignature(name='x', rules=[PixelRule.of(0.0, 0.0, (200, 200, 200))])
         assert PixelChecker.identify(screen, [sig]) is None
 
     def test_identify_empty_list(self):
@@ -531,25 +557,27 @@ class TestIdentify:
 
     def test_identify_skips_unmatched(self):
         screen = self._make_screen_with_marker((99, 0, 0))
-        page_a = PixelSignature(name="a", rules=[PixelRule.of(0.10, 0.10, (200, 0, 0))])  # wrong color
-        page_b = PixelSignature(name="b", rules=[PixelRule.of(0.10, 0.10, (99, 0, 0))])   # correct
+        page_a = PixelSignature(
+            name='a', rules=[PixelRule.of(0.10, 0.10, (200, 0, 0))]
+        )  # wrong color
+        page_b = PixelSignature(name='b', rules=[PixelRule.of(0.10, 0.10, (99, 0, 0))])  # correct
         result = PixelChecker.identify(screen, [page_a, page_b])
         assert result is not None
-        assert result.signature_name == "b"
+        assert result.signature_name == 'b'
 
     def test_identify_all_returns_all_matches(self):
         screen = solid_screen(100, 100, 100)
         r1 = PixelRule.of(0.0, 0.0, (100, 100, 100))
         r2 = PixelRule.of(0.0, 0.0, (100, 100, 100))
-        sig_a = PixelSignature(name="a", rules=[r1])
-        sig_b = PixelSignature(name="b", rules=[r2])
+        sig_a = PixelSignature(name='a', rules=[r1])
+        sig_b = PixelSignature(name='b', rules=[r2])
         results = PixelChecker.identify_all(screen, [sig_a, sig_b])
         names = [r.signature_name for r in results]
-        assert "a" in names and "b" in names
+        assert 'a' in names and 'b' in names
 
     def test_identify_all_empty_on_no_match(self):
         screen = solid_screen(0, 0, 0)
-        sig = PixelSignature(name="x", rules=[PixelRule.of(0.0, 0.0, (255, 255, 255))])
+        sig = PixelSignature(name='x', rules=[PixelRule.of(0.0, 0.0, (255, 255, 255))])
         assert PixelChecker.identify_all(screen, [sig]) == []
 
 
@@ -560,9 +588,9 @@ class TestIdentify:
 
 class TestClassifyColor:
     BLOOD_COLORS = {
-        "green":  Color.of(117, 162, 69),
-        "yellow": Color.of(51, 184, 246),
-        "red":    Color.of(89, 58, 230),
+        'green': Color.of(117, 162, 69),
+        'yellow': Color.of(51, 184, 246),
+        'red': Color.of(89, 58, 230),
     }
 
     def _screen_with_pixel(self, r, g, b) -> np.ndarray:
@@ -574,25 +602,23 @@ class TestClassifyColor:
     def test_classify_green(self):
         screen = self._screen_with_pixel(117, 162, 69)
         result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS)
-        assert result == "green"
+        assert result == 'green'
 
     def test_classify_yellow(self):
         screen = self._screen_with_pixel(51, 184, 246)
         result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS)
-        assert result == "yellow"
+        assert result == 'yellow'
 
     def test_classify_undefined_color_returns_none(self):
         screen = self._screen_with_pixel(128, 128, 128)
-        result = PixelChecker.classify_color(
-            screen, 0.5, 0.5, self.BLOOD_COLORS, tolerance=5.0
-        )
+        result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS, tolerance=5.0)
         assert result is None
 
     def test_classify_nearest_within_tolerance(self):
         # Slightly off from green
         screen = self._screen_with_pixel(115, 160, 72)
         result = PixelChecker.classify_color(screen, 0.5, 0.5, self.BLOOD_COLORS, tolerance=30)
-        assert result == "green"
+        assert result == 'green'
 
     def test_classify_empty_map(self):
         screen = self._screen_with_pixel(100, 100, 100)
@@ -647,14 +673,14 @@ class TestIntegration:
         # main_page: (0.50, 0.50) 和 (0.20, 0.30)
         # map_page:  (0.80, 0.10) 和 (0.90, 0.20)
         main_page_sig = PixelSignature(
-            name="main_page",
+            name='main_page',
             rules=[
                 PixelRule.of(0.50, 0.50, (201, 129, 54)),
                 PixelRule.of(0.20, 0.30, (47, 253, 226)),
             ],
         )
         map_page_sig = PixelSignature(
-            name="map_page",
+            name='map_page',
             rules=[
                 PixelRule.of(0.80, 0.10, (255, 200, 100)),
                 PixelRule.of(0.90, 0.20, (200, 230, 80)),
@@ -669,11 +695,11 @@ class TestIntegration:
 
         result = PixelChecker.identify(screen, [main_page_sig, map_page_sig])
         assert result is not None
-        assert result.signature_name == "main_page"
+        assert result.signature_name == 'main_page'
 
     def test_signature_yaml_round_trip(self):
         original = PixelSignature(
-            name="fight_prepare",
+            name='fight_prepare',
             strategy=MatchStrategy.COUNT,
             threshold=2,
             rules=[

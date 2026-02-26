@@ -76,10 +76,7 @@ def resolve_plan_path(
         if candidate_yaml.exists():
             return candidate_yaml.resolve()
 
-    raise FileNotFoundError(
-        f'策略文件未找到: {name_or_path!r}\n'
-        f'已搜索: {p} | {data_dir / p.name}'
-    )
+    raise FileNotFoundError(f'策略文件未找到: {name_or_path!r}\n已搜索: {p} | {data_dir / p.name}')
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -102,8 +99,8 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
     """
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"YAML 文件不存在: {path}")
-    with open(path, encoding="utf-8") as f:
+        raise FileNotFoundError(f'YAML 文件不存在: {path}')
+    with open(path, encoding='utf-8') as f:
         return yaml.safe_load(f) or {}
 
 
@@ -119,7 +116,7 @@ def save_yaml(data: dict[str, Any], path: str | Path) -> None:
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, 'w', encoding='utf-8') as f:
         yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
 
 

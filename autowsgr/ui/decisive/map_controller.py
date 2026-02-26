@@ -14,18 +14,22 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
-from autowsgr.infra.logger import get_logger
+
 import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
+from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     CLICK_ADVANCE_CONFIRM,
     CLICK_FLEET_CLOSE,
     CLICK_FLEET_REFRESH,
-    CLICK_LEAVE,
     CLICK_FORMATION,
+    CLICK_LEAVE,
     CLICK_RETREAT_BUTTON,
     CLICK_RETREAT_CONFIRM,
     CLICK_SORTIE,
@@ -34,19 +38,28 @@ from autowsgr.ui.decisive.overlay import (
     get_overlay_signature,
     is_decisive_map_page,
 )
-from ..page import click_and_wait_for_page
-from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
-from autowsgr.vision import PixelChecker, ROI, get_api_dll, OCREngine, ImageChecker, PixelSignature, PixelRule, MatchStrategy
-from autowsgr.types import FleetSelection, DecisivePhase, ShipDamageState
-from autowsgr.infra import DecisiveConfig
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
+from autowsgr.vision import (
+    ImageChecker,
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+    get_api_dll,
+)
 
-_log = get_logger("ui.decisive")
+from ..page import click_and_wait_for_page
+
+
+if TYPE_CHECKING:
+    from autowsgr.context import GameContext
+    from autowsgr.infra import DecisiveConfig
+
+
+_log = get_logger('ui.decisive')
 
 SKILL_USED = PixelSignature(
-    name="skill_used",
+    name='skill_used',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.1977, 0.9361, (245, 245, 245), tolerance=30.0),
@@ -104,7 +117,8 @@ class DecisiveMapController:
         return PixelChecker.check_signature(screen, SKILL_USED).matched
 
     def detect_decisive_phase(
-        self, screen: np.ndarray | None = None,
+        self,
+        screen: np.ndarray | None = None,
     ) -> DecisivePhase | None:
         """单次截图检测当前决战页面状态。
 
@@ -126,15 +140,19 @@ class DecisiveMapController:
             screen = self._ctrl.screenshot()
 
         if ImageChecker.template_exists(
-            screen, Templates.Build.SHIP_FULL_DEPOT, confidence=0.8,
+            screen,
+            Templates.Build.SHIP_FULL_DEPOT,
+            confidence=0.8,
         ):
-            _log.warning("[地图控制器] 检测到船坞已满弹窗")
+            _log.warning('[地图控制器] 检测到船坞已满弹窗')
             return DecisivePhase.DOCK_FULL
 
         if ImageChecker.template_exists(
-            screen, Templates.Decisive.USE_LAST_FLEET, confidence=0.8,
+            screen,
+            Templates.Decisive.USE_LAST_FLEET,
+            confidence=0.8,
         ):
-            _log.info("[地图控制器] 检测到「使用上次舰队」按钮")
+            _log.info('[地图控制器] 检测到「使用上次舰队」按钮')
             return DecisivePhase.USE_LAST_FLEET
 
         if is_decisive_map_page(screen):
@@ -168,8 +186,9 @@ class DecisiveMapController:
             舰标中心 X 占图像宽度比例 (0‒1)；检测失败返回 ``None``。
         """
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, DecisiveMapController._SHIP_HSV_LO,
-                           DecisiveMapController._SHIP_HSV_HI)
+        mask = cv2.inRange(
+            hsv, DecisiveMapController._SHIP_HSV_LO, DecisiveMapController._SHIP_HSV_HI
+        )
         # 闭运算连接临近像素
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
@@ -186,7 +205,9 @@ class DecisiveMapController:
         return float(centroids[best][0]) / bgr.shape[1]
 
     def recognize_node(
-        self, screen: np.ndarray | None = None, fallback: str = "A",
+        self,
+        screen: np.ndarray | None = None,
+        fallback: str = 'A',
     ) -> str:
         """DLL 识别当前决战节点字母 (如 ``'A'``, ``'B'``)。
 
@@ -216,9 +237,9 @@ class DecisiveMapController:
                 time.sleep(_ICON_GAP)
 
             if icon_rel_x is None:
-                raise RuntimeError("决战节点识别失败: 舰船指示器超时未出现")
+                raise RuntimeError('决战节点识别失败: 舰船指示器超时未出现')
 
-            _log.debug("[地图控制器] 舰船指示器位置: X={:.3f}", icon_rel_x)
+            _log.debug('[地图控制器] 舰船指示器位置: X={:.3f}', icon_rel_x)
 
             # 2. 取新截图，按舰标 X 裁剪竖列
             fresh_screen = self._ctrl.screenshot()
@@ -230,26 +251,28 @@ class DecisiveMapController:
             # 3. DLL 识别
             try:
                 result = dll.recognize_map(col_crop)
-                if result != "0":
-                    _log.info("[地图控制器] 识别决战节点: {}", result[0])
+                if result != '0':
+                    _log.info('[地图控制器] 识别决战节点: {}', result[0])
                     return result[0]
             except Exception:
-                _log.warning("[地图控制器] DLL 节点识别异常", exc_info=True)
+                _log.warning('[地图控制器] DLL 节点识别异常', exc_info=True)
 
             if retry >= _MAX_RETRY:
                 break
             _log.warning(
-                "[地图控制器] 节点识别失败, 正在重试第 {} 次", retry + 1,
+                '[地图控制器] 节点识别失败, 正在重试第 {} 次',
+                retry + 1,
             )
 
-        raise RuntimeError("决战节点识别失败: 重试 {} 次后仍无法识别".format(_MAX_RETRY + 1))
+        raise RuntimeError(f'决战节点识别失败: 重试 {_MAX_RETRY + 1} 次后仍无法识别')
 
     # ══════════════════════════════════════════════════════════════════════
     # 战备舰队获取 overlay
     # ══════════════════════════════════════════════════════════════════════
 
     def recognize_fleet_options(
-        self, screen: np.ndarray | None = None,
+        self,
+        screen: np.ndarray | None = None,
     ) -> tuple[int, dict[str, FleetSelection]]:
         """OCR 识别战备舰队获取界面的可选项。"""
         if screen is None:
@@ -257,7 +280,8 @@ class DecisiveMapController:
         return _fleet_ocr.recognize_fleet_options(self._ocr, self._config, screen)
 
     def detect_last_offer_name(
-        self, screen: np.ndarray | None = None,
+        self,
+        screen: np.ndarray | None = None,
     ) -> str | None:
         """读取战备舰队最后一张卡的名称，用于首节点判定修正。"""
         if screen is None:
@@ -285,7 +309,9 @@ class DecisiveMapController:
 
         screen = self._ctrl.screenshot()
         return ImageChecker.template_exists(
-            screen, Templates.Build.SHIP_FULL_DEPOT, confidence=0.8,
+            screen,
+            Templates.Build.SHIP_FULL_DEPOT,
+            confidence=0.8,
         )
 
     def click_use_last_fleet(self) -> None:
@@ -300,7 +326,9 @@ class DecisiveMapController:
 
         screen = self._ctrl.screenshot()
         match = ImageChecker.find_template(
-            screen, Templates.Decisive.USE_LAST_FLEET, confidence=0.8,
+            screen,
+            Templates.Decisive.USE_LAST_FLEET,
+            confidence=0.8,
         )
         if match is not None:
             self._ctrl.click(*match.center)
@@ -336,7 +364,7 @@ class DecisiveMapController:
             - *damage*: 各槽位血量状态
             - *all_ships*: 所有可用舰船名 (含编队成员)
         """
-        _log.info("[地图控制器] 扫描当前编队与可用舰船")
+        _log.info('[地图控制器] 扫描当前编队与可用舰船')
 
         self.enter_formation()
         page = DecisiveBattlePreparationPage(self._ctx, self._config, self._ocr)
@@ -368,8 +396,9 @@ class DecisiveMapController:
         time.sleep(1.0)
 
         _log.info(
-            "[地图控制器] 编队={}, 可用舰船={}",
-            fleet, sorted(all_ships),
+            '[地图控制器] 编队={}, 可用舰船={}',
+            fleet,
+            sorted(all_ships),
         )
         return fleet, damage, all_ships
 
@@ -412,7 +441,7 @@ class DecisiveMapController:
         self._ctrl.click(0.03, 0.06)
         time.sleep(1.0)
         if not is_decisive_map_page(self._ctrl.screenshot()):
-            _log.warning("[地图控制器] 无法确认已回到地图页")
+            _log.warning('[地图控制器] 无法确认已回到地图页')
 
     def open_retreat_dialog(self) -> None:
         """点击左上角撤退按钮，打开确认退出 overlay。"""
@@ -447,20 +476,26 @@ class DecisiveMapController:
         for _ in range(10):
             # 等待掉落弹窗出现
             if ImageChecker.template_exists(
-                self._ctrl.screenshot(), ship_templates, confidence=0.8,
+                self._ctrl.screenshot(),
+                ship_templates,
+                confidence=0.8,
             ):
                 break
             time.sleep(0.25)
         while True:
             screen = self._ctrl.screenshot()
             detail = ImageChecker.find_any(
-                screen, ship_templates, confidence=0.8,
+                screen,
+                ship_templates,
+                confidence=0.8,
             )
             if detail is None:
                 time.sleep(1.0)
                 screen = self._ctrl.screenshot()
                 detail = ImageChecker.find_any(
-                    screen, ship_templates, confidence=0.8,
+                    screen,
+                    ship_templates,
+                    confidence=0.8,
                 )
                 if detail is None:
                     break
@@ -472,7 +507,7 @@ class DecisiveMapController:
             confirm_operation(self._ctrl, timeout=1.0)
 
         if collected:
-            _log.info("[地图控制器] 小关通关共收集 {} 个掉落", len(collected))
+            _log.info('[地图控制器] 小关通关共收集 {} 个掉落', len(collected))
         return collected
 
     # ══════════════════════════════════════════════════════════════════════
@@ -481,7 +516,7 @@ class DecisiveMapController:
 
     def repair_at_node(self, repair_level: int) -> list[int]:
         """进入出征准备页 → 执行快速修理 → 返回地图页。"""
-        _log.info("[地图控制器] 节点间修理 (等级: {})", repair_level)
+        _log.info('[地图控制器] 节点间修理 (等级: {})', repair_level)
 
         self._ctrl.click(*CLICK_SORTIE)
         time.sleep(2.0)
@@ -491,9 +526,9 @@ class DecisiveMapController:
         repaired = page.apply_repair(strategy)
 
         if repaired:
-            _log.info("[地图控制器] 修理完成, 修理槽位: {}", repaired)
+            _log.info('[地图控制器] 修理完成, 修理槽位: {}', repaired)
         else:
-            _log.debug("[地图控制器] 无需修理")
+            _log.debug('[地图控制器] 无需修理')
 
         page.go_back()
         time.sleep(1.0)
@@ -516,7 +551,7 @@ class DecisiveMapController:
         ship_names:
             目标舰船名列表 (按槽位 0–5)；``None``/``""`` 表示该位留空。
         """
-        _log.info("[地图控制器] 进入准备页换船: {} 队 → {}", fleet_id, ship_names)
+        _log.info('[地图控制器] 进入准备页换船: {} 队 → {}', fleet_id, ship_names)
         page = DecisiveBattlePreparationPage(self._ctx, self._config, self._ocr)
         page.change_fleet(fleet_id, ship_names)
 
@@ -538,7 +573,5 @@ class DecisiveMapController:
             if PixelChecker.check_signature(screen, sig):
                 return screen
             if time.monotonic() >= deadline:
-                raise TimeoutError(
-                    f"等待 overlay {target.value} 超时 ({timeout}s)"
-                )
+                raise TimeoutError(f'等待 overlay {target.value} 超时 ({timeout}s)')
             time.sleep(interval)

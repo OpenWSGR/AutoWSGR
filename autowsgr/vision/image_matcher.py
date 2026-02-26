@@ -16,10 +16,11 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
+
 from autowsgr.infra.logger import get_logger
 
 from .image_template import (
@@ -32,11 +33,16 @@ from .image_template import (
 from .matcher import MatchStrategy
 from .roi import ROI
 
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
 # ── 模板采集基准分辨率 ──
 TEMPLATE_SOURCE_RESOLUTION: tuple[int, int] = (960, 540)
 """模板图片采集时的屏幕分辨率 (width, height)。"""
 
-_log = get_logger("vision.image")
+_log = get_logger('vision.image')
 
 
 class ImageChecker:
@@ -119,14 +125,21 @@ class ImageChecker:
 
         # 分辨率适配：按截图实际尺寸缩放模板（使用模板自身的采集分辨率）
         tmpl_img = ImageChecker._scale_template_if_needed(
-            template.image, w, h, source_resolution=template.source_resolution,
+            template.image,
+            w,
+            h,
+            source_resolution=template.source_resolution,
         )
         th, tw_ = tmpl_img.shape[:2]
 
         if th > ch or tw_ > cw:
             _log.trace(
                 "[ImageMatcher] 模板 '{}' ({}x{}) 大于搜索区域 ({}x{})，跳过",
-                template.name, tw_, th, cw, ch,
+                template.name,
+                tw_,
+                th,
+                cw,
+                ch,
             )
             return None
 
@@ -146,7 +159,9 @@ class ImageChecker:
         if best_val < confidence:
             _log.trace(
                 "[ImageMatcher] 模板 '{}' 未匹配 (confidence={:.3f} < {:.3f})",
-                template.name, best_val, confidence,
+                template.name,
+                best_val,
+                confidence,
             )
             return None
 
@@ -159,11 +174,16 @@ class ImageChecker:
 
         _log.trace(
             "[ImageMatcher] 模板 '{}' OK confidence={:.3f} center=({:.4f},{:.4f})",
-            template.name, best_val, rel_cx, rel_cy,
+            template.name,
+            best_val,
+            rel_cx,
+            rel_cy,
         )
         return ImageMatchDetail(
-            template_name=template.name, confidence=best_val,
-            center=(rel_cx, rel_cy), top_left=(rel_x1, rel_y1),
+            template_name=template.name,
+            confidence=best_val,
+            center=(rel_cx, rel_cy),
+            top_left=(rel_x1, rel_y1),
             bottom_right=(rel_x2, rel_y2),
         )
 
@@ -177,8 +197,11 @@ class ImageChecker:
 
         for tmpl in rule.templates:
             detail = ImageChecker._match_single_template(
-                screen, tmpl, roi=rule.roi,
-                confidence=rule.confidence, method=rule.method,
+                screen,
+                tmpl,
+                roi=rule.roi,
+                confidence=rule.confidence,
+                method=rule.method,
             )
             if detail is not None:
                 all_details.append(detail)
@@ -188,11 +211,16 @@ class ImageChecker:
         matched = len(all_details) > 0
         _log.trace(
             "[ImageMatcher] 规则 '{}' {} ({}/{} 模板匹配)",
-            rule.name, "OK" if matched else "FAIL", len(all_details), len(rule),
+            rule.name,
+            'OK' if matched else 'FAIL',
+            len(all_details),
+            len(rule),
         )
         return ImageMatchResult(
-            matched=matched, rule_name=rule.name,
-            best=best, all_details=tuple(all_details),
+            matched=matched,
+            rule_name=rule.name,
+            best=best,
+            all_details=tuple(all_details),
         )
 
     # ── 签名匹配 ──
@@ -209,12 +237,24 @@ class ImageChecker:
             if result.matched:
                 matched_count += 1
                 all_details.extend(result.all_details)
-                if result.best is not None and (best is None or result.best.confidence > best.confidence):
+                if result.best is not None and (
+                    best is None or result.best.confidence > best.confidence
+                ):
                     best = result.best
                 if signature.strategy == MatchStrategy.ANY:
-                    return ImageMatchResult(matched=True, rule_name=signature.name, best=best, all_details=tuple(all_details))
+                    return ImageMatchResult(
+                        matched=True,
+                        rule_name=signature.name,
+                        best=best,
+                        all_details=tuple(all_details),
+                    )
             elif signature.strategy == MatchStrategy.ALL:
-                return ImageMatchResult(matched=False, rule_name=signature.name, best=best, all_details=tuple(all_details))
+                return ImageMatchResult(
+                    matched=False,
+                    rule_name=signature.name,
+                    best=best,
+                    all_details=tuple(all_details),
+                )
 
         total = len(signature)
         match signature.strategy:
@@ -225,48 +265,95 @@ class ImageChecker:
             case MatchStrategy.COUNT:
                 sig_matched = matched_count >= signature.threshold
 
-        return ImageMatchResult(matched=sig_matched, rule_name=signature.name, best=best, all_details=tuple(all_details))
+        return ImageMatchResult(
+            matched=sig_matched, rule_name=signature.name, best=best, all_details=tuple(all_details)
+        )
 
     # ── 便捷方法 ──
 
     @staticmethod
-    def find_template(screen: np.ndarray, template: ImageTemplate, *, roi: ROI | None = None, confidence: float = 0.85) -> ImageMatchDetail | None:
+    def find_template(
+        screen: np.ndarray,
+        template: ImageTemplate,
+        *,
+        roi: ROI | None = None,
+        confidence: float = 0.85,
+    ) -> ImageMatchDetail | None:
         """在截图中查找单个模板（等价于旧代码 ``locate_image_center``）。"""
         return ImageChecker._match_single_template(screen, template, roi=roi, confidence=confidence)
 
     @staticmethod
-    def find_any(screen: np.ndarray, templates: Sequence[ImageTemplate], *, roi: ROI | None = None, confidence: float = 0.85) -> ImageMatchDetail | None:
+    def find_any(
+        screen: np.ndarray,
+        templates: Sequence[ImageTemplate],
+        *,
+        roi: ROI | None = None,
+        confidence: float = 0.85,
+    ) -> ImageMatchDetail | None:
         """查找多个模板中的任意一个（等价于旧代码 ``image_exist``）。"""
         for tmpl in templates:
-            detail = ImageChecker._match_single_template(screen, tmpl, roi=roi, confidence=confidence)
+            detail = ImageChecker._match_single_template(
+                screen, tmpl, roi=roi, confidence=confidence
+            )
             if detail is not None:
                 return detail
         return None
 
     @staticmethod
-    def find_best(screen: np.ndarray, templates: Sequence[ImageTemplate], *, roi: ROI | None = None, confidence: float = 0.85) -> ImageMatchDetail | None:
+    def find_best(
+        screen: np.ndarray,
+        templates: Sequence[ImageTemplate],
+        *,
+        roi: ROI | None = None,
+        confidence: float = 0.85,
+    ) -> ImageMatchDetail | None:
         """查找多个模板中置信度最高的一个。"""
         best: ImageMatchDetail | None = None
         for tmpl in templates:
-            detail = ImageChecker._match_single_template(screen, tmpl, roi=roi, confidence=confidence)
+            detail = ImageChecker._match_single_template(
+                screen, tmpl, roi=roi, confidence=confidence
+            )
             if detail is not None and (best is None or detail.confidence > best.confidence):
                 best = detail
         return best
 
     @staticmethod
-    def find_all(screen: np.ndarray, templates: Sequence[ImageTemplate], *, roi: ROI | None = None, confidence: float = 0.85) -> list[ImageMatchDetail]:
+    def find_all(
+        screen: np.ndarray,
+        templates: Sequence[ImageTemplate],
+        *,
+        roi: ROI | None = None,
+        confidence: float = 0.85,
+    ) -> list[ImageMatchDetail]:
         """查找所有匹配的模板。"""
-        return [d for tmpl in templates if (d := ImageChecker._match_single_template(screen, tmpl, roi=roi, confidence=confidence)) is not None]
+        return [
+            d
+            for tmpl in templates
+            if (
+                d := ImageChecker._match_single_template(
+                    screen, tmpl, roi=roi, confidence=confidence
+                )
+            )
+            is not None
+        ]
 
     @staticmethod
-    def template_exists(screen: np.ndarray, templates: ImageTemplate | Sequence[ImageTemplate], *, roi: ROI | None = None, confidence: float = 0.85) -> bool:
+    def template_exists(
+        screen: np.ndarray,
+        templates: ImageTemplate | Sequence[ImageTemplate],
+        *,
+        roi: ROI | None = None,
+        confidence: float = 0.85,
+    ) -> bool:
         """判断模板是否存在于截图中（等价于旧代码 ``image_exist``）。"""
         if isinstance(templates, ImageTemplate):
             templates = [templates]
         return ImageChecker.find_any(screen, templates, roi=roi, confidence=confidence) is not None
 
     @staticmethod
-    def identify(screen: np.ndarray, signatures: Sequence[ImageSignature]) -> ImageMatchResult | None:
+    def identify(
+        screen: np.ndarray, signatures: Sequence[ImageSignature]
+    ) -> ImageMatchResult | None:
         """从多个图像签名中识别当前页面 / 状态。"""
         for sig in signatures:
             result = ImageChecker.check_signature(screen, sig)
@@ -281,9 +368,13 @@ class ImageChecker:
 
     @staticmethod
     def find_all_occurrences(
-        screen: np.ndarray, template: ImageTemplate, *,
-        roi: ROI | None = None, confidence: float = 0.85,
-        max_count: int = 20, min_distance: int = 10,
+        screen: np.ndarray,
+        template: ImageTemplate,
+        *,
+        roi: ROI | None = None,
+        confidence: float = 0.85,
+        max_count: int = 20,
+        min_distance: int = 10,
     ) -> list[ImageMatchDetail]:
         """查找单个模板的所有出现位置（非极大值抑制去重）。
 
@@ -296,7 +387,10 @@ class ImageChecker:
 
         # 分辨率适配（使用模板自身的采集分辨率）
         tmpl_img = ImageChecker._scale_template_if_needed(
-            template.image, w, h, source_resolution=template.source_resolution,
+            template.image,
+            w,
+            h,
+            source_resolution=template.source_resolution,
         )
         th, tw_ = tmpl_img.shape[:2]
 
@@ -327,9 +421,13 @@ class ImageChecker:
             ax, ay = int(roi.x1 * w) + lx, int(roi.y1 * h) + ly
             rx1, ry1 = ax / w, ay / h
             rx2, ry2 = (ax + tw_) / w, (ay + th) / h
-            details.append(ImageMatchDetail(
-                template_name=template.name, confidence=float(scores[idx]),
-                center=((rx1 + rx2) / 2, (ry1 + ry2) / 2),
-                top_left=(rx1, ry1), bottom_right=(rx2, ry2),
-            ))
+            details.append(
+                ImageMatchDetail(
+                    template_name=template.name,
+                    confidence=float(scores[idx]),
+                    center=((rx1 + rx2) / 2, (ry1 + ry2) / 2),
+                    top_left=(rx1, ry1),
+                    bottom_right=(rx2, ry2),
+                )
+            )
         return details

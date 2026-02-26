@@ -1,7 +1,8 @@
 """测试配置系统与日志工具。"""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from autowsgr.infra import (
     BattleConfig,
@@ -23,9 +24,9 @@ from autowsgr.types import (
 
 class TestEmulatorConfig:
     def test_from_dict(self):
-        cfg = EmulatorConfig.model_validate({"type": "蓝叠", "serial": "127.0.0.1:5555"})
+        cfg = EmulatorConfig.model_validate({'type': '蓝叠', 'serial': '127.0.0.1:5555'})
         assert cfg.type == EmulatorType.bluestacks
-        assert cfg.serial == "127.0.0.1:5555"
+        assert cfg.serial == '127.0.0.1:5555'
 
 
 # ── DecisiveBattleConfig ──
@@ -52,10 +53,10 @@ account:
 delay: 2.0
 dock_full_destroy: false
 """
-        path = tmp_yaml("config.yaml", content)
+        path = tmp_yaml('config.yaml', content)
         cfg = UserConfig.from_yaml(path)
         assert cfg.emulator.type == EmulatorType.bluestacks
-        assert cfg.emulator.serial == "127.0.0.1:5555"
+        assert cfg.emulator.serial == '127.0.0.1:5555'
         assert cfg.delay == 2.0
         assert cfg.dock_full_destroy is False
 
@@ -69,11 +70,11 @@ daily_automation:
   auto_exercise: false
   battle_type: "简单航母"
 """
-        path = tmp_yaml("daily.yaml", content)
+        path = tmp_yaml('daily.yaml', content)
         cfg = UserConfig.from_yaml(path)
         assert cfg.daily_automation is not None
         assert cfg.daily_automation.auto_exercise is False
-        assert cfg.daily_automation.battle_type == "简单航母"
+        assert cfg.daily_automation.battle_type == '简单航母'
 
     def test_with_decisive_battle(self, tmp_yaml):
         content = """\
@@ -85,7 +86,7 @@ decisive_battle:
   chapter: 5
   repair_level: 2
 """
-        path = tmp_yaml("decisive.yaml", content)
+        path = tmp_yaml('decisive.yaml', content)
         cfg = UserConfig.from_yaml(path)
         assert cfg.decisive_battle is not None
         assert cfg.decisive_battle.chapter == 5
@@ -102,7 +103,7 @@ destroy_ship_types:
   - "驱逐"
   - "轻巡"
 """
-        path = tmp_yaml("destroy.yaml", content)
+        path = tmp_yaml('destroy.yaml', content)
         cfg = UserConfig.from_yaml(path)
         assert cfg.destroy_ship_work_mode == DestroyShipWorkMode.include
         assert len(cfg.destroy_ship_types) == 2
@@ -119,7 +120,9 @@ class TestFightConfig:
         assert all(r == RepairMode.moderate_damage for r in cfg.repair_mode)
 
     def test_repair_mode_list_kept(self):
-        modes = [RepairMode.moderate_damage, RepairMode.severe_damage] + [RepairMode.moderate_damage] * 4
+        modes = [RepairMode.moderate_damage, RepairMode.severe_damage] + [
+            RepairMode.moderate_damage
+        ] * 4
         cfg = FightConfig(repair_mode=modes)
         assert cfg.repair_mode == modes
 
@@ -143,13 +146,13 @@ emulator:
   path: "C:/fake/MuMuPlayer.exe"
 delay: 2.5
 """
-        path = tmp_yaml("settings.yaml", content)
+        path = tmp_yaml('settings.yaml', content)
         cfg = ConfigManager.load(path)
         assert cfg.emulator.type == EmulatorType.mumu
         assert cfg.delay == 2.5
 
     def test_load_nonexistent_returns_default(self, tmp_path: Path):
-        cfg = ConfigManager.load(tmp_path / "no_such_file.yaml")
+        cfg = ConfigManager.load(tmp_path / 'no_such_file.yaml')
         assert isinstance(cfg, UserConfig)
         assert cfg.delay == 1.5
 
@@ -164,6 +167,6 @@ class TestSetupLogger:
         """log_dir 应被自动创建。"""
         from autowsgr.infra import setup_logger
 
-        log_dir = tmp_path / "logs" / "sub"
-        setup_logger(log_dir=log_dir, level="INFO")
+        log_dir = tmp_path / 'logs' / 'sub'
+        setup_logger(log_dir=log_dir, level='INFO')
         assert log_dir.exists()

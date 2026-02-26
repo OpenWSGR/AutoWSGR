@@ -13,15 +13,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from autowsgr.infra.logger import get_logger
 from PIL import Image
 
-from autowsgr.vision import ApiDll, get_api_dll, ROI
+from autowsgr.infra.logger import get_logger
+from autowsgr.vision import ROI, ApiDll, get_api_dll
 
-_log = get_logger("combat.recognition")
+
+_log = get_logger('combat.recognition')
 
 if TYPE_CHECKING:
-    from autowsgr.emulator.controller import AndroidController
     from autowsgr.vision import OCREngine
 
 
@@ -51,8 +51,8 @@ _SCAN_AREA_FIGHT: list[tuple[int, int, int, int]] = [
 """索敌成功界面的 6 个舰类图标扫描区域 (960×540, 2 列×3 行)。"""
 
 _SCAN_AREAS: dict[str, list[tuple[int, int, int, int]]] = {
-    "exercise": _SCAN_AREA_EXERCISE,
-    "fight": _SCAN_AREA_FIGHT,
+    'exercise': _SCAN_AREA_EXERCISE,
+    'fight': _SCAN_AREA_FIGHT,
 }
 
 # 阵型 OCR 区域 (相对坐标)
@@ -60,19 +60,19 @@ _FORMATION_ROI = ROI(x1=0.11, y1=0.05, x2=0.20, y2=0.15)
 """敌方阵型文字区域 — 索敌成功页面左上方。"""
 
 # OCR 阵型识别用的字符白名单
-_FORMATION_ALLOWLIST = "单纵复轮型梯形横阵"
+_FORMATION_ALLOWLIST = '单纵复轮型梯形横阵'
 
 # 阵型名称映射 (OCR 结果 → 标准名)
 _FORMATION_NAMES: dict[str, str] = {
-    "单纵": "单纵阵",
-    "复纵": "复纵阵",
-    "轮型": "轮型阵",
-    "梯形": "梯形阵",
-    "单横": "单横阵",
+    '单纵': '单纵阵',
+    '复纵': '复纵阵',
+    '轮型': '轮型阵',
+    '梯形': '梯形阵',
+    '单横': '单横阵',
 }
 
 # 无舰船（空位）的 DLL 返回值
-_NO_SHIP = "NO"
+_NO_SHIP = 'NO'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -97,7 +97,7 @@ RESULT_BLOOD_BAR_PROBE: dict[int, tuple[float, float]] = {
 
 def recognize_enemy_ships(
     screen: np.ndarray,
-    mode: str = "fight",
+    mode: str = 'fight',
     *,
     dll: ApiDll | None = None,
 ) -> dict[str, int]:
@@ -130,10 +130,10 @@ def recognize_enemy_ships(
 
     areas = _SCAN_AREAS.get(mode)
     if areas is None:
-        raise ValueError(f"不支持的模式: {mode!r}，可选: {list(_SCAN_AREAS)}")
+        raise ValueError(f'不支持的模式: {mode!r}，可选: {list(_SCAN_AREAS)}')
 
     # 转换为 960×540 灰度
-    img = Image.fromarray(screen).convert("L")
+    img = Image.fromarray(screen).convert('L')
     img = img.resize((960, 540))
     img_arr = np.array(img)
 
@@ -145,7 +145,7 @@ def recognize_enemy_ships(
     # DLL 识别
     result_str = dll.recognize_enemy(crops)
     types = result_str.split()
-    _log.debug("[识别] DLL 返回: {}", result_str)
+    _log.debug('[识别] DLL 返回: {}', result_str)
 
     # 统计
     counts: dict[str, int] = {}
@@ -155,9 +155,9 @@ def recognize_enemy_ships(
             continue
         counts[t] = counts.get(t, 0) + 1
         total += 1
-    counts["ALL"] = total
+    counts['ALL'] = total
 
-    _log.debug("[识别] 敌方编成: {}", counts)
+    _log.debug('[识别] 敌方编成: {}', counts)
     return counts
 
 
@@ -192,21 +192,20 @@ def recognize_enemy_formation(
     text = result.text.strip()
 
     if not text:
-        _log.debug("[识别] 阵型 OCR 无结果")
-        return ""
+        _log.debug('[识别] 阵型 OCR 无结果')
+        return ''
 
     # 尝试精确匹配
     for key, name in _FORMATION_NAMES.items():
         if key in text:
-            _log.info("[识别] 敌方阵型: {}", name)
+            _log.info('[识别] 敌方阵型: {}', name)
             return name
 
     # 模糊返回原文
-    _log.info("[识别] 敌方阵型 (原文): {}", text)
+    _log.info('[识别] 敌方阵型 (原文): {}', text)
     return text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 回调工厂
 # ═══════════════════════════════════════════════════════════════════════════════
-

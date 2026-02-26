@@ -15,12 +15,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
 
 from .matcher import MatchStrategy
 from .roi import ROI
+
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 # ── 图像模板 ──
@@ -45,7 +49,7 @@ class ImageTemplate:
 
     name: str
     image: np.ndarray
-    source: str = ""
+    source: str = ''
     source_resolution: tuple[int, int] = (960, 540)
     """模板图片采集时的屏幕分辨率 (width, height)。
 
@@ -83,11 +87,11 @@ class ImageTemplate:
         """
         p = Path(path)
         if not p.exists():
-            raise FileNotFoundError(f"模板文件不存在: {p}")
+            raise FileNotFoundError(f'模板文件不存在: {p}')
 
         bgr = cv2.imread(str(p), cv2.IMREAD_COLOR)
         if bgr is None:
-            raise ValueError(f"无法解码图像文件: {p}")
+            raise ValueError(f'无法解码图像文件: {p}')
 
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         template_name = name or p.stem
@@ -102,7 +106,7 @@ class ImageTemplate:
     def from_ndarray(
         cls,
         image: np.ndarray,
-        name: str = "unnamed",
+        name: str = 'unnamed',
         *,
         is_bgr: bool = False,
         source_resolution: tuple[int, int] = (960, 540),
@@ -125,7 +129,7 @@ class ImageTemplate:
         return cls(
             name=name,
             image=image.copy(),
-            source="ndarray",
+            source='ndarray',
             source_resolution=source_resolution,
         )
 
@@ -145,7 +149,7 @@ class ImageTemplate:
     def __repr__(self) -> str:
         h, w = self.shape
         res = self.source_resolution
-        res_str = f", source_resolution={res!r}" if res != (960, 540) else ""
+        res_str = f', source_resolution={res!r}' if res != (960, 540) else ''
         return f"ImageTemplate(name='{self.name}', size={w}x{h}, source='{self.source}'{res_str})"
 
 
@@ -249,7 +253,7 @@ class ImageRule:
 
     def __post_init__(self) -> None:
         if isinstance(self.templates, list):
-            object.__setattr__(self, "templates", tuple(self.templates))
+            object.__setattr__(self, 'templates', tuple(self.templates))
 
     def __len__(self) -> int:
         return len(self.templates)
@@ -284,7 +288,7 @@ class ImageSignature:
 
     def __post_init__(self) -> None:
         if isinstance(self.rules, list):
-            object.__setattr__(self, "rules", tuple(self.rules))
+            object.__setattr__(self, 'rules', tuple(self.rules))
 
     def __len__(self) -> int:
         return len(self.rules)

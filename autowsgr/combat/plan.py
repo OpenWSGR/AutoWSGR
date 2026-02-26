@@ -14,7 +14,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from autowsgr.infra import NodeConfig, load_yaml
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import FightCondition, Formation, RepairMode
 
 from .rules import RuleEngine
 from .state import (
@@ -23,10 +25,9 @@ from .state import (
     PhaseBranch,
     build_transitions,
 )
-from autowsgr.infra import NodeConfig, load_yaml
-from autowsgr.types import FightCondition, Formation, RepairMode
 
-_log = get_logger("combat")
+
+_log = get_logger('combat')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -132,13 +133,13 @@ def _parse_rule_item(rule: str | list) -> list:
     """
     if isinstance(rule, str):
         # 尝试解析 "condition => action" 格式
-        if "=>" in rule:
-            parts = rule.split("=>", 1)
+        if '=>' in rule:
+            parts = rule.split('=>', 1)
             return [parts[0].strip(), parts[1].strip()]
-        return [rule, "retreat"]
+        return [rule, 'retreat']
     if isinstance(rule, list) and len(rule) >= 2:
         return rule[:2]
-    raise ValueError(f"无法解析规则: {rule!r}")
+    raise ValueError(f'无法解析规则: {rule!r}')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -149,19 +150,19 @@ def _parse_rule_item(rule: str | list) -> list:
 class CombatMode:
     """战斗模式标识与对应的状态转移图。"""
 
-    NORMAL = "normal"
+    NORMAL = 'normal'
     """常规战（多点地图）。"""
 
-    BATTLE = "battle"
+    BATTLE = 'battle'
     """战役（单点）。"""
 
-    EXERCISE = "exercise"
+    EXERCISE = 'exercise'
     """演习。"""
 
-    DECISIVE = "decisive"
+    DECISIVE = 'decisive'
     """决战 (单点战斗，RESULT 即终止)。"""
 
-    EVENT = "event"
+    EVENT = 'event'
     """活动战斗 (与常规战类似，但终止态为活动地图页面)。"""
 
 
@@ -181,18 +182,14 @@ _MODE_SPECS: dict[str, _ModeSpec] = {
 # ── 由规格自动派生的映射表 ──
 
 MODE_TRANSITIONS: dict[str, dict[CombatPhase, PhaseBranch]] = {
-    mode: build_transitions(cat, ep)
-    for mode, (cat, ep) in _MODE_SPECS.items()
+    mode: build_transitions(cat, ep) for mode, (cat, ep) in _MODE_SPECS.items()
 }
 
 MODE_END_PHASES: dict[str, CombatPhase] = {
-    mode: (ep if ep is not None else CombatPhase.RESULT)
-    for mode, (_cat, ep) in _MODE_SPECS.items()
+    mode: (ep if ep is not None else CombatPhase.RESULT) for mode, (_cat, ep) in _MODE_SPECS.items()
 }
 
-MODE_CATEGORIES: dict[str, ModeCategory] = {
-    mode: cat for mode, (cat, _ep) in _MODE_SPECS.items()
-}
+MODE_CATEGORIES: dict[str, ModeCategory] = {mode: cat for mode, (cat, _ep) in _MODE_SPECS.items()}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -232,7 +229,7 @@ class CombatPlan:
         未配置节点的默认决策。
     """
 
-    name: str = ""
+    name: str = ''
     mode: str = CombatMode.NORMAL
     chapter: int | str = 1
     map_id: int | str = 1
@@ -278,30 +275,30 @@ class CombatPlan:
         return cls.from_dict(data, name=Path(path).stem)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], name: str = "") -> CombatPlan:
+    def from_dict(cls, data: dict[str, Any], name: str = '') -> CombatPlan:
         # 基础配置
-        mode = data.get("mode", CombatMode.NORMAL)
-        chapter = data.get("chapter", 1)
-        map_id = data.get("map", 1)
-        fleet_id = data.get("fleet_id", 1)
-        fleet = data.get("fleet")
-        fight_condition = FightCondition(data.get("fight_condition", 4))
-        selected_nodes = data.get("selected_nodes", [])
+        mode = data.get('mode', CombatMode.NORMAL)
+        chapter = data.get('chapter', 1)
+        map_id = data.get('map', 1)
+        fleet_id = data.get('fleet_id', 1)
+        fleet = data.get('fleet')
+        fight_condition = FightCondition(data.get('fight_condition', 4))
+        selected_nodes = data.get('selected_nodes', [])
 
         # 修理模式
-        repair_mode_raw = data.get("repair_mode", 2)
+        repair_mode_raw = data.get('repair_mode', 2)
         if isinstance(repair_mode_raw, list):
             repair_mode = [RepairMode(x) for x in repair_mode_raw]
         else:
             repair_mode = RepairMode(repair_mode_raw)
 
         # 默认节点配置
-        node_defaults = data.get("node_defaults", {})
+        node_defaults = data.get('node_defaults', {})
         default_node = NodeDecision.from_dict(node_defaults)
 
         # 各节点配置
         nodes: dict[str, NodeDecision] = {}
-        node_args_data = data.get("node_args", {})
+        node_args_data = data.get('node_args', {})
         if node_args_data:
             for node_name, node_data in node_args_data.items():
                 # 合并默认配置和节点特有配置
@@ -315,10 +312,10 @@ class CombatPlan:
             if node_name not in nodes:
                 nodes[node_name] = copy.deepcopy(default_node)
 
-        event_name: str | None = data.get("event") or None
+        event_name: str | None = data.get('event') or None
 
         plan = cls(
-            name=name or data.get("name", ""),
+            name=name or data.get('name', ''),
             mode=mode,
             chapter=chapter,
             map_id=map_id,
@@ -333,12 +330,12 @@ class CombatPlan:
         )
 
         _log.info(
-            "[Combat] 加载作战计划: {} ({}), 章节 {}-{}, 节点: {}",
+            '[Combat] 加载作战计划: {} ({}), 章节 {}-{}, 节点: {}',
             plan.name,
             plan.mode,
             plan.chapter,
             plan.map_id,
-            list(plan.nodes.keys()) or "全部",
+            list(plan.nodes.keys()) or '全部',
         )
 
         return plan

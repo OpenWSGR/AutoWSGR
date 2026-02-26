@@ -69,6 +69,14 @@
 """
 
 # ── 控制器 ─────────────────────────────────────────────────────────────
+from autowsgr.ui.main_page.constants import OverlayKind
+from autowsgr.ui.overlay import NetworkError
+
+# ── 标签页统一检测层 ──────────────────────────────────────────────
+from autowsgr.ui.tabbed_page import (
+    TabbedPageType,
+)
+
 from .backyard_page import BackyardPage, BackyardTarget
 from .bath_page import BathPage
 from .battle import BattlePreparationPage, Panel, RepairStrategy
@@ -85,19 +93,14 @@ from .map.page import MapPage
 from .mission_page import MissionPage
 from .sidebar_page import SidebarPage, SidebarTarget
 
-# ── 标签页统一检测层 ──────────────────────────────────────────────
-from autowsgr.ui.tabbed_page import (
-    TabbedPageType,
-)
-
-from autowsgr.ui.main_page.constants import OverlayKind
-from autowsgr.ui.overlay import NetworkError
 
 # ── 兼容别名 ─────────────────────────────────────────────────────
 MainPageTarget = MainPage.Target
 OverlayType = OverlayKind
 
 # ── 导航基础设施 ───────────────────────────────────────────────────────
+# ── 注册所有页面识别器 ──
+from autowsgr.types import PageName
 from autowsgr.ui.page import (
     NavConfig,
     NavigationError,
@@ -109,8 +112,6 @@ from autowsgr.ui.page import (
     wait_leave_page,
 )
 
-# ── 注册所有页面识别器 ──
-from autowsgr.types import PageName
 
 register_page(PageName.MAIN, MainPage.is_current_page)
 register_page(PageName.MAP, MapPage.is_current_page)
@@ -128,46 +129,45 @@ register_page(PageName.EVENT_MAP, BaseEventPage.is_current_page)
 
 __all__ = [
     # ── 控制器 ──
-    "BackyardPage",
-    "BackyardTarget",
-    "BathPage",
-    "BattlePreparationPage",
-    "BuildPage",
-    "BuildTab",
-    "CanteenPage",
-    "ChooseShipPage",
-    "DecisiveBattlePage",
-    "DecisiveMapController",
-
-    "BaseEventPage",
-    "FriendPage",
-    "IntensifyPage",
-    "IntensifyTab",
-    "MainPage",
-    "MainPageTarget",
-    "MapIdentity",
-    "MapPage",
-    "MapPanel",
-    "MissionPage",
-    "Panel",
-    "RepairStrategy",
-    "SidebarPage",
-    "SidebarTarget",
+    'BackyardPage',
+    'BackyardTarget',
+    'BathPage',
+    'BattlePreparationPage',
+    'BuildPage',
+    'BuildTab',
+    'CanteenPage',
+    'ChooseShipPage',
+    'DecisiveBattlePage',
+    'DecisiveMapController',
+    'BaseEventPage',
+    'FriendPage',
+    'IntensifyPage',
+    'IntensifyTab',
+    'MainPage',
+    'MainPageTarget',
+    'MapIdentity',
+    'MapPage',
+    'MapPanel',
+    'MissionPage',
+    'Panel',
+    'RepairStrategy',
+    'SidebarPage',
+    'SidebarTarget',
     # ── 标签页统一检测 ──
-    "TabbedPageType",
+    'TabbedPageType',
     # ── 浮层 ──
-    "NetworkError",
-    "OverlayKind",
-    "OverlayType",
+    'NetworkError',
+    'OverlayKind',
+    'OverlayType',
     # ── 导航基础设施 ──
-    "NavConfig",
-    "NavigationError",
-    "click_and_wait_for_page",
-    "get_current_page",
-    "get_registered_pages",
-    "register_page",
-    "wait_for_page",
-    "wait_leave_page",
+    'NavConfig',
+    'NavigationError',
+    'click_and_wait_for_page',
+    'get_current_page',
+    'get_registered_pages',
+    'register_page',
+    'wait_for_page',
+    'wait_leave_page',
     # ── 数据 ──
-    "MAP_DATABASE",
+    'MAP_DATABASE',
 ]

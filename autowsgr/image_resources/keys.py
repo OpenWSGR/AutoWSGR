@@ -19,6 +19,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from autowsgr.vision import ImageTemplate
 
@@ -31,41 +32,41 @@ class TemplateKey(Enum):
     """
 
     # ── 战斗阶段 ──
-    FORMATION = "formation"
-    SPOT_ENEMY = "spot_enemy"
-    RESULT = "result"
-    FLAGSHIP_DAMAGE = "flagship_damage"
-    PROCEED = "proceed"
-    NIGHT_BATTLE = "night_battle"
-    FIGHT_CONDITION = "fight_condition"
-    BYPASS = "bypass"
-    RESULT_PAGE = "result_page"
-    MISSILE_SUPPORT = "missile_support"
-    MISSILE_ANIMATION = "missile_animation"
-    FIGHT_PERIOD = "fight_period"
-    GET_SHIP = "get_ship"
-    GET_ITEM = "get_item"
-    GET_SHIP_OR_ITEM = "get_ship_or_item"
+    FORMATION = 'formation'
+    SPOT_ENEMY = 'spot_enemy'
+    RESULT = 'result'
+    FLAGSHIP_DAMAGE = 'flagship_damage'
+    PROCEED = 'proceed'
+    NIGHT_BATTLE = 'night_battle'
+    FIGHT_CONDITION = 'fight_condition'
+    BYPASS = 'bypass'
+    RESULT_PAGE = 'result_page'
+    MISSILE_SUPPORT = 'missile_support'
+    MISSILE_ANIMATION = 'missile_animation'
+    FIGHT_PERIOD = 'fight_period'
+    GET_SHIP = 'get_ship'
+    GET_ITEM = 'get_item'
+    GET_SHIP_OR_ITEM = 'get_ship_or_item'
 
     # ── 战斗终止态 ──
-    END_MAP_PAGE = "end_map_page"
-    END_BATTLE_PAGE = "end_battle_page"
-    END_EXERCISE_PAGE = "end_exercise_page"
+    END_MAP_PAGE = 'end_map_page'
+    END_BATTLE_PAGE = 'end_battle_page'
+    END_EXERCISE_PAGE = 'end_exercise_page'
 
     # ── 船坞已满 ──
-    DOCK_FULL = "dock_full"
+    DOCK_FULL = 'dock_full'
 
     # ── 战役次数耗尽 ──
-    BATTLE_TIMES_EXCEED = "battle_times_exceed"
+    BATTLE_TIMES_EXCEED = 'battle_times_exceed'
 
     # ── 战果评级 ──
-    GRADE_SS = "grade_ss"
-    GRADE_S = "grade_s"
-    GRADE_A = "grade_a"
-    GRADE_B = "grade_b"
-    GRADE_C = "grade_c"
-    GRADE_D = "grade_d"
-    GRADE_LOOT = "grade_loot"
+    GRADE_SS = 'grade_ss'
+    GRADE_S = 'grade_s'
+    GRADE_A = 'grade_a'
+    GRADE_B = 'grade_b'
+    GRADE_C = 'grade_c'
+    GRADE_D = 'grade_d'
+    GRADE_LOOT = 'grade_loot'
 
     @property
     def templates(self) -> list[ImageTemplate]:
@@ -144,10 +145,10 @@ def get_templates(key: TemplateKey) -> list[ImageTemplate]:
 # ── 战果评级映射 (供 detect_result_grade 使用) ──
 
 RESULT_GRADE_KEYS: dict[str, TemplateKey] = {
-    "SS": TemplateKey.GRADE_SS,
-    "S": TemplateKey.GRADE_S,
-    "A": TemplateKey.GRADE_A,
-    "B": TemplateKey.GRADE_B,
-    "C": TemplateKey.GRADE_C,
-    "D": TemplateKey.GRADE_D,
+    'SS': TemplateKey.GRADE_SS,
+    'S': TemplateKey.GRADE_S,
+    'A': TemplateKey.GRADE_A,
+    'B': TemplateKey.GRADE_B,
+    'C': TemplateKey.GRADE_C,
+    'D': TemplateKey.GRADE_D,
 }

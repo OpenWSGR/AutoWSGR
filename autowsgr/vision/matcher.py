@@ -24,9 +24,8 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
 
 # 从 pixel.py 导入所有数据类型 (保持向后兼容)
@@ -40,7 +39,15 @@ from .pixel import (
     PixelSignature,
 )
 
-_log = get_logger("vision.pixel")
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import numpy as np
+
+
+_log = get_logger('vision.pixel')
+
 
 class PixelChecker:
     """像素特征检测引擎 — 视觉层核心 API。
@@ -96,10 +103,7 @@ class PixelChecker:
         rules: Sequence[PixelRule],
     ) -> list[bool]:
         """批量检查多条像素规则。"""
-        return [
-            PixelChecker.check_pixel(screen, r.x, r.y, r.color, r.tolerance)
-            for r in rules
-        ]
+        return [PixelChecker.check_pixel(screen, r.x, r.y, r.color, r.tolerance) for r in rules]
 
     # ── 签名匹配 ──
 
@@ -127,7 +131,9 @@ class PixelChecker:
         """
         if isinstance(signature, CompositePixelSignature):
             return PixelChecker._check_composite(
-                screen, signature, with_details=with_details,
+                screen,
+                signature,
+                with_details=with_details,
             )
 
         details: list[PixelDetail] = []
@@ -143,9 +149,7 @@ class PixelChecker:
 
             if with_details:
                 details.append(
-                    PixelDetail(
-                        rule=rule, actual=actual, distance=dist, matched=is_match
-                    )
+                    PixelDetail(rule=rule, actual=actual, distance=dist, matched=is_match)
                 )
 
             _log.trace(
@@ -156,7 +160,7 @@ class PixelChecker:
                 rule.color.as_rgb_tuple(),
                 actual.as_rgb_tuple(),
                 dist,
-                "OK" if is_match else f"FAIL(容差={rule.tolerance})",
+                'OK' if is_match else f'FAIL(容差={rule.tolerance})',
             )
 
             # 短路优化
@@ -202,7 +206,7 @@ class PixelChecker:
         _log.debug(
             "[Matcher] '{}' {} ({}/{} 规则匹配, 策略={})",
             signature.name,
-            "OK" if matched else "FAIL",
+            'OK' if matched else 'FAIL',
             matched_count,
             total,
             signature.strategy.value,
@@ -229,7 +233,9 @@ class PixelChecker:
 
         for sig in composite.signatures:
             result = PixelChecker.check_signature(
-                screen, sig, with_details=with_details,
+                screen,
+                sig,
+                with_details=with_details,
             )
             total_matched += result.matched_count
             if with_details:
@@ -270,15 +276,11 @@ class PixelChecker:
     ) -> PixelMatchResult | None:
         """从多个签名中识别当前页面/状态（首次匹配）。"""
         for sig in signatures:
-            result = PixelChecker.check_signature(
-                screen, sig, with_details=with_details
-            )
+            result = PixelChecker.check_signature(screen, sig, with_details=with_details)
             if result:
                 _log.debug("[Matcher] identify() → '{}'", result.signature_name)
                 return result
-        _log.debug(
-            "[Matcher] identify() → None（共 {} 个签名均未匹配）", len(signatures)
-        )
+        _log.debug('[Matcher] identify() → None（共 {} 个签名均未匹配）', len(signatures))
         return None
 
     @staticmethod
@@ -291,16 +293,14 @@ class PixelChecker:
         """检查所有签名，返回所有匹配的结果。"""
         results: list[PixelMatchResult] = []
         for sig in signatures:
-            result = PixelChecker.check_signature(
-                screen, sig, with_details=with_details
-            )
+            result = PixelChecker.check_signature(screen, sig, with_details=with_details)
             if result:
                 results.append(result)
         _log.debug(
-            "[Matcher] identify_all() → {} / {} 匹配: [{}]",
+            '[Matcher] identify_all() → {} / {} 匹配: [{}]',
             len(results),
             len(signatures),
-            ", ".join(r.signature_name for r in results),
+            ', '.join(r.signature_name for r in results),
         )
         return results
 
@@ -337,7 +337,7 @@ class PixelChecker:
                 best_name = name
         result_name = best_name if best_dist <= tolerance else None
         _log.debug(
-            "[Matcher] classify_color({:.3f},{:.3f}) → {} (dist={:.1f})",
+            '[Matcher] classify_color({:.3f},{:.3f}) → {} (dist={:.1f})',
             x,
             y,
             result_name,

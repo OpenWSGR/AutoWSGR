@@ -20,9 +20,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from testing.ui._framework import UIControllerTestRunner, connect_via_launcher, ensure_page, info, parse_e2e_args, reset_to_main_page
+from testing.ui._framework import (
+    UIControllerTestRunner,
+    connect_via_launcher,
+    ensure_page,
+    info,
+    parse_e2e_args,
+    reset_to_main_page,
+)
 
 
 def run_test(runner: UIControllerTestRunner) -> None:
@@ -38,14 +46,14 @@ def run_test(runner: UIControllerTestRunner) -> None:
     friend_page = FriendPage(runner.ctx)
 
     # Step 0: 验证初始
-    runner.verify_current("初始验证: 侧边栏", "侧边栏", SidebarPage.is_current_page)
+    runner.verify_current('初始验证: 侧边栏', '侧边栏', SidebarPage.is_current_page)
     if runner.aborted:
         return
 
     # Step 1: 侧边栏 → 建造
     runner.execute_step(
-        "侧边栏 → 建造页面",
-        "建造页面",
+        '侧边栏 → 建造页面',
+        '建造页面',
         BuildPage.is_current_page,
         lambda: sidebar_page.navigate_to(SidebarTarget.BUILD),
     )
@@ -55,8 +63,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
     # Step 2-4: 建造页面内标签切换
     for tab in [BuildTab.DESTROY, BuildTab.DEVELOP, BuildTab.DISCARD, BuildTab.BUILD]:
         runner.execute_step(
-            f"建造: 切换标签 → {tab.value}",
-            "建造页面",
+            f'建造: 切换标签 → {tab.value}',
+            '建造页面',
             BuildPage.is_current_page,
             lambda t=tab: build_page.switch_tab(t),
         )
@@ -65,8 +73,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # Step 5: 建造 → ◁ 侧边栏
     runner.execute_step(
-        "建造页面 → ◁ 侧边栏",
-        "侧边栏",
+        '建造页面 → ◁ 侧边栏',
+        '侧边栏',
         SidebarPage.is_current_page,
         lambda: build_page.go_back(),
     )
@@ -75,8 +83,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # Step 6: 侧边栏 → 强化
     runner.execute_step(
-        "侧边栏 → 强化页面",
-        "强化页面",
+        '侧边栏 → 强化页面',
+        '强化页面',
         IntensifyPage.is_current_page,
         lambda: sidebar_page.navigate_to(SidebarTarget.INTENSIFY),
     )
@@ -86,8 +94,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
     # Step 7-8: 强化页面内标签切换
     for tab in [IntensifyTab.REMAKE, IntensifyTab.SKILL, IntensifyTab.INTENSIFY]:
         runner.execute_step(
-            f"强化: 切换标签 → {tab.value}",
-            "强化页面",
+            f'强化: 切换标签 → {tab.value}',
+            '强化页面',
             IntensifyPage.is_current_page,
             lambda t=tab: intensify_page.switch_tab(t),
         )
@@ -96,8 +104,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # Step 9: 强化 → ◁ 侧边栏
     runner.execute_step(
-        "强化页面 → ◁ 侧边栏",
-        "侧边栏",
+        '强化页面 → ◁ 侧边栏',
+        '侧边栏',
         SidebarPage.is_current_page,
         lambda: intensify_page.go_back(),
     )
@@ -106,8 +114,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # Step 10: 侧边栏 → 好友
     runner.execute_step(
-        "侧边栏 → 好友页面",
-        "好友页面",
+        '侧边栏 → 好友页面',
+        '好友页面',
         FriendPage.is_current_page,
         lambda: sidebar_page.navigate_to(SidebarTarget.FRIEND),
     )
@@ -116,8 +124,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # Step 11: 好友 → ◁ 侧边栏
     runner.execute_step(
-        "好友页面 → ◁ 侧边栏",
-        "侧边栏",
+        '好友页面 → ◁ 侧边栏',
+        '侧边栏',
         SidebarPage.is_current_page,
         lambda: friend_page.go_back(),
     )
@@ -126,8 +134,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # Step 12: 侧边栏 → close → 主页面
     runner.execute_step(
-        "侧边栏 → close → 主页面",
-        "主页面",
+        '侧边栏 → close → 主页面',
+        '主页面',
         MainPage.is_current_page,
         lambda: sidebar_page.close(),
     )
@@ -152,19 +160,21 @@ def _navigate_to(ctrl, pause: float) -> None:
 
 def main() -> None:
     args = parse_e2e_args(
-        "侧边栏 (SidebarPage) e2e 测试",
-        precondition="游戏位于侧边栏 (主页面 → ≡)",
-        default_log_dir="logs/e2e/sidebar_page",
+        '侧边栏 (SidebarPage) e2e 测试',
+        precondition='游戏位于侧边栏 (主页面 → ≡)',
+        default_log_dir='logs/e2e/sidebar_page',
     )
     ctrl = connect_via_launcher(args.serial, args.log_dir, args.log_level)
     from loguru import logger
 
-    logger.info("=== 侧边栏 e2e 测试开始 ===")
+    logger.info('=== 侧边栏 e2e 测试开始 ===')
     from autowsgr.ui.sidebar_page import SidebarPage
+
     if not ensure_page(
-        ctrl, SidebarPage.is_current_page,
+        ctrl,
+        SidebarPage.is_current_page,
         lambda: _navigate_to(ctrl, args.pause),
-        "侧边栏",
+        '侧边栏',
         auto_mode=args.auto,
         pause=args.pause,
     ):
@@ -172,7 +182,7 @@ def main() -> None:
         sys.exit(1)
     runner = UIControllerTestRunner(
         ctrl,
-        controller_name="侧边栏",
+        controller_name='侧边栏',
         log_dir=args.log_dir,
         auto_mode=args.auto,
         pause=args.pause,
@@ -182,21 +192,21 @@ def main() -> None:
     except KeyboardInterrupt:
         from testing.ui._framework import warn
 
-        warn("用户中断")
+        warn('用户中断')
     except Exception as exc:
         from testing.ui._framework import fail
 
-        fail(f"未预期异常: {exc}")
-        logger.opt(exception=True).error("侧边栏 e2e 测试异常")
+        fail(f'未预期异常: {exc}')
+        logger.opt(exception=True).error('侧边栏 e2e 测试异常')
     finally:
         runner.finalize()
         runner.print_summary()
         ctrl.disconnect()
-        info("设备已断开")
+        info('设备已断开')
 
     r = runner.report
     sys.exit(1 if (r.failed > 0 or r.errors > 0) else 0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

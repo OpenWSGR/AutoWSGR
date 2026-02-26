@@ -1,4 +1,5 @@
 """Shared helpers for vision test modules."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -14,12 +15,15 @@ def solid_screen(r: int, g: int, b: int, h: int = 540, w: int = 960) -> np.ndarr
 
 
 def make_template(
-    seed: int = 42, h: int = 50, w: int = 80, name: str = "test",
+    seed: int = 42,
+    h: int = 50,
+    w: int = 80,
+    name: str = 'test',
 ) -> ImageTemplate:
     """创建有纹理的随机模板（纯色模板在 TM_CCOEFF_NORMED 下无法正确匹配）。"""
     rng = np.random.RandomState(seed)
     img = rng.randint(0, 256, (h, w, 3), dtype=np.uint8)
-    return ImageTemplate(name=name, image=img, source="test")
+    return ImageTemplate(name=name, image=img, source='test')
 
 
 def embed_template_in_screen(

@@ -12,9 +12,10 @@ from enum import Enum, auto
 from typing import Any
 
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import ShipDamageState, ConditionFlag
+from autowsgr.types import ConditionFlag, ShipDamageState
 
-_log = get_logger("combat")
+
+_log = get_logger('combat')
 
 
 class EventType(Enum):
@@ -80,26 +81,27 @@ class CombatEvent:
     """
 
     event_type: EventType
-    node: str = ""
-    action: str = ""
-    result: str = ""
+    node: str = ''
+    action: str = ''
+    result: str = ''
     enemies: dict[str, int] | None = None
     ship_stats: list[ShipDamageState] | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
-        parts = [f"[{self.event_type.name}]"]
+        parts = [f'[{self.event_type.name}]']
         if self.node:
-            parts.append(f"节点={self.node}")
+            parts.append(f'节点={self.node}')
         if self.action:
-            parts.append(f"动作={self.action}")
+            parts.append(f'动作={self.action}')
         if self.result:
-            parts.append(f"结果={self.result}")
+            parts.append(f'结果={self.result}')
         if self.enemies is not None:
-            parts.append(f"敌方={self.enemies}")
+            parts.append(f'敌方={self.enemies}')
         if self.ship_stats is not None:
-            parts.append(f"血量={self.ship_stats}")
-        return " | ".join(parts)
+            parts.append(f'血量={self.ship_stats}')
+        return ' | '.join(parts)
+
 
 @dataclass
 class FightResult:
@@ -116,15 +118,15 @@ class FightResult:
     """
 
     mvp: int = 0
-    grade: str = ""
+    grade: str = ''
     ship_stats: list[ShipDamageState] = field(
         default_factory=lambda: [ShipDamageState.NORMAL] * 6,
     )
 
-    _GRADE_ORDER = ["D", "C", "B", "A", "S", "SS"]
+    _GRADE_ORDER = ['D', 'C', 'B', 'A', 'S', 'SS']
 
     def __str__(self) -> str:
-        return f"MVP={self.mvp} 评价={self.grade}"
+        return f'MVP={self.mvp} 评价={self.grade}'
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, FightResult):
@@ -169,19 +171,19 @@ class CombatHistory:
     def add(self, event: CombatEvent) -> None:
         """添加一个事件。"""
         self.events.append(event)
-        _log.debug("[History] 记录事件: {}", event)
+        _log.debug('[History] 记录事件: {}', event)
 
     def reset(self) -> None:
         """清空历史。"""
         count = len(self.events)
         self.events = []
-        _log.debug("[History] 历史已清空 (原 {} 条记录)", count)
+        _log.debug('[History] 历史已清空 (原 {} 条记录)', count)
 
     @property
     def last_node(self) -> str:
         """最后一个事件的节点。"""
         if not self.events:
-            return ""
+            return ''
         return self.events[-1].node
 
     def get_fight_results(self) -> dict[str, FightResult] | list[FightResult]:
@@ -206,18 +208,19 @@ class CombatHistory:
             else:
                 results_list.append(fr)
 
-        results = results_list if results_list else results_dict
-        _log.debug("[History] 提取战果: {} 条结算记录", len(results))
+        results = results_list or results_dict
+        _log.debug('[History] 提取战果: {} 条结算记录', len(results))
         return results
 
     def __str__(self) -> str:
-        return "\n".join(str(e) for e in self.events)
+        return '\n'.join(str(e) for e in self.events)
 
     def __repr__(self) -> str:
-        return f"CombatHistory({len(self.events)} events)"
+        return f'CombatHistory({len(self.events)} events)'
 
     def __len__(self) -> int:
         return len(self.events)
+
 
 @dataclass
 class CombatResult:

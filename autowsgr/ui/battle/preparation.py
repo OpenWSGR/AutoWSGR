@@ -30,14 +30,15 @@ from autowsgr.ui.battle.fleet_change import FleetChangeMixin
 from autowsgr.ui.battle.repair import RepairMixin
 from autowsgr.ui.battle.supply import SupplyMixin
 
+
 __all__ = [
-    "BattlePreparationPage",
-    "CLICK_PANEL",
-    "FleetInfo",
-    "PAGE_SIGNATURE",
-    "PANEL_PROBE",
-    "Panel",
-    "RepairStrategy",
+    'CLICK_PANEL',
+    'PAGE_SIGNATURE',
+    'PANEL_PROBE',
+    'BattlePreparationPage',
+    'FleetInfo',
+    'Panel',
+    'RepairStrategy',
 ]
 
 

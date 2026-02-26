@@ -3,8 +3,9 @@
 使用第 1 舰队自动挑战所有可用对手。
 """
 
-from autowsgr.scheduler import launch
 from autowsgr.ops import ExerciseRunner
+from autowsgr.scheduler import launch
+
 
 # 1. 启动
 ctx = launch('usersettings.yaml')

@@ -2,4 +2,5 @@
 
 from .event_page import BaseEventPage
 
-__all__ = ["BaseEventPage"]
+
+__all__ = ['BaseEventPage']

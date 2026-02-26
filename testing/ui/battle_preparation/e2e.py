@@ -20,9 +20,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from testing.ui._framework import UIControllerTestRunner, connect_via_launcher, ensure_page, info, parse_e2e_args, reset_to_main_page
+from testing.ui._framework import (
+    UIControllerTestRunner,
+    connect_via_launcher,
+    ensure_page,
+    info,
+    parse_e2e_args,
+    reset_to_main_page,
+)
 
 
 def run_test(runner: UIControllerTestRunner) -> None:
@@ -30,24 +38,26 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     bp_page = BattlePreparationPage(runner.ctrl)
 
-    runner.verify_current("初始验证: 出征准备页面", "出征准备页面", BattlePreparationPage.is_current_page)
+    runner.verify_current(
+        '初始验证: 出征准备页面', '出征准备页面', BattlePreparationPage.is_current_page
+    )
     if runner.aborted:
         return
 
     runner.read_state(
-        "出征准备页面",
+        '出征准备页面',
         readers={
-            "当前舰队": lambda s: BattlePreparationPage.get_selected_fleet(s),
-            "当前面板": lambda s: BattlePreparationPage.get_active_panel(s),
-            "自动补给": lambda s: BattlePreparationPage.is_auto_supply_enabled(s),
+            '当前舰队': lambda s: BattlePreparationPage.get_selected_fleet(s),
+            '当前面板': lambda s: BattlePreparationPage.get_active_panel(s),
+            '自动补给': lambda s: BattlePreparationPage.is_auto_supply_enabled(s),
         },
     )
 
     # 舰队切换
     for fleet_id in [2, 3, 4, 1]:
         runner.execute_step(
-            f"切换舰队 → 第{fleet_id}舰队",
-            "出征准备页面",
+            f'切换舰队 → 第{fleet_id}舰队',
+            '出征准备页面',
             BattlePreparationPage.is_current_page,
             lambda fid=fleet_id: bp_page.select_fleet(fid),
         )
@@ -57,8 +67,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
     # 面板切换
     for panel in [Panel.QUICK_SUPPLY, Panel.QUICK_REPAIR, Panel.EQUIPMENT, Panel.STATS]:
         runner.execute_step(
-            f"切换面板 → {panel.value}",
-            "出征准备页面",
+            f'切换面板 → {panel.value}',
+            '出征准备页面',
             BattlePreparationPage.is_current_page,
             lambda p=panel: bp_page.select_panel(p),
         )
@@ -68,8 +78,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
     # 自动补给拨动两次
     for i in range(1, 3):
         runner.execute_step(
-            f"拨动自动补给 (第{i}次)",
-            "出征准备页面",
+            f'拨动自动补给 (第{i}次)',
+            '出征准备页面',
             BattlePreparationPage.is_current_page,
             lambda: bp_page.toggle_auto_supply(),
         )
@@ -77,7 +87,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
             return
 
     runner.execute_step(
-        "出征准备页面 → ◁ 返回",
+        '出征准备页面 → ◁ 返回',
         None,  # 返回目标页面因地图层级不同而变化，跳过严格验证
         lambda _: True,
         lambda: bp_page.go_back(),
@@ -90,10 +100,10 @@ def _parse_extra_args() -> tuple[int, int]:
     args = sys.argv[1:]
     i = 0
     while i < len(args):
-        if args[i] == "--chapter" and i + 1 < len(args):
+        if args[i] == '--chapter' and i + 1 < len(args):
             chapter = int(args[i + 1])
             i += 2
-        elif args[i] == "--map-node" and i + 1 < len(args):
+        elif args[i] == '--map-node' and i + 1 < len(args):
             map_node = int(args[i + 1])
             i += 2
         else:
@@ -109,9 +119,8 @@ def _navigate_to(ctrl, pause: float, *, chapter: int = 1, map_node: int = 1) -> 
     import time
 
     from autowsgr.ui.main_page import MainPage
-    from autowsgr.ui.map.data import TOTAL_CHAPTERS
+    from autowsgr.ui.map.data import MAP_NODE_POSITIONS, TOTAL_CHAPTERS, MapPanel
     from autowsgr.ui.map.page import MapPage
-    from autowsgr.ui.map.data import MapPanel, MAP_NODE_POSITIONS
 
     if not reset_to_main_page(ctrl, pause):
         return
@@ -144,7 +153,7 @@ def _navigate_to(ctrl, pause: float, *, chapter: int = 1, map_node: int = 1) -> 
 
     # 点击地图节点（两次：第一次选中，第二次确认进入）
     if map_node not in MAP_NODE_POSITIONS:
-        info(f"[battle_preparation] map_node={map_node} 不在已知坐标表，尝试节点 1")
+        info(f'[battle_preparation] map_node={map_node} 不在已知坐标表，尝试节点 1')
         map_node = 1
     pos = MAP_NODE_POSITIONS[map_node]
     ctrl.click(*pos)
@@ -155,21 +164,23 @@ def _navigate_to(ctrl, pause: float, *, chapter: int = 1, map_node: int = 1) -> 
 
 def main() -> None:
     args = parse_e2e_args(
-        "出征准备页面 (BattlePreparationPage) e2e 测试",
-        precondition="游戏位于出征准备页面 (地图 → 普通关卡 → 选择关卡)",
-        default_log_dir="logs/e2e/battle_preparation",
+        '出征准备页面 (BattlePreparationPage) e2e 测试',
+        precondition='游戏位于出征准备页面 (地图 → 普通关卡 → 选择关卡)',
+        default_log_dir='logs/e2e/battle_preparation',
     )
     chapter, map_node = _parse_extra_args()
     ctrl = connect_via_launcher(args.serial, args.log_dir, args.log_level)
     from loguru import logger
 
-    logger.info("=== 出征准备页面 e2e 测试开始 === 章节={} 地图节点={}", chapter, map_node)
-    info(f"  章节: {chapter}   地图节点: {map_node}  (可用 --chapter N --map-node M 覆盖)")
+    logger.info('=== 出征准备页面 e2e 测试开始 === 章节={} 地图节点={}', chapter, map_node)
+    info(f'  章节: {chapter}   地图节点: {map_node}  (可用 --chapter N --map-node M 覆盖)')
     from autowsgr.ui.battle.preparation import BattlePreparationPage
+
     if not ensure_page(
-        ctrl, BattlePreparationPage.is_current_page,
+        ctrl,
+        BattlePreparationPage.is_current_page,
         lambda: _navigate_to(ctrl, args.pause, chapter=chapter, map_node=map_node),
-        "出征准备页面",
+        '出征准备页面',
         auto_mode=args.auto,
         pause=args.pause,
     ):
@@ -177,7 +188,7 @@ def main() -> None:
         sys.exit(1)
     runner = UIControllerTestRunner(
         ctrl,
-        controller_name="出征准备页面",
+        controller_name='出征准备页面',
         log_dir=args.log_dir,
         auto_mode=args.auto,
         pause=args.pause,
@@ -187,21 +198,21 @@ def main() -> None:
     except KeyboardInterrupt:
         from testing.ui._framework import warn
 
-        warn("用户中断")
+        warn('用户中断')
     except Exception as exc:
         from testing.ui._framework import fail
 
-        fail(f"未预期: {exc}")
-        logger.opt(exception=True).error("出征准备页面 e2e 测试异常")
+        fail(f'未预期: {exc}')
+        logger.opt(exception=True).error('出征准备页面 e2e 测试异常')
     finally:
         runner.finalize()
         runner.print_summary()
         ctrl.disconnect()
-        info("设备已断开")
+        info('设备已断开')
 
     r = runner.report
     sys.exit(1 if (r.failed > 0 or r.errors > 0) else 0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

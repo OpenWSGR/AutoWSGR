@@ -19,8 +19,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import numpy as np
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,11 +58,11 @@ class ROI:
     def __post_init__(self) -> None:
         if not (0.0 <= self.x1 < self.x2 <= 1.0):
             raise ValueError(
-                f"ROI x 坐标无效: x1={self.x1}, x2={self.x2}（需满足 0 ≤ x1 < x2 ≤ 1）"
+                f'ROI x 坐标无效: x1={self.x1}, x2={self.x2}（需满足 0 ≤ x1 < x2 ≤ 1）'
             )
         if not (0.0 <= self.y1 < self.y2 <= 1.0):
             raise ValueError(
-                f"ROI y 坐标无效: y1={self.y1}, y2={self.y2}（需满足 0 ≤ y1 < y2 ≤ 1）"
+                f'ROI y 坐标无效: y1={self.y1}, y2={self.y2}（需满足 0 ≤ y1 < y2 ≤ 1）'
             )
 
     # ── 构造 ──
@@ -84,19 +87,19 @@ class ROI:
             # 或简写
             {"roi": [0.6, 0.8, 1.0, 1.0]}
         """
-        if "roi" in d:
-            vals = d["roi"]
+        if 'roi' in d:
+            vals = d['roi']
             return cls(x1=vals[0], y1=vals[1], x2=vals[2], y2=vals[3])
         return cls(
-            x1=float(d["x1"]),
-            y1=float(d["y1"]),
-            x2=float(d["x2"]),
-            y2=float(d["y2"]),
+            x1=float(d['x1']),
+            y1=float(d['y1']),
+            x2=float(d['x2']),
+            y2=float(d['y2']),
         )
 
     def to_dict(self) -> dict:
         """序列化为字典。"""
-        return {"x1": self.x1, "y1": self.y1, "x2": self.x2, "y2": self.y2}
+        return {'x1': self.x1, 'y1': self.y1, 'x2': self.x2, 'y2': self.y2}
 
     def to_tuple(self) -> tuple[float, float, float, float]:
         """转为 (x1, y1, x2, y2) 元组。"""
@@ -150,4 +153,4 @@ class ROI:
         return self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
 
     def __repr__(self) -> str:
-        return f"ROI(x1={self.x1}, y1={self.y1}, x2={self.x2}, y2={self.y2})"
+        return f'ROI(x1={self.x1}, y1={self.y1}, x2={self.x2}, y2={self.y2})'

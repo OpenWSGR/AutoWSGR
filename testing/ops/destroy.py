@@ -21,45 +21,45 @@ import argparse
 import sys
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 except Exception:
     pass
 
 from loguru import logger
 
-from testing.ops._framework import launch_for_test
 from autowsgr.types import ShipType
+from testing.ops._framework import launch_for_test
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="舰船解装 E2E 测试")
+    parser = argparse.ArgumentParser(description='舰船解装 E2E 测试')
     parser.add_argument(
-        "serial",
-        nargs="?",
+        'serial',
+        nargs='?',
         default=None,
-        help="ADB 设备序列号，如 127.0.0.1:16384",
+        help='ADB 设备序列号，如 127.0.0.1:16384',
     )
     parser.add_argument(
-        "--types",
-        nargs="+",
+        '--types',
+        nargs='+',
         default=None,
-        metavar="SHIP_TYPE",
+        metavar='SHIP_TYPE',
         help=(
-            "要解装的舰种简称列表，不传则解装全部。"
-            f" 可选值: {', '.join(t.name for t in ShipType)}"
+            f'要解装的舰种简称列表，不传则解装全部。 可选值: {", ".join(t.name for t in ShipType)}'
         ),
     )
     parser.add_argument(
-        "--no-remove-equip",
-        dest="remove_equipment",
-        action="store_false",
+        '--no-remove-equip',
+        dest='remove_equipment',
+        action='store_false',
         default=True,
-        help="解装时不卸下装备",
+        help='解装时不卸下装备',
     )
     return parser.parse_args()
 
@@ -72,35 +72,35 @@ def main() -> None:
         try:
             ship_types = [ShipType[t] for t in args.types]
         except KeyError as exc:
-            print(f"  [ERROR] 未知舰种: {exc}")
-            print(f"  可用舰种: {', '.join(t.name for t in ShipType)}")
+            print(f'  [ERROR] 未知舰种: {exc}')
+            print(f'  可用舰种: {", ".join(t.name for t in ShipType)}')
             sys.exit(1)
 
-    print("=" * 60)
-    print("  舰船解装 (destroy_ships) E2E 测试")
-    print("=" * 60)
+    print('=' * 60)
+    print('  舰船解装 (destroy_ships) E2E 测试')
+    print('=' * 60)
     print()
-    print(f"  舰种列表  : {[t.name for t in ship_types] if ship_types else '全部'}")
-    print(f"  卸下装备  : {args.remove_equipment}")
+    print(f'  舰种列表  : {[t.name for t in ship_types] if ship_types else "全部"}')
+    print(f'  卸下装备  : {args.remove_equipment}')
     print()
 
     steps = [
-        "1. 连接设备",
-        f"2. 调用 destroy_ships(ship_types={[t.name for t in ship_types] if ship_types else None}, remove_equipment={args.remove_equipment})",
-        "3. 验证执行完成",
+        '1. 连接设备',
+        f'2. 调用 destroy_ships(ship_types={[t.name for t in ship_types] if ship_types else None}, remove_equipment={args.remove_equipment})',
+        '3. 验证执行完成',
     ]
-    print("  测试步骤:")
+    print('  测试步骤:')
     for s in steps:
-        print(f"    {s}")
+        print(f'    {s}')
     print()
-    input("  按 Enter 开始运行...")
+    input('  按 Enter 开始运行...')
     print()
 
     try:
-        ctx = launch_for_test(args.serial, log_dir=Path("logs/e2e/destroy"))
+        ctx = launch_for_test(args.serial, log_dir=Path('logs/e2e/destroy'))
         ctrl = ctx.ctrl
-        logger.info(f"已连接: {ctrl.serial}")
-        print(f"  [OK] 已连接: {ctrl.serial}")
+        logger.info(f'已连接: {ctrl.serial}')
+        print(f'  [OK] 已连接: {ctrl.serial}')
 
         from autowsgr.ops.destroy import destroy_ships
 
@@ -109,20 +109,19 @@ def main() -> None:
             ship_types=ship_types,
             remove_equipment=args.remove_equipment,
         )
-        logger.info("destroy_ships() 已执行")
-        print("  [OK] destroy_ships() 已执行")
+        logger.info('destroy_ships() 已执行')
+        print('  [OK] destroy_ships() 已执行')
     except Exception as exc:
-        logger.opt(exception=True).error(f"测试失败: {exc}")
-        print(f"  [FAIL] {exc}")
+        logger.opt(exception=True).error(f'测试失败: {exc}')
+        print(f'  [FAIL] {exc}')
         sys.exit(1)
 
     ctrl.disconnect()
     print()
 
-    result_desc = f"只解装 {[t.name for t in ship_types]}" if ship_types else "全量解装"
-    print(f"  [OK] 舰船解装测试通过 — {result_desc}")
+    result_desc = f'只解装 {[t.name for t in ship_types]}' if ship_types else '全量解装'
+    print(f'  [OK] 舰船解装测试通过 — {result_desc}')
 
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

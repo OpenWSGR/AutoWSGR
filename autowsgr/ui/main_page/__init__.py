@@ -10,4 +10,5 @@
 
 from .controller import MainPage
 
-__all__ = ["MainPage"]
+
+__all__ = ['MainPage']

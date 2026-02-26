@@ -33,15 +33,15 @@ from enum import Enum, auto
 from typing import Any
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import Formation
 
-from autowsgr.types import Formation, SearchEnemyAction
 
 # 允许在规则中出现的舰种标识符
-_log = get_logger("combat.recognition")
+_log = get_logger('combat.recognition')
 
 _SHIP_TYPE_PATTERN = re.compile(
-    r"\b(CV|CVL|AV|BB|BBV|BC|CA|CAV|CLT|CL|BM|DD|SSG|SS|SC|NAP|"
-    r"ASDG|AADG|KP|CG|CBG|BG)\b"
+    r'\b(CV|CVL|AV|BB|BBV|BC|CA|CAV|CLT|CL|BM|DD|SSG|SS|SC|NAP|'
+    r'ASDG|AADG|KP|CG|CBG|BG)\b'
 )
 
 
@@ -103,12 +103,12 @@ class RuleAction:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _OPERATORS: dict[str, Any] = {
-    ">": lambda a, b: a > b,
-    ">=": lambda a, b: a >= b,
-    "<": lambda a, b: a < b,
-    "<=": lambda a, b: a <= b,
-    "==": lambda a, b: a == b,
-    "!=": lambda a, b: a != b,
+    '>': lambda a, b: a > b,
+    '>=': lambda a, b: a >= b,
+    '<': lambda a, b: a < b,
+    '<=': lambda a, b: a <= b,
+    '==': lambda a, b: a == b,
+    '!=': lambda a, b: a != b,
 }
 
 
@@ -196,7 +196,7 @@ class RuleEngine:
         for rule in self.rules:
             if rule.evaluate(context):
                 _log.debug(
-                    "[Combat] 规则命中: {} → {}",
+                    '[Combat] 规则命中: {} → {}',
                     [(c.field, c.op, c.value) for c in rule.conditions],
                     rule.action.result.name,
                 )
@@ -249,7 +249,7 @@ class RuleEngine:
         for item in formation_rules:
             formation_name, action_value = item[0], item[1]
             # 使用特殊字段 _formation 存储阵型名称的哈希
-            conditions = [Condition(field=f"_formation:{formation_name}", op="==", value=1)]
+            conditions = [Condition(field=f'_formation:{formation_name}', op='==', value=1)]
             action = _parse_action_value(action_value)
             rules.append(Rule(conditions=conditions, action=action))
         return cls(rules=rules)
@@ -267,7 +267,7 @@ class RuleEngine:
         RuleAction
         """
         # 构建特殊上下文
-        context: dict[str, int | float] = {f"_formation:{enemy_formation}": 1}
+        context: dict[str, int | float] = {f'_formation:{enemy_formation}': 1}
         return self.evaluate(context)
 
 
@@ -276,9 +276,7 @@ class RuleEngine:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # 匹配 "BB >= 2" 形式的条件片段
-_CONDITION_PIECE_RE = re.compile(
-    r"([A-Z]{2,4})\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)"
-)
+_CONDITION_PIECE_RE = re.compile(r'([A-Z]{2,4})\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)')
 
 
 def _parse_legacy_condition(condition_str: str) -> list[Condition]:
@@ -296,7 +294,7 @@ def _parse_legacy_condition(condition_str: str) -> list[Condition]:
 
     conditions: list[Condition] = []
     for field_name, op, value_str in matches:
-        value = float(value_str) if "." in value_str else int(value_str)
+        value = float(value_str) if '.' in value_str else int(value_str)
         conditions.append(Condition(field=field_name, op=op, value=value))
     return conditions
 
@@ -312,13 +310,13 @@ def _parse_action_value(action_value: str | int) -> RuleAction:
         return RuleAction.set_formation(Formation(action_value))
     if isinstance(action_value, str):
         action_lower = action_value.lower()
-        if action_lower == "retreat":
+        if action_lower == 'retreat':
             return RuleAction.retreat()
-        if action_lower == "detour":
+        if action_lower == 'detour':
             return RuleAction.detour()
         # 尝试作为阵型数字
         try:
             return RuleAction.set_formation(Formation(int(action_value)))
         except (ValueError, KeyError):
             pass
-    raise ValueError(f"无法识别的动作值: {action_value!r}")
+    raise ValueError(f'无法识别的动作值: {action_value!r}')

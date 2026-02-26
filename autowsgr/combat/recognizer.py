@@ -1,21 +1,27 @@
-"""战斗状态视觉识别器。
-"""
+"""战斗状态视觉识别器。"""
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING
 
-import numpy as np
-
-from .state import CombatPhase
-from autowsgr.infra import get_logger
-from autowsgr.context import GameContext
 from autowsgr.image_resources import TemplateKey
+from autowsgr.infra import get_logger
 from autowsgr.vision import CompositePixelSignature, ImageChecker, PixelChecker, PixelSignature
 
-_log = get_logger("combat.recognition")
+from .state import CombatPhase
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('combat.recognition')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -52,8 +58,11 @@ class PhaseSignature:
 def _get_event_map_signatures() -> CompositePixelSignature:
     """延迟导入活动地图页面的组合像素签名（基础页面 OR 浮层）。"""
     from autowsgr.ui.event.event_page import BASE_PAGE_SIGNATURE, OVERLAY_SIGNATURE
+
     return CompositePixelSignature.any_of(
-        "event_map_page_composite", BASE_PAGE_SIGNATURE, OVERLAY_SIGNATURE,
+        'event_map_page_composite',
+        BASE_PAGE_SIGNATURE,
+        OVERLAY_SIGNATURE,
     )
 
 
@@ -130,12 +139,12 @@ PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 RESULT_GRADE_KEYS: dict[str, TemplateKey] = {
-    "SS": TemplateKey.GRADE_SS,
-    "S": TemplateKey.GRADE_S,
-    "A": TemplateKey.GRADE_A,
-    "B": TemplateKey.GRADE_B,
-    "C": TemplateKey.GRADE_C,
-    "D": TemplateKey.GRADE_D,
+    'SS': TemplateKey.GRADE_SS,
+    'S': TemplateKey.GRADE_S,
+    'A': TemplateKey.GRADE_A,
+    'B': TemplateKey.GRADE_B,
+    'C': TemplateKey.GRADE_C,
+    'D': TemplateKey.GRADE_D,
 }
 
 # 向后兼容别名
@@ -168,16 +177,24 @@ class CombatRecognizer:
 
     @staticmethod
     def _match_template(
-        screen: np.ndarray, key: TemplateKey, confidence: float,
+        screen: np.ndarray,
+        key: TemplateKey,
+        confidence: float,
     ) -> bool:
         """检查截图是否包含模板键对应的图像。"""
-        return ImageChecker.find_any(
-            screen, key.templates, confidence=confidence,
-        ) is not None
+        return (
+            ImageChecker.find_any(
+                screen,
+                key.templates,
+                confidence=confidence,
+            )
+            is not None
+        )
 
     @staticmethod
     def _match_pixel(
-        screen: np.ndarray, sig: PixelSignature | CompositePixelSignature,
+        screen: np.ndarray,
+        sig: PixelSignature | CompositePixelSignature,
     ) -> bool:
         """检查截图是否匹配像素特征签名（支持单签名或组合签名）。"""
         return PixelChecker.check_signature(screen, sig).matched
@@ -240,7 +257,7 @@ class CombatRecognizer:
         deadline = time.time() + max_timeout
 
         _log.debug(
-            "[Combat] 等待状态: {} (超时 {:.1f}s)",
+            '[Combat] 等待状态: {} (超时 {:.1f}s)',
             [p.name for p, _ in phase_sigs],
             max_timeout,
         )
@@ -256,13 +273,11 @@ class CombatRecognizer:
                 if self._match_phase(screen, sig):
                     if sig.after_match_delay > 0:
                         time.sleep(sig.after_match_delay)
-                    _log.debug("[Combat] 匹配到状态: {}", phase.name)
+                    _log.debug('[Combat] 匹配到状态: {}', phase.name)
                     return phase
         # 超时
         phase_names = [p.name for p, _ in phase_sigs]
-        raise CombatRecognitionTimeout(
-            f"等待状态超时 ({max_timeout:.1f}s): {phase_names}"
-        )
+        raise CombatRecognitionTimeout(f'等待状态超时 ({max_timeout:.1f}s): {phase_names}')
 
     def identify_current(
         self,
@@ -294,5 +309,3 @@ class CombatRecognizer:
 
 class CombatRecognitionTimeout(Exception):
     """战斗状态识别超时。"""
-
-    pass

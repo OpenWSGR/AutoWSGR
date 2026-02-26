@@ -23,20 +23,24 @@ from __future__ import annotations
 
 import enum
 import time
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 from autowsgr.types import PageName
-from autowsgr.ui.page import NavConfig, click_and_wait_for_page, wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision import (
     Color,
     PixelChecker,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举
@@ -46,9 +50,9 @@ _log = get_logger("ui")
 class SidebarTarget(enum.Enum):
     """侧边栏可导航的目标。"""
 
-    BUILD = "建造"
-    INTENSIFY = "强化"
-    FRIEND = "好友"
+    BUILD = '建造'
+    INTENSIFY = '强化'
+    FRIEND = '好友'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -56,12 +60,12 @@ class SidebarTarget(enum.Enum):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 MENU_PROBES: list[tuple[float, float]] = [
-    (0.0417, 0.0806),   # 商城
-    (0.0422, 0.2102),   # 活动
-    (0.0453, 0.3463),   # 建造
-    (0.0406, 0.4676),   # 强化
-    (0.0396, 0.6028),   # 图鉴
-    (0.0432, 0.7231),   # 好友
+    (0.0417, 0.0806),  # 商城
+    (0.0422, 0.2102),  # 活动
+    (0.0453, 0.3463),  # 建造
+    (0.0406, 0.4676),  # 强化
+    (0.0396, 0.6028),  # 图鉴
+    (0.0432, 0.7231),  # 好友
 ]
 """侧边栏左侧 6 个菜单探测点 (来自 sig.py)。
 
@@ -81,9 +85,9 @@ _MENU_TOLERANCE = 30.0
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CLICK_NAV: dict[SidebarTarget, tuple[float, float]] = {
-    SidebarTarget.BUILD:     (0.1563, 0.3704),
+    SidebarTarget.BUILD: (0.1563, 0.3704),
     SidebarTarget.INTENSIFY: (0.1563, 0.5000),
-    SidebarTarget.FRIEND:    (0.1563, 0.7593),
+    SidebarTarget.FRIEND: (0.1563, 0.7593),
 }
 """侧边栏菜单项点击坐标。
 
@@ -94,7 +98,7 @@ CLICK_CLOSE: tuple[float, float] = (0.0438, 0.8963)
 """关闭侧边栏 (左下角 ≡ 同一切换按钮)。"""
 
 CLICK_SUBMENU: dict[SidebarTarget, tuple[float, float]] = {
-    SidebarTarget.BUILD:     (0.375, 0.3704),
+    SidebarTarget.BUILD: (0.375, 0.3704),
     SidebarTarget.INTENSIFY: (0.375, 0.5000),
 }
 """二级弹出菜单点击坐标。
@@ -103,10 +107,12 @@ CLICK_SUBMENU: dict[SidebarTarget, tuple[float, float]] = {
 需要二次点击选中第一个选项。坐标来自旧代码 (360, 200)/(360, 270) ÷ (960, 540)。
 """
 
-_SUBMENU_TARGETS: frozenset[SidebarTarget] = frozenset({
-    SidebarTarget.BUILD,
-    SidebarTarget.INTENSIFY,
-})
+_SUBMENU_TARGETS: frozenset[SidebarTarget] = frozenset(
+    {
+        SidebarTarget.BUILD,
+        SidebarTarget.INTENSIFY,
+    }
+)
 """需要二级菜单点击的导航目标。"""
 
 SUBMENU_DELAY: float = 1.25
@@ -187,12 +193,13 @@ class SidebarPage:
             SidebarTarget.INTENSIFY: IntensifyPage.is_current_page,
             SidebarTarget.FRIEND: FriendPage.is_current_page,
         }
-        _log.info("[UI] 侧边栏 → {}", target.value)
+        _log.info('[UI] 侧边栏 → {}', target.value)
 
         if target in _SUBMENU_TARGETS:
             # 二级菜单: 点击侧边栏项 → 等弹出 → 点击子选项 → 验证
             self._navigate_with_submenu(
-                target, target_checker[target],
+                target,
+                target_checker[target],
             )
         else:
             # 单次点击 (好友)
@@ -222,8 +229,11 @@ class SidebarPage:
         for attempt in range(1, config.max_retries + 1):
             if attempt > 1:
                 _log.warning(
-                    "[UI] 二级菜单重试 {}/{}: 侧边栏 → {} (等 {:.1f}s)",
-                    attempt, config.max_retries, target.value, config.retry_delay,
+                    '[UI] 二级菜单重试 {}/{}: 侧边栏 → {} (等 {:.1f}s)',
+                    attempt,
+                    config.max_retries,
+                    target.value,
+                    config.retry_delay,
                 )
                 time.sleep(config.retry_delay)
 
@@ -248,12 +258,14 @@ class SidebarPage:
             except NavigationError as e:
                 last_err = e
                 _log.warning(
-                    "[UI] 二级菜单后超时 ({}/{}): 侧边栏 → {}",
-                    attempt, config.max_retries, target.value,
+                    '[UI] 二级菜单后超时 ({}/{}): 侧边栏 → {}',
+                    attempt,
+                    config.max_retries,
+                    target.value,
                 )
 
         raise NavigationError(
-            f"导航失败 (已重试 {config.max_retries} 次): 侧边栏 → {target.value}"
+            f'导航失败 (已重试 {config.max_retries} 次): 侧边栏 → {target.value}'
         ) from last_err
 
     def go_to_build(self) -> None:
@@ -282,7 +294,7 @@ class SidebarPage:
         """
         from autowsgr.ui.main_page import MainPage
 
-        _log.info("[UI] 侧边栏 → 关闭 (返回主页面)")
+        _log.info('[UI] 侧边栏 → 关闭 (返回主页面)')
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_CLOSE,

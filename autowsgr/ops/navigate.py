@@ -9,15 +9,14 @@ import time
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.types import PageName
 from autowsgr.ui.navigation import find_path
 from autowsgr.ui.page import NavigationError, get_current_page
+
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
-_log = get_logger("ops")
+_log = get_logger('ops')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 常量
@@ -52,7 +51,7 @@ def identify_current_page(ctx: GameContext) -> str | None:
         if page is not None:
             return page
         _log.debug(
-            "[OPS] 页面识别失败 (第 {} 次尝试), 等待重试",
+            '[OPS] 页面识别失败 (第 {} 次尝试), 等待重试',
             attempt + 1,
         )
         time.sleep(IDENTIFY_INTERVAL)
@@ -78,30 +77,30 @@ def _goto_page(ctx: GameContext, target: str) -> None:
     """
     current = identify_current_page(ctx)
     if current is None:
-        raise NavigationError(
-            f"无法识别当前页面，无法导航到 '{target}'"
-        )
+        raise NavigationError(f"无法识别当前页面，无法导航到 '{target}'")
 
     if current == target:
-        _log.info("[OPS] 已在目标页面: {}", target)
+        _log.info('[OPS] 已在目标页面: {}', target)
         return
 
     path = find_path(current, target)
     if path is None:
-        raise NavigationError(
-            f"无法找到从 '{current}' 到 '{target}' 的路径"
-        )
+        raise NavigationError(f"无法找到从 '{current}' 到 '{target}' 的路径")
 
-    _log.debug("[OPS] 导航: {} → {} (共 {} 步)", current, target, len(path))
+    _log.debug('[OPS] 导航: {} → {} (共 {} 步)', current, target, len(path))
 
     for i, edge in enumerate(path):
         _log.debug(
-            "[OPS]   步骤 {}/{}: {} → {} ({})",
-            i + 1, len(path), edge.source, edge.target, edge.description,
+            '[OPS]   步骤 {}/{}: {} → {} ({})',
+            i + 1,
+            len(path),
+            edge.source,
+            edge.target,
+            edge.description,
         )
         edge.action(ctx)
 
-    _log.info("[OPS] 已到达: {}", target)
+    _log.info('[OPS] 已到达: {}', target)
 
 
 def goto_page(ctx: GameContext, target: str) -> None:
@@ -109,7 +108,7 @@ def goto_page(ctx: GameContext, target: str) -> None:
     try:
         _goto_page(ctx, target)
     except NavigationError as e:
-        _log.error("[OPS] 导航失败: {}", e)
+        _log.error('[OPS] 导航失败: {}', e)
         current_page = identify_current_page(ctx)
-        _log.info("[OPS] 当前页面: {}, 执行一次重试", current_page)
+        _log.info('[OPS] 当前页面: {}, 执行一次重试', current_page)
         _goto_page(ctx, target)

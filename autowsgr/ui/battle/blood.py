@@ -72,7 +72,7 @@ def classify_blood(pixel: Color) -> ShipDamageState:
     ShipDamageState
     """
     best_state = ShipDamageState.NORMAL
-    best_dist = float("inf")
+    best_dist = float('inf')
     for ref_color, state in _BLOOD_COLORS:
         dist = pixel.distance(ref_color)
         if dist < best_dist:

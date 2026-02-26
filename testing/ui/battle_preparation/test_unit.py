@@ -118,7 +118,7 @@ class TestIsCurrentPage:
 
 
 class TestGetSelectedFleet:
-    @pytest.mark.parametrize("fleet", [1, 2, 3, 4])
+    @pytest.mark.parametrize('fleet', [1, 2, 3, 4])
     def test_each_fleet(self, fleet: int):
         screen = _make_screen(selected_fleet=fleet)
         assert BattlePreparationPage.get_selected_fleet(screen) == fleet
@@ -134,7 +134,7 @@ class TestGetSelectedFleet:
 
 
 class TestGetActivePanel:
-    @pytest.mark.parametrize("panel", list(Panel))
+    @pytest.mark.parametrize('panel', list(Panel))
     def test_each_panel(self, panel: Panel):
         screen = _make_screen(active_panel=panel)
         assert BattlePreparationPage.get_active_panel(screen) == panel
@@ -190,7 +190,7 @@ class TestActions:
                 screen[y, x] = list(TAB_DARK)
         ctrl.screenshot.return_value = screen
         with patch(
-            "autowsgr.ui.map.base.identify_page_type",
+            'autowsgr.ui.map.base.identify_page_type',
             return_value=TabbedPageType.MAP,
         ):
             pg.go_back()
@@ -213,7 +213,7 @@ class TestSelectFleet:
         ctrl = MagicMock(spec=AndroidController)
         return BattlePreparationPage(ctrl), ctrl
 
-    @pytest.mark.parametrize("fleet", [1, 2, 3, 4])
+    @pytest.mark.parametrize('fleet', [1, 2, 3, 4])
     def test_valid_fleet(self, page, fleet: int):
         pg, ctrl = page
         pg.select_fleet(fleet)
@@ -221,7 +221,7 @@ class TestSelectFleet:
 
     def test_invalid_fleet_raises(self, page):
         pg, ctrl = page
-        with pytest.raises(ValueError, match="1–4"):
+        with pytest.raises(ValueError, match='1–4'):
             pg.select_fleet(5)
 
     def test_fleet_zero_raises(self, page):
@@ -241,7 +241,7 @@ class TestSelectPanel:
         ctrl = MagicMock(spec=AndroidController)
         return BattlePreparationPage(ctrl), ctrl
 
-    @pytest.mark.parametrize("panel", list(Panel))
+    @pytest.mark.parametrize('panel', list(Panel))
     def test_each_panel(self, page, panel: Panel):
         pg, ctrl = page
         pg.select_panel(panel)
@@ -278,4 +278,3 @@ class TestToggles:
         pg, ctrl = page
         pg.toggle_auto_supply()
         ctrl.click.assert_called_once_with(*CLICK_AUTO_SUPPLY)
-

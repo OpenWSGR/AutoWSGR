@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from autowsgr.types import ShipDamageState
-from autowsgr.types import DecisivePhase
+from autowsgr.types import DecisivePhase, ShipDamageState
 
 
 @dataclass
@@ -36,11 +35,11 @@ class DecisiveState:
 
     chapter: int = 6
     stage: int = 0
-    node: str = "U" # U 表示未知节点
+    node: str = 'U'  # U 表示未知节点
     phase: DecisivePhase = DecisivePhase.INIT
     score: int = 10
     ships: set[str] = field(default_factory=set)
-    fleet: list[str] = field(default_factory=lambda: [""] * 7)
+    fleet: list[str] = field(default_factory=lambda: [''] * 7)
     ship_stats: list[ShipDamageState] = field(default_factory=lambda: [ShipDamageState.NO_SHIP] * 6)
 
     def reset(self) -> None:
@@ -51,4 +50,4 @@ class DecisiveState:
 
     def is_begin(self) -> bool:
         """是否在第一小关第一节点。"""
-        return self.stage <= 1 and self.node == "A"
+        return self.stage <= 1 and self.node == 'A'

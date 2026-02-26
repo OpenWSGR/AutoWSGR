@@ -1,4 +1,5 @@
 """Tests for autowsgr.vision.roi — ROI class."""
+
 from __future__ import annotations
 
 import pytest
@@ -20,17 +21,17 @@ class TestROI:
         assert roi.x2 == 0.5 and roi.y2 == 0.6
 
     def test_from_dict(self):
-        roi = ROI.from_dict({"x1": 0.1, "y1": 0.2, "x2": 0.5, "y2": 0.6})
+        roi = ROI.from_dict({'x1': 0.1, 'y1': 0.2, 'x2': 0.5, 'y2': 0.6})
         assert roi.x1 == 0.1
 
     def test_from_dict_shorthand(self):
-        roi = ROI.from_dict({"roi": [0.1, 0.2, 0.5, 0.6]})
+        roi = ROI.from_dict({'roi': [0.1, 0.2, 0.5, 0.6]})
         assert roi.x1 == 0.1 and roi.y2 == 0.6
 
     def test_to_dict(self):
         roi = ROI(0.1, 0.2, 0.5, 0.6)
         d = roi.to_dict()
-        assert d == {"x1": 0.1, "y1": 0.2, "x2": 0.5, "y2": 0.6}
+        assert d == {'x1': 0.1, 'y1': 0.2, 'x2': 0.5, 'y2': 0.6}
 
     def test_to_tuple(self):
         roi = ROI(0.1, 0.2, 0.5, 0.6)
@@ -64,11 +65,11 @@ class TestROI:
         assert not roi.contains(0.6, 0.5)
 
     def test_invalid_x_raises(self):
-        with pytest.raises(ValueError, match="x 坐标无效"):
+        with pytest.raises(ValueError, match='x 坐标无效'):
             ROI(0.5, 0.0, 0.3, 1.0)
 
     def test_invalid_y_raises(self):
-        with pytest.raises(ValueError, match="y 坐标无效"):
+        with pytest.raises(ValueError, match='y 坐标无效'):
             ROI(0.0, 0.6, 0.5, 0.3)
 
     def test_equal_x_raises(self):

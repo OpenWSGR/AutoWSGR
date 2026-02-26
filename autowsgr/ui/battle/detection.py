@@ -10,19 +10,23 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import ShipDamageState
+from autowsgr.ui.battle.base import BaseBattlePreparation
+from autowsgr.vision import PixelChecker
 
 from .blood import classify_blood
 from .constants import (
     BLOOD_BAR_PROBE,
     SHIP_LEVEL_CROP,
 )
-from autowsgr.types import ShipDamageState
-from autowsgr.vision import PixelChecker
-from autowsgr.ui.battle.base import BaseBattlePreparation
 
-_log = get_logger("ui.preparation")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+
+_log = get_logger('ui.preparation')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -70,8 +74,8 @@ class DetectionMixin(BaseBattlePreparation):
             pixel = PixelChecker.get_pixel(screen, x, y)
             result[slot] = classify_blood(pixel)
         _log.debug(
-            "[准备页] 血量检测: {}",
-            " | ".join(f"槽{i}={result[i].name}" for i in range(len(result))),
+            '[准备页] 血量检测: {}',
+            ' | '.join(f'槽{i}={result[i].name}' for i in range(len(result))),
         )
         return result
 
@@ -98,8 +102,8 @@ class DetectionMixin(BaseBattlePreparation):
         levels: dict[int, int | None] = {}
         ocr = self._ocr
         if ocr is None:
-            _log.warning("[UI] 未提供 OCR 引擎，无法识别舰船等级")
-            return {slot: None for slot in range(6)}
+            _log.warning('[UI] 未提供 OCR 引擎，无法识别舰船等级')
+            return dict.fromkeys(range(6))
 
         # 先检测哪些槽位有舰船
         damage = self.detect_ship_damage(screen)
@@ -115,22 +119,20 @@ class DetectionMixin(BaseBattlePreparation):
                 continue
 
             cropped = PixelChecker.crop(screen, *crop_region)
-            text = ocr.recognize_single(
-                cropped, allowlist="0123456789Llv.V"
-            ).text.strip()
+            text = ocr.recognize_single(cropped, allowlist='0123456789Llv.V').text.strip()
 
             level = self._parse_level(text)
             levels[slot] = level
 
             if level is not None:
-                _log.debug("[UI] 槽位{} 等级: Lv.{}", slot, level)
+                _log.debug('[UI] 槽位{} 等级: Lv.{}', slot, level)
             else:
                 _log.debug("[UI] 槽位{} 等级识别失败: '{}'", slot, text)
 
         _log.info(
-            "[准备页] 等级检测: {}",
-            " | ".join(
-                f"槽{i}={'Lv.' + str(levels[i]) if levels[i] is not None else '无'}"
+            '[准备页] 等级检测: {}',
+            ' | '.join(
+                f'槽{i}={"Lv." + str(levels[i]) if levels[i] is not None else "无"}'
                 for i in range(6)
             ),
         )
@@ -176,10 +178,10 @@ class DetectionMixin(BaseBattlePreparation):
         )
 
         _log.info(
-            "[UI] 舰队 {} 信息: {}",
-            actual_fleet or "?",
-            " | ".join(
-                f"槽{i}=Lv.{levels.get(i, '?')} {damage[i].name if i in damage else '?'}"
+            '[UI] 舰队 {} 信息: {}',
+            actual_fleet or '?',
+            ' | '.join(
+                f'槽{i}=Lv.{levels.get(i, "?")} {damage[i].name if i in damage else "?"}'
                 for i in range(6)
             ),
         )
@@ -193,8 +195,8 @@ class DetectionMixin(BaseBattlePreparation):
 
         支持格式: ``"Lv.120"``, ``"Lv120"``, ``"lv 98"``, ``"120"`` 等。
         """
-        cleaned = re.sub(r"(?i)^l\s*v\.?\s*", "", text)
-        m = re.search(r"(\d+)", cleaned)
+        cleaned = re.sub(r'(?i)^l\s*v\.?\s*', '', text)
+        m = re.search(r'(\d+)', cleaned)
         if m:
             val = int(m.group(1))
             if 1 <= val <= 200:

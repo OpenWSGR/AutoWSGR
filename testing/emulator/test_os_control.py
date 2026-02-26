@@ -5,14 +5,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from autowsgr.emulator import (
-    WindowsEmulatorManager,
-    MacEmulatorManager,
     LinuxEmulatorManager,
+    MacEmulatorManager,
+    WindowsEmulatorManager,
 )
 from autowsgr.infra import EmulatorConfig, EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType
@@ -44,81 +44,85 @@ class TestWindowsEmulatorManager:
     def test_leidian_is_running_true(self):
         config = EmulatorConfig(
             type=EmulatorType.leidian,
-            path=r"C:\LDPlayer\dnplayer.exe",
-            serial="emulator-5554",
+            path=r'C:\LDPlayer\dnplayer.exe',
+            serial='emulator-5554',
         )
         mgr = WindowsEmulatorManager(config)
-        with patch.object(mgr, "_ldconsole", return_value="running"):
+        with patch.object(mgr, '_ldconsole', return_value='running'):
             assert mgr.is_running() is True
 
     def test_leidian_is_running_false(self):
         config = EmulatorConfig(
             type=EmulatorType.leidian,
-            path=r"C:\LDPlayer\dnplayer.exe",
-            serial="emulator-5554",
+            path=r'C:\LDPlayer\dnplayer.exe',
+            serial='emulator-5554',
         )
         mgr = WindowsEmulatorManager(config)
-        with patch.object(mgr, "_ldconsole", return_value="stopped"):
+        with patch.object(mgr, '_ldconsole', return_value='stopped'):
             assert mgr.is_running() is False
 
     def test_mumu_is_running_true(self):
         config = EmulatorConfig(
             type=EmulatorType.mumu,
-            path=r"C:\MuMu\MuMuPlayer.exe",
-            serial="127.0.0.1:16384",
+            path=r'C:\MuMu\MuMuPlayer.exe',
+            serial='127.0.0.1:16384',
         )
         mgr = WindowsEmulatorManager(config)
         json_resp = '{"is_android_started": true}'
-        with patch.object(mgr, "_mumuconsole", return_value=json_resp):
+        with patch.object(mgr, '_mumuconsole', return_value=json_resp):
             assert mgr.is_running() is True
 
     def test_mumu_is_running_false(self):
         config = EmulatorConfig(
             type=EmulatorType.mumu,
-            path=r"C:\MuMu\MuMuPlayer.exe",
-            serial="127.0.0.1:16384",
+            path=r'C:\MuMu\MuMuPlayer.exe',
+            serial='127.0.0.1:16384',
         )
         mgr = WindowsEmulatorManager(config)
         json_resp = '{"is_android_started": false}'
-        with patch.object(mgr, "_mumuconsole", return_value=json_resp):
+        with patch.object(mgr, '_mumuconsole', return_value=json_resp):
             assert mgr.is_running() is False
 
     def test_mumu_is_running_bad_json(self):
-        config = EmulatorConfig(type=EmulatorType.mumu, path=r"C:\MuMu\x.exe")
+        config = EmulatorConfig(type=EmulatorType.mumu, path=r'C:\MuMu\x.exe')
         mgr = WindowsEmulatorManager(config)
-        with patch.object(mgr, "_mumuconsole", return_value="not json"):
+        with patch.object(mgr, '_mumuconsole', return_value='not json'):
             assert mgr.is_running() is False
 
     def test_others_tasklist_check_running(self):
         config = EmulatorConfig(
             type=EmulatorType.bluestacks,
-            process_name="HD-Player.exe",
+            process_name='HD-Player.exe',
         )
         mgr = WindowsEmulatorManager(config)
-        fake_output = "映像名称  PID  会话名  会话#  内存使用\nHD-Player.exe  1234  Console  1  100,000 K".encode("gbk")
-        with patch("autowsgr.emulator.os_control.windows.subprocess.check_output", return_value=fake_output):
+        fake_output = '映像名称  PID  会话名  会话#  内存使用\nHD-Player.exe  1234  Console  1  100,000 K'.encode(
+            'gbk'
+        )
+        with patch(
+            'autowsgr.emulator.os_control.windows.subprocess.check_output', return_value=fake_output
+        ):
             assert mgr.is_running() is True
 
     def test_others_tasklist_check_not_running(self):
         config = EmulatorConfig(
             type=EmulatorType.bluestacks,
-            process_name="HD-Player.exe",
+            process_name='HD-Player.exe',
         )
         mgr = WindowsEmulatorManager(config)
-        fake_output = "信息: 没有运行的任务匹配".encode("gbk")
-        with patch("subprocess.check_output", return_value=fake_output):
+        fake_output = '信息: 没有运行的任务匹配'.encode('gbk')
+        with patch('subprocess.check_output', return_value=fake_output):
             assert mgr.is_running() is False
 
     def test_start_no_path_raises(self):
         config = EmulatorConfig(type=EmulatorType.leidian, path=None)
         mgr = WindowsEmulatorManager(config)
-        with pytest.raises(EmulatorNotFoundError, match="路径"):
+        with pytest.raises(EmulatorNotFoundError, match='路径'):
             mgr.start()
 
     def test_stop_no_process_name_raises(self):
         config = EmulatorConfig(type=EmulatorType.bluestacks, process_name=None)
         mgr = WindowsEmulatorManager(config)
-        with pytest.raises(EmulatorError, match="进程名"):
+        with pytest.raises(EmulatorError, match='进程名'):
             mgr.stop()
 
 
@@ -136,32 +140,33 @@ class TestMacEmulatorManager:
         assert mgr.is_running() is False
 
     def test_is_running_process_not_found(self):
-        config = EmulatorConfig(type=EmulatorType.bluestacks, process_name="bluestacks")
+        config = EmulatorConfig(type=EmulatorType.bluestacks, process_name='bluestacks')
         mgr = MacEmulatorManager(config)
         from subprocess import CalledProcessError
-        with patch("subprocess.check_output", side_effect=CalledProcessError(1, "pgrep")):
+
+        with patch('subprocess.check_output', side_effect=CalledProcessError(1, 'pgrep')):
             assert mgr.is_running() is False
 
     def test_is_running_non_mumu(self):
-        config = EmulatorConfig(type=EmulatorType.bluestacks, process_name="bluestacks")
+        config = EmulatorConfig(type=EmulatorType.bluestacks, process_name='bluestacks')
         mgr = MacEmulatorManager(config)
-        with patch("subprocess.check_output", return_value=b"12345"):
+        with patch('subprocess.check_output', return_value=b'12345'):
             assert mgr.is_running() is True
 
     def test_start_no_path_raises(self):
         config = EmulatorConfig(type=EmulatorType.bluestacks, path=None)
         mgr = MacEmulatorManager(config)
-        with pytest.raises(EmulatorNotFoundError, match="路径"):
+        with pytest.raises(EmulatorNotFoundError, match='路径'):
             mgr.start()
 
     def test_stop_no_process_name_raises(self):
         config = EmulatorConfig(type=EmulatorType.bluestacks, process_name=None)
         mgr = MacEmulatorManager(config)
-        with pytest.raises(EmulatorError, match="进程名"):
+        with pytest.raises(EmulatorError, match='进程名'):
             mgr.stop()
 
     def test_stop_mumu_noop(self):
-        config = EmulatorConfig(type=EmulatorType.mumu, process_name="mumu")
+        config = EmulatorConfig(type=EmulatorType.mumu, process_name='mumu')
         mgr = MacEmulatorManager(config)
         mgr.stop()  # MuMu macOS 暂不支持关闭，不应报错
 
@@ -177,44 +182,41 @@ class TestLinuxEmulatorManager:
     def test_start_no_path_raises(self):
         config = EmulatorConfig(type=EmulatorType.leidian, path=None)
         mgr = LinuxEmulatorManager(config)
-        with pytest.raises(EmulatorNotFoundError, match="路径"):
+        with pytest.raises(EmulatorNotFoundError, match='路径'):
             mgr.start()
 
     def test_stop_no_process_name_raises(self):
         config = EmulatorConfig(type=EmulatorType.leidian, process_name=None)
         mgr = LinuxEmulatorManager(config)
-        with pytest.raises(EmulatorError, match="进程名"):
+        with pytest.raises(EmulatorError, match='进程名'):
             mgr.stop()
 
     def test_adb_devices_empty(self):
         """_adb_devices 在异常时返回空列表。"""
         with patch(
-            "autowsgr.emulator.os_control.linux.LinuxEmulatorManager._adb_devices",
+            'autowsgr.emulator.os_control.linux.LinuxEmulatorManager._adb_devices',
             return_value=[],
         ):
             config = EmulatorConfig(
                 type=EmulatorType.leidian,
-                serial="emulator-5554",
-                process_name="ld",
+                serial='emulator-5554',
+                process_name='ld',
             )
             mgr = LinuxEmulatorManager(config)
             # Patch is_wsl and pgrep
             mgr._is_wsl = False
-            with patch("subprocess.run") as mock_run:
+            with patch('subprocess.run') as mock_run:
                 from subprocess import CalledProcessError
-                mock_run.side_effect = CalledProcessError(1, "pgrep")
+
+                mock_run.side_effect = CalledProcessError(1, 'pgrep')
                 assert mgr.is_running() is False
 
     def test_is_running_adb_online(self):
         """设备在 ADB 列表中应返回 True。"""
         config = EmulatorConfig(
             type=EmulatorType.leidian,
-            serial="emulator-5554",
+            serial='emulator-5554',
         )
         mgr = LinuxEmulatorManager(config)
-        with patch.object(
-            LinuxEmulatorManager, "_adb_devices", return_value=["emulator-5554"]
-        ):
+        with patch.object(LinuxEmulatorManager, '_adb_devices', return_value=['emulator-5554']):
             assert mgr.is_running() is True
-
-

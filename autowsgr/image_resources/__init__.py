@@ -29,10 +29,11 @@ from autowsgr.image_resources.combat import CombatTemplates
 from autowsgr.image_resources.keys import TemplateKey, get_templates
 from autowsgr.image_resources.ops import Templates
 
+
 __all__ = [
-    "CombatTemplates",
-    "LazyTemplate",
-    "Templates",
-    "TemplateKey",
-    "get_templates",
+    'CombatTemplates',
+    'LazyTemplate',
+    'TemplateKey',
+    'Templates',
+    'get_templates',
 ]

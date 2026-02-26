@@ -12,11 +12,12 @@ from autowsgr.ui.battle.preparation import (
     RepairStrategy,
 )
 
+
 __all__ = [
-    "BattlePreparationPage",
-    "CLICK_PANEL",
-    "FleetInfo",
-    "PANEL_PROBE",
-    "Panel",
-    "RepairStrategy",
+    'CLICK_PANEL',
+    'PANEL_PROBE',
+    'BattlePreparationPage',
+    'FleetInfo',
+    'Panel',
+    'RepairStrategy',
 ]

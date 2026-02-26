@@ -161,8 +161,8 @@ def _build_map_transitions(
     if ep is not None:
         proceed_yes.append(ep)
     t[CombatPhase.PROCEED] = {
-        "yes": proceed_yes,
-        "no": [ep] if ep is not None else [],
+        'yes': proceed_yes,
+        'no': [ep] if ep is not None else [],
     }
 
     t[CombatPhase.FIGHT_CONDITION] = [
@@ -172,9 +172,9 @@ def _build_map_transitions(
     ]
 
     t[CombatPhase.SPOT_ENEMY_SUCCESS] = {
-        "fight": list(fight_targets),
-        "detour": list(core_nav),
-        "retreat": [ep] if ep is not None else [],
+        'fight': list(fight_targets),
+        'detour': list(core_nav),
+        'retreat': [ep] if ep is not None else [],
     }
 
     t[CombatPhase.FORMATION] = [
@@ -189,8 +189,8 @@ def _build_map_transitions(
 
     t[CombatPhase.FIGHT_PERIOD] = [CombatPhase.NIGHT_PROMPT, CombatPhase.RESULT]
     t[CombatPhase.NIGHT_PROMPT] = {
-        "yes": [CombatPhase.RESULT],
-        "no": [CombatPhase.RESULT],
+        'yes': [CombatPhase.RESULT],
+        'no': [CombatPhase.RESULT],
     }
 
     t[CombatPhase.RESULT] = list(after_result)
@@ -223,15 +223,15 @@ def _build_single_transitions(
     t[CombatPhase.DOCK_FULL] = []
 
     t[CombatPhase.SPOT_ENEMY_SUCCESS] = {
-        "fight": [CombatPhase.FORMATION, CombatPhase.FIGHT_PERIOD],
-        "retreat": [ep] if ep is not None else [],
+        'fight': [CombatPhase.FORMATION, CombatPhase.FIGHT_PERIOD],
+        'retreat': [ep] if ep is not None else [],
     }
 
     t[CombatPhase.FORMATION] = [CombatPhase.FIGHT_PERIOD]
     t[CombatPhase.FIGHT_PERIOD] = [CombatPhase.NIGHT_PROMPT, CombatPhase.RESULT]
     t[CombatPhase.NIGHT_PROMPT] = {
-        "yes": [CombatPhase.RESULT],
-        "no": [CombatPhase.RESULT],
+        'yes': [CombatPhase.RESULT],
+        'no': [CombatPhase.RESULT],
     }
 
     if ep is not None:
@@ -276,4 +276,3 @@ def resolve_successors(
         targets = branch
 
     return list(targets)
-

@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.ui.battle.constants import BLOOD_BAR_PROBE
 from autowsgr.types import ShipDamageState
 from autowsgr.ui.battle.base import BaseBattlePreparation, RepairStrategy
+from autowsgr.ui.battle.constants import BLOOD_BAR_PROBE
 
-_log = get_logger("ui.preparation")
+
+_log = get_logger('ui.preparation')
 
 
 class RepairMixin(BaseBattlePreparation):
@@ -36,11 +35,11 @@ class RepairMixin(BaseBattlePreparation):
         time.sleep(0.8)
         for pos in positions:
             if pos not in BLOOD_BAR_PROBE:
-                _log.warning("[UI] 无效修理位置: {}", pos)
+                _log.warning('[UI] 无效修理位置: {}', pos)
                 continue
             self._ctrl.click(*BLOOD_BAR_PROBE[pos])
             time.sleep(1.5)
-            _log.info("[UI] 出征准备 → 修理位置 {}", pos)
+            _log.info('[UI] 出征准备 → 修理位置 {}', pos)
 
     def apply_repair(
         self,
@@ -73,14 +72,14 @@ class RepairMixin(BaseBattlePreparation):
         for slot, dmg in damage.items():
             if dmg == ShipDamageState.NO_SHIP or dmg == ShipDamageState.NORMAL:
                 continue
-            if strategy is RS.ALWAYS and dmg >= ShipDamageState.MODERATE:
-                positions.append(slot)
-            elif strategy is RS.MODERATE and dmg >= ShipDamageState.MODERATE:
-                positions.append(slot)
-            elif strategy is RS.SEVERE and dmg >= ShipDamageState.SEVERE:
+            if (
+                (strategy is RS.ALWAYS and dmg >= ShipDamageState.MODERATE)
+                or (strategy is RS.MODERATE and dmg >= ShipDamageState.MODERATE)
+                or (strategy is RS.SEVERE and dmg >= ShipDamageState.SEVERE)
+            ):
                 positions.append(slot)
 
         if positions:
             self.repair_slots(positions)
-            _log.info("[UI] 修理位置: {} (策略: {})", positions, strategy.value)
+            _log.info('[UI] 修理位置: {} (策略: {})', positions, strategy.value)
         return positions

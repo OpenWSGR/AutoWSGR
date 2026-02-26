@@ -8,9 +8,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
+from autowsgr.ui.battle.base import BaseBattlePreparation
 from autowsgr.ui.battle.constants import (
     CLICK_SHIP_SLOT,
     CLICK_SUPPORT,
@@ -20,9 +19,13 @@ from autowsgr.ui.battle.constants import (
     SUPPORT_PROBE,
 )
 from autowsgr.vision import PixelChecker
-from autowsgr.ui.battle.base import BaseBattlePreparation
 
-_log = get_logger("ui.preparation")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+
+_log = get_logger('ui.preparation')
 
 
 class SupplyMixin(BaseBattlePreparation):
@@ -50,7 +53,7 @@ class SupplyMixin(BaseBattlePreparation):
 
     def toggle_battle_support(self) -> None:
         """切换战役支援开关。"""
-        _log.debug("[UI] 出征准备 → 切换战役支援")
+        _log.debug('[UI] 出征准备 → 切换战役支援')
         self._ctrl.click(*CLICK_SUPPORT)
 
     # ── 动作 — 补给 ──────────────────────────────────────────────────────
@@ -65,11 +68,11 @@ class SupplyMixin(BaseBattlePreparation):
         time.sleep(0.5)
         for sid in ship_ids:
             if sid not in CLICK_SHIP_SLOT:
-                _log.warning("[UI] 无效槽位: {}", sid)
+                _log.warning('[UI] 无效槽位: {}', sid)
                 continue
             self._ctrl.click(*CLICK_SHIP_SLOT[sid])
             time.sleep(0.3)
-        _log.debug("[UI] 出征准备 → 补给 {}", ship_ids)
+        _log.debug('[UI] 出征准备 → 补给 {}', ship_ids)
 
     def apply_supply(self) -> None:
         """确保舰队已补给 (自动补给未开启则手动补给)。"""
