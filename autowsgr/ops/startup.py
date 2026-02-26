@@ -242,7 +242,7 @@ def ensure_game_ready(
     startup_timeout: float = _STARTUP_TIMEOUT,
     dismiss_overlays: bool = True,
 ) -> None:
-    """确保游戏已启动并处于主页面。
+    """确保游戏已启动并处于可识别页面。
 
     这是最常用的顶层入口，适合脚本开头调用：
 
@@ -278,7 +278,10 @@ def ensure_game_ready(
         _log.info("[Startup] 游戏未运行，正在启动…")
         start_game(ctrl, package, startup_timeout=startup_timeout)
     else:
+        from .navigate import identify_current_page
+        if identify_current_page(ctx) is None:
+            _log.info("[Startup] 游戏已在运行但页面未知，正在重启…")
+            restart_game(ctrl, package, startup_timeout=startup_timeout)
         _log.info("[Startup] 游戏已在运行")
 
-    go_main_page(ctx, dismiss_overlays=dismiss_overlays)
-    _log.info("[Startup] 游戏就绪，当前位于主页面")
+    _log.info("[Startup] 游戏就绪")

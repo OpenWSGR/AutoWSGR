@@ -67,14 +67,16 @@ class EventFightRunner:
         *,
         map_code: str | None = None,
         entrance: Literal["alpha", "beta"] | None = None,
-        fleet_id: int | None = None,
         event_name: str | None = None,
+        fleet_id: int | None = None,
+        fleet: list[str] | None = None,
     ) -> None:
         self._ctx = ctx
         self._ctrl = ctx.ctrl
         self._plan = plan
         self._entrance = entrance
         self._fleet_id = fleet_id if fleet_id is not None else (plan.fleet_id or 1)
+        self._fleet = fleet if fleet is not None else plan.fleet
 
         # 推导 map_code
         if map_code is not None:
@@ -184,9 +186,6 @@ class EventFightRunner:
 
         弹窗关闭由 UI 层 (:class:`BaseEventPage`) 内部处理，ops 不介入。
         """
-        go_main_page(self._ctx)
-        time.sleep(0.5)
-
         # 导航到活动地图页面
         goto_page(self._ctx, PageName.EVENT_MAP)
         time.sleep(1.0)
@@ -292,6 +291,8 @@ def run_event_fight(
     entrance: Literal["alpha", "beta"] | None = None,
     times: int = 1,
     gap: float = 0.0,
+    fleet_id: int | None = None,
+    fleet: list[str] | None = None,
 ) -> list[CombatResult]:
     """执行活动战的便捷函数。
 
@@ -319,6 +320,8 @@ def run_event_fight(
         plan,
         map_code=map_code,
         entrance=entrance,
+        fleet_id=fleet_id,
+        fleet=fleet,
     )
     return runner.run_for_times(times, gap=gap)
 
@@ -330,7 +333,8 @@ def run_event_fight_from_yaml(
     map_code: str | None = None,
     entrance: Literal["alpha", "beta"] | None = None,
     times: int = 1,
-    **kwargs,
+    fleet_id: int | None = None,
+    fleet: list[str] | None = None,
 ) -> list[CombatResult]:
     """从 YAML 文件加载计划并执行活动战。
 
@@ -352,8 +356,10 @@ def run_event_fight_from_yaml(
         入口选择。
     times:
         重复次数。
-    **kwargs:
-        传递给 ``run_event_fight`` 的额外参数。
+    fleet_id:
+        舰队 ID。
+    fleet:
+        舰船列表。
 
     Returns
     -------
@@ -368,5 +374,6 @@ def run_event_fight_from_yaml(
         map_code=map_code,
         entrance=entrance,
         times=times,
-        **kwargs,
+        fleet_id=fleet_id,
+        fleet=fleet,
     )

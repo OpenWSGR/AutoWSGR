@@ -16,10 +16,7 @@ from autowsgr.combat.engine import run_combat
 from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, RepairStrategy, MapPage
-from autowsgr.emulator import AndroidController
 from autowsgr.context import GameContext
-from autowsgr.infra import UserConfig
-from autowsgr.vision import EasyOCREngine
 
 _log = get_logger("ops")
 
@@ -30,10 +27,14 @@ class NormalFightRunner:
         self,
         ctx: GameContext,
         plan: CombatPlan,
+        fleet_id: int | None = None,
+        fleet: list[str] | None = None,
     ) -> None:
         self._ctx = ctx
         self._ctrl = ctx.ctrl
         self._plan = plan
+        self._fleet_id = fleet_id if fleet_id is not None else plan.fleet_id
+        self._fleet = fleet if fleet is not None else plan.fleet
 
         # 从 config 读取拆船配置
         self._dock_full_destroy = ctx.config.dock_full_destroy
@@ -68,6 +69,8 @@ class NormalFightRunner:
             self._plan.chapter,
             self._plan.map_id,
             self._plan.name,
+            self._fleet_id,
+            self._fleet,
         )
 
         # 1. 进入战斗地图
@@ -89,6 +92,7 @@ class NormalFightRunner:
         times: int,
         *,
         gap: float = 0.0,
+        **kwargs,
     ) -> list[CombatResult]:
         """重复执行常规战。
 
@@ -108,7 +112,7 @@ class NormalFightRunner:
 
         for i in range(times):
             _log.info("[OPS] 常规战第 {}/{} 次", i + 1, times)
-            result = self.run()
+            result = self.run(**kwargs)
             self._results.append(result)
 
             if result.flag == ConditionFlag.DOCK_FULL:
@@ -147,14 +151,14 @@ class NormalFightRunner:
         page = BattlePreparationPage(self._ctx)
 
         # 选择舰队
-        page.select_fleet(self._plan.fleet_id)
+        page.select_fleet(self._fleet_id)
         time.sleep(0.5)
 
         # 换船 (如果指定了舰船列表)
-        if self._plan.fleet is not None:
+        if self._fleet is not None:
             page.change_fleet(
-                self._plan.fleet_id,
-                self._plan.fleet,
+                self._fleet_id,
+                self._fleet,
             )
             time.sleep(0.5)
 
@@ -219,7 +223,7 @@ class NormalFightRunner:
             # 点击弹窗确认按钮 (legacy 坐标)
             self._ctrl.click(0.38, 0.565)
             destroy_ships(
-                self._ctrl,
+                self._ctx,
                 ship_types=self._destroy_ship_types,
             )
             # 解装后标记为成功 (调用方可根据需要重试出征)
@@ -241,11 +245,15 @@ def run_normal_fight(
     *,
     times: int = 1,
     gap: float = 0.0,
+    fleet_id: int | None = None,
+    fleet: list[str] | None = None,
 ) -> list[CombatResult]:
     """执行常规战的便捷函数。"""
     runner = NormalFightRunner(
         ctx,
         plan,
+        fleet_id=fleet_id,
+        fleet=fleet,
     )
     return runner.run_for_times(times, gap=gap)
 
@@ -255,7 +263,8 @@ def run_normal_fight_from_yaml(
     yaml_path: str,
     *,
     times: int = 1,
-    **kwargs,
+    fleet_id: int | None = None,
+    fleet: list[str] | None = None,
 ) -> list[CombatResult]:
     """从 YAML 文件加载计划并执行常规战。
 
@@ -269,4 +278,4 @@ def run_normal_fight_from_yaml(
 
     resolved = resolve_plan_path(yaml_path, category='normal_fight')
     plan = CombatPlan.from_yaml(resolved)
-    return run_normal_fight(ctx, plan, times=times, **kwargs)
+    return run_normal_fight(ctx, plan, times=times, fleet_id=fleet_id, fleet=fleet)
