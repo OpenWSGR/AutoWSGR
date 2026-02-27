@@ -51,6 +51,8 @@ class EmulatorConfig(BaseModel):
     """ADB serial 地址。None = 自动检测"""
     process_name: str | None = None
     """模拟器进程名。None = 自动推断"""
+    ime: str | None = None
+    """输入法选择，默认为 None = 系统默认输入法，可选值：'Yosemite' """
 
 
 class AccountConfig(BaseModel):

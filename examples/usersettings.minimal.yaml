@@ -12,6 +12,7 @@
 emulator:
   type: 雷电                     # 雷电 / 蓝叠 / MuMu / 夜神 / 逍遥 / WAYDROID
   # serial: "127.0.0.1:5555"    # 多开时手动指定, 默认自动检测
+  # ime: Yosemite               # 文本输入法; 设为 Yosemite 以支持低版本安卓内核的模拟器中文输入
 
 # ── 账号 ──
 account:

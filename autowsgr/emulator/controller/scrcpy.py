@@ -43,6 +43,11 @@ _SCRCPY_SERVER_JAR = Path(__file__).resolve().parents[2] / 'data' / 'bin' / 'scr
 _SCRCPY_SERVER_VERSION = '2.7'
 _DEVICE_JAR_PATH = '/data/local/tmp/scrcpy-server.jar'
 
+# Yosemite IME (airtest) — 通过 broadcast 接收文本，无需切换输入法
+# APK 由 airtest 包提供，确保 `pip install airtest` 已执行
+_YOSEMITE_DEVICE_PATH = '/data/local/tmp/Yosemite.apk'
+_YOSEMITE_IME = 'com.netease.nie.yosemite/.ime.ImeService'
+
 
 class ScrcpyController(AndroidController):
     """基于 scrcpy 协议的 Android 设备控制器。
@@ -96,6 +101,10 @@ class ScrcpyController(AndroidController):
         self._frame_lock = threading.Lock()
         self._reconnect_lock = threading.Lock()
 
+        # Yosemite IME 状态
+        self._ime_before_yosemite: str | None = None
+        self._yosemite_ime_enabled = False
+
     # ── 连接 ──
 
     def connect(self) -> DeviceInfo:
@@ -144,6 +153,10 @@ class ScrcpyController(AndroidController):
             self._serial or 'auto',
             *self._resolution,
         )
+        # 在首次交互前切换到 Yosemite IME，确保游戏打开键盘时
+        # InputConnection 直接绑定到 Yosemite（与 airtest 一致）
+        if self._config is not None and self._config.ime and self._config.ime.lower() == 'yosemite':
+            self._ensure_yosemite_ime_ready()
         return DeviceInfo(
             serial=self._serial or 'auto',
             resolution=self._resolution,
@@ -313,6 +326,9 @@ class ScrcpyController(AndroidController):
 
     def disconnect(self) -> None:
         serial = self._serial or 'auto'
+        # 恢复 Yosemite IME 切换前的输入法
+        if self._yosemite_ime_enabled and self._ime_before_yosemite is not None:
+            self._restore_yosemite_ime()
         self._close_video_channel()
 
         self._device = None
@@ -494,10 +510,76 @@ class ScrcpyController(AndroidController):
                 )
             )
 
+    # ── IME / 文本输入 ──
+
+    def _ensure_yosemite_ime_ready(self) -> None:
+        """确保 Yosemite IME 已安装、启用并设为当前输入法。
+
+        首次调用时从 airtest 包中安装 APK 并持久切换到 Yosemite IME。
+        """
+        if self._yosemite_ime_enabled:
+            return
+
+        import airtest
+
+        _yosemite_apk = (
+            Path(airtest.__file__).resolve().parent
+            / 'core'
+            / 'android'
+            / 'static'
+            / 'apks'
+            / 'Yosemite.apk'
+        )
+
+        dev = self._require_device()
+        ime_list = dev.shell('ime list -s')
+
+        if _YOSEMITE_IME not in ime_list:
+            if not _yosemite_apk.exists():
+                raise EmulatorConnectionError(
+                    f'Yosemite.apk 未找到: {_yosemite_apk}\n'
+                    '请确保 airtest 包安装正确：pip install airtest'
+                )
+            _log.info('[Emulator] 安装 Yosemite IME（来自 airtest 包）...')
+            dev.push(str(_yosemite_apk), _YOSEMITE_DEVICE_PATH)
+            result = dev.shell(f'pm install -r -g {_YOSEMITE_DEVICE_PATH}')
+            if 'Success' not in result:
+                _log.error('[Emulator] pm install 输出: {}', result.strip())
+                raise EmulatorConnectionError(f'Yosemite IME 安装失败: {result.strip()}')
+
+        # 保存原输入法并切换到 Yosemite IME（持久，disconnect 时恢复）
+        self._ime_before_yosemite = dev.shell('settings get secure default_input_method').strip()
+        dev.shell(f'ime enable {_YOSEMITE_IME}')
+        dev.shell(f'ime set {_YOSEMITE_IME}')
+        time.sleep(0.5)  # 等待 InputConnection 建立
+        self._yosemite_ime_enabled = True
+        _log.debug('[Emulator] Yosemite IME 就绪 (was {})', self._ime_before_yosemite)
+
+    def _restore_yosemite_ime(self) -> None:
+        """恢复 _ensure_yosemite_ime_ready() 之前的输入法。"""
+        prev = self._ime_before_yosemite
+        if prev is None:
+            return
+        dev = self._require_device()
+        dev.shell(f'ime set {prev}')
+        _log.debug('[Emulator] IME 已恢复为 {}', prev)
+
     def text(self, content: str, *, delay: bool = True) -> None:
+        """向设备输入文本。
+
+        当 ``emulator.ime`` 为 ``"yosemite"`` 时，使用 Yosemite IME broadcast
+        （支持中文、英文及空格）；否则回退到 adbutils send_keys（仅 ASCII）。
+        """
         dev = self._require_device()
         _log.debug("[Emulator] text('{}')  {}", content, caller_info())
-        dev.send_keys(content)
+        if self._config is not None and self._config.ime and self._config.ime.lower() == 'yosemite':
+            self._ensure_yosemite_ime_ready()
+            # 用单引号包裹文本，防止 shell / am 误解析特殊字符（如 -）
+            # 文本中的单引号用 '\'' 转义：结束单引号 → 转义引号 → 开始单引号
+            safe = content.replace("'", "'\\''")
+            dev.shell(f"am broadcast -a ADB_INPUT_TEXT --es msg '{safe}'")
+        else:
+            dev.send_keys(content)
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟

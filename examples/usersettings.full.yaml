@@ -16,6 +16,7 @@ emulator:
   path: null                       # 模拟器可执行文件路径; null = 自动检测
   serial: null                     # ADB serial 地址; null = 自动检测
   process_name: null               # 模拟器进程名; null = 自动推断
+  ime: null                        # 文本输入法; null = 系统默认, 'Yosemite' = 以支持低版本安卓内核的模拟器中文输入
 
 # ═══════════════════════════════════════════
 # 游戏账号
