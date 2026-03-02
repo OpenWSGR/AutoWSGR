@@ -8,17 +8,22 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
-from autowsgr.infra.logger import get_logger
-
-from autowsgr.combat import CombatResult, CombatMode, CombatPlan
+from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat
+from autowsgr.infra.logger import get_logger
 from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
-from autowsgr.ui import BattlePreparationPage, RepairStrategy, MapPage
-from autowsgr.context import GameContext
+from autowsgr.ui import BattlePreparationPage, MapPage, RepairStrategy
 
-_log = get_logger("ops")
+
+if TYPE_CHECKING:
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ops')
+
 
 class NormalFightRunner:
     """常规战斗执行器。"""
@@ -43,7 +48,7 @@ class NormalFightRunner:
         # 确保 plan 模式是 NORMAL
         if plan.mode != CombatMode.NORMAL:
             _log.warning(
-                "[OPS] NormalFightRunner 收到非 NORMAL 模式的计划: {}, 已修正",
+                '[OPS] NormalFightRunner 收到非 NORMAL 模式的计划: {}, 已修正',
                 plan.mode,
             )
             plan.mode = CombatMode.NORMAL
@@ -65,7 +70,7 @@ class NormalFightRunner:
         CombatResult
         """
         _log.info(
-            "[OPS] 常规战: {}-{} ({})",
+            '[OPS] 常规战: {}-{} ({})',
             self._plan.chapter,
             self._plan.map_id,
             self._plan.name,
@@ -107,23 +112,23 @@ class NormalFightRunner:
         -------
         list[CombatResult]
         """
-        _log.info("[OPS] 常规战连续执行 {} 次", times)
+        _log.info('[OPS] 常规战连续执行 {} 次', times)
         self._results = []
 
         for i in range(times):
-            _log.info("[OPS] 常规战第 {}/{} 次", i + 1, times)
+            _log.info('[OPS] 常规战第 {}/{} 次', i + 1, times)
             result = self.run(**kwargs)
             self._results.append(result)
 
             if result.flag == ConditionFlag.DOCK_FULL:
-                _log.warning("[OPS] 船坞已满, 停止")
+                _log.warning('[OPS] 船坞已满, 停止')
                 break
 
             if gap > 0 and i < times - 1:
                 time.sleep(gap)
 
         _log.info(
-            "[OPS] 常规战完成: {} 次 (成功 {} 次)",
+            '[OPS] 常规战完成: {} 次 (成功 {} 次)',
             len(self._results),
             sum(1 for r in self._results if r.flag == ConditionFlag.OPERATION_SUCCESS),
         )
@@ -141,7 +146,7 @@ class NormalFightRunner:
 
     def _prepare_for_battle(self) -> list[ShipDamageState]:
         """出征准备: 舰队选择、修理、检测血量。
-        
+
         Returns
         -------
         list[int]
@@ -181,9 +186,7 @@ class NormalFightRunner:
         # 检测战前血量
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
-        ship_stats = [
-            damage.get(i, ShipDamageState.NORMAL) for i in range(6)
-        ]
+        ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
 
         # 出征
         page.start_battle()
@@ -212,14 +215,14 @@ class NormalFightRunner:
         if result.flag == ConditionFlag.DOCK_FULL:
             self._handle_dock_full(result)
             return
-        _log.info("[OPS] 常规战结果: {}", result.flag.value)
+        _log.info('[OPS] 常规战结果: {}', result.flag.value)
 
     def _handle_dock_full(self, result: CombatResult) -> None:
         """船坞已满: 按配置自动解装并重试，或保持 DOCK_FULL 标志。"""
         if self._dock_full_destroy:
             from autowsgr.ops.destroy import destroy_ships
 
-            _log.warning("[OPS] 船坞已满，执行自动解装")
+            _log.warning('[OPS] 船坞已满，执行自动解装')
             # 点击弹窗确认按钮 (legacy 坐标)
             self._ctrl.click(0.38, 0.565)
             destroy_ships(
@@ -230,7 +233,7 @@ class NormalFightRunner:
             result.flag = ConditionFlag.OPERATION_SUCCESS
             return
 
-        _log.warning("[OPS] 船坞已满, 未开启自动解装")
+        _log.warning('[OPS] 船坞已满, 未开启自动解装')
         # result.flag 保持 DOCK_FULL, 由 run_for_times 终止循环
 
 

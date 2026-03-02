@@ -19,13 +19,13 @@
 
 from __future__ import annotations
 
+from autowsgr.infra import EmulatorConfig, EmulatorError
+from autowsgr.types import OSType
+
 from .base import EmulatorProcessManager
 from .linux import LinuxEmulatorManager
 from .macos import MacEmulatorManager
 from .windows import WindowsEmulatorManager
-
-from autowsgr.infra import EmulatorConfig, EmulatorError
-from autowsgr.types import OSType
 
 
 def create_emulator_manager(
@@ -62,13 +62,13 @@ def create_emulator_manager(
         case OSType.linux:
             return LinuxEmulatorManager(config)
         case _:
-            raise EmulatorError(f"不支持的操作系统: {os_type}")
+            raise EmulatorError(f'不支持的操作系统: {os_type}')
 
 
 __all__ = [
-    "EmulatorProcessManager",
-    "WindowsEmulatorManager",
-    "MacEmulatorManager",
-    "LinuxEmulatorManager",
-    "create_emulator_manager",
+    'EmulatorProcessManager',
+    'LinuxEmulatorManager',
+    'MacEmulatorManager',
+    'WindowsEmulatorManager',
+    'create_emulator_manager',
 ]

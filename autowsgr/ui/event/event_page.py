@@ -23,9 +23,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Literal
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
 from autowsgr.vision import (
@@ -37,11 +35,13 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
+
 if TYPE_CHECKING:
-    from autowsgr.emulator import AndroidController
+    import numpy as np
+
     from autowsgr.context import GameContext
 
-_log = get_logger("ui")
+_log = get_logger('ui')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -49,7 +49,7 @@ _log = get_logger("ui")
 # ═══════════════════════════════════════════════════════════════════════════════
 
 BASE_PAGE_SIGNATURE = PixelSignature(
-    name="event_map_page",
+    name='event_map_page',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.8422, 0.0500, (209, 211, 232), tolerance=30.0),
@@ -59,7 +59,7 @@ BASE_PAGE_SIGNATURE = PixelSignature(
 )
 
 OVERLAY_SIGNATURE = PixelSignature(
-    name="overlay",
+    name='overlay',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.2672, 0.0889, (34, 143, 246), tolerance=30.0),
@@ -71,12 +71,16 @@ OVERLAY_SIGNATURE = PixelSignature(
 
 #: 组合签名：基础页面 OR 浮层 — 只要任一匹配即认定为活动地图页面。
 EVENT_MAP_COMPOSITE = CompositePixelSignature.any_of(
-    "event_map_page", BASE_PAGE_SIGNATURE, OVERLAY_SIGNATURE,
+    'event_map_page',
+    BASE_PAGE_SIGNATURE,
+    OVERLAY_SIGNATURE,
 )
 
 #: 组合签名：基础页面 OR 浮层 — 只要任一匹配即认定为活动地图页面。
 EVENT_MAP_COMPOSITE = CompositePixelSignature.any_of(
-    "event_map_page", BASE_PAGE_SIGNATURE, OVERLAY_SIGNATURE,
+    'event_map_page',
+    BASE_PAGE_SIGNATURE,
+    OVERLAY_SIGNATURE,
 )
 
 NODE_POSITIONS = {
@@ -89,19 +93,19 @@ NODE_POSITIONS = {
 }
 
 DIFFICULTY_EASY_SIGNATURE = PixelSignature(
-    name="difficulty_easy",
+    name='difficulty_easy',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.1208, 0.9093, (106, 30, 30), tolerance=30.0),
     ],
-) # 难度切换标签为红色困难，则难度为简单；
+)  # 难度切换标签为红色困难，则难度为简单；
 DIFFICULTY_HARD_SIGNATURE = PixelSignature(
-    name="difficulty_hard",
+    name='difficulty_hard',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.1208, 0.9093, (44, 66, 111), tolerance=30.0),
     ],
-) # 难度切换标签为蓝色简单，则难度为困难；
+)  # 难度切换标签为蓝色简单，则难度为困难；
 
 """活动地图页面像素签名。"""
 
@@ -167,14 +171,13 @@ class BaseEventPage:
 
     # —— 悬浮窗检测 ─────────────────────────────────────────────────────────
     def _detect_overlay(self, screen: np.ndarray) -> bool:
-        """检测截图中是否存在可消除的浮层（地图进入页）。
-        """
+        """检测截图中是否存在可消除的浮层（地图进入页）。"""
         result = PixelChecker.check_signature(screen, OVERLAY_SIGNATURE)
         return result.matched
 
     def _close_overlay(self) -> None:
         """点击浮层中的关闭按钮，返回地图基础页面。"""
-        _log.info("[UI] 活动地图: 关闭进入页浮层")
+        _log.info('[UI] 活动地图: 关闭进入页浮层')
         self._ctrl.click(*CLICK_CLOSE_OVERLAY)
         wait_for_page(self._ctrl, self.is_current_page, timeout=5.0)
         time.sleep(0.25)  # 等待页面稳定
@@ -193,7 +196,7 @@ class BaseEventPage:
             节点编号，通常为 1~6。
         """
         x, y = NODE_POSITIONS[node_id]
-        _log.debug("[UI] 活动地图: 选择节点 {}", node_id)
+        _log.debug('[UI] 活动地图: 选择节点 {}', node_id)
         self._ctrl.click(x, y)
         for _ in range(10):
             # 检测到节点浮层即成功
@@ -201,27 +204,34 @@ class BaseEventPage:
                 break
             time.sleep(0.25)
         else:
-            raise Exception(f"活动地图: 选择节点 {node_id} 失败，无法进入页面")
-        
+            raise Exception(f'活动地图: 选择节点 {node_id} 失败，无法进入页面')
+
     # ── 出击 ──────────────────────────────────────────────────────────────
 
-    def start_fight(self, map: str, entrance: Literal['alpha', 'beta'] | None = None, skip_check: bool = False) -> None:
+    def start_fight(
+        self, map: str, entrance: Literal['alpha', 'beta'] | None = None, skip_check: bool = False
+    ) -> None:
         """点击出击按钮，等待进入出征准备页面。"""
         # map 为 H1, E1 等
         if not skip_check:
-            if len(map) != 2 or map[0] not in ("H", "E") or not map[1].isdigit() or int(map[1]) not in NODE_POSITIONS:
-                raise ValueError(f"无效的地图标识: {map}")
-            if entrance not in ("alpha", "beta", None):
-                raise ValueError(f"无效的入口标识: {entrance}")
+            if (
+                len(map) != 2
+                or map[0] not in ('H', 'E')
+                or not map[1].isdigit()
+                or int(map[1]) not in NODE_POSITIONS
+            ):
+                raise ValueError(f'无效的地图标识: {map}')
+            if entrance not in ('alpha', 'beta', None):
+                raise ValueError(f'无效的入口标识: {entrance}')
             difficulty, node_id = map[0], int(map[1])
             self._change_difficulty(difficulty)
             self._enter_node(node_id)
             if entrance is not None:
                 self._select_entrance(entrance)
-        
+
         from autowsgr.ui.battle.preparation import BattlePreparationPage
 
-        _log.debug("[UI] 活动地图: 点击出击")
+        _log.debug('[UI] 活动地图: 点击出击')
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_FIGHT_BUTTON,
@@ -241,10 +251,12 @@ class BaseEventPage:
             ``"H"`` (困难) 或 ``"E"`` (简单)。
         """
         if PixelChecker.check_signature(self._ctrl.screenshot(), DIFFICULTY_HARD_SIGNATURE).matched:
-            return "H"
-        elif PixelChecker.check_signature(self._ctrl.screenshot(), DIFFICULTY_EASY_SIGNATURE).matched:
-            return "E"
-        raise Exception("活动地图: 无法识别当前难度")
+            return 'H'
+        elif PixelChecker.check_signature(
+            self._ctrl.screenshot(), DIFFICULTY_EASY_SIGNATURE
+        ).matched:
+            return 'E'
+        raise Exception('活动地图: 无法识别当前难度')
 
     def _change_difficulty(self, target: str) -> None:
         """切换难度到目标。
@@ -257,10 +269,10 @@ class BaseEventPage:
         self._ensure_no_overlay()
         current = self._get_difficulty()
         if current == target:
-            _log.debug("[UI] 活动地图: 当前已是 {} 难度", target)
+            _log.debug('[UI] 活动地图: 当前已是 {} 难度', target)
             return
 
-        _log.info("[UI] 活动地图: 切换难度 {} -> {}", current, target)
+        _log.info('[UI] 活动地图: 切换难度 {} -> {}', current, target)
         self._ctrl.click(*CLICK_DIFFICULTY)
         time.sleep(1.0)
 
@@ -268,7 +280,7 @@ class BaseEventPage:
         new_diff = self._get_difficulty()
         if new_diff != target:
             _log.warning(
-                "[UI] 活动地图: 难度切换验证失败 (期望 {}, 实际 {}), 重试",
+                '[UI] 活动地图: 难度切换验证失败 (期望 {}, 实际 {}), 重试',
                 target,
                 new_diff,
             )
@@ -284,7 +296,7 @@ class BaseEventPage:
         pixel = PixelChecker.get_pixel(screen, x, y)
         return pixel.near(ENTRANCE_ALPHA_COLOR, 40.0)
 
-    def _select_entrance(self, entrance: Literal["alpha", "beta"]) -> None:
+    def _select_entrance(self, entrance: Literal['alpha', 'beta']) -> None:
         # 选择入口
         pass
 
@@ -294,7 +306,7 @@ class BaseEventPage:
         """返回主页面。"""
         from autowsgr.ui.main_page import MainPage
 
-        _log.info("[UI] 活动地图 -> 主页面")
+        _log.info('[UI] 活动地图 -> 主页面')
         self._ensure_no_overlay()
         time.sleep(0.5)
         click_and_wait_for_page(

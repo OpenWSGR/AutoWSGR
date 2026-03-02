@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -10,14 +9,14 @@ import pytest
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import (
-    NavigationError,
     _PAGE_REGISTRY,
+    NavigationError,
     get_current_page,
-    get_registered_pages,
     register_page,
     wait_for_page,
     wait_leave_page,
 )
+
 
 _W, _H = 960, 540
 
@@ -45,13 +44,13 @@ class TestGetCurrentPage:
         _PAGE_REGISTRY.update(self._backup)
 
     def test_returns_first_match(self):
-        register_page("always_true", lambda s: True)
-        register_page("also_true", lambda s: True)
+        register_page('always_true', lambda s: True)
+        register_page('also_true', lambda s: True)
         result = get_current_page(_blank())
-        assert result == "always_true"
+        assert result == 'always_true'
 
     def test_returns_none_when_no_match(self):
-        register_page("never", lambda s: False)
+        register_page('never', lambda s: False)
         assert get_current_page(_blank()) is None
 
     def test_empty_registry(self):
@@ -61,11 +60,11 @@ class TestGetCurrentPage:
         """识别器抛异常时跳过，不影响后续。"""
 
         def bad_checker(s):
-            raise RuntimeError("boom")
+            raise RuntimeError('boom')
 
-        register_page("bad", bad_checker)
-        register_page("good", lambda s: True)
-        assert get_current_page(_blank()) == "good"
+        register_page('bad', bad_checker)
+        register_page('good', lambda s: True)
+        assert get_current_page(_blank()) == 'good'
 
 
 # ─────────────────────────────────────────────
@@ -82,8 +81,8 @@ class TestWaitForPage:
         result = wait_for_page(
             ctrl,
             lambda s: True,
-            source="A",
-            target="B",
+            source='A',
+            target='B',
         )
         assert result is not None
         ctrl.screenshot.assert_called_once()
@@ -94,7 +93,7 @@ class TestWaitForPage:
         screens = [_blank(), _blank(), _white()]
         ctrl.screenshot.side_effect = screens
 
-        with patch("autowsgr.ui.page.time") as mock_time:
+        with patch('autowsgr.ui.page.time') as mock_time:
             mock_time.monotonic.return_value = 0.0
             mock_time.sleep = MagicMock()
 
@@ -104,8 +103,8 @@ class TestWaitForPage:
                 timeout=10.0,
                 interval=0.1,
                 handle_overlays=False,  # 白屏会误匹配 NEWS 浮层签名
-                source="A",
-                target="B",
+                source='A',
+                target='B',
             )
 
         assert np.array_equal(result, _white())
@@ -117,7 +116,7 @@ class TestWaitForPage:
         ctrl.screenshot.return_value = _blank()
 
         # 模拟时间: 第一次 monotonic=0, deadline=0, 立即超时
-        with patch("autowsgr.ui.page.time") as mock_time:
+        with patch('autowsgr.ui.page.time') as mock_time:
             call_count = 0
 
             def advancing_time():
@@ -129,13 +128,13 @@ class TestWaitForPage:
             mock_time.monotonic.side_effect = advancing_time
             mock_time.sleep = MagicMock()
 
-            with pytest.raises(NavigationError, match="超时"):
+            with pytest.raises(NavigationError, match='超时'):
                 wait_for_page(
                     ctrl,
                     lambda s: False,
                     timeout=1.0,
-                    source="A",
-                    target="B",
+                    source='A',
+                    target='B',
                 )
 
     def test_timeout_message_contains_details(self):
@@ -143,12 +142,12 @@ class TestWaitForPage:
         ctrl = MagicMock(spec=AndroidController)
         ctrl.screenshot.return_value = _blank()
 
-        with patch("autowsgr.ui.page.time") as mock_time:
-            counts = {"n": 0}
+        with patch('autowsgr.ui.page.time') as mock_time:
+            counts = {'n': 0}
 
             def advancing():
-                counts["n"] += 1
-                return 0.0 if counts["n"] <= 1 else 100.0
+                counts['n'] += 1
+                return 0.0 if counts['n'] <= 1 else 100.0
 
             mock_time.monotonic.side_effect = advancing
             mock_time.sleep = MagicMock()
@@ -158,13 +157,13 @@ class TestWaitForPage:
                     ctrl,
                     lambda s: False,
                     timeout=1.0,
-                    source="出征准备",
-                    target="地图页面",
+                    source='出征准备',
+                    target='地图页面',
                 )
 
             msg = str(exc_info.value)
-            assert "出征准备" in msg
-            assert "地图页面" in msg
+            assert '出征准备' in msg
+            assert '地图页面' in msg
 
 
 # ─────────────────────────────────────────────
@@ -181,8 +180,8 @@ class TestWaitLeavePage:
         result = wait_leave_page(
             ctrl,
             lambda s: False,  # 不在原页面
-            source="A",
-            target="B",
+            source='A',
+            target='B',
         )
         assert result is not None
         ctrl.screenshot.assert_called_once()
@@ -191,15 +190,15 @@ class TestWaitLeavePage:
         """前两次仍在原页面，第三次离开。"""
         ctrl = MagicMock(spec=AndroidController)
         # 前两次 checker 返回 True (仍在), 第三次提供不同屏幕
-        call_count = {"n": 0}
+        call_count = {'n': 0}
 
         def checker(s):
-            call_count["n"] += 1
-            return call_count["n"] <= 2
+            call_count['n'] += 1
+            return call_count['n'] <= 2
 
         ctrl.screenshot.return_value = _blank()
 
-        with patch("autowsgr.ui.page.time") as mock_time:
+        with patch('autowsgr.ui.page.time') as mock_time:
             mock_time.monotonic.return_value = 0.0
             mock_time.sleep = MagicMock()
 
@@ -208,8 +207,8 @@ class TestWaitLeavePage:
                 checker,
                 timeout=10.0,
                 interval=0.1,
-                source="A",
-                target="B",
+                source='A',
+                target='B',
             )
 
         assert result is not None
@@ -220,21 +219,21 @@ class TestWaitLeavePage:
         ctrl = MagicMock(spec=AndroidController)
         ctrl.screenshot.return_value = _blank()
 
-        with patch("autowsgr.ui.page.time") as mock_time:
-            counts = {"n": 0}
+        with patch('autowsgr.ui.page.time') as mock_time:
+            counts = {'n': 0}
 
             def advancing():
-                counts["n"] += 1
-                return 0.0 if counts["n"] <= 1 else 100.0
+                counts['n'] += 1
+                return 0.0 if counts['n'] <= 1 else 100.0
 
             mock_time.monotonic.side_effect = advancing
             mock_time.sleep = MagicMock()
 
-            with pytest.raises(NavigationError, match="超时"):
+            with pytest.raises(NavigationError, match='超时'):
                 wait_leave_page(
                     ctrl,
                     lambda s: True,  # 始终在原页面
                     timeout=1.0,
-                    source="A",
-                    target="B",
+                    source='A',
+                    target='B',
                 )

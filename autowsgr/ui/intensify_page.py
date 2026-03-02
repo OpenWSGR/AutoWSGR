@@ -17,14 +17,11 @@
 from __future__ import annotations
 
 import enum
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 from autowsgr.types import PageName
-from autowsgr.ui.page import click_and_wait_for_page, wait_for_page
+from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
     get_active_tab_index,
@@ -32,7 +29,14 @@ from autowsgr.ui.tabbed_page import (
     make_tab_checker,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举
@@ -42,9 +46,9 @@ _log = get_logger("ui")
 class IntensifyTab(enum.Enum):
     """强化页面标签组。"""
 
-    INTENSIFY = "强化"
-    REMAKE = "改修"
-    SKILL = "技能"
+    INTENSIFY = '强化'
+    REMAKE = '改修'
+    SKILL = '技能'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -54,9 +58,7 @@ class IntensifyTab(enum.Enum):
 _TAB_LIST: list[IntensifyTab] = list(IntensifyTab)
 """标签枚举值列表 — 索引与标签栏探测位置一一对应。"""
 
-_TAB_TO_INDEX: dict[IntensifyTab, int] = {
-    tab: i for i, tab in enumerate(_TAB_LIST)
-}
+_TAB_TO_INDEX: dict[IntensifyTab, int] = {tab: i for i, tab in enumerate(_TAB_LIST)}
 """标签 → 标签索引映射。"""
 
 
@@ -69,8 +71,8 @@ CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 
 CLICK_TAB: dict[IntensifyTab, tuple[float, float]] = {
     IntensifyTab.INTENSIFY: (0.1875, 0.0463),
-    IntensifyTab.REMAKE:    (0.3125, 0.0463),
-    IntensifyTab.SKILL:     (0.4375, 0.0463),
+    IntensifyTab.REMAKE: (0.3125, 0.0463),
+    IntensifyTab.SKILL: (0.4375, 0.0463),
 }
 """标签切换点击坐标。
 """
@@ -148,8 +150,8 @@ class IntensifyPage:
         """
         current = self.get_active_tab(self._ctrl.screenshot())
         _log.info(
-            "[UI] 强化页面: {} → {}",
-            current.value if current else "未知",
+            '[UI] 强化页面: {} → {}',
+            current.value if current else '未知',
             tab.value,
         )
         target_idx = _TAB_TO_INDEX[tab]
@@ -157,8 +159,8 @@ class IntensifyPage:
             self._ctrl,
             click_coord=CLICK_TAB[tab],
             checker=make_tab_checker(TabbedPageType.INTENSIFY, target_idx),
-            source=f"强化-{current.value if current else '?'}",
-            target=f"强化-{tab.value}",
+            source=f'强化-{current.value if current else "?"}',
+            target=f'强化-{tab.value}',
         )
 
     # ── 回退 ──────────────────────────────────────────────────────────────
@@ -173,7 +175,7 @@ class IntensifyPage:
         """
         from autowsgr.ui.sidebar_page import SidebarPage
 
-        _log.info("[UI] 强化页面 → 返回侧边栏")
+        _log.info('[UI] 强化页面 → 返回侧边栏')
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_BACK,

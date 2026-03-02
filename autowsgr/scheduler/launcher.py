@@ -33,7 +33,8 @@ from autowsgr.infra import ConfigManager, UserConfig
 from autowsgr.infra.logger import get_logger, setup_logger
 from autowsgr.vision import EasyOCREngine, OCREngine
 
-_log = get_logger("scheduler")
+
+_log = get_logger('scheduler')
 
 
 class Launcher:
@@ -73,9 +74,9 @@ class Launcher:
         使用内置默认配置。
         """
         if self._config_path is not None:
-            _log.info("[Launcher] 加载配置: {}", self._config_path)
+            _log.info('[Launcher] 加载配置: {}', self._config_path)
         else:
-            _log.info("[Launcher] 未指定配置文件，尝试自动检测")
+            _log.info('[Launcher] 未指定配置文件，尝试自动检测')
         self._config = ConfigManager.load(self._config_path)
         log_cfg = self._config.log
         setup_logger(
@@ -85,9 +86,9 @@ class Launcher:
         )
         ch_summary = log_cfg.effective_channels
         _log.info(
-            "[Launcher] 日志初始化完成: level={}, 通道覆盖={}",
+            '[Launcher] 日志初始化完成: level={}, 通道覆盖={}',
             log_cfg.level,
-            ch_summary if ch_summary else "无",
+            ch_summary or '无',
         )
         return self._config
 
@@ -98,7 +99,7 @@ class Launcher:
     @property
     def config(self) -> UserConfig:
         if self._config is None:
-            raise RuntimeError("配置未加载，请先调用 load_config() 或 set_config()")
+            raise RuntimeError('配置未加载，请先调用 load_config() 或 set_config()')
         return self._config
 
     # ── 设备连接 ──
@@ -112,7 +113,7 @@ class Launcher:
             已建立连接的设备控制器。
         """
         cfg = self.config
-        _log.info("[Launcher] 连接设备 (serial={})", cfg.emulator.serial or "auto")
+        _log.info('[Launcher] 连接设备 (serial={})', cfg.emulator.serial or 'auto')
         self._ctrl = ADBController(
             serial=cfg.emulator.serial,
             config=cfg.emulator,
@@ -123,7 +124,7 @@ class Launcher:
     @property
     def ctrl(self) -> ADBController:
         if self._ctrl is None:
-            raise RuntimeError("设备未连接，请先调用 connect()")
+            raise RuntimeError('设备未连接，请先调用 connect()')
         return self._ctrl
 
     # ── OCR ──
@@ -131,7 +132,7 @@ class Launcher:
     def create_ocr(self) -> OCREngine:
         """根据配置创建 OCR 引擎。"""
         cfg = self.config
-        _log.info("[Launcher] 创建 OCR 引擎 (backend={})", cfg.ocr.backend.value)
+        _log.info('[Launcher] 创建 OCR 引擎 (backend={})', cfg.ocr.backend.value)
         # 目前仅支持 EasyOCR，后续可按 cfg.ocr.backend 分发
         self._ocr = EasyOCREngine.create(gpu=cfg.ocr.gpu)
         return self._ocr
@@ -157,7 +158,7 @@ class Launcher:
             config=self.config,
             ocr=self._ocr,
         )
-        _log.info("[Launcher] GameContext 已构建")
+        _log.info('[Launcher] GameContext 已构建')
         return ctx
 
     # ── 游戏启动 ──
@@ -171,10 +172,9 @@ class Launcher:
             已构建的 GameContext（内部使用 ``ctx.ctrl``）。
         """
         from autowsgr.ops.startup import ensure_game_ready
-        from autowsgr.types import GameAPP
 
         app = ctx.config.account.game_app
-        _log.info("[Launcher] 确保游戏就绪 (app={})", app.value)
+        _log.info('[Launcher] 确保游戏就绪 (app={})', app.value)
         ensure_game_ready(ctx, app)
 
     # ── 一步到位 ──
@@ -191,7 +191,7 @@ class Launcher:
         self.connect()
         ctx = self.build_context()
         self.ensure_ready(ctx)
-        _log.info("[Launcher] 启动完成，游戏已就绪")
+        _log.info('[Launcher] 启动完成，游戏已就绪')
         return ctx
 
 

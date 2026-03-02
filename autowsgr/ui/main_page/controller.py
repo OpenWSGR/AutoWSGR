@@ -7,7 +7,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.vision import PixelChecker
@@ -22,13 +21,15 @@ from .constants import (
 )
 from .overlays import detect_overlay, dismiss_overlay
 
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from autowsgr.emulator import AndroidController
+    import numpy as np
+
     from autowsgr.context import GameContext
 
-_log = get_logger("ui")
+_log = get_logger('ui')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ def _get_target_checker(target: Target) -> Callable[[np.ndarray], bool]:
         from autowsgr.ui.event.event_page import BaseEventPage
 
         return BaseEventPage.is_current_page
-    raise ValueError(f"未知的导航目标: {target}")
+    raise ValueError(f'未知的导航目标: {target}')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -122,7 +123,8 @@ class MainPage:
         """检测是否有远征完成可收取 (右下角红点)。"""
         tc = ThemeColor.NOTIFICATION_RED
         return PixelChecker.get_pixel(
-            screen, *ProbePoint.EXPEDITION_READY.xy,
+            screen,
+            *ProbePoint.EXPEDITION_READY.xy,
         ).near(tc.color, tc.tolerance)
 
     @staticmethod
@@ -130,7 +132,8 @@ class MainPage:
         """检测是否有任务奖励可领取 (任务按钮红点)。"""
         tc = ThemeColor.NOTIFICATION_RED
         return PixelChecker.get_pixel(
-            screen, *ProbePoint.TASK_READY.xy,
+            screen,
+            *ProbePoint.TASK_READY.xy,
         ).near(tc.color, tc.tolerance)
 
     # ── 浮层处理 ──────────────────────────────────────────────────────────
@@ -170,8 +173,10 @@ class MainPage:
             if overlay is None:
                 return
             _log.info(
-                "[UI] 主页面: 导航前消除浮层 {} ({}/{})",
-                overlay.value, i + 1, max_attempts,
+                '[UI] 主页面: 导航前消除浮层 {} ({}/{})',
+                overlay.value,
+                i + 1,
+                max_attempts,
             )
             dismiss_overlay(self._ctrl, overlay)
             time.sleep(0.5)
@@ -181,7 +186,7 @@ class MainPage:
         from autowsgr.ui.page import click_and_wait_for_page
 
         coord = NavCoord[target.name]
-        _log.info("[UI] 主页面 → {}", target.value)
+        _log.info('[UI] 主页面 → {}', target.value)
         click_and_wait_for_page(
             self._ctrl,
             click_coord=coord.xy,

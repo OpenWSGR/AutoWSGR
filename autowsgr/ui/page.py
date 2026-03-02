@@ -40,15 +40,21 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
 from autowsgr.vision import ImageChecker
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import numpy as np
+
+    from autowsgr.emulator import AndroidController
+
+
+_log = get_logger('ui')
 
 # ---------------------------------------------------------------------------
 # 异常
@@ -103,7 +109,7 @@ def register_page(name: str, checker: Callable[[np.ndarray], bool]) -> None:
     """注册页面识别函数。"""
     # Python 3.13+ 中 StrEnum 的 str()/format() 返回 'ClassName.MEMBER' 而非值，
     # 显式提取 .value 确保 key 始终为纯 str，避免日志和比较中出现意外格式。
-    key: str = name.value if hasattr(name, "value") else name
+    key: str = name.value if hasattr(name, 'value') else name
     if key in _PAGE_REGISTRY:
         _log.warning("[UI] 页面 '{}' 已注册，将覆盖", key)
     _PAGE_REGISTRY[key] = checker
@@ -116,18 +122,19 @@ def get_current_page(screen: np.ndarray) -> str | None:
     for name, checker in _PAGE_REGISTRY.items():
         try:
             if checker(screen):
-                _log.debug("[UI] 当前页面: {}", name)
+                _log.debug('[UI] 当前页面: {}', name)
                 return name
         except Exception:
             _log.opt(exception=True).warning("[UI] 页面 '{}' 识别器异常", name)
             failed_checkers.append(name)
     if failed_checkers:
         _log.warning(
-            "[UI] 无匹配页面，且以下识别器抛异常: {} (共 {} 个注册页面)",
-            failed_checkers, len(_PAGE_REGISTRY),
+            '[UI] 无匹配页面，且以下识别器抛异常: {} (共 {} 个注册页面)',
+            failed_checkers,
+            len(_PAGE_REGISTRY),
         )
     else:
-        _log.debug("[UI] 当前页面: 无匹配 (共 {} 个注册页面)", len(_PAGE_REGISTRY))
+        _log.debug('[UI] 当前页面: 无匹配 (共 {} 个注册页面)', len(_PAGE_REGISTRY))
     return None
 
 
@@ -148,8 +155,8 @@ def wait_for_page(
     timeout: float = DEFAULT_NAV_CONFIG.timeout,
     interval: float = DEFAULT_NAV_CONFIG.interval,
     handle_overlays: bool = True,
-    source: str = "",
-    target: str = "",
+    source: str = '',
+    target: str = '',
 ) -> np.ndarray:
     """反复截图，直到 ``checker`` 返回 ``True``。
 
@@ -164,25 +171,31 @@ def wait_for_page(
     """
     deadline = time.monotonic() + timeout
     attempt = 0
-    _log.debug("[UI] 等待到达: {} → {} (超时 {:.1f}s)", source or "?", target or "?", timeout)
+    _log.debug('[UI] 等待到达: {} → {} (超时 {:.1f}s)', source or '?', target or '?', timeout)
 
     while True:
         attempt += 1
         screen = ctrl.screenshot()
 
         if checker(screen):
-            _log.debug("[UI] 已到达: {} → {} (第 {} 次截图)", source or "?", target or "?", attempt)
+            _log.debug('[UI] 已到达: {} → {} (第 {} 次截图)', source or '?', target or '?', attempt)
             return screen
 
         current = get_current_page(screen)
-        _log.debug("[UI] 等待 #{}: {} → {}, 当前={}", attempt, source or "?", target or "?", current or "未知")
+        _log.debug(
+            '[UI] 等待 #{}: {} → {}, 当前={}',
+            attempt,
+            source or '?',
+            target or '?',
+            current or '未知',
+        )
 
         if time.monotonic() >= deadline:
             msg = (
-                f"等待超时: {source or '?'} → {target or '?'}, "
-                f"{attempt} 次截图后仍未到达, 当前: {current or '未知'}"
+                f'等待超时: {source or "?"} → {target or "?"}, '
+                f'{attempt} 次截图后仍未到达, 当前: {current or "未知"}'
             )
-            _log.error("[UI] {}", msg)
+            _log.error('[UI] {}', msg)
             raise NavigationError(msg)
 
         time.sleep(interval)
@@ -195,8 +208,8 @@ def wait_leave_page(
     timeout: float = DEFAULT_NAV_CONFIG.timeout,
     interval: float = DEFAULT_NAV_CONFIG.interval,
     handle_overlays: bool = True,
-    source: str = "",
-    target: str = "",
+    source: str = '',
+    target: str = '',
 ) -> np.ndarray:
     """反复截图，直到 ``checker`` 返回 ``False`` (已离开)。
 
@@ -211,7 +224,7 @@ def wait_leave_page(
     """
     deadline = time.monotonic() + timeout
     attempt = 0
-    _log.info("[UI] 等待离开: {} → {} (超时 {:.1f}s)", source or "?", target or "?", timeout)
+    _log.info('[UI] 等待离开: {} → {} (超时 {:.1f}s)', source or '?', target or '?', timeout)
 
     while True:
         attempt += 1
@@ -219,17 +232,23 @@ def wait_leave_page(
 
         if not checker(screen):
             current = get_current_page(screen)
-            _log.info("[UI] 已离开: {} → {} (第 {} 次截图, 到达={})", source or "?", target or "?", attempt, current or "未知")
+            _log.info(
+                '[UI] 已离开: {} → {} (第 {} 次截图, 到达={})',
+                source or '?',
+                target or '?',
+                attempt,
+                current or '未知',
+            )
             return screen
 
-        _log.debug("[UI] 等待离开 #{}: 仍在 {}", attempt, source or "?")
+        _log.debug('[UI] 等待离开 #{}: 仍在 {}', attempt, source or '?')
 
         if time.monotonic() >= deadline:
             msg = (
-                f"离开超时: {source or '?'} → {target or '?'}, "
-                f"{attempt} 次截图后仍在 {source or '?'}"
+                f'离开超时: {source or "?"} → {target or "?"}, '
+                f'{attempt} 次截图后仍在 {source or "?"}'
             )
-            _log.error("[UI] {}", msg)
+            _log.error('[UI] {}', msg)
             raise NavigationError(msg)
 
         time.sleep(interval)
@@ -245,8 +264,8 @@ def click_and_wait_for_page(
     click_coord: tuple[float, float],
     checker: Callable[[np.ndarray], bool],
     *,
-    source: str = "",
-    target: str = "",
+    source: str = '',
+    target: str = '',
     config: NavConfig = DEFAULT_NAV_CONFIG,
 ) -> np.ndarray:
     """点击 + 等待到达目标页面，内置重试。
@@ -260,7 +279,8 @@ def click_and_wait_for_page(
     """
     ctrl.click(*click_coord)
     return wait_for_page(
-        ctrl, checker,
+        ctrl,
+        checker,
         timeout=config.timeout,
         interval=config.interval,
         handle_overlays=config.handle_overlays,
@@ -319,13 +339,17 @@ def confirm_operation(
     while True:
         screen = ctrl.screenshot()
         detail = ImageChecker.find_any(
-            screen, confirm_templates, confidence=confidence,
+            screen,
+            confirm_templates,
+            confidence=confidence,
         )
         if detail is not None:
             # 精确重定位 (Legacy 二次匹配风格)
             screen2 = ctrl.screenshot()
             detail2 = ImageChecker.find_any(
-                screen2, confirm_templates, confidence=confidence,
+                screen2,
+                confirm_templates,
+                confidence=confidence,
             )
             if detail2 is not None:
                 detail = detail2
@@ -343,7 +367,7 @@ def confirm_operation(
         time.sleep(0.3)
 
     if must_confirm:
-        raise NavigationError("确认操作超时: 未找到确认按钮")
+        raise NavigationError('确认操作超时: 未找到确认按钮')
     return False
 
 
@@ -352,8 +376,8 @@ def click_and_wait_leave_page(
     click_coord: tuple[float, float],
     checker: Callable[[np.ndarray], bool],
     *,
-    source: str = "",
-    target: str = "",
+    source: str = '',
+    target: str = '',
     config: NavConfig = DEFAULT_NAV_CONFIG,
 ) -> np.ndarray:
     """点击 + 等待离开当前页面，内置重试。
@@ -373,8 +397,12 @@ def click_and_wait_leave_page(
     for attempt in range(1, config.max_retries + 1):
         if attempt > 1:
             _log.warning(
-                "[UI] 离开重试 {}/{}: {} → {} (等 {:.1f}s)",
-                attempt, config.max_retries, source or "?", target or "?", config.retry_delay,
+                '[UI] 离开重试 {}/{}: {} → {} (等 {:.1f}s)',
+                attempt,
+                config.max_retries,
+                source or '?',
+                target or '?',
+                config.retry_delay,
             )
             time.sleep(config.retry_delay)
 
@@ -382,7 +410,8 @@ def click_and_wait_leave_page(
 
         try:
             return wait_leave_page(
-                ctrl, checker,
+                ctrl,
+                checker,
                 timeout=config.timeout,
                 interval=config.interval,
                 handle_overlays=config.handle_overlays,
@@ -391,8 +420,14 @@ def click_and_wait_leave_page(
             )
         except NavigationError as e:
             last_err = e
-            _log.warning("[UI] 点击后离开超时 ({}/{}): {} → {}", attempt, config.max_retries, source or "?", target or "?")
+            _log.warning(
+                '[UI] 点击后离开超时 ({}/{}): {} → {}',
+                attempt,
+                config.max_retries,
+                source or '?',
+                target or '?',
+            )
 
     raise NavigationError(
-        f"离开失败 (已重试 {config.max_retries} 次): {source or '?'} → {target or '?'}"
+        f'离开失败 (已重试 {config.max_retries} 次): {source or "?"} → {target or "?"}'
     ) from last_err

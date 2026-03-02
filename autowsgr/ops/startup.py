@@ -28,17 +28,17 @@ import time
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import GameAPP, PageName
 from autowsgr.ui.main_page import MainPage
 from autowsgr.ui.start_screen_page import StartScreenPage
 
-if TYPE_CHECKING:
-    from autowsgr.emulator import AndroidController
-    from autowsgr.context import GameContext
 
-_log = get_logger("ops.startup")
+if TYPE_CHECKING:
+    from autowsgr.context import GameContext
+    from autowsgr.emulator import AndroidController
+
+_log = get_logger('ops.startup')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 常量
@@ -81,7 +81,7 @@ def is_game_running(ctrl: AndroidController, package: str = _GAME_PACKAGE_OFFICI
         ``True`` 表示游戏进程存在（但不保证处于可操作的页面状态）。
     """
     running = ctrl.is_app_running(package)
-    _log.debug("[Startup] 游戏运行状态: {}", "运行中" if running else "未运行")
+    _log.debug('[Startup] 游戏运行状态: {}', '运行中' if running else '未运行')
     return running
 
 
@@ -100,8 +100,9 @@ def is_on_main_page(ctrl: AndroidController) -> bool:
     """
     screen = ctrl.screenshot()
     result = MainPage.is_current_page(screen)
-    _log.debug("[Startup] 主页面检测: {}", "是" if result else "否")
+    _log.debug('[Startup] 主页面检测: {}', '是' if result else '否')
     return result
+
 
 def wait_for_game_ui(
     ctrl: AndroidController,
@@ -129,7 +130,7 @@ def wait_for_game_ui(
         超时前成功检测到返回 ``True``，超时返回 ``False``。
     """
 
-    _log.info("[Startup] 等待游戏 UI 就绪 (超时 {:.0f}s)…", timeout)
+    _log.info('[Startup] 等待游戏 UI 就绪 (超时 {:.0f}s)…', timeout)
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
@@ -137,13 +138,13 @@ def wait_for_game_ui(
 
         # 出现「点击进入」画面
         if StartScreenPage.is_current_page(screen):
-            _log.info("[Startup] 检测到启动画面")
+            _log.info('[Startup] 检测到启动画面')
             return True
 
-        _log.debug("[Startup] 游戏尚未就绪，等待 {:.1f}s…", interval)
+        _log.debug('[Startup] 游戏尚未就绪，等待 {:.1f}s…', interval)
         time.sleep(interval)
 
-    _log.warning("[Startup] 等待游戏 UI 超时 ({:.0f}s)", timeout)
+    _log.warning('[Startup] 等待游戏 UI 超时 ({:.0f}s)', timeout)
     return False
 
 
@@ -179,20 +180,20 @@ def start_game(
     TimeoutError
         超时后游戏未进入可识别状态。
     """
-    _log.info("[Startup] 启动游戏 (package={})", package)
+    _log.info('[Startup] 启动游戏 (package={})', package)
     ctrl.start_app(package)
 
     # 等待游戏 UI 就绪
     if not wait_for_game_ui(ctrl, timeout=startup_timeout):
-        raise TimeoutError(f"游戏启动超时 ({startup_timeout}s)，未检测到任何已知页面")
+        raise TimeoutError(f'游戏启动超时 ({startup_timeout}s)，未检测到任何已知页面')
 
     # 若在启动画面，点击进入，然后等待进入主流程（检测登录浮层）
     if StartScreenPage.is_current_page(ctrl.screenshot()):
         StartScreenPage(ctrl).click_enter()
         if not wait_for_game_ui(ctrl, timeout=30.0):
-            raise TimeoutError("点击启动画面后超时，未进入游戏")
+            raise TimeoutError('点击启动画面后超时，未进入游戏')
 
-    _log.info("[Startup] 游戏加载完成")
+    _log.info('[Startup] 游戏加载完成')
 
 
 def restart_game(
@@ -212,7 +213,7 @@ def restart_game(
     startup_timeout:
         冷启动等待超时 (秒)。
     """
-    _log.info("[Startup] 强制重启游戏")
+    _log.info('[Startup] 强制重启游戏')
     ctrl.stop_app(package)
     time.sleep(2.0)
     start_game(ctrl, package, startup_timeout=startup_timeout)
@@ -231,7 +232,7 @@ def go_main_page(ctx: GameContext, *, dismiss_overlays: bool = True) -> None:
     dismiss_overlays:
         是否先消除登录浮层，默认 ``True``。
     """
-    _log.info("[Startup] 导航到主页面")
+    _log.info('[Startup] 导航到主页面')
     goto_page(ctx, PageName.MAIN)
 
 
@@ -272,16 +273,17 @@ def ensure_game_ready(
     """
     ctrl = ctx.ctrl
     package = app.package_name if isinstance(app, GameAPP) else app
-    _log.info("[Startup] 确保游戏就绪 (package={})", package)
+    _log.info('[Startup] 确保游戏就绪 (package={})', package)
 
     if not is_game_running(ctrl, package):
-        _log.info("[Startup] 游戏未运行，正在启动…")
+        _log.info('[Startup] 游戏未运行，正在启动…')
         start_game(ctrl, package, startup_timeout=startup_timeout)
     else:
         from .navigate import identify_current_page
-        if identify_current_page(ctx) is None:
-            _log.info("[Startup] 游戏已在运行但页面未知，正在重启…")
-            restart_game(ctrl, package, startup_timeout=startup_timeout)
-        _log.info("[Startup] 游戏已在运行")
 
-    _log.info("[Startup] 游戏就绪")
+        if identify_current_page(ctx) is None:
+            _log.info('[Startup] 游戏已在运行但页面未知，正在重启…')
+            restart_game(ctrl, package, startup_timeout=startup_timeout)
+        _log.info('[Startup] 游戏已在运行')
+
+    _log.info('[Startup] 游戏就绪')

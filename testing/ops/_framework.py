@@ -7,15 +7,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from autowsgr.context import GameContext
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def launch_for_test(
     serial: str | None,
     log_dir: Path,
-    log_level: str = "DEBUG",
+    log_level: str = 'DEBUG',
     *,
     with_ocr: bool = False,
 ) -> GameContext:
@@ -46,7 +50,6 @@ def launch_for_test(
         ``ctx.ctrl`` 已连接、游戏已在主页面。
         若 ``with_ocr=True`` 则 ``ctx.ocr`` 也已初始化。
     """
-    from autowsgr.infra import ConfigManager
     from autowsgr.infra.logger import setup_logger
     from autowsgr.scheduler.launcher import Launcher
 
@@ -59,8 +62,8 @@ def launch_for_test(
 
     # 以命令行指定的 serial 覆盖配置
     if serial is not None:
-        new_emu = cfg.emulator.model_copy(update={"serial": serial})
-        launcher.set_config(cfg.model_copy(update={"emulator": new_emu}))
+        new_emu = cfg.emulator.model_copy(update={'serial': serial})
+        launcher.set_config(cfg.model_copy(update={'emulator': new_emu}))
 
     launcher.connect()
 

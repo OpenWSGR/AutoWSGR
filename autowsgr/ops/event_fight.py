@@ -15,19 +15,19 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Literal
 
-from autowsgr.infra.logger import get_logger
-
-from autowsgr.combat import CombatResult, CombatMode, CombatPlan
+from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat
-from autowsgr.ops import goto_page, go_main_page
+from autowsgr.infra.logger import get_logger
+from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.event.event_page import BaseEventPage
 
+
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
-_log = get_logger("ops")
+_log = get_logger('ops')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -66,7 +66,7 @@ class EventFightRunner:
         plan: CombatPlan,
         *,
         map_code: str | None = None,
-        entrance: Literal["alpha", "beta"] | None = None,
+        entrance: Literal['alpha', 'beta'] | None = None,
         event_name: str | None = None,
         fleet_id: int | None = None,
         fleet: list[str] | None = None,
@@ -84,12 +84,12 @@ class EventFightRunner:
             self._map_code = map_code
         else:
             # 从 plan.chapter + plan.map_id 推导: chapter="H", map_id=3 → "H3"
-            ch = str(plan.chapter).upper() if plan.chapter else "H"
-            mid = str(plan.map_id) if plan.map_id else "1"
-            if len(ch) == 1 and ch in ("H", "E") and mid.isdigit():
-                self._map_code = f"{ch}{mid}"
+            ch = str(plan.chapter).upper() if plan.chapter else 'H'
+            mid = str(plan.map_id) if plan.map_id else '1'
+            if len(ch) == 1 and ch in ('H', 'E') and mid.isdigit():
+                self._map_code = f'{ch}{mid}'
             else:
-                self._map_code = f"H{mid}"
+                self._map_code = f'H{mid}'
 
         # 活动名称：用于节点追踪器加载地图数据
         resolved_event_name = event_name or plan.event_name
@@ -103,7 +103,7 @@ class EventFightRunner:
         # 强制设置为 EVENT 模式
         if plan.mode != CombatMode.EVENT:
             _log.info(
-                "[OPS] 活动战斗: 计划模式 {} → EVENT",
+                '[OPS] 活动战斗: 计划模式 {} → EVENT',
                 plan.mode,
             )
             plan.mode = CombatMode.EVENT
@@ -120,7 +120,7 @@ class EventFightRunner:
         CombatResult
         """
         _log.info(
-            "[OPS] 活动战: {} ({})",
+            '[OPS] 活动战: {} ({})',
             self._map_code,
             self._plan.name,
         )
@@ -138,7 +138,7 @@ class EventFightRunner:
         self._handle_result(result)
 
         self._skip_check = True
-        
+
         return result
 
     def run_for_times(
@@ -160,23 +160,23 @@ class EventFightRunner:
         -------
         list[CombatResult]
         """
-        _log.info("[OPS] 活动战连续执行 {} 次", times)
+        _log.info('[OPS] 活动战连续执行 {} 次', times)
         self._results = []
 
         for i in range(times):
-            _log.info("[OPS] 活动战第 {}/{} 次", i + 1, times)
+            _log.info('[OPS] 活动战第 {}/{} 次', i + 1, times)
             result = self.run()
             self._results.append(result)
 
             if result.flag == ConditionFlag.DOCK_FULL:
-                _log.warning("[OPS] 船坞已满, 停止")
+                _log.warning('[OPS] 船坞已满, 停止')
                 break
 
             if gap > 0 and i < times - 1:
                 time.sleep(gap)
 
         _log.info(
-            "[OPS] 活动战完成: {} 次 (成功 {} 次)",
+            '[OPS] 活动战完成: {} 次 (成功 {} 次)',
             len(self._results),
             sum(1 for r in self._results if r.flag == ConditionFlag.OPERATION_SUCCESS),
         )
@@ -195,7 +195,7 @@ class EventFightRunner:
 
         # 委托 UI 层完成: 难度 / 节点 / 出击
         event_page = BaseEventPage(self._ctx)
-        entrance: Literal["alpha", "beta"] | None = self._entrance  # type: ignore[assignment]
+        entrance: Literal['alpha', 'beta'] | None = self._entrance  # type: ignore[assignment]
         event_page.start_fight(self._map_code, entrance, self._skip_check)
 
     # ── 出征准备 ──
@@ -236,9 +236,7 @@ class EventFightRunner:
         # 检测战前血量
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
-        ship_stats = [
-            damage.get(i, ShipDamageState.NORMAL) for i in range(6)
-        ]
+        ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
 
         # 出征
         page.start_battle()
@@ -269,7 +267,7 @@ class EventFightRunner:
         if self._dock_full_destroy:
             from autowsgr.ops.destroy import destroy_ships
 
-            _log.warning("[OPS] 船坞已满，执行自动解装")
+            _log.warning('[OPS] 船坞已满，执行自动解装')
             self._ctrl.click(0.38, 0.565)
             destroy_ships(
                 self._ctx,
@@ -278,7 +276,7 @@ class EventFightRunner:
             result.flag = ConditionFlag.OPERATION_SUCCESS
             return
 
-        _log.warning("[OPS] 船坞已满, 未开启自动解装")
+        _log.warning('[OPS] 船坞已满, 未开启自动解装')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -291,7 +289,7 @@ def run_event_fight(
     plan: CombatPlan,
     *,
     map_code: str | None = None,
-    entrance: Literal["alpha", "beta"] | None = None,
+    entrance: Literal['alpha', 'beta'] | None = None,
     times: int = 1,
     gap: float = 0.0,
     fleet_id: int | None = None,
@@ -334,7 +332,7 @@ def run_event_fight_from_yaml(
     yaml_path: str,
     *,
     map_code: str | None = None,
-    entrance: Literal["alpha", "beta"] | None = None,
+    entrance: Literal['alpha', 'beta'] | None = None,
     times: int = 1,
     fleet_id: int | None = None,
     fleet: list[str] | None = None,
@@ -373,7 +371,8 @@ def run_event_fight_from_yaml(
     resolved = resolve_plan_path(yaml_path, category='event')
     plan = CombatPlan.from_yaml(resolved)
     return run_event_fight(
-        ctx, plan,
+        ctx,
+        plan,
         map_code=map_code,
         entrance=entrance,
         times=times,

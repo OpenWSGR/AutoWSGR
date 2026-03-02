@@ -12,12 +12,11 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
-from autowsgr.infra.logger import get_logger
 
-from autowsgr.emulator import AndroidController
+from autowsgr.infra.logger import get_logger
 from autowsgr.types import FleetSelection
 from autowsgr.ui.decisive.overlay import (
     COST_AREA,
@@ -27,9 +26,17 @@ from autowsgr.ui.decisive.overlay import (
     SHIP_NAME_X_RANGES,
     SHIP_NAME_Y_RANGE,
 )
-from autowsgr.vision import OCREngine, ROI
+from autowsgr.vision import ROI, OCREngine
 
-_log = get_logger("ui.decisive")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.emulator import AndroidController
+
+
+_log = get_logger('ui.decisive')
+
 
 def recognize_fleet_options(
     ocr: OCREngine,
@@ -45,34 +52,38 @@ def recognize_fleet_options(
     """
     # 1. 识别可用分数
     res_roi = ROI(
-        x1=RESOURCE_AREA[0][0], y1=RESOURCE_AREA[1][1],
-        x2=RESOURCE_AREA[1][0], y2=RESOURCE_AREA[0][1],
+        x1=RESOURCE_AREA[0][0],
+        y1=RESOURCE_AREA[1][1],
+        x2=RESOURCE_AREA[1][0],
+        y2=RESOURCE_AREA[0][1],
     )
     score_img = res_roi.crop(screen)
     score_val = ocr.recognize_number(score_img)
     score = score_val if score_val is not None else 0
     # TODO: 分数 OCR 需要改进
     if score_val is not None:
-        _log.debug("[舰队OCR] 可用分数: {}", score_val)
+        _log.debug('[舰队OCR] 可用分数: {}', score_val)
     else:
-        _log.warning("[舰队OCR] 分数 OCR 失败")
+        _log.warning('[舰队OCR] 分数 OCR 失败')
 
     # 2. 识别费用整行
     cost_roi = ROI(
-        x1=COST_AREA[0][0], y1=COST_AREA[1][1],
-        x2=COST_AREA[1][0], y2=COST_AREA[0][1],
+        x1=COST_AREA[0][0],
+        y1=COST_AREA[1][1],
+        x2=COST_AREA[1][0],
+        y2=COST_AREA[0][1],
     )
     cost_img = cost_roi.crop(screen)
-    cost_results = ocr.recognize(cost_img, allowlist="0123456789x")
+    cost_results = ocr.recognize(cost_img, allowlist='0123456789x')
 
     costs: list[int] = []
     for r in cost_results:
-        text = r.text.strip().lstrip("xX")
+        text = r.text.strip().lstrip('xX')
         try:
             costs.append(int(text))
         except (ValueError, TypeError):
             _log.debug("[舰队OCR] 费用解析跳过: '{}'", r.text)
-    _log.debug("[舰队OCR] 识别到 {} 项费用: {}", len(costs), costs)
+    _log.debug('[舰队OCR] 识别到 {} 项费用: {}', len(costs), costs)
 
     # 3. 对可负担的卡识别舰船名
     selections: dict[str, FleetSelection] = {}
@@ -90,7 +101,7 @@ def recognize_fleet_options(
         name = ocr.recognize_ship_name(name_img)
         if name is None:
             raw = ocr.recognize_single(name_img)
-            name = raw.text.strip() if raw.text.strip() else f"未识别_{i}"
+            name = raw.text.strip() if raw.text.strip() else f'未识别_{i}'
             _log.debug("[舰队OCR] 舰船名模糊匹配失败, 原文: '{}'", name)
 
         click_x = FLEET_CARD_X_POSITIONS[i] if i < len(FLEET_CARD_X_POSITIONS) else 0.5
@@ -102,7 +113,7 @@ def recognize_fleet_options(
             click_position=(click_x, click_y),
         )
 
-    _log.info("[舰队OCR] 舰队选项: {}", {k: v.cost for k, v in selections.items()})
+    _log.info('[舰队OCR] 舰队选项: {}', {k: v.cost for k, v in selections.items()})
     return (score, selections)
 
 
@@ -138,7 +149,7 @@ def use_skill(
     if result is not None:
         acquired.append(result)
 
-    ctrl.click(*skill_pos) # 快进一下
+    ctrl.click(*skill_pos)  # 快进一下
     return acquired
 
 
@@ -216,7 +227,7 @@ def locate_ship_rows(
 
     dll = get_api_dll()
     rows = dll.locate(list_720p)
-    _log.debug("[舰队OCR] DLL 定位到 {} 行候选项", len(rows))
+    _log.debug('[舰队OCR] DLL 定位到 {} 行候选项', len(rows))
 
     # 在原始分辨率上裁剪并 OCR（用原图的左 82% 区域）
     list_w_native = int(w * _LEGACY_LIST_WIDTH / _LEGACY_WIDTH)
@@ -252,8 +263,9 @@ def locate_ship_rows(
             found.append((name, cx, cy))
 
     _log.debug(
-        "[舰队OCR] 选船列表识别: {} (共 {} 行)",
-        sorted({n for n, _, _ in found}), len(rows),
+        '[舰队OCR] 选船列表识别: {} (共 {} 行)',
+        sorted({n for n, _, _ in found}),
+        len(rows),
     )
     return found
 

@@ -19,11 +19,11 @@ from autowsgr.vision import Color, MatchStrategy, PixelRule, PixelSignature
 class Target(enum.Enum):
     """主页面可导航的目标。"""
 
-    SORTIE = "出征"
-    TASK = "任务"
-    SIDEBAR = "侧边栏"
-    HOME = "主页"
-    EVENT = "活动"
+    SORTIE = '出征'
+    TASK = '任务'
+    SIDEBAR = '侧边栏'
+    HOME = '主页'
+    EVENT = '活动'
 
     @property
     def page_name(self) -> str:
@@ -48,9 +48,9 @@ _TARGET_PAGES: dict[Target, str] = {
 class OverlayKind(enum.Enum):
     """主页面可出现的浮层类型。"""
 
-    NEWS = "新闻公告"
-    SIGN = "每日签到"
-    BOOKING = "活动预约"
+    NEWS = '新闻公告'
+    SIGN = '每日签到'
+    BOOKING = '活动预约'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,19 +140,19 @@ class Sig(enum.Enum):
     通过 ``.ps`` 属性访问 :class:`PixelSignature` 实例。
     """
 
-    PAGE = "page"
+    PAGE = 'page'
     """主页面基础签名 — 检测资源栏 + 角落特征。"""
 
-    NEWS = "news"
+    NEWS = 'news'
     """新闻公告浮层签名。"""
 
-    NEWS_NOT_SHOW = "news_not_show"
+    NEWS_NOT_SHOW = 'news_not_show'
     """「不再显示」复选框已勾选态签名 (蓝色)。"""
 
-    SIGN = "sign"
+    SIGN = 'sign'
     """每日签到浮层签名。"""
 
-    BOOKING = "booking"
+    BOOKING = 'booking'
     """预约页面签名。"""
 
     @property
@@ -173,7 +173,7 @@ _SIGNATURES: dict[Sig, PixelSignature] = {
         ],
     ),
     Sig.NEWS: PixelSignature(
-        name="news_overlay",
+        name='news_overlay',
         strategy=MatchStrategy.ALL,
         rules=[
             PixelRule.of(0.1437, 0.9065, (254, 255, 255), tolerance=40.0),
@@ -185,7 +185,7 @@ _SIGNATURES: dict[Sig, PixelSignature] = {
         ],
     ),
     Sig.NEWS_NOT_SHOW: PixelSignature(
-        name="news_not_show",
+        name='news_not_show',
         strategy=MatchStrategy.ALL,
         rules=[
             PixelRule.of(0.0714, 0.9065, (49, 130, 211), tolerance=40.0),
@@ -193,7 +193,7 @@ _SIGNATURES: dict[Sig, PixelSignature] = {
         ],
     ),
     Sig.SIGN: PixelSignature(
-        name="sign_overlay",
+        name='sign_overlay',
         strategy=MatchStrategy.ALL,
         rules=[
             PixelRule.of(0.8766, 0.3046, (216, 218, 215), tolerance=40.0),
@@ -203,7 +203,7 @@ _SIGNATURES: dict[Sig, PixelSignature] = {
         ],
     ),
     Sig.BOOKING: PixelSignature(
-        name="booking_overlay",
+        name='booking_overlay',
         strategy=MatchStrategy.ALL,
         rules=[
             PixelRule.of(0.3375, 0.3861, (225, 225, 225), tolerance=30.0),

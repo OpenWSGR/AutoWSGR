@@ -27,21 +27,21 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
-import os
-import winreg
 import sys
+import winreg
 from dataclasses import dataclass, field
 
 from autowsgr.infra import EmulatorConnectionError
-
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("emulator")
-from autowsgr.types import EmulatorType
+
+_log = get_logger('emulator')
 from autowsgr.infra import EmulatorConfig
+from autowsgr.types import EmulatorType
 
 
 # ── serial → EmulatorType 识别规则 ──
@@ -49,15 +49,15 @@ from autowsgr.infra import EmulatorConfig
 # 按顺序匹配，首条命中即止。
 _SERIAL_RULES: list[tuple[re.Pattern[str], EmulatorType]] = [
     # 雷电：emulator-5554, emulator-5556 …
-    (re.compile(r"^emulator-\d+$"), EmulatorType.leidian),
+    (re.compile(r'^emulator-\d+$'), EmulatorType.leidian),
     # MuMu 12（新版）：127.0.0.1:16384, 16416, 16448 … 步进 32
-    (re.compile(r"^127\.0\.0\.1:(1638[4-9]|16[4-9]\d{2}|1[7-9]\d{3})$"), EmulatorType.mumu),
+    (re.compile(r'^127\.0\.0\.1:(1638[4-9]|16[4-9]\d{2}|1[7-9]\d{3})$'), EmulatorType.mumu),
     # MuMu 旧版：127.0.0.1:62001, 62025, 62049 …
-    (re.compile(r"^127\.0\.0\.1:620\d{2}$"), EmulatorType.mumu),
+    (re.compile(r'^127\.0\.0\.1:620\d{2}$'), EmulatorType.mumu),
     # 蓝叠：127.0.0.1:5555, 5565, 5575 … 步进 10
-    (re.compile(r"^127\.0\.0\.1:5(5[5-9]\d|[6-9]\d{2})\d?$"), EmulatorType.bluestacks),
+    (re.compile(r'^127\.0\.0\.1:5(5[5-9]\d|[6-9]\d{2})\d?$'), EmulatorType.bluestacks),
     # 蓝叠也用这些端口段
-    (re.compile(r"^127\.0\.0\.1:555[5-9]$"), EmulatorType.bluestacks),
+    (re.compile(r'^127\.0\.0\.1:555[5-9]$'), EmulatorType.bluestacks),
 ]
 
 
@@ -83,11 +83,12 @@ class EmulatorCandidate:
     description: str = field(init=False)
 
     def __post_init__(self) -> None:
-        type_label = self.emulator_type.value if self.emulator_type else "未知"
-        self.description = f"{self.serial:<25} {type_label:<8} ({self.status})"
+        type_label = self.emulator_type.value if self.emulator_type else '未知'
+        self.description = f'{self.serial:<25} {type_label:<8} ({self.status})'
 
 
 # ── ADB 可执行文件解析 ──
+
 
 def _registry_adb_candidates_windows() -> list[str]:
     """从 Windows 注册表中读取各模拟器安装目录，返回可能的 adb 路径列表。
@@ -100,24 +101,24 @@ def _registry_adb_candidates_windows() -> list[str]:
     # ── 雷电模拟器 ──
     # HKLM\SOFTWARE\leidian\<子键>\InstallDir
     try:
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\leidian") as key:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\leidian') as key:
             sub_key_name = winreg.EnumKey(key, 0)
             with winreg.OpenKey(key, sub_key_name) as sub:
-                install_dir, _ = winreg.QueryValueEx(sub, "InstallDir")
-                candidates.append(os.path.join(install_dir, "adb.exe"))
+                install_dir, _ = winreg.QueryValueEx(sub, 'InstallDir')
+                candidates.append(os.path.join(install_dir, 'adb.exe'))
     except OSError as exc:
-        _log.debug("[Detector] 雷电模拟器注册表读取跳过: {}", exc)
+        _log.debug('[Detector] 雷电模拟器注册表读取跳过: {}', exc)
 
     # ── 蓝叠（国内版） ──
     # HKLM\SOFTWARE\BlueStacks_nxt_cn\InstallDir
-    for reg_key in (r"SOFTWARE\BlueStacks_nxt_cn", r"SOFTWARE\BlueStacks_nxt"):
+    for reg_key in (r'SOFTWARE\BlueStacks_nxt_cn', r'SOFTWARE\BlueStacks_nxt'):
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_key) as key:
-                install_dir, _ = winreg.QueryValueEx(key, "InstallDir")
-                candidates.append(os.path.join(install_dir, "HD-Adb.exe"))
+                install_dir, _ = winreg.QueryValueEx(key, 'InstallDir')
+                candidates.append(os.path.join(install_dir, 'HD-Adb.exe'))
                 break
         except OSError as exc:
-            _log.debug("[Detector] 蓝叠模拟器注册表读取跳过 ({}): {}", reg_key, exc)
+            _log.debug('[Detector] 蓝叠模拟器注册表读取跳过 ({}): {}', reg_key, exc)
 
     # ── MuMu 12（新版） ──
     # HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0
@@ -126,26 +127,26 @@ def _registry_adb_candidates_windows() -> list[str]:
     try:
         with winreg.OpenKey(
             winreg.HKEY_LOCAL_MACHINE,
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0",
+            r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer-12.0',
         ) as key:
-            uninstall_str, _ = winreg.QueryValueEx(key, "UninstallString")
+            uninstall_str, _ = winreg.QueryValueEx(key, 'UninstallString')
             root = os.path.dirname(uninstall_str.strip('"'))
-            candidates.append(os.path.join(root, "shell", "adb.exe"))
+            candidates.append(os.path.join(root, 'shell', 'adb.exe'))
     except OSError as exc:
-        _log.debug("[Detector] MuMu 12 注册表读取跳过: {}", exc)
+        _log.debug('[Detector] MuMu 12 注册表读取跳过: {}', exc)
 
     # ── MuMu 旧版 ──
     # UninstallString dirname → <root>\nx_main\adb.exe
     try:
         with winreg.OpenKey(
             winreg.HKEY_LOCAL_MACHINE,
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer",
+            r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer',
         ) as key:
-            uninstall_str, _ = winreg.QueryValueEx(key, "UninstallString")
+            uninstall_str, _ = winreg.QueryValueEx(key, 'UninstallString')
             root = os.path.dirname(uninstall_str.strip('"'))
-            candidates.append(os.path.join(root, "nx_main", "adb.exe"))
+            candidates.append(os.path.join(root, 'nx_main', 'adb.exe'))
     except OSError as exc:
-        _log.debug("[Detector] MuMu 旧版注册表读取跳过: {}", exc)
+        _log.debug('[Detector] MuMu 旧版注册表读取跳过: {}', exc)
 
     return candidates
 
@@ -162,22 +163,22 @@ def _find_adb() -> str:
     FileNotFoundError
         找不到 adb 可执行文件。
     """
-    if path := shutil.which("adb"):
+    if path := shutil.which('adb'):
         return path
 
-    if sys.platform.startswith("win"):
+    if sys.platform.startswith('win'):
         for candidate in _registry_adb_candidates_windows():
             if os.path.isfile(candidate):
-                _log.debug("[Detector] 从注册表找到 adb: {}", candidate)
+                _log.debug('[Detector] 从注册表找到 adb: {}', candidate)
                 return candidate
 
     raise FileNotFoundError(
-        "未找到 adb 可执行文件。请将 adb 加入系统 PATH，"
-        "或在配置文件中手动指定 emulator.serial。"
+        '未找到 adb 可执行文件。请将 adb 加入系统 PATH，或在配置文件中手动指定 emulator.serial。'
     )
 
 
 # ── 核心探测函数 ──
+
 
 def list_adb_devices(adb_path: str | None = None) -> list[tuple[str, str]]:
     """运行 ``adb devices`` 并解析结果。
@@ -195,15 +196,15 @@ def list_adb_devices(adb_path: str | None = None) -> list[tuple[str, str]]:
     adb = adb_path or _find_adb()
     try:
         result = subprocess.run(
-            [adb, "devices"],
+            [adb, 'devices'],
             capture_output=True,
             text=True,
             timeout=10,
         )
     except subprocess.TimeoutExpired as exc:
-        raise EmulatorConnectionError("adb devices 超时，请检查 adb 是否正常运行") from exc
+        raise EmulatorConnectionError('adb devices 超时，请检查 adb 是否正常运行') from exc
     except FileNotFoundError as exc:
-        raise EmulatorConnectionError(f"adb 可执行文件未找到: {adb}") from exc
+        raise EmulatorConnectionError(f'adb 可执行文件未找到: {adb}') from exc
 
     lines = result.stdout.strip().splitlines()
     devices: list[tuple[str, str]] = []
@@ -254,16 +255,17 @@ def detect_emulators(adb_path: str | None = None) -> list[EmulatorCandidate]:
     for serial, status in raw:
         emu_type = identify_emulator_type(serial)
         cand = EmulatorCandidate(serial=serial, emulator_type=emu_type, status=status)
-        if status == "device":
+        if status == 'device':
             candidates.append(cand)
         else:
-            _log.debug("[Detector] 忽略非在线设备: {}", cand.description)
+            _log.debug('[Detector] 忽略非在线设备: {}', cand.description)
 
-    _log.debug("[Detector] 检测到 {} 个在线设备", len(candidates))
+    _log.debug('[Detector] 检测到 {} 个在线设备', len(candidates))
     return sorted(candidates, key=lambda c: c.serial)
 
 
 # ── 用户交互选择 ──
+
 
 def prompt_user_select(candidates: list[EmulatorCandidate]) -> str:
     """命令行交互，让用户从多个设备中选择一个。
@@ -284,34 +286,35 @@ def prompt_user_select(candidates: list[EmulatorCandidate]) -> str:
         当前不是 TTY（脚本/管道环境），无法交互。
     """
     if not sys.stdin.isatty():
-        serials = ", ".join(c.serial for c in candidates)
+        serials = ', '.join(c.serial for c in candidates)
         raise EmulatorConnectionError(
-            f"检测到多个在线设备（{serials}），无法自动选择。\n"
-            "请在配置文件中设置 emulator.serial 以指定目标设备。"
+            f'检测到多个在线设备（{serials}），无法自动选择。\n'
+            '请在配置文件中设置 emulator.serial 以指定目标设备。'
         )
 
-    print("\n检测到多个在线设备，请选择要连接的模拟器：\n")
+    print('\n检测到多个在线设备，请选择要连接的模拟器：\n')
     for i, cand in enumerate(candidates):
-        print(f"  [{i}] {cand.description}")
+        print(f'  [{i}] {cand.description}')
     print()
 
     while True:
         try:
-            raw = input(f"请输入编号 [0-{len(candidates) - 1}]: ").strip()
+            raw = input(f'请输入编号 [0-{len(candidates) - 1}]: ').strip()
         except (EOFError, KeyboardInterrupt):
-            raise EmulatorConnectionError("用户取消了设备选择") from None
+            raise EmulatorConnectionError('用户取消了设备选择') from None
 
         if raw.isdigit():
             idx = int(raw)
             if 0 <= idx < len(candidates):
                 chosen = candidates[idx]
-                _log.info("[Detector] 用户选择设备: {}", chosen.description)
+                _log.info('[Detector] 用户选择设备: {}', chosen.description)
                 return chosen.serial
 
-        print(f"  无效输入，请输入 0 到 {len(candidates) - 1} 之间的整数。")
+        print(f'  无效输入，请输入 0 到 {len(candidates) - 1} 之间的整数。')
 
 
 # ── 主入口：结合配置决策 ──
+
 
 def resolve_serial(config: EmulatorConfig, adb_path: str | None = None) -> str:
     """根据配置和当前在线设备决定最终连接的 serial。
@@ -343,7 +346,7 @@ def resolve_serial(config: EmulatorConfig, adb_path: str | None = None) -> str:
     """
     # 优先级 1：用户显式配置
     if config.serial:
-        _log.debug("[Detector] 使用配置中的 serial: {}", config.serial)
+        _log.debug('[Detector] 使用配置中的 serial: {}', config.serial)
         return config.serial
 
     # 探测在线设备
@@ -355,15 +358,15 @@ def resolve_serial(config: EmulatorConfig, adb_path: str | None = None) -> str:
     # 优先级 5：无设备
     if not candidates:
         raise EmulatorConnectionError(
-            "未检测到任何在线 Android 设备。\n"
-            "请确认模拟器已启动，或在配置文件中手动设置 emulator.serial。"
+            '未检测到任何在线 Android 设备。\n'
+            '请确认模拟器已启动，或在配置文件中手动设置 emulator.serial。'
         )
 
     # 优先级 2：唯一设备
     if len(candidates) == 1:
         serial = candidates[0].serial
         _log.info(
-            "[Detector] 自动选择唯一在线设备: {}",
+            '[Detector] 自动选择唯一在线设备: {}',
             candidates[0].description,
         )
         return serial
@@ -388,5 +391,5 @@ def resolve_serial(config: EmulatorConfig, adb_path: str | None = None) -> str:
             return prompt_user_select(matched)
 
     # 优先级 4：无法唯一确定，交互选择
-    _log.warning("[Detector] 检测到 {} 个在线设备，需要用户选择", len(candidates))
+    _log.warning('[Detector] 检测到 {} 个在线设备，需要用户选择', len(candidates))
     return prompt_user_select(candidates)

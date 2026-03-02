@@ -5,16 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from autowsgr.types import PageName
-
 from .build import BuildQueue
 from .expedition import ExpeditionQueue
 from .fleet import Fleet
 from .resources import Resources
 
+
 if TYPE_CHECKING:
     from autowsgr.emulator import AndroidController
     from autowsgr.infra import UserConfig
+    from autowsgr.types import PageName
     from autowsgr.vision import OCREngine
 
 # 游戏固定 4 支舰队
@@ -87,7 +87,5 @@ class GameContext:
     def fleet(self, fleet_id: int) -> Fleet:
         """按编号 (1–4) 获取舰队。"""
         if not 1 <= fleet_id <= len(self.fleets):
-            raise ValueError(
-                f"fleet_id 应在 1–{len(self.fleets)} 范围内，收到 {fleet_id}"
-            )
+            raise ValueError(f'fleet_id 应在 1–{len(self.fleets)} 范围内，收到 {fleet_id}')
         return self.fleets[fleet_id - 1]

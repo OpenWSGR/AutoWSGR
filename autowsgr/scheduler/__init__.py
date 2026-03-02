@@ -20,10 +20,11 @@
 from .launcher import Launcher, launch
 from .scheduler import BatchRunnerAdapter, FightTask, TaskScheduler
 
+
 __all__ = [
-    "BatchRunnerAdapter",
-    "FightTask",
-    "Launcher",
-    "TaskScheduler",
-    "launch",
+    'BatchRunnerAdapter',
+    'FightTask',
+    'Launcher',
+    'TaskScheduler',
+    'launch',
 ]

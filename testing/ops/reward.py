@@ -13,12 +13,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 except Exception:
     pass
 
@@ -26,47 +27,48 @@ from loguru import logger
 
 from testing.ops._framework import launch_for_test
 
+
 _STEPS = [
-    "1. 连接设备",
-    "2. 调用 collect_rewards(ctrl)",
-    "3. 打印是否收取了奖励",
+    '1. 连接设备',
+    '2. 调用 collect_rewards(ctrl)',
+    '3. 打印是否收取了奖励',
 ]
 
 
 def main() -> None:
     serial = sys.argv[1] if len(sys.argv) > 1 else None
 
-    print("=" * 60)
-    print("  任务奖励收取 (collect_rewards) E2E 测试")
-    print("=" * 60)
+    print('=' * 60)
+    print('  任务奖励收取 (collect_rewards) E2E 测试')
+    print('=' * 60)
     print()
-    print("  测试步骤:")
+    print('  测试步骤:')
     for s in _STEPS:
-        print(f"    {s}")
+        print(f'    {s}')
     print()
-    input("  按 Enter 开始运行...")
+    input('  按 Enter 开始运行...')
     print()
 
     try:
-        ctx = launch_for_test(serial, log_dir=Path("logs/e2e/reward"))
+        ctx = launch_for_test(serial, log_dir=Path('logs/e2e/reward'))
         ctrl = ctx.ctrl
-        logger.info(f"已连接: {ctrl.serial}")
-        print(f"  [OK] 已连接: {ctrl.serial}")
+        logger.info(f'已连接: {ctrl.serial}')
+        print(f'  [OK] 已连接: {ctrl.serial}')
 
         from autowsgr.ops.reward import collect_rewards
 
         result = collect_rewards(ctrl)
-        logger.info(f"collect_rewards() 返回: {result}")
-        print(f"  [OK] collect_rewards() = {result}")
+        logger.info(f'collect_rewards() 返回: {result}')
+        print(f'  [OK] collect_rewards() = {result}')
     except Exception as exc:
-        logger.opt(exception=True).error(f"测试失败: {exc}")
-        print(f"  [FAIL] {exc}")
+        logger.opt(exception=True).error(f'测试失败: {exc}')
+        print(f'  [FAIL] {exc}')
         sys.exit(1)
 
     ctrl.disconnect()
     print()
-    print("  [OK] 任务奖励收取测试通过")
+    print('  [OK] 任务奖励收取测试通过')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -38,12 +38,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
@@ -51,14 +48,21 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面识别签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="浴场页",
+    name='浴场页',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.8458, 0.1102, (74, 132, 178), tolerance=30.0),
@@ -70,7 +74,7 @@ PAGE_SIGNATURE = PixelSignature(
 """浴室页面像素签名 (无 overlay 时)。"""
 
 CHOOSE_REPAIR_OVERLAY_SIGNATURE = PixelSignature(
-    name="选择修理",
+    name='选择修理',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.6797, 0.1750, (27, 122, 212), tolerance=30.0),
@@ -151,7 +155,7 @@ class RepairShipInfo:
 
     name: str
     position: tuple[float, float]
-    repair_time: str = ""
+    repair_time: str = ''
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -207,7 +211,8 @@ class BathPage:
             截图 (H×W×3, RGB)。
         """
         return PixelChecker.check_signature(
-            screen, CHOOSE_REPAIR_OVERLAY_SIGNATURE,
+            screen,
+            CHOOSE_REPAIR_OVERLAY_SIGNATURE,
         ).matched
 
     # ── Overlay 操作 ──────────────────────────────────────────────────────
@@ -224,14 +229,14 @@ class BathPage:
         """
         from autowsgr.ui.page import wait_for_page
 
-        _log.info("[UI] 浴室 → 打开选择修理 overlay")
+        _log.info('[UI] 浴室 → 打开选择修理 overlay')
         if not self.has_choose_repair_overlay(self._ctrl.screenshot()):
             self._ctrl.click(*CLICK_CHOOSE_REPAIR)
         wait_for_page(
             self._ctrl,
             BathPage.has_choose_repair_overlay,
-            source="浴室",
-            target="选择修理 overlay",
+            source='浴室',
+            target='选择修理 overlay',
         )
 
     def close_choose_repair_overlay(self) -> None:
@@ -244,7 +249,7 @@ class BathPage:
         """
         from autowsgr.ui.page import wait_for_page
 
-        _log.info("[UI] 关闭选择修理 overlay")
+        _log.info('[UI] 关闭选择修理 overlay')
         self._ctrl.click(*CLICK_CLOSE_OVERLAY)
         # 等待 overlay 消失，基础浴室签名恢复
         wait_for_page(
@@ -253,8 +258,8 @@ class BathPage:
                 PixelChecker.check_signature(s, PAGE_SIGNATURE).matched
                 and not BathPage.has_choose_repair_overlay(s)
             ),
-            source="选择修理 overlay",
-            target="浴室",
+            source='选择修理 overlay',
+            target='浴室',
         )
 
     def click_first_repair_ship(self) -> None:
@@ -271,12 +276,12 @@ class BathPage:
         """
         from autowsgr.ui.page import NavigationError
 
-        _log.info("[UI] 选择修理 → 点击第一个舰船")
+        _log.info('[UI] 选择修理 → 点击第一个舰船')
 
         # 确认 overlay 已打开
         screen = self._ctrl.screenshot()
         if not BathPage.has_choose_repair_overlay(screen):
-            raise NavigationError("选择修理 overlay 未打开，无法点击舰船")
+            raise NavigationError('选择修理 overlay 未打开，无法点击舰船')
 
         self._ctrl.click(*CLICK_FIRST_REPAIR_SHIP)
 
@@ -306,7 +311,7 @@ class BathPage:
 
         screen = self._ctrl.screenshot()
         if not BathPage.has_choose_repair_overlay(screen):
-            raise NavigationError("选择修理 overlay 未打开，无法修理指定舰船")
+            raise NavigationError('选择修理 overlay 未打开，无法修理指定舰船')
 
         # TODO: 实现 OCR 识别 + 滑动查找
         # 大致流程:
@@ -316,8 +321,7 @@ class BathPage:
         # 4. 找到后点击对应位置
         # 5. _wait_overlay_auto_close()
         raise NotImplementedError(
-            f"repair_ship('{ship_name}') 尚未实现: "
-            "需要 OCR 识别接口完成后实现舰船名称匹配"
+            f"repair_ship('{ship_name}') 尚未实现: 需要 OCR 识别接口完成后实现舰船名称匹配"
         )
 
     def recognize_repair_ships(self) -> list[RepairShipInfo]:
@@ -343,9 +347,7 @@ class BathPage:
         # 2. 对 overlay 区域进行 OCR
         # 3. 解析舰船名称和修理时间
         # 4. 返回 RepairShipInfo 列表
-        raise NotImplementedError(
-            "recognize_repair_ships() 尚未实现: 需要 OCR 识别接口"
-        )
+        raise NotImplementedError('recognize_repair_ships() 尚未实现: 需要 OCR 识别接口')
 
     def _swipe_left(self) -> None:
         """在选择修理 overlay 中向左滑动，查看更多待修理舰船。
@@ -354,9 +356,10 @@ class BathPage:
 
         旧代码参考: ``timer.relative_swipe(0.33, 0.5, 0.66, 0.5)`` (反向)。
         """
-        _log.debug("[UI] 选择修理 overlay: 向左滑动")
+        _log.debug('[UI] 选择修理 overlay: 向左滑动')
         self._ctrl.swipe(
-            *_SWIPE_START, *_SWIPE_END,
+            *_SWIPE_START,
+            *_SWIPE_END,
             duration=_SWIPE_DURATION,
         )
         time.sleep(_SWIPE_DELAY)
@@ -374,8 +377,8 @@ class BathPage:
                 PixelChecker.check_signature(s, PAGE_SIGNATURE).matched
                 and not BathPage.has_choose_repair_overlay(s)
             ),
-            source="选择修理 overlay (自动关闭)",
-            target="浴室",
+            source='选择修理 overlay (自动关闭)',
+            target='浴室',
         )
 
     # ── 回退 ──────────────────────────────────────────────────────────────
@@ -399,11 +402,11 @@ class BathPage:
             self.close_choose_repair_overlay()
             return
 
-        _log.info("[UI] 浴室 → 返回")
+        _log.info('[UI] 浴室 → 返回')
         self._ctrl.click(*CLICK_BACK)
         wait_leave_page(
             self._ctrl,
             BathPage.is_current_page,
-            source="浴室",
-            target="后院/出征准备",
+            source='浴室',
+            target='后院/出征准备',
         )

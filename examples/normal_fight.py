@@ -4,8 +4,9 @@
 策略文件自动从 ``autowsgr/data/plan/normal_fight/`` 解析，无需指定完整路径。
 """
 
-from autowsgr.scheduler import launch
 from autowsgr.ops import run_normal_fight_from_yaml
+from autowsgr.scheduler import launch
+
 
 # 1. 启动 (加载配置 → 连接模拟器 → 启动游戏)
 ctx = launch('usersettings.yaml')

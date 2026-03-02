@@ -7,11 +7,12 @@ import os
 import re
 import subprocess
 
-from .base import EmulatorProcessManager
-
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("emulator")
+from .base import EmulatorProcessManager
+
+
+_log = get_logger('emulator')
 from autowsgr.infra import EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType
 
@@ -29,18 +30,18 @@ class WindowsEmulatorManager(EmulatorProcessManager):
     def is_running(self) -> bool:
         match self._emulator_type:
             case EmulatorType.leidian:
-                raw = self._ldconsole("isrunning")
-                _log.debug("雷电模拟器状态: {}", raw)
-                return raw.strip() == "running"
+                raw = self._ldconsole('isrunning')
+                _log.debug('雷电模拟器状态: {}', raw)
+                return raw.strip() == 'running'
             case EmulatorType.mumu:
-                raw = self._mumuconsole("is_android_started")
+                raw = self._mumuconsole('is_android_started')
                 try:
                     result = json.loads(raw)
-                    is_started = result.get("is_android_started", False)
+                    is_started = result.get('is_android_started', False)
                 except (json.JSONDecodeError, KeyError):
-                    _log.debug("[Emulator] MuMu 状态查询解析失败", exc_info=True)
+                    _log.debug('[Emulator] MuMu 状态查询解析失败', exc_info=True)
                     is_started = False
-                _log.debug("MuMu 模拟器状态: {}", is_started)
+                _log.debug('MuMu 模拟器状态: {}', is_started)
                 return bool(is_started)
             case EmulatorType.yunshouji:
                 return True  # 云手机始终在线
@@ -49,68 +50,68 @@ class WindowsEmulatorManager(EmulatorProcessManager):
 
     def start(self) -> None:
         if self._emulator_type == EmulatorType.yunshouji:
-            _log.info("云手机无需启动")
+            _log.info('云手机无需启动')
             return
 
         if self._path is None:
-            raise EmulatorNotFoundError("未设置模拟器路径，无法启动")
+            raise EmulatorNotFoundError('未设置模拟器路径，无法启动')
 
         try:
             match self._emulator_type:
                 case EmulatorType.leidian:
-                    self._ldconsole("launch")
+                    self._ldconsole('launch')
                 case EmulatorType.mumu:
-                    self._mumuconsole("launch")
+                    self._mumuconsole('launch')
                 case _:
                     os.popen(self._path)
 
             self.wait_until_online()
-            _log.info("模拟器已启动")
+            _log.info('模拟器已启动')
         except EmulatorError:
             raise
         except Exception as exc:
-            raise EmulatorError(f"启动模拟器失败: {exc}") from exc
+            raise EmulatorError(f'启动模拟器失败: {exc}') from exc
 
     def stop(self) -> None:
         try:
             match self._emulator_type:
                 case EmulatorType.leidian:
-                    self._ldconsole("quit")
+                    self._ldconsole('quit')
                 case EmulatorType.mumu:
-                    self._mumuconsole("shutdown")
+                    self._mumuconsole('shutdown')
                 case EmulatorType.yunshouji:
-                    _log.info("云手机无需关闭")
+                    _log.info('云手机无需关闭')
                     return
                 case _:
                     if not self._process_name:
-                        raise EmulatorError("未设置进程名，无法停止模拟器")
+                        raise EmulatorError('未设置进程名，无法停止模拟器')
                     subprocess.run(
-                        ["taskkill", "-f", "-im", self._process_name],
+                        ['taskkill', '-f', '-im', self._process_name],
                         check=True,
                         capture_output=True,
                     )
-            _log.info("模拟器已停止")
+            _log.info('模拟器已停止')
         except EmulatorError:
             raise
         except Exception as exc:
-            raise EmulatorError(f"停止模拟器失败: {exc}") from exc
+            raise EmulatorError(f'停止模拟器失败: {exc}') from exc
 
     # ── 雷电 CLI ──
 
-    def _ldconsole(self, command: str, command_arg: str = "") -> str:
+    def _ldconsole(self, command: str, command_arg: str = '') -> str:
         """调用 ldconsole.exe 控制雷电模拟器。"""
         if not self._path:
-            raise EmulatorNotFoundError("未设置雷电模拟器路径")
+            raise EmulatorNotFoundError('未设置雷电模拟器路径')
 
-        console = os.path.join(os.path.dirname(self._path), "ldconsole.exe")
+        console = os.path.join(os.path.dirname(self._path), 'ldconsole.exe')
         if not os.path.isfile(console):
-            raise EmulatorNotFoundError(f"找不到 ldconsole.exe: {console}")
+            raise EmulatorNotFoundError(f'找不到 ldconsole.exe: {console}')
 
-        serial = self._serial or "emulator-5554"
-        match = re.search(r"\d+", serial)
+        serial = self._serial or 'emulator-5554'
+        match = re.search(r'\d+', serial)
         emulator_index = int((int(match.group()) - 5554) / 2) if match else 0
 
-        cmd: list[str] = [console, command, "--index", str(emulator_index)]
+        cmd: list[str] = [console, command, '--index', str(emulator_index)]
         if command_arg:
             cmd.append(command_arg)
 
@@ -118,27 +119,25 @@ class WindowsEmulatorManager(EmulatorProcessManager):
 
     # ── MuMu CLI ──
 
-    def _mumuconsole(self, command: str, command_arg: str = "") -> str:
+    def _mumuconsole(self, command: str, command_arg: str = '') -> str:
         """调用 MuMuManager.exe 控制 MuMu 模拟器。"""
         if not self._path:
-            raise EmulatorNotFoundError("未设置 MuMu 模拟器路径")
+            raise EmulatorNotFoundError('未设置 MuMu 模拟器路径')
 
-        console = os.path.join(os.path.dirname(self._path), "MuMuManager.exe")
+        console = os.path.join(os.path.dirname(self._path), 'MuMuManager.exe')
         if not os.path.isfile(console):
-            raise EmulatorNotFoundError(f"找不到 MuMuManager.exe: {console}")
+            raise EmulatorNotFoundError(f'找不到 MuMuManager.exe: {console}')
 
-        serial = self._serial or "127.0.0.1:16384"
-        num_match = re.search(r"[:-]\s*(\d+)", serial)
+        serial = self._serial or '127.0.0.1:16384'
+        num_match = re.search(r'[:-]\s*(\d+)', serial)
         if num_match:
             num = int(num_match.group(1))
-            emulator_index = (
-                (num - 16384) // 32 if num >= 16384 else (num - 5555) // 2
-            )
+            emulator_index = (num - 16384) // 32 if num >= 16384 else (num - 5555) // 2
         else:
             emulator_index = 0
 
-        order = "info" if command == "is_android_started" else "control"
-        cmd: list[str] = [console, order, "-v", str(emulator_index), command]
+        order = 'info' if command == 'is_android_started' else 'control'
+        cmd: list[str] = [console, order, '-v', str(emulator_index), command]
         if command_arg:
             cmd.append(command_arg)
 
@@ -154,8 +153,8 @@ class WindowsEmulatorManager(EmulatorProcessManager):
             raw = subprocess.check_output(
                 f'tasklist /fi "ImageName eq {self._process_name}"',
                 shell=True,
-            ).decode("gbk", errors="replace")
-            return "PID" in raw
+            ).decode('gbk', errors='replace')
+            return 'PID' in raw
         except subprocess.CalledProcessError:
             return False
 
@@ -170,7 +169,5 @@ class WindowsEmulatorManager(EmulatorProcessManager):
         )
         out, err = proc.communicate()
         return (
-            out.decode("utf-8", errors="replace")
-            if out
-            else err.decode("utf-8", errors="replace")
+            out.decode('utf-8', errors='replace') if out else err.decode('utf-8', errors='replace')
         )

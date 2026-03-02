@@ -8,7 +8,7 @@ import pytest
 @pytest.fixture
 def fixtures_dir() -> Path:
     """测试数据目录。"""
-    return Path(__file__).parent / "fixtures"
+    return Path(__file__).parent / 'fixtures'
 
 
 @pytest.fixture
@@ -17,7 +17,7 @@ def tmp_yaml(tmp_path: Path):
 
     def _factory(name: str, content: str) -> Path:
         p = tmp_path / name
-        p.write_text(content, encoding="utf-8")
+        p.write_text(content, encoding='utf-8')
         return p
 
     return _factory

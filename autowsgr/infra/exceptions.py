@@ -66,7 +66,7 @@ class VisionError(AutoWSGRError):
 class ImageNotFoundError(VisionError):
     """图像模板匹配超时。"""
 
-    def __init__(self, template_name: str = "", timeout: float = 0) -> None:
+    def __init__(self, template_name: str = '', timeout: float = 0) -> None:
         self.template_name = template_name
         self.timeout = timeout
         super().__init__(f"未找到图像 '{template_name}'（超时 {timeout:.1f}s）")
@@ -90,23 +90,23 @@ class PageNotFoundError(UIError):
 class NavigationError(UIError):
     """页面导航失败。"""
 
-    def __init__(self, source: str, target: str, reason: str = "") -> None:
+    def __init__(self, source: str, target: str, reason: str = '') -> None:
         self.source = source
         self.target = target
-        msg = f"导航失败: {source} → {target}"
+        msg = f'导航失败: {source} → {target}'
         if reason:
-            msg += f" ({reason})"
+            msg += f' ({reason})'
         super().__init__(msg)
 
 
 class ActionFailedError(UIError):
     """UIAction 执行失败。"""
 
-    def __init__(self, action_name: str, reason: str = "") -> None:
+    def __init__(self, action_name: str, reason: str = '') -> None:
         self.action_name = action_name
-        msg = f"操作失败: {action_name}"
+        msg = f'操作失败: {action_name}'
         if reason:
-            msg += f" ({reason})"
+            msg += f' ({reason})'
         super().__init__(msg)
 
 
@@ -142,8 +142,8 @@ class CombatRecognitionTimeout(CombatError):
     def __init__(self, candidates: list[str] | None = None, timeout: float = 0) -> None:
         self.candidates = candidates or []
         self.timeout = timeout
-        names = ", ".join(self.candidates)
-        super().__init__(f"战斗状态识别超时 ({timeout:.1f}s): [{names}]")
+        names = ', '.join(self.candidates)
+        super().__init__(f'战斗状态识别超时 ({timeout:.1f}s): [{names}]')
 
 
 class CombatDecisionError(CombatError):

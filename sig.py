@@ -1,5 +1,5 @@
 绿血特征 = PixelSignature(
-    name="绿血特征",
+    name='绿血特征',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.0563, 0.5944, (77, 171, 135), tolerance=30.0),
@@ -18,7 +18,7 @@
 )
 
 空血特征 = PixelSignature(
-    name="空血特征",
+    name='空血特征',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.0914, 0.4014, (54, 55, 59), tolerance=30.0),
@@ -36,7 +36,7 @@
 )
 
 红血特征 = PixelSignature(
-    name="红血特征",
+    name='红血特征',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.0664, 0.2625, (156, 1, 0), tolerance=30.0),
@@ -50,4 +50,3 @@
         PixelRule.of(0.0984, 0.5403, (183, 36, 28), tolerance=30.0),
     ],
 )
-

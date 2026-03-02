@@ -15,13 +15,10 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
-import numpy as np
-from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 from autowsgr.image_resources import Templates
+from autowsgr.infra.logger import get_logger
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
     ImageChecker,
@@ -31,14 +28,21 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面识别签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="餐厅页",
+    name='餐厅页',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.7667, 0.0454, (27, 134, 228), tolerance=30.0),
@@ -140,13 +144,13 @@ class CanteenPage:
         """
         from autowsgr.ui.backyard_page import BackyardPage
 
-        _log.info("[UI] 食堂 → 返回后院")
+        _log.info('[UI] 食堂 → 返回后院')
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=BackyardPage.is_current_page,
-            source="食堂",
-            target="后院",
+            source='食堂',
+            target='后院',
         )
 
     # ── 操作 ──────────────────────────────────────────────────────────────
@@ -165,23 +169,23 @@ class CanteenPage:
             编号不在 1–3 范围内。
         """
         if position not in CLICK_RECIPE:
-            raise ValueError(f"菜谱编号必须为 1–3，收到: {position}")
-        _log.info("[UI] 食堂 → 选择菜谱 {}", position)
+            raise ValueError(f'菜谱编号必须为 1–3，收到: {position}')
+        _log.info('[UI] 食堂 → 选择菜谱 {}', position)
         self._ctrl.click(*CLICK_RECIPE[position])
 
     def confirm_force_cook(self) -> None:
         """「效果正在生效」弹窗 → 点击继续做菜。"""
-        _log.info("[UI] 食堂 → 确认继续做菜 (覆盖生效中的菜)")
+        _log.info('[UI] 食堂 → 确认继续做菜 (覆盖生效中的菜)')
         self._ctrl.click(*CLICK_FORCE_COOK)
 
     def cancel_force_cook(self) -> None:
         """「效果正在生效」弹窗 → 取消做菜。"""
-        _log.info("[UI] 食堂 → 取消做菜 (保留生效中的菜)")
+        _log.info('[UI] 食堂 → 取消做菜 (保留生效中的菜)')
         self._ctrl.click(*CLICK_CANCEL_COOK)
 
     def dismiss_popup(self) -> None:
         """关闭弹窗 (通用关闭按钮)。"""
-        _log.info("[UI] 食堂 → 关闭弹窗")
+        _log.info('[UI] 食堂 → 关闭弹窗')
         self._ctrl.click(*CLICK_DISMISS_POPUP)
 
     def click_to_skip_animation(self) -> None:
@@ -189,8 +193,9 @@ class CanteenPage:
 
         目前仅在做菜过程中使用，点击坐标为屏幕右下角。
         """
-        _log.info("[UI] 食堂 → 点击跳过动画")
+        _log.info('[UI] 食堂 → 点击跳过动画')
         self._ctrl.click(0.9, 0.9)
+
     # ── 组合动作 — 做菜 ──
 
     _COOK_BUTTON_TIMEOUT: float = 7.5
@@ -224,7 +229,7 @@ class CanteenPage:
                 break
             time.sleep(0.3)
         else:
-            raise TimeoutError(f"做菜按钮未出现 ({self._COOK_BUTTON_TIMEOUT}s)")
+            raise TimeoutError(f'做菜按钮未出现 ({self._COOK_BUTTON_TIMEOUT}s)')
 
         time.sleep(0.5)
 
@@ -245,6 +250,6 @@ class CanteenPage:
                 return False
 
         self.click_to_skip_animation()
-        _log.info("[UI] 做菜完成 (菜谱 {})", position)
-    
+        _log.info('[UI] 做菜完成 (菜谱 {})', position)
+
         return True

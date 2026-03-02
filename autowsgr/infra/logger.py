@@ -55,32 +55,38 @@ import inspect
 import logging
 import sys
 import time as _time
-from typing import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
 from loguru import logger
-from pathlib import Path
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import numpy as np
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 常量
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # 全局图片存储目录（由 setup_logger 设置）
-_image_dir = "logs/images"
+_image_dir = 'logs/images'
 
 # 项目根目录，用于将绝对路径转换为相对路径（Ctrl+点击用）
 _PROJECT_ROOT = Path(__file__).parent.parent
 
 # loguru 内置级别名 → 数值 (用于通道过滤)
 _LEVEL_MAP: dict[str, int] = {
-    "TRACE": 5,
-    "DEBUG": 10,
-    "INFO": 20,
-    "SUCCESS": 25,
-    "WARNING": 30,
-    "ERROR": 40,
-    "CRITICAL": 50,
+    'TRACE': 5,
+    'DEBUG': 10,
+    'INFO': 20,
+    'SUCCESS': 25,
+    'WARNING': 30,
+    'ERROR': 40,
+    'CRITICAL': 50,
 }
 
 # 默认通道级别：未在 channels 中指定的通道使用此值。
@@ -103,14 +109,14 @@ def _src_patcher(record: dict) -> None:
     在 VS Code 终端中可通过 Ctrl+点击直接跳转。
     """
     try:
-        rel = Path(record["file"].path).relative_to(_PROJECT_ROOT)
+        rel = Path(record['file'].path).relative_to(_PROJECT_ROOT)
         # 统一使用正斜杠，与 VS Code 兼容
-        record["extra"]["src"] = f"{rel.as_posix()}:{record['line']}"
+        record['extra']['src'] = f'{rel.as_posix()}:{record["line"]}'
     except ValueError:
-        record["extra"]["src"] = f"{record['file'].name}:{record['line']}"
+        record['extra']['src'] = f'{record["file"].name}:{record["line"]}'
 
     # 确保 ch 总是存在（未 bind 的 logger 调用不会有 ch）
-    record["extra"].setdefault("ch", "")
+    record['extra'].setdefault('ch', '')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -138,10 +144,10 @@ def _resolve_channel_level(channel: str) -> int | None:
         return _channel_levels[channel]
 
     # 前缀匹配 (从最长的开始)
-    best_prefix = ""
+    best_prefix = ''
     best_level: int | None = _DEFAULT_CHANNEL_LEVEL
     for prefix, level in _channel_levels.items():
-        if channel.startswith(prefix + ".") and len(prefix) > len(best_prefix):
+        if channel.startswith(prefix + '.') and len(prefix) > len(best_prefix):
             best_prefix = prefix
             best_level = level
     return best_level
@@ -156,12 +162,13 @@ def _make_channel_filter(sink_level: int) -> Callable:
 
     无通道 (ch="") 的消息仅检查 sink 级别。
     """
+
     def _filter(record: dict) -> bool:
-        msg_level = record["level"].no
+        msg_level = record['level'].no
         if msg_level < sink_level:
             return False
 
-        channel = record["extra"].get("ch", "")
+        channel = record['extra'].get('ch', '')
         if not channel:
             return True  # 无通道的消息不做额外过滤
 
@@ -200,9 +207,9 @@ def caller_info(depth: int = 1) -> str:
             rel = filepath.relative_to(_PROJECT_ROOT).as_posix()
         except ValueError:
             rel = filepath.name
-        return f"{rel}:{frame.lineno} in {frame.function}"
+        return f'{rel}:{frame.lineno} in {frame.function}'
     except Exception:
-        return "<unknown>"
+        return '<unknown>'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -240,9 +247,9 @@ def get_logger(channel: str):
 
 def setup_logger(
     log_dir: Path | None = None,
-    level: str = "INFO",
-    rotation: str = "10 MB",
-    retention: str = "7 days",
+    level: str = 'INFO',
+    rotation: str = '10 MB',
+    retention: str = '7 days',
     save_images: bool = False,
     channels: dict[str, str] | None = None,
 ) -> None:
@@ -286,10 +293,7 @@ def setup_logger(
         for ch_name, ch_level_str in channels.items():
             ch_level_str = ch_level_str.upper()
             if ch_level_str not in _LEVEL_MAP:
-                raise ValueError(
-                    f"无效的日志级别 '{ch_level_str}'，"
-                    f"有效值: {list(_LEVEL_MAP)}"
-                )
+                raise ValueError(f"无效的日志级别 '{ch_level_str}'，有效值: {list(_LEVEL_MAP)}")
             _channel_levels[ch_name] = _LEVEL_MAP[ch_level_str]
 
     # 移除所有已注册的 handler，避免重复输出
@@ -299,10 +303,10 @@ def setup_logger(
     logger.configure(patcher=_src_patcher)
 
     _FMT = (
-        "<green>{time:HH:mm:ss.SSS}</green> | "
-        "<level>{level:8}</level> | "
-        "<cyan>{extra[src]}</cyan> | "
-        "{message}"
+        '<green>{time:HH:mm:ss.SSS}</green> | '
+        '<level>{level:8}</level> | '
+        '<cyan>{extra[src]}</cyan> | '
+        '{message}'
     )
 
     # 控制台 sink — 级别过滤 + 通道过滤
@@ -320,48 +324,48 @@ def setup_logger(
 
         # 全量文件：固定 DEBUG，**不做**通道过滤（记录一切）
         logger.add(
-            log_dir / "autowsgr_{time:YYYY-MM-DD}.debug.log",
-            level="DEBUG",
+            log_dir / 'autowsgr_{time:YYYY-MM-DD}.debug.log',
+            level='DEBUG',
             rotation=rotation,
             retention=retention,
-            encoding="utf-8",
+            encoding='utf-8',
             format=_FMT,
         )
 
         # 过滤文件：与控制台 level 一致，受通道过滤
-        if level.upper() != "DEBUG":
+        if level.upper() != 'DEBUG':
             logger.add(
-                log_dir / "autowsgr_{time:YYYY-MM-DD}.log",
+                log_dir / 'autowsgr_{time:YYYY-MM-DD}.log',
                 level=0,
                 filter=_make_channel_filter(console_level_no),
                 rotation=rotation,
                 retention=retention,
-                encoding="utf-8",
+                encoding='utf-8',
                 format=_FMT,
             )
 
         # 图片目录
         if save_images:
-            _image_dir = log_dir / "images"
+            _image_dir = log_dir / 'images'
             _image_dir.mkdir(parents=True, exist_ok=True)
-            logger.debug("截图存储目录: {}", _image_dir)
+            logger.debug('截图存储目录: {}', _image_dir)
     else:
         _image_dir = None
 
     # ── 静默第三方库的 Python logging 噪音 ──────────────────────────────
     for _noisy in (
-        "airtest",
-        "airtest.core.android.adb",
-        "airtest.core.android.rotation",
-        "airtest.utils.nbsp",
-        "pocoui",
+        'airtest',
+        'airtest.core.android.adb',
+        'airtest.core.android.rotation',
+        'airtest.utils.nbsp',
+        'pocoui',
     ):
         logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 
 def save_image(
     image: np.ndarray,
-    tag: str = "screenshot",
+    tag: str = 'screenshot',
     img_dir: Path | None = None,
 ) -> Path | None:
     """将 RGB ndarray 截图保存到磁盘。
@@ -385,21 +389,21 @@ def save_image(
     target_dir = str(img_dir or _image_dir)
     target_dir = Path(target_dir)
     if target_dir is None:
-        raise ValueError("未配置图片保存目录，请在 setup_logger 中设置 log_dir 并启用 save_images")
+        raise ValueError('未配置图片保存目录，请在 setup_logger 中设置 log_dir 并启用 save_images')
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    ts = _time.strftime("%H%M%S") + f"_{int(_time.monotonic() * 1000) % 1000:03d}"
-    filename = f"{tag}_{ts}.png"
+    ts = _time.strftime('%H%M%S') + f'_{int(_time.monotonic() * 1000) % 1000:03d}'
+    filename = f'{tag}_{ts}.png'
     path = target_dir / filename
 
     # cv2.imwrite 期望 BGR 排列，而我们统一使用 RGB，写入前需转换
     bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     # 使用 imencode + write_bytes 避免 OpenCV C 层 ANSI 路径导致中文乱码
-    ok, buf = cv2.imencode(".png", bgr)
+    ok, buf = cv2.imencode('.png', bgr)
     if ok:
         path.write_bytes(buf.tobytes())
-        logger.debug("截图已保存: {}", path)
+        logger.debug('截图已保存: {}', path)
     else:
-        logger.warning("截图保存失败: {}", path)
+        logger.warning('截图保存失败: {}', path)
         return None
     return path

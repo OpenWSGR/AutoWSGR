@@ -16,11 +16,9 @@
 
 from __future__ import annotations
 
-import numpy as np
-from autowsgr.infra.logger import get_logger
+from typing import TYPE_CHECKING
 
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
+from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
@@ -29,14 +27,21 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面识别签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="好友页",
+    name='好友页',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.1953, 0.0444, (255, 255, 255), tolerance=30.0),
@@ -105,11 +110,11 @@ class FriendPage:
         """
         from autowsgr.ui.sidebar_page import SidebarPage
 
-        _log.info("[UI] 好友 → 返回侧边栏")
+        _log.info('[UI] 好友 → 返回侧边栏')
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=SidebarPage.is_current_page,
-            source="好友",
+            source='好友',
             target=PageName.SIDEBAR,
         )

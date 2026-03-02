@@ -30,10 +30,11 @@ from autowsgr.combat import CombatResult
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag
 
+
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
-_log = get_logger("scheduler")
+_log = get_logger('scheduler')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -64,15 +65,19 @@ class BatchRunnerAdapter:
     """
 
     def __init__(self, inner: object) -> None:
-        if not hasattr(inner, "run"):
-            raise TypeError(f"{type(inner).__name__} 没有 run() 方法")
+        if not hasattr(inner, 'run'):
+            raise TypeError(f'{type(inner).__name__} 没有 run() 方法')
         self._inner = inner
 
     def run(self) -> CombatResult:
         results = self._inner.run()  # type: ignore[union-attr]
         if isinstance(results, list):
-            return results[-1] if results else CombatResult(
-                flag=ConditionFlag.OPERATION_SUCCESS,
+            return (
+                results[-1]
+                if results
+                else CombatResult(
+                    flag=ConditionFlag.OPERATION_SUCCESS,
+                )
             )
         return results  # type: ignore[return-value]
 
@@ -100,7 +105,7 @@ class FightTask:
 
     runner: object
     times: int = 1
-    name: str = ""
+    name: str = ''
 
     # 运行时状态
     completed: int = field(default=0, init=False, repr=False)
@@ -145,8 +150,9 @@ class TaskScheduler:
         """添加一个战斗任务。支持链式调用。"""
         self._tasks.append(task)
         _log.info(
-            "[Scheduler] 添加任务: {} ×{}",
-            task.name, task.times,
+            '[Scheduler] 添加任务: {} ×{}',
+            task.name,
+            task.times,
         )
         return self
 
@@ -166,19 +172,22 @@ class TaskScheduler:
             执行完毕的任务列表 (包含结果)。
         """
         if not self._tasks:
-            _log.warning("[Scheduler] 无任务，直接退出")
+            _log.warning('[Scheduler] 无任务，直接退出')
             return []
 
         _log.info(
-            "[Scheduler] 开始调度: {} 个任务",
+            '[Scheduler] 开始调度: {} 个任务',
             len(self._tasks),
         )
         self._last_expedition_time = time.monotonic()
 
         for i, task in enumerate(self._tasks):
             _log.info(
-                "[Scheduler] ── 任务 {}/{}: {} ×{} ──",
-                i + 1, len(self._tasks), task.name, task.times,
+                '[Scheduler] ── 任务 {}/{}: {} ×{} ──',
+                i + 1,
+                len(self._tasks),
+                task.name,
+                task.times,
             )
             self._run_task(task)
 
@@ -194,8 +203,10 @@ class TaskScheduler:
 
         for j in range(task.times):
             _log.info(
-                "[Scheduler] {} 第 {}/{} 次",
-                task.name, j + 1, task.times,
+                '[Scheduler] {} 第 {}/{} 次',
+                task.name,
+                j + 1,
+                task.times,
             )
 
             # 远征检查 (战斗前)
@@ -205,8 +216,10 @@ class TaskScheduler:
                 result = runner.run()
             except Exception as exc:
                 _log.opt(exception=True).error(
-                    "[Scheduler] {} 第 {} 次异常: {}",
-                    task.name, j + 1, exc,
+                    '[Scheduler] {} 第 {} 次异常: {}',
+                    task.name,
+                    j + 1,
+                    exc,
                 )
                 result = CombatResult(flag=ConditionFlag.DOCK_FULL)
 
@@ -214,18 +227,19 @@ class TaskScheduler:
             task.completed += 1
 
             _log.info(
-                "[Scheduler] {} [{}/{}] → {}",
+                '[Scheduler] {} [{}/{}] → {}',
                 task.name,
                 task.completed,
                 task.times,
-                result.flag.value if result.flag else "N/A",
+                result.flag.value if result.flag else 'N/A',
             )
 
             # 船坞满则停止当前任务
             if result.flag == ConditionFlag.DOCK_FULL:
                 _log.warning(
-                    "[Scheduler] {} 船坞已满, 跳过剩余 {} 次",
-                    task.name, task.times - task.completed,
+                    '[Scheduler] {} 船坞已满, 跳过剩余 {} 次',
+                    task.name,
+                    task.times - task.completed,
                 )
                 break
 
@@ -241,7 +255,7 @@ class TaskScheduler:
             return
 
         _log.info(
-            "[Scheduler] 远征检查 (距上次 {:.0f}s)",
+            '[Scheduler] 远征检查 (距上次 {:.0f}s)',
             elapsed,
         )
         try:
@@ -250,7 +264,8 @@ class TaskScheduler:
             collect_expedition(self._ctx)
         except Exception as exc:
             _log.opt(exception=True).warning(
-                "[Scheduler] 远征检查失败: {}", exc,
+                '[Scheduler] 远征检查失败: {}',
+                exc,
             )
 
         self._last_expedition_time = time.monotonic()
@@ -259,21 +274,18 @@ class TaskScheduler:
 
     def _print_summary(self) -> None:
         """打印执行汇总。"""
-        _log.info("[Scheduler] " + "=" * 50)
-        _log.info("[Scheduler] 调度完成")
+        _log.info('[Scheduler] ' + '=' * 50)
+        _log.info('[Scheduler] 调度完成')
 
         total_fights = 0
         total_success = 0
 
         for task in self._tasks:
-            success = sum(
-                1 for r in task.results
-                if r.flag == ConditionFlag.OPERATION_SUCCESS
-            )
+            success = sum(1 for r in task.results if r.flag == ConditionFlag.OPERATION_SUCCESS)
             total_fights += task.completed
             total_success += success
             _log.info(
-                "[Scheduler]   {} : {}/{} 完成, {} 成功",
+                '[Scheduler]   {} : {}/{} 完成, {} 成功',
                 task.name,
                 task.completed,
                 task.times,
@@ -281,7 +293,8 @@ class TaskScheduler:
             )
 
         _log.info(
-            "[Scheduler] 总计: {} 场战斗, {} 成功",
-            total_fights, total_success,
+            '[Scheduler] 总计: {} 场战斗, {} 成功',
+            total_fights,
+            total_success,
         )
-        _log.info("[Scheduler] " + "=" * 50)
+        _log.info('[Scheduler] ' + '=' * 50)

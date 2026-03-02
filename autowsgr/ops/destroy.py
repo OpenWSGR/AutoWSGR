@@ -11,14 +11,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import PageName, ShipType
+
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
-_log = get_logger("ops")
+_log = get_logger('ops')
 
 
 def destroy_ships(
@@ -40,7 +40,7 @@ def destroy_ships(
     """
     from autowsgr.ui.build_page import BuildPage, BuildTab
 
-    _log.info("[OPS] 开始解装")
+    _log.info('[OPS] 开始解装')
     goto_page(ctx, PageName.BUILD)
 
     page = BuildPage(ctx)
@@ -48,4 +48,4 @@ def destroy_ships(
     page.destroy_ships(ship_types, remove_equipment=remove_equipment)
 
     goto_page(ctx, PageName.MAIN)
-    _log.info("[OPS] 解装完成")
+    _log.info('[OPS] 解装完成')

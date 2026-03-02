@@ -65,13 +65,17 @@ from __future__ import annotations
 
 import enum
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 
 from autowsgr.types import PageName
 from autowsgr.vision import Color, PixelChecker
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -125,7 +129,7 @@ TAB_DARK = (22, 37, 62)
 # 模板匹配常量与加载
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "data" / "images" / "ui"
+_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / 'data' / 'images' / 'ui'
 """参考模板目录 (autowsgr/ui/templates/)。"""
 
 _CROP_Y: float = 0.075
@@ -158,11 +162,11 @@ def _load_templates() -> dict[TabbedPageType, np.ndarray]:
         布尔数组 (True = 白色像素)。
     """
     mapping = {
-        TabbedPageType.MAP: "map.png",
-        TabbedPageType.BUILD: "build.png",
-        TabbedPageType.INTENSIFY: "intensify.png",
-        TabbedPageType.MISSION: "mission.png",
-        TabbedPageType.FRIEND: "friend.png",
+        TabbedPageType.MAP: 'map.png',
+        TabbedPageType.BUILD: 'build.png',
+        TabbedPageType.INTENSIFY: 'intensify.png',
+        TabbedPageType.MISSION: 'mission.png',
+        TabbedPageType.FRIEND: 'friend.png',
     }
     result: dict[TabbedPageType, np.ndarray] = {}
     for page_type, filename in mapping.items():
@@ -179,7 +183,7 @@ _templates: dict[TabbedPageType, np.ndarray] | None = None
 
 def _get_templates() -> dict[TabbedPageType, np.ndarray]:
     """获取参考模板 (懒加载 + 缓存)。"""
-    global _templates  # noqa: PLW0603
+    global _templates
     if _templates is None:
         _templates = _load_templates()
     return _templates
@@ -209,8 +213,12 @@ def _binarize_tabbar(screen: np.ndarray) -> np.ndarray:
     crop = screen[0 : int(h * _CROP_Y), 0 : int(w * _CROP_X)]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     binary = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, _ADAPTIVE_BLOCK, _ADAPTIVE_C,
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        _ADAPTIVE_BLOCK,
+        _ADAPTIVE_C,
     )
     resized = cv2.resize(binary, (_REF_W, _REF_H), interpolation=cv2.INTER_NEAREST)
     return resized > 0
@@ -358,10 +366,7 @@ def make_tab_checker(
     """
 
     def _check(screen: np.ndarray) -> bool:
-        return (
-            identify_page_type(screen) == page_type
-            and get_active_tab_index(screen) == tab_index
-        )
+        return identify_page_type(screen) == page_type and get_active_tab_index(screen) == tab_index
 
     return _check
 

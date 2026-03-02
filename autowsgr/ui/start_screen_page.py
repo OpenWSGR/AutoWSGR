@@ -15,21 +15,26 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
 from autowsgr.vision import MatchStrategy, PixelChecker, PixelRule, PixelSignature
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.emulator import AndroidController
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面识别签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="启动画面",
+    name='启动画面',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.0508, 0.8722, (204, 210, 208), tolerance=30.0),
@@ -96,6 +101,6 @@ class StartScreenPage:
         点击坐标为 :data:`CLICK_ENTER` ``(0.9, 0.85)``，点击后等待
         :data:`_CLICK_SETTLE` 秒让画面稳定，之后可开始检测登录浮层。
         """
-        _log.info("[UI] 点击「点击进入」按钮 {}", CLICK_ENTER)
+        _log.info('[UI] 点击「点击进入」按钮 {}', CLICK_ENTER)
         self._ctrl.click(*CLICK_ENTER)
         time.sleep(_CLICK_SETTLE)

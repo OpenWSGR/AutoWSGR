@@ -17,15 +17,21 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
-import numpy as np
-from autowsgr.emulator import AndroidController
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import PixelChecker
 
 from .constants import DismissCoord, OverlayKind, Sig
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.emulator import AndroidController
+
+
+_log = get_logger('ui')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -44,13 +50,13 @@ def detect_overlay(screen: np.ndarray) -> OverlayKind | None:
         检测到的浮层类型，无浮层返回 ``None``。
     """
     if PixelChecker.check_signature(screen, Sig.NEWS.ps).matched:
-        _log.debug("[UI] 检测到浮层: 新闻公告")
+        _log.debug('[UI] 检测到浮层: 新闻公告')
         return OverlayKind.NEWS
     if PixelChecker.check_signature(screen, Sig.SIGN.ps).matched:
-        _log.debug("[UI] 检测到浮层: 每日签到")
+        _log.debug('[UI] 检测到浮层: 每日签到')
         return OverlayKind.SIGN
     if PixelChecker.check_signature(screen, Sig.BOOKING.ps).matched:
-        _log.debug("[UI] 检测到浮层: 活动预约")
+        _log.debug('[UI] 检测到浮层: 活动预约')
         return OverlayKind.BOOKING
     return None
 
@@ -67,11 +73,11 @@ def dismiss_news(ctrl: AndroidController, screen: np.ndarray | None = None) -> N
 
     not_show = PixelChecker.check_signature(screen, Sig.NEWS_NOT_SHOW.ps).matched
     if not not_show:
-        _log.info("[UI] 新闻公告: 勾选「不再显示」")
+        _log.info('[UI] 新闻公告: 勾选「不再显示」')
         ctrl.click(*DismissCoord.NEWS_NOT_SHOW.xy)
         time.sleep(0.3)
 
-    _log.info("[UI] 新闻公告: 关闭")
+    _log.info('[UI] 新闻公告: 关闭')
     ctrl.click(*DismissCoord.NEWS_CLOSE.xy)
 
 
@@ -79,21 +85,22 @@ def dismiss_sign(ctrl: AndroidController) -> None:
     """关闭每日签到浮层。"""
     from autowsgr.ui.page import confirm_operation
 
-    _log.info("[UI] 每日签到: 关闭")
+    _log.info('[UI] 每日签到: 关闭')
     ctrl.click(*DismissCoord.SIGN_CONFIRM.xy)
     confirm_operation(ctrl, must_confirm=True, timeout=5.0)
 
 
 def dismiss_booking(ctrl: AndroidController) -> None:
     """关闭活动预约浮层。"""
-    _log.info("[UI] 活动预约: 关闭")
+    _log.info('[UI] 活动预约: 关闭')
     ctrl.click(*DismissCoord.BOOKING.xy)
     time.sleep(1.0)
     # 二次确认 — 若仍未返回主页面则再点一次
     from autowsgr.ui.main_page.constants import Sig as _Sig
+
     screen = ctrl.screenshot()
     if not PixelChecker.check_signature(screen, _Sig.PAGE.ps).matched:
-        _log.warning("[UI] 活动预约: 首次关闭未生效，重试")
+        _log.warning('[UI] 活动预约: 首次关闭未生效，重试')
         ctrl.click(*DismissCoord.BOOKING.xy)
         time.sleep(1.0)
 
@@ -113,4 +120,4 @@ def dismiss_overlay(ctrl: AndroidController, overlay: OverlayKind) -> None:
         case OverlayKind.BOOKING:
             dismiss_booking(ctrl)
         case _:
-            raise ValueError(f"未知浮层类型: {overlay}")
+            raise ValueError(f'未知浮层类型: {overlay}')

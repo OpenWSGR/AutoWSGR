@@ -8,14 +8,15 @@ from .game_context import GameContext
 from .resources import Resources
 from .ship import Ship
 
+
 __all__ = [
-    "BuildQueue",
-    "BuildSlot",
-    "Equipment",
-    "Expedition",
-    "ExpeditionQueue",
-    "Fleet",
-    "GameContext",
-    "Resources",
-    "Ship",
+    'BuildQueue',
+    'BuildSlot',
+    'Equipment',
+    'Expedition',
+    'ExpeditionQueue',
+    'Fleet',
+    'GameContext',
+    'Resources',
+    'Ship',
 ]

@@ -9,17 +9,20 @@ TODO: 修船逻辑
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
+from autowsgr.combat import CombatMode, CombatPlan, CombatResult, NodeDecision, run_combat
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.combat import CombatResult, run_combat, CombatMode, CombatPlan, NodeDecision
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode, ShipDamageState
-from autowsgr.ui import BattlePreparationPage, RepairStrategy, MapPage, MapPanel
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
+from autowsgr.types import Formation, PageName, ShipDamageState
+from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel
 
-_log = get_logger("ops")
+
+if TYPE_CHECKING:
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ops')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 配置
@@ -50,19 +53,18 @@ class ExerciseRunner:
             每次演习的战斗结果列表。
         """
         self._results = []
-        _log.info("[OPS] 开始演习流程")
+        _log.info('[OPS] 开始演习流程')
 
         # 1. 导航到演习面板
         self._enter_exercise_page()
         rivals_status = MapPage(self._ctx).get_exercise_rival_status()
-        _log.info("[OPS] 当前可挑战对手: {}", rivals_status)
+        _log.info('[OPS] 当前可挑战对手: {}', rivals_status)
         for index, rival in enumerate(rivals_status.rivals, start=1):
             if rival:
-                _log.info("[OPS] 正在挑战对手 {}", index)
+                _log.info('[OPS] 正在挑战对手 {}', index)
                 self._results.append(self._challenge_rival(index))
-        _log.info("[OPS] 演习流程结束, 共完成 {} 场", len(self._results))
+        _log.info('[OPS] 演习流程结束, 共完成 {} 场', len(self._results))
         return self._results
-
 
     # ── 导航 ──
 
@@ -74,13 +76,13 @@ class ExerciseRunner:
         time.sleep(1.0)
 
     # ── 对手选择 ──
-    
+
     def _challenge_rival(self, rival: int) -> CombatResult:
         """选择一个可挑战的对手。"""
         self._enter_exercise_page()
         if rival < 1 or rival > 5:
-            raise ValueError(f"无效的对手索引: {rival} (应在 1–5 之间)")
-        _log.info("[OPS] 选择对手 {}", rival)
+            raise ValueError(f'无效的对手索引: {rival} (应在 1–5 之间)')
+        _log.info('[OPS] 选择对手 {}', rival)
         map_page = MapPage(self._ctx)
         map_page.select_exercise_rival(rival)
         map_page.enter_exercise_battle()
@@ -111,14 +113,11 @@ class ExerciseRunner:
 
     def _do_combat(self, ship_stats: list[ShipDamageState]) -> CombatResult:
         """构建 CombatPlan 并执行战斗。"""
-        _log.debug("[OPS] 演习战斗开始")
+        _log.debug('[OPS] 演习战斗开始')
         plan = CombatPlan(
-            name="演习",
+            name='演习',
             mode=CombatMode.EXERCISE,
-            default_node=NodeDecision(
-                formation=Formation.single_column,
-                night=True
-            ),
+            default_node=NodeDecision(formation=Formation.single_column, night=True),
         )
 
         result = run_combat(
@@ -126,7 +125,7 @@ class ExerciseRunner:
             plan,
             ship_stats=ship_stats,
         )
-        _log.debug("[OPS] 演习战斗结束")
+        _log.debug('[OPS] 演习战斗结束')
         return result
 
 
@@ -140,4 +139,3 @@ def run_exercise(
     if rival is None:
         return runner.run()
     return [runner._challenge_rival(rival)]
-

@@ -39,6 +39,7 @@ import sys
 import time
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from testing.ui._framework import (
@@ -75,8 +76,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 1: 验证初始状态 (is_current_page) ────────────────────
     runner.verify_current(
-        "初始验证: 活动地图页面 (is_current_page)",
-        "活动地图页面",
+        '初始验证: 活动地图页面 (is_current_page)',
+        '活动地图页面',
         BaseEventPage.is_current_page,
     )
     if runner.aborted:
@@ -84,9 +85,9 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 2: 浮层检测 ──────────────────────────────────────────
     runner.read_state(
-        "活动地图状态",
+        '活动地图状态',
         readers={
-            "浮层 (进入页弹窗)": lambda s: BaseEventPage._detect_overlay(s),
+            '浮层 (进入页弹窗)': lambda s: BaseEventPage._detect_overlay(s),
         },
     )
 
@@ -95,19 +96,19 @@ def run_test(runner: UIControllerTestRunner) -> None:
     # ═══════════════════════════════════════════════════════════════════════
 
     # ───── Step 3: 读取当前难度 ──────────────────────────────────────
-    initial_difficulty: str = "H"  # 默认值，读取失败时维持
+    initial_difficulty: str = 'H'  # 默认值，读取失败时维持
     try:
         initial_difficulty = event_page._get_difficulty()
-        ok(f"当前难度: {initial_difficulty} ({'困难' if initial_difficulty == 'H' else '简单'})")
+        ok(f'当前难度: {initial_difficulty} ({"困难" if initial_difficulty == "H" else "简单"})')
     except Exception as exc:
-        warn(f"读取难度失败: {exc}")
+        warn(f'读取难度失败: {exc}')
 
     # ───── Step 4: 切换到相反难度并验证 ──────────────────────────────
-    opposite = "E" if initial_difficulty == "H" else "H"
-    opposite_label = "简单" if opposite == "E" else "困难"
+    opposite = 'E' if initial_difficulty == 'H' else 'H'
+    opposite_label = '简单' if opposite == 'E' else '困难'
     runner.execute_step(
-        f"切换难度: {initial_difficulty} → {opposite} ({opposite_label})",
-        "活动地图页面",
+        f'切换难度: {initial_difficulty} → {opposite} ({opposite_label})',
+        '活动地图页面',
         lambda s: event_page._get_difficulty() == opposite,
         lambda: event_page._change_difficulty(opposite),
     )
@@ -115,10 +116,10 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     # ───── Step 5: 切换回原难度并验证 ────────────────────────────────
-    initial_label = "困难" if initial_difficulty == "H" else "简单"
+    initial_label = '困难' if initial_difficulty == 'H' else '简单'
     runner.execute_step(
-        f"切换回原难度: {opposite} → {initial_difficulty} ({initial_label})",
-        "活动地图页面",
+        f'切换回原难度: {opposite} → {initial_difficulty} ({initial_label})',
+        '活动地图页面',
         lambda s: event_page._get_difficulty() == initial_difficulty,
         lambda: event_page._change_difficulty(initial_difficulty),
     )
@@ -131,8 +132,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 6: 活动地图 → ◁ 主页面 ──────────────────────────────────
     runner.execute_step(
-        "活动地图 → ◁ 主页面",
-        "主页面",
+        '活动地图 → ◁ 主页面',
+        '主页面',
         MainPage.is_current_page,
         lambda: event_page.go_back(),
     )
@@ -141,8 +142,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 7: 主页面 → 活动地图 (双向导航验证) ────────────────────
     runner.execute_step(
-        "主页面 → 活动地图 (双向导航验证)",
-        "活动地图页面",
+        '主页面 → 活动地图 (双向导航验证)',
+        '活动地图页面',
         BaseEventPage.is_current_page,
         lambda: main_page.navigate_to(MainPage.Target.EVENT),
     )
@@ -155,8 +156,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 8: 选择节点 → 检测浮层 ────────────────────────────────────
     runner.execute_step(
-        "选择节点 1 → 检测浮层 (节点进入页)",
-        "活动地图页面",
+        '选择节点 1 → 检测浮层 (节点进入页)',
+        '活动地图页面',
         BaseEventPage.is_current_page,
         lambda: _try_enter_node(event_page, node_id=1),
     )
@@ -165,8 +166,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 9: 最终验证 ──────────────────────────────────────────
     runner.verify_current(
-        "最终验证: 活动地图页面",
-        "活动地图页面",
+        '最终验证: 活动地图页面',
+        '活动地图页面',
         BaseEventPage.is_current_page,
     )
 
@@ -207,14 +208,14 @@ def _navigate_to(ctrl, pause: float) -> None:
 
 def main() -> None:
     args = parse_e2e_args(
-        "活动地图页面 (BaseEventPage) e2e 测试",
-        precondition="游戏位于活动地图页面 (主页面 → 活动入口)",
-        default_log_dir="logs/e2e/event_page",
+        '活动地图页面 (BaseEventPage) e2e 测试',
+        precondition='游戏位于活动地图页面 (主页面 → 活动入口)',
+        default_log_dir='logs/e2e/event_page',
     )
     ctrl = connect_via_launcher(args.serial, args.log_dir, args.log_level)
     from loguru import logger
 
-    logger.info("=== 活动地图页面 e2e 测试开始 ===")
+    logger.info('=== 活动地图页面 e2e 测试开始 ===')
 
     from autowsgr.ui.event.event_page import BaseEventPage
 
@@ -222,7 +223,7 @@ def main() -> None:
         ctrl,
         BaseEventPage.is_current_page,
         lambda: _navigate_to(ctrl, args.pause),
-        "活动地图页面",
+        '活动地图页面',
         auto_mode=args.auto,
         pause=args.pause,
     ):
@@ -231,7 +232,7 @@ def main() -> None:
 
     runner = UIControllerTestRunner(
         ctrl,
-        controller_name="活动地图页面",
+        controller_name='活动地图页面',
         log_dir=args.log_dir,
         auto_mode=args.auto,
         pause=args.pause,
@@ -239,22 +240,22 @@ def main() -> None:
     try:
         run_test(runner)
     except KeyboardInterrupt:
-        warn("用户中断 (Ctrl+C)")
+        warn('用户中断 (Ctrl+C)')
     except Exception as exc:
         from testing.ui._framework import fail
 
-        fail(f"未预期异常: {exc}")
-        logger.opt(exception=True).error("活动地图页面 e2e 测试异常")
+        fail(f'未预期异常: {exc}')
+        logger.opt(exception=True).error('活动地图页面 e2e 测试异常')
     finally:
         runner.finalize()
         runner.print_summary()
         ctrl.disconnect()
-        info("设备已断开")
+        info('设备已断开')
 
-    logger.info("=== 活动地图页面 e2e 测试结束 ===")
+    logger.info('=== 活动地图页面 e2e 测试结束 ===')
     r = runner.report
     sys.exit(1 if (r.failed > 0 or r.errors > 0) else 0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

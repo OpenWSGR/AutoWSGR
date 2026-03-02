@@ -9,8 +9,6 @@
 
 from __future__ import annotations
 
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 from autowsgr.ui.map.panels import (
     CampaignPanelMixin,
     DecisivePanelMixin,
@@ -18,7 +16,6 @@ from autowsgr.ui.map.panels import (
     ExpeditionPanelMixin,
     SortiePanelMixin,
 )
-from autowsgr.vision import OCREngine
 
 
 class MapPage(

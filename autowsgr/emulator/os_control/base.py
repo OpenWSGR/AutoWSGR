@@ -77,5 +77,5 @@ class EmulatorProcessManager(ABC):
         start_time = time.monotonic()
         while not self.is_running():
             if time.monotonic() - start_time > timeout:
-                raise EmulatorError(f"模拟器启动超时 ({timeout}s)")
+                raise EmulatorError(f'模拟器启动超时 ({timeout}s)')
             time.sleep(1)

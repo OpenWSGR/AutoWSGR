@@ -29,8 +29,9 @@ from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
 from autowsgr.ui.decisive.map_controller import DecisiveMapController
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 
+
 __all__ = [
-    "DecisiveBattlePage",
-    "DecisiveMapController",
-    "DecisiveBattlePreparationPage",
+    'DecisiveBattlePage',
+    'DecisiveBattlePreparationPage',
+    'DecisiveMapController',
 ]

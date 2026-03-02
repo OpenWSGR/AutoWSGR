@@ -6,11 +6,12 @@ import json
 import os
 import subprocess
 
-from .base import EmulatorProcessManager
-
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("emulator")
+from .base import EmulatorProcessManager
+
+
+_log = get_logger('emulator')
 from autowsgr.infra import EmulatorError, EmulatorNotFoundError
 from autowsgr.types import EmulatorType
 
@@ -22,62 +23,58 @@ class MacEmulatorManager(EmulatorProcessManager):
         if not self._process_name:
             return False
         try:
-            subprocess.check_output(
-                f"pgrep -f {self._process_name}", shell=True
-            )
+            subprocess.check_output(f'pgrep -f {self._process_name}', shell=True)
         except subprocess.CalledProcessError:
             return False
 
         if self._emulator_type == EmulatorType.mumu:
             mumu_info = self._get_mumu_info()
-            port = (self._serial or "").split(":")[-1]
-            results = mumu_info.get("return", {}).get("results", [])
-            return any(port == v.get("adb_port") for v in results)
+            port = (self._serial or '').split(':')[-1]
+            results = mumu_info.get('return', {}).get('results', [])
+            return any(port == v.get('adb_port') for v in results)
         return True
 
     def start(self) -> None:
         if not self._path:
-            raise EmulatorNotFoundError("未设置模拟器路径，无法启动")
+            raise EmulatorNotFoundError('未设置模拟器路径，无法启动')
 
         try:
-            subprocess.Popen(f"open -a {self._path}", shell=True)
+            subprocess.Popen(f'open -a {self._path}', shell=True)
             if self._emulator_type == EmulatorType.mumu:
                 self._mumu_restart_instance()
             self.wait_until_online()
-            _log.info("模拟器已启动")
+            _log.info('模拟器已启动')
         except EmulatorError:
             raise
         except Exception as exc:
-            raise EmulatorError(f"启动模拟器失败: {exc}") from exc
+            raise EmulatorError(f'启动模拟器失败: {exc}') from exc
 
     def stop(self) -> None:
         if self._emulator_type == EmulatorType.mumu:
-            _log.info("MuMu macOS 版暂不支持 CLI 关闭")
+            _log.info('MuMu macOS 版暂不支持 CLI 关闭')
             return
         if not self._process_name:
-            raise EmulatorError("未设置进程名，无法停止")
+            raise EmulatorError('未设置进程名，无法停止')
         try:
-            subprocess.Popen(
-                f"pkill -9 -f {self._process_name}", shell=True
-            )
-            _log.info("模拟器已停止")
+            subprocess.Popen(f'pkill -9 -f {self._process_name}', shell=True)
+            _log.info('模拟器已停止')
         except Exception as exc:
-            raise EmulatorError(f"停止模拟器失败: {exc}") from exc
+            raise EmulatorError(f'停止模拟器失败: {exc}') from exc
 
     # ── MuMu macOS 辅助 ──
 
     @property
     def _mumu_tool(self) -> str:
         if not self._path:
-            return ""
-        return os.path.join(self._path, "Contents/MacOS/mumutool")
+            return ''
+        return os.path.join(self._path, 'Contents/MacOS/mumutool')
 
     def _get_mumu_info(self) -> dict:
         tool = self._mumu_tool
         if not tool or not os.path.isfile(tool):
             return {}
         proc = subprocess.Popen(
-            f"{tool} info all",
+            f'{tool} info all',
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=True,
@@ -91,14 +88,12 @@ class MacEmulatorManager(EmulatorProcessManager):
     def _mumu_restart_instance(self) -> None:
         """重启对应 MuMu 实例（通过端口匹配）。"""
         tool = self._mumu_tool
-        port = (self._serial or "").split(":")[-1]
+        port = (self._serial or '').split(':')[-1]
         info = self._get_mumu_info()
-        for idx, v in enumerate(
-            info.get("return", {}).get("results", [])
-        ):
-            if port == v.get("adb_port"):
+        for idx, v in enumerate(info.get('return', {}).get('results', [])):
+            if port == v.get('adb_port'):
                 subprocess.Popen(
-                    f"{tool} restart {idx}",
+                    f'{tool} restart {idx}',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     shell=True,

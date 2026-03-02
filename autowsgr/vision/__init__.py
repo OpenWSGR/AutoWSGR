@@ -29,7 +29,7 @@
 """
 
 from .api_dll import ApiDll, get_api_dll
-from .image_matcher import ImageChecker, TEMPLATE_SOURCE_RESOLUTION
+from .image_matcher import TEMPLATE_SOURCE_RESOLUTION, ImageChecker
 from .image_template import (
     ImageMatchDetail,
     ImageMatchResult,
@@ -37,6 +37,8 @@ from .image_template import (
     ImageSignature,
     ImageTemplate,
 )
+from .matcher import PixelChecker
+from .ocr import EasyOCREngine, OCREngine, OCRResult, ShipNameMismatchError
 from .pixel import (
     Color,
     CompositePixelSignature,
@@ -46,35 +48,34 @@ from .pixel import (
     PixelRule,
     PixelSignature,
 )
-from .matcher import PixelChecker
-from .ocr import OCREngine, OCRResult, EasyOCREngine, ShipNameMismatchError
 from .roi import ROI
+
 
 __all__ = [
     # matcher (pixel)
-    "Color",
-    "CompositePixelSignature",
-    "MatchStrategy",
-    "PixelChecker",
-    "PixelDetail",
-    "PixelMatchResult",
-    "PixelRule",
-    "PixelSignature",
+    'Color',
+    'CompositePixelSignature',
+    'MatchStrategy',
+    'PixelChecker',
+    'PixelDetail',
+    'PixelMatchResult',
+    'PixelRule',
+    'PixelSignature',
     # image_matcher (template)
-    "ROI",
-    "ImageTemplate",
-    "ImageRule",
-    "ImageSignature",
-    "ImageChecker",
-    "ImageMatchResult",
-    "ImageMatchDetail",
-    "TEMPLATE_SOURCE_RESOLUTION",
+    'ROI',
+    'ImageTemplate',
+    'ImageRule',
+    'ImageSignature',
+    'ImageChecker',
+    'ImageMatchResult',
+    'ImageMatchDetail',
+    'TEMPLATE_SOURCE_RESOLUTION',
     # ocr
-    "OCREngine",
-    "OCRResult",
-    "EasyOCREngine",
-    "ShipNameMismatchError",
+    'OCREngine',
+    'OCRResult',
+    'EasyOCREngine',
+    'ShipNameMismatchError',
     # api_dll
-    "ApiDll",
-    "get_api_dll",
+    'ApiDll',
+    'get_api_dll',
 ]

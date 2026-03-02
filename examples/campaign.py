@@ -3,8 +3,9 @@
 执行 3 次困难航母战役。
 """
 
-from autowsgr.scheduler import launch
 from autowsgr.ops import CampaignRunner
+from autowsgr.scheduler import launch
+
 
 # 1. 启动
 ctx = launch('usersettings.yaml')
