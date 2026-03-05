@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Literal
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat
 from autowsgr.infra.logger import get_logger
-from autowsgr.ops import goto_page
+from autowsgr.ops.navigate import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.event.event_page import BaseEventPage
