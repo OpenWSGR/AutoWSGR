@@ -173,11 +173,7 @@ async def system_status():
 
 
 TaskRequestUnion = Annotated[
-    NormalFightRequest
-    | EventFightRequest
-    | CampaignRequest
-    | ExerciseRequest
-    | DecisiveRequest,
+    NormalFightRequest | EventFightRequest | CampaignRequest | ExerciseRequest | DecisiveRequest,
     Discriminator('type'),
 ]
 
