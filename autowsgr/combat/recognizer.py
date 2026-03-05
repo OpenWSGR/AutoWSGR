@@ -285,6 +285,10 @@ class CombatRecognizer:
         )
 
         while time.time() < deadline:
+            # 检查停止信号
+            if self._ctx.stop_event.is_set():
+                raise CombatStopRequested('任务被用户停止')
+
             screen = self._device.screenshot()
             if poll_action is not None:
                 poll_action(screen)
@@ -331,3 +335,7 @@ class CombatRecognizer:
 
 class CombatRecognitionTimeout(Exception):
     """战斗状态识别超时。"""
+
+
+class CombatStopRequested(Exception):
+    """外部请求停止战斗。"""

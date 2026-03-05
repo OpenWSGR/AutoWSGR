@@ -16,6 +16,7 @@ from .plan import MODE_CATEGORIES, CombatMode, CombatPlan, NodeDecision
 from .recognizer import (
     CombatRecognitionTimeout,
     CombatRecognizer,
+    CombatStopRequested,
 )
 from .state import CombatPhase, ModeCategory, resolve_successors
 
@@ -154,6 +155,10 @@ class CombatEngine(PhaseHandlersMixin):
         while True:
             try:
                 decision = self._step()
+            except CombatStopRequested:
+                _log.info('[Combat] 收到停止请求，正在退出战斗')
+                result.flag = ConditionFlag.FIGHT_END
+                break
             except CombatRecognitionTimeout as e:
                 _log.warning('[Combat] 状态识别超时: {}', e)
                 if self._try_recovery():

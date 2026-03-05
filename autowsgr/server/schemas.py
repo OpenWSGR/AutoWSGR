@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -105,7 +105,7 @@ class CombatPlanRequest(BaseModel):
 class NormalFightRequest(BaseModel):
     """常规战请求。"""
 
-    type: TaskType = TaskType.NORMAL_FIGHT
+    type: Literal[TaskType.NORMAL_FIGHT] = TaskType.NORMAL_FIGHT
     plan: CombatPlanRequest | None = Field(
         default=None,
         description='作战计划 (与 plan_id 二选一)',
@@ -123,7 +123,7 @@ class NormalFightRequest(BaseModel):
 class EventFightRequest(BaseModel):
     """活动战请求。"""
 
-    type: TaskType = TaskType.EVENT_FIGHT
+    type: Literal[TaskType.EVENT_FIGHT] = TaskType.EVENT_FIGHT
     plan: CombatPlanRequest | None = Field(default=None)
     plan_id: str | None = Field(default=None)
     times: int = Field(default=1, ge=1)
@@ -136,7 +136,7 @@ class EventFightRequest(BaseModel):
 class CampaignRequest(BaseModel):
     """战役请求。"""
 
-    type: TaskType = TaskType.CAMPAIGN
+    type: Literal[TaskType.CAMPAIGN] = TaskType.CAMPAIGN
     campaign_name: str = Field(description="战役名称，如 '困难航母'")
     times: int = Field(default=1, ge=1, description='执行次数')
 
@@ -146,7 +146,7 @@ class CampaignRequest(BaseModel):
 class ExerciseRequest(BaseModel):
     """演习请求。"""
 
-    type: TaskType = TaskType.EXERCISE
+    type: Literal[TaskType.EXERCISE] = TaskType.EXERCISE
     fleet_id: int = Field(default=1, ge=1, le=6)
 
     model_config = {'extra': 'forbid'}
@@ -155,7 +155,7 @@ class ExerciseRequest(BaseModel):
 class DecisiveRequest(BaseModel):
     """决战请求。"""
 
-    type: TaskType = TaskType.DECISIVE
+    type: Literal[TaskType.DECISIVE] = TaskType.DECISIVE
     chapter: int = Field(default=6, ge=1, le=6, description='决战章节')
     level1: list[str] = Field(
         default_factory=lambda: [
