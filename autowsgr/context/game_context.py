@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -81,6 +82,9 @@ class GameContext:
     """当天掉落胖次数。"""
     quick_repair_used: int = 0
     """本次会话已消耗快修数。"""
+
+    stop_event: threading.Event = field(default_factory=threading.Event)
+    """任务停止信号 (由 TaskManager 设置)。"""
 
     # ── 便捷访问 ──
 

@@ -16,11 +16,11 @@ from __future__ import annotations
 import asyncio
 import json
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Discriminator
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.server.schemas import (
@@ -172,13 +172,19 @@ async def system_status():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@app.post('/api/task/start', response_model=ApiResponse)
-async def task_start(
-    request: NormalFightRequest
+TaskRequestUnion = Annotated[
+    NormalFightRequest
     | EventFightRequest
     | CampaignRequest
     | ExerciseRequest
     | DecisiveRequest,
+    Discriminator('type'),
+]
+
+
+@app.post('/api/task/start', response_model=ApiResponse)
+async def task_start(
+    request: TaskRequestUnion,
 ):  # type: ignore
     """启动任务 (异步执行，立即返回)。"""
     if task_manager.is_running:
@@ -188,6 +194,9 @@ async def task_start(
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+    # 将任务管理器的停止事件绑定到游戏上下文
+    ctx.stop_event = task_manager._stop_event
 
     # 根据任务类型分发
     if isinstance(request, NormalFightRequest):
