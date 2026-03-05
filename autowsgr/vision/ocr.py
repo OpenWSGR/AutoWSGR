@@ -15,18 +15,25 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
 import easyocr
-import numpy as np
 
 from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("vision.ocr")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+
+_log = get_logger('vision.ocr')
 
 
 # ── 结果数据类 ──
 
-REPLACE_RULE: dict[str, str] = {"鲍鱼": "鲃鱼"}
+REPLACE_RULE: dict[str, str] = {'鲍鱼': '鲃鱼'}
+
 
 @dataclass(frozen=True, slots=True)
 class OCRResult:
@@ -78,7 +85,7 @@ class ShipNameMismatchError(ValueError):
         self.max_threshold = max_threshold
         super().__init__(
             f"OCR 识别到 '{text}'，与最近候选 '{best_candidate}' 编辑距离={distance} "
-            f"超过最大阈值 {max_threshold}，拒绝匹配"
+            f'超过最大阈值 {max_threshold}，拒绝匹配'
         )
 
 
@@ -106,7 +113,7 @@ class OCREngine(ABC):
     def recognize(
         self,
         image: np.ndarray,
-        allowlist: str = "",
+        allowlist: str = '',
     ) -> list[OCRResult]:
         """识别图像中的文字。
 
@@ -129,7 +136,7 @@ class OCREngine(ABC):
     def recognize_single(
         self,
         image: np.ndarray,
-        allowlist: str = "",
+        allowlist: str = '',
     ) -> OCRResult:
         """识别单个文本区域，返回置信度最高的结果。
 
@@ -138,8 +145,8 @@ class OCREngine(ABC):
         results = self.recognize(image, allowlist)
         _log_fn = _log.debug if self.verbose else _log.trace
         if not results:
-            _log_fn("[OCR] recognize_single: 无结果")
-            return OCRResult(text="", confidence=0.0)
+            _log_fn('[OCR] recognize_single: 无结果')
+            return OCRResult(text='', confidence=0.0)
         best = max(results, key=lambda r: r.confidence)
         _log_fn("[OCR] recognize_single: '{}' (conf={:.2f})", best.text, best.confidence)
         return best
@@ -147,7 +154,7 @@ class OCREngine(ABC):
     def recognize_number(
         self,
         image: np.ndarray,
-        extra_chars: str = "",
+        extra_chars: str = '',
     ) -> int | None:
         """识别数字，支持 K/M 后缀。
         不依赖位置信息
@@ -163,17 +170,17 @@ class OCREngine(ABC):
         int | None
             识别出的数字，无法解析时返回 None。
         """
-        result = self.recognize_single(image, allowlist="0123456789" + extra_chars)
+        result = self.recognize_single(image, allowlist='0123456789' + extra_chars)
         text = result.text.strip()
         if not text:
             return None
 
         # 处理 K / M 后缀
         multiplier = 1
-        if text.upper().endswith("K"):
+        if text.upper().endswith('K'):
             multiplier = 1000
             text = text[:-1]
-        elif text.upper().endswith("M"):
+        elif text.upper().endswith('M'):
             multiplier = 1_000_000
             text = text[:-1]
 
@@ -213,19 +220,21 @@ class OCREngine(ABC):
         result = self.recognize_single(image)
         _log_fn = _log.debug if self.verbose else _log.trace
         if not result.text:
-            _log_fn("[OCR] recognize_ship_name: 无文本")
+            _log_fn('[OCR] recognize_ship_name: 无文本')
             return None
         if result.text in REPLACE_RULE:
             matched = REPLACE_RULE[result.text]
             _log_fn(
                 "[OCR] recognize_ship_name: '{}' → '{}' (替换规则)",
-                result.text, matched,
+                result.text,
+                matched,
             )
             return matched
         matched = _fuzzy_match(result.text, candidates, threshold)
         _log_fn(
             "[OCR] recognize_ship_name: '{}' → '{}'",
-            result.text, matched if matched else "\u672a匹配",
+            result.text,
+            matched or '\u672a匹配',
         )
         return matched
 
@@ -288,7 +297,7 @@ class OCREngine(ABC):
                     if dist > max_threshold:
                         raise ShipNameMismatchError(text, best_candidate, dist, max_threshold)
                 _log_fn("[OCR] recognize_ship_names: '{}' 无匹配 (阈值={})，跳过", text, threshold)
-        _log_fn("[OCR] recognize_ship_names: 共识别 {} 艰: {}", len(matched), matched)
+        _log_fn('[OCR] recognize_ship_names: 共识别 {} 艰: {}', len(matched), matched)
         return matched
 
     # ── 工厂方法 ──
@@ -297,7 +306,7 @@ class OCREngine(ABC):
     """已创建的引擎单例缓存，key 为 ``"<engine>:<gpu>"``。"""
 
     @classmethod
-    def create(cls, engine: str = "easyocr", gpu: bool = False) -> OCREngine:
+    def create(cls, engine: str = 'easyocr', gpu: bool = False) -> OCREngine:
         """创建或获取 OCR 引擎实例（单例）。
 
         首次调用时创建引擎实例并缓存，后续相同参数的调用直接返回缓存实例。
@@ -313,17 +322,17 @@ class OCREngine(ABC):
         -------
         OCREngine
         """
-        cache_key = f"{engine}:{gpu}"
+        cache_key = f'{engine}:{gpu}'
         if cache_key in cls._instances:
-            _log.debug("[OCR] 复用已有 {} 实例（gpu={}）", engine, gpu)
+            _log.debug('[OCR] 复用已有 {} 实例（gpu={}）', engine, gpu)
             return cls._instances[cache_key]
 
-        if engine == "easyocr":
-            _log.info("[OCR] 初始化 EasyOCR（gpu={}）", gpu)
+        if engine == 'easyocr':
+            _log.info('[OCR] 初始化 EasyOCR（gpu={}）', gpu)
             instance = EasyOCREngine(gpu=gpu)
             cls._instances[cache_key] = instance
             return instance
-        raise ValueError(f"不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr")
+        raise ValueError(f'不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr')
 
 
 # ── 具体实现 ──
@@ -333,16 +342,16 @@ class EasyOCREngine(OCREngine):
     """基于 EasyOCR 的识别引擎。"""
 
     def __init__(self, gpu: bool = False) -> None:
-        self._reader = easyocr.Reader(["ch_sim", "en"], gpu=gpu)
+        self._reader = easyocr.Reader(['ch_sim', 'en'], gpu=gpu)
 
     def recognize(
         self,
         image: np.ndarray,
-        allowlist: str = "",
+        allowlist: str = '',
     ) -> list[OCRResult]:
         kwargs: dict = {}
         if allowlist:
-            kwargs["allowlist"] = allowlist
+            kwargs['allowlist'] = allowlist
         raw = self._reader.readtext(image, **kwargs)
         return [
             OCRResult(
@@ -357,12 +366,12 @@ class EasyOCREngine(OCREngine):
             )
             for box, text, conf in raw
         ]
+
+
 # ── 辅助函数 ──
 
 
-def _fuzzy_match(
-    text: str, candidates: list[str], threshold: int = 3
-) -> str | None:
+def _fuzzy_match(text: str, candidates: list[str], threshold: int = 3) -> str | None:
     """基于编辑距离的模糊匹配。"""
     best_name: str | None = None
     best_dist = threshold + 1

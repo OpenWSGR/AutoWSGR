@@ -9,14 +9,19 @@ TODO: 对 choose_ship_page 建模
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
+
 from .base import BaseBattlePreparation
 
-_log = get_logger("ui.preparation")
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+
+_log = get_logger('ui.preparation')
 
 
 class FleetChangeMixin(BaseBattlePreparation):
@@ -51,16 +56,16 @@ class FleetChangeMixin(BaseBattlePreparation):
             始终返回 ``True``（子类可覆盖以返回失败状态）。
         """
         if fleet_id == 1:
-            raise ValueError("不支持更换 1 队舰船编成")
-        
+            raise ValueError('不支持更换 1 队舰船编成')
+
         if fleet_id and self.get_selected_fleet(self._ctrl.screenshot()) != fleet_id:
             self.select_fleet(fleet_id)
             time.sleep(0.5)
 
-        _log.info("[UI] 更换 {} 队编成: {}", fleet_id, ship_names)
+        _log.info('[UI] 更换 {} 队编成: {}', fleet_id, ship_names)
 
         names = list(ship_names) + [None] * 6
-        names = [n if n else None for n in names[:6]]
+        names = [n or None for n in names[:6]]
 
         # 检测当前各槽位状态
         screen = self._ctrl.screenshot()
@@ -83,7 +88,7 @@ class FleetChangeMixin(BaseBattlePreparation):
             self._change_single_ship(slot, name, slot_occupied=occupied)
             time.sleep(0.3)
 
-        _log.info("[UI] {} 队编成更换完成", fleet_id)
+        _log.info('[UI] {} 队编成更换完成', fleet_id)
         return True
 
     def _change_single_ship(
@@ -118,7 +123,7 @@ class FleetChangeMixin(BaseBattlePreparation):
 
         screen = self._ctrl.screenshot()
         if self._ocr is None:
-            _log.warning("[UI] 未提供 OCR 引擎，无法验证舰船名称")
+            _log.warning('[UI] 未提供 OCR 引擎，无法验证舰船名称')
         else:
             ship_name = self._ocr.recognize_ship_name(screen, [name])
             if ship_name != name:

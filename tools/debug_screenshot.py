@@ -32,9 +32,14 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
+
+
+if TYPE_CHECKING:
+    import numpy as np
+
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
@@ -53,12 +58,15 @@ def _save(img: np.ndarray, name: str, out_dir: Path) -> Path:
 
 def _crop(screen: np.ndarray, x1: float, y1: float, x2: float, y2: float) -> np.ndarray:
     h, w = screen.shape[:2]
-    return screen[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)].copy()
+    return screen[int(y1 * h) : int(y2 * h), int(x1 * w) : int(x2 * w)].copy()
 
 
 def _draw_roi(
     screen: np.ndarray,
-    x1: float, y1: float, x2: float, y2: float,
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
     color: tuple[int, int, int] = (255, 0, 0),
     label: str = '',
 ) -> np.ndarray:
@@ -66,8 +74,9 @@ def _draw_roi(
     h, w = vis.shape[:2]
     cv2.rectangle(vis, (int(x1 * w), int(y1 * h)), (int(x2 * w), int(y2 * h)), color, 2)
     if label:
-        cv2.putText(vis, label, (int(x1 * w), int(y1 * h) - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        cv2.putText(
+            vis, label, (int(x1 * w), int(y1 * h) - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+        )
     return vis
 
 
@@ -100,11 +109,13 @@ def check_page_signatures(screen: np.ndarray, page_name: str | None = None) -> N
     known_pages = {}
     try:
         from autowsgr.ui.decisive.battle_page import PAGE_SIGNATURE as DECISIVE_SIG
+
         known_pages['decisive_battle'] = DECISIVE_SIG
     except ImportError:
         pass
     try:
         from autowsgr.ui.main_page import PAGE_SIGNATURE as MAIN_SIG
+
         known_pages['main'] = MAIN_SIG
     except ImportError:
         pass
@@ -118,9 +129,11 @@ def check_page_signatures(screen: np.ndarray, page_name: str | None = None) -> N
         print(f'  {name}: {status}')
         if hasattr(result, 'details') and result.details:
             for d in result.details:
-                print(f'    ({d.rx:.4f}, {d.ry:.4f}): '
-                      f'期望 {d.expected} 实际 {d.actual} '
-                      f'距离={d.distance:.1f} {"✓" if d.passed else "✗"}')
+                print(
+                    f'    ({d.rx:.4f}, {d.ry:.4f}): '
+                    f'期望 {d.expected} 实际 {d.actual} '
+                    f'距离={d.distance:.1f} {"✓" if d.passed else "✗"}'
+                )
 
 
 def run_ocr_on_roi(
@@ -161,7 +174,7 @@ def run_ocr_on_roi(
         if not results:
             print('  [无结果]')
 
-    print(f'\n=== OCR: 放大 4x 无白名单 ===')
+    print('\n=== OCR: 放大 4x 无白名单 ===')
     results = ocr.recognize(enlarged)
     for r in results:
         print(f"  '{r.text}' (conf={r.confidence:.3f})")

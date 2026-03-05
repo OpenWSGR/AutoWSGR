@@ -6,10 +6,11 @@ from autowsgr.ui.map.panels.exercise import ExercisePanelMixin
 from autowsgr.ui.map.panels.expedition import ExpeditionPanelMixin
 from autowsgr.ui.map.panels.sortie import SortiePanelMixin
 
+
 __all__ = [
-    "CampaignPanelMixin",
-    "DecisivePanelMixin",
-    "ExercisePanelMixin",
-    "ExpeditionPanelMixin",
-    "SortiePanelMixin",
+    'CampaignPanelMixin',
+    'DecisivePanelMixin',
+    'ExercisePanelMixin',
+    'ExpeditionPanelMixin',
+    'SortiePanelMixin',
 ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+
 # 游戏默认建造槽位数量
 _DEFAULT_BUILD_SLOTS = 4
 

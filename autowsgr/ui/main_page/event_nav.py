@@ -14,14 +14,16 @@ from autowsgr.vision import ImageChecker
 from .constants import NavCoord, Sig, Target
 from .overlays import detect_overlay, dismiss_overlay
 
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy as np
+
     from autowsgr.emulator import AndroidController
     from autowsgr.vision import ImageTemplate
 
-_log = get_logger("ui")
+_log = get_logger('ui')
 
 # ── 活动图标模板 (延迟加载) ──────────────────────────────────────────────
 
@@ -36,8 +38,8 @@ def _get_event_icon_templates() -> list[ImageTemplate]:
 
         _event_icon_templates = [
             load_template(
-                "event/event_icon_20260212_720p.png",
-                name="event_icon",
+                'event/event_icon_20260212_720p.png',
+                name='event_icon',
                 source_resolution=(1280, 720),
             ),
         ]
@@ -72,14 +74,14 @@ def _try_navigate_to_event(
     screen = ctrl.screenshot()
     overlay = detect_overlay(screen)
     if overlay is not None:
-        _log.debug("[UI] 活动导航: 先消除浮层 {}", overlay.value)
+        _log.debug('[UI] 活动导航: 先消除浮层 {}', overlay.value)
         dismiss_overlay(ctrl, overlay)
         time.sleep(0.5)
         screen = ctrl.screenshot()
 
     # 确认仍在主页面
     if not PixelChecker.check_signature(screen, Sig.PAGE.ps).matched:
-        _log.warning("[UI] 活动导航: 当前不在主页面基础态")
+        _log.warning('[UI] 活动导航: 当前不在主页面基础态')
         return False
 
     # ② 等待活动图标模板出现
@@ -94,12 +96,12 @@ def _try_navigate_to_event(
         time.sleep(0.3)
 
     if detail is None:
-        _log.warning("[UI] 活动导航: 等待 {:.1f}s 后仍未检测到活动图标", icon_wait)
+        _log.warning('[UI] 活动导航: 等待 {:.1f}s 后仍未检测到活动图标', icon_wait)
         return False
 
     # ③ 点击活动图标并等待活动页面
     coord = NavCoord.EVENT.xy
-    _log.debug("[UI] 主页面 → 活动")
+    _log.debug('[UI] 主页面 → 活动')
     ctrl.click(*coord)
     time.sleep(1.0)
 
@@ -107,16 +109,16 @@ def _try_navigate_to_event(
     while time.time() < deadline:
         screen = ctrl.screenshot()
         if event_checker(screen):
-            _log.info("[UI] 已到达活动地图页面")
+            _log.info('[UI] 已到达活动地图页面')
             return True
         # 点击后可能触发的浮层 (如预约页) 由 overlay 机制统一处理
         overlay = detect_overlay(screen)
         if overlay is not None:
-            _log.debug("[UI] 活动导航: 点击后出现浮层 {}, 消除", overlay.value)
+            _log.debug('[UI] 活动导航: 点击后出现浮层 {}, 消除', overlay.value)
             dismiss_overlay(ctrl, overlay)
         time.sleep(0.5)
 
-    _log.warning("[UI] 活动导航: 点击后 {:.1f}s 内未到达活动页面", nav_wait)
+    _log.warning('[UI] 活动导航: 点击后 {:.1f}s 内未到达活动页面', nav_wait)
     return False
 
 
@@ -143,11 +145,11 @@ def navigate_to_event(
     event_checker = _get_target_checker(Target.EVENT)
 
     for attempt in range(1, max_retries + 1):
-        _log.debug("[UI] 活动导航: 尝试 {}/{}", attempt, max_retries)
+        _log.debug('[UI] 活动导航: 尝试 {}/{}', attempt, max_retries)
         if _try_navigate_to_event(ctrl, event_checker):
             return
         time.sleep(1.0)
 
     raise NavigationError(
-        f"活动导航失败: {max_retries} 次尝试后仍未进入活动地图页面",
+        f'活动导航失败: {max_retries} 次尝试后仍未进入活动地图页面',
     )

@@ -18,9 +18,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from testing.ui._framework import UIControllerTestRunner, connect_via_launcher, ensure_page, info, parse_e2e_args, reset_to_main_page
+from testing.ui._framework import (
+    UIControllerTestRunner,
+    connect_via_launcher,
+    ensure_page,
+    info,
+    parse_e2e_args,
+    reset_to_main_page,
+)
 
 
 def run_test(runner: UIControllerTestRunner) -> None:
@@ -29,18 +37,18 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     bath_page = BathPage(runner.ctrl)
 
-    runner.verify_current("初始验证: 浴室页面", "浴室页面", BathPage.is_current_page)
+    runner.verify_current('初始验证: 浴室页面', '浴室页面', BathPage.is_current_page)
     if runner.aborted:
         return
 
     runner.read_state(
-        "浴室页面",
-        readers={"修理中船舰数": lambda s: "（需手动读取）"},
+        '浴室页面',
+        readers={'修理中船舰数': lambda s: '（需手动读取）'},
     )
 
     runner.execute_step(
-        "浴室页面 → ◁ 后院",
-        "后院",
+        '浴室页面 → ◁ 后院',
+        '后院',
         BackyardPage.is_current_page,
         lambda: bath_page.go_back(),
     )
@@ -67,19 +75,21 @@ def _navigate_to(ctrl, pause: float) -> None:
 
 def main() -> None:
     args = parse_e2e_args(
-        "浴室页面 (BathPage) e2e 测试",
-        precondition="游戏位于浴室页面 (后院 → 浴室)",
-        default_log_dir="logs/e2e/bath_page",
+        '浴室页面 (BathPage) e2e 测试',
+        precondition='游戏位于浴室页面 (后院 → 浴室)',
+        default_log_dir='logs/e2e/bath_page',
     )
     ctrl = connect_via_launcher(args.serial, args.log_dir, args.log_level)
     from loguru import logger
 
-    logger.info("=== 浴室页面 e2e 测试开始 ===")
+    logger.info('=== 浴室页面 e2e 测试开始 ===')
     from autowsgr.ui.bath_page import BathPage
+
     if not ensure_page(
-        ctrl, BathPage.is_current_page,
+        ctrl,
+        BathPage.is_current_page,
         lambda: _navigate_to(ctrl, args.pause),
-        "浴室页面",
+        '浴室页面',
         auto_mode=args.auto,
         pause=args.pause,
     ):
@@ -87,7 +97,7 @@ def main() -> None:
         sys.exit(1)
     runner = UIControllerTestRunner(
         ctrl,
-        controller_name="浴室页面",
+        controller_name='浴室页面',
         log_dir=args.log_dir,
         auto_mode=args.auto,
         pause=args.pause,
@@ -97,21 +107,21 @@ def main() -> None:
     except KeyboardInterrupt:
         from testing.ui._framework import warn
 
-        warn("用户中断")
+        warn('用户中断')
     except Exception as exc:
         from testing.ui._framework import fail
 
-        fail(f"未预期: {exc}")
-        logger.opt(exception=True).error("浴室页面 e2e 测试异常")
+        fail(f'未预期: {exc}')
+        logger.opt(exception=True).error('浴室页面 e2e 测试异常')
     finally:
         runner.finalize()
         runner.print_summary()
         ctrl.disconnect()
-        info("设备已断开")
+        info('设备已断开')
 
     r = runner.report
     sys.exit(1 if (r.failed > 0 or r.errors > 0) else 0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

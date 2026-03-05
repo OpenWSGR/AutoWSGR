@@ -40,6 +40,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from testing.ui._framework import (
@@ -79,8 +80,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 1: is_current_page 验证 ──────────────────────────────
     runner.verify_current(
-        "初始验证: 主页面 (is_current_page)",
-        "主页面",
+        '初始验证: 主页面 (is_current_page)',
+        '主页面',
         MainPage.is_current_page,
     )
     if runner.aborted:
@@ -92,10 +93,10 @@ def run_test(runner: UIControllerTestRunner) -> None:
     overlay = MainPage.detect_overlay(screen)
 
     if overlay is not None:
-        info(f"检测到浮层: {overlay.value} — 尝试消除")
+        info(f'检测到浮层: {overlay.value} — 尝试消除')
         runner.execute_step(
-            f"浮层消除: {overlay.value}",
-            "主页面",
+            f'浮层消除: {overlay.value}',
+            '主页面',
             MainPage.is_base_page,
             lambda: main_page.dismiss_current_overlay(),
         )
@@ -103,16 +104,16 @@ def run_test(runner: UIControllerTestRunner) -> None:
             return
     else:
         if is_base:
-            ok("主页面基础状态确认 (无浮层)")
+            ok('主页面基础状态确认 (无浮层)')
         else:
-            warn("is_current_page 通过但 is_base_page 为 False — 可能存在未识别浮层")
+            warn('is_current_page 通过但 is_base_page 为 False — 可能存在未识别浮层')
 
     # ───── Step 3: 状态查询 (远征/任务通知红点) ──────────────────────
     runner.read_state(
-        "主页面状态",
+        '主页面状态',
         readers={
-            "远征完成通知": lambda s: MainPage.has_expedition_ready(s),
-            "任务可领取通知": lambda s: MainPage.has_task_ready(s),
+            '远征完成通知': lambda s: MainPage.has_expedition_ready(s),
+            '任务可领取通知': lambda s: MainPage.has_task_ready(s),
         },
     )
 
@@ -122,8 +123,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 4: 主页面 → 地图页面 (出征) ─────────────────────────
     runner.execute_step(
-        "主页面 → 地图页面 (navigate_to SORTIE)",
-        "地图页面",
+        '主页面 → 地图页面 (navigate_to SORTIE)',
+        '地图页面',
         MapPage.is_current_page,
         lambda: main_page.navigate_to(MainPage.Target.SORTIE),
     )
@@ -131,8 +132,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     runner.execute_step(
-        "地图页面 → ◁ 主页面",
-        "主页面",
+        '地图页面 → ◁ 主页面',
+        '主页面',
         MainPage.is_current_page,
         lambda: map_page.go_back(),
     )
@@ -141,8 +142,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 5: 主页面 → 任务页面 ────────────────────────────────
     runner.execute_step(
-        "主页面 → 任务页面 (navigate_to TASK)",
-        "任务页面",
+        '主页面 → 任务页面 (navigate_to TASK)',
+        '任务页面',
         MissionPage.is_current_page,
         lambda: main_page.navigate_to(MainPage.Target.TASK),
     )
@@ -150,8 +151,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     runner.execute_step(
-        "任务页面 → ◁ 主页面",
-        "主页面",
+        '任务页面 → ◁ 主页面',
+        '主页面',
         MainPage.is_current_page,
         lambda: mission_page.go_back(),
     )
@@ -160,8 +161,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 6: 主页面 → 侧边栏 ──────────────────────────────────
     runner.execute_step(
-        "主页面 → 侧边栏 (navigate_to SIDEBAR)",
-        "侧边栏",
+        '主页面 → 侧边栏 (navigate_to SIDEBAR)',
+        '侧边栏',
         SidebarPage.is_current_page,
         lambda: main_page.navigate_to(MainPage.Target.SIDEBAR),
     )
@@ -169,8 +170,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     runner.execute_step(
-        "侧边栏 → close → 主页面",
-        "主页面",
+        '侧边栏 → close → 主页面',
+        '主页面',
         MainPage.is_current_page,
         lambda: sidebar_page.close(),
     )
@@ -179,8 +180,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 7: 主页面 → 后院页面 ────────────────────────────────
     runner.execute_step(
-        "主页面 → 后院页面 (navigate_to HOME)",
-        "后院页面",
+        '主页面 → 后院页面 (navigate_to HOME)',
+        '后院页面',
         BackyardPage.is_current_page,
         lambda: main_page.navigate_to(MainPage.Target.HOME),
     )
@@ -188,8 +189,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     runner.execute_step(
-        "后院页面 → ◁ 主页面",
-        "主页面",
+        '后院页面 → ◁ 主页面',
+        '主页面',
         MainPage.is_current_page,
         lambda: backyard_page.go_back(),
     )
@@ -205,13 +206,13 @@ def run_test(runner: UIControllerTestRunner) -> None:
         from autowsgr.ui.event.event_page import BaseEventPage
 
         runner.execute_step(
-            "主页面 → 活动地图 (navigate_to EVENT, 模板匹配)",
-            "活动地图页面",
+            '主页面 → 活动地图 (navigate_to EVENT, 模板匹配)',
+            '活动地图页面',
             BaseEventPage.is_current_page,
             lambda: main_page.navigate_to(MainPage.Target.EVENT),
         )
     except Exception as exc:
-        warn(f"活动导航测试跳过 (可能当前无活动入口): {exc}")
+        warn(f'活动导航测试跳过 (可能当前无活动入口): {exc}')
 
     if runner.aborted:
         return
@@ -224,13 +225,13 @@ def run_test(runner: UIControllerTestRunner) -> None:
         if BaseEventPage.is_current_page(screen):
             event_page = BaseEventPage(runner.ctrl)
             runner.execute_step(
-                "活动地图 → ◁ 主页面",
-                "主页面",
+                '活动地图 → ◁ 主页面',
+                '主页面',
                 MainPage.is_current_page,
                 lambda: event_page.go_back(),
             )
         else:
-            info("未在活动地图页面，跳过返回步骤")
+            info('未在活动地图页面，跳过返回步骤')
     except Exception:
         pass
 
@@ -243,8 +244,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     # ───── Step 9: go_to_sortie() ────────────────────────────────────
     runner.execute_step(
-        "便捷方法 go_to_sortie()",
-        "地图页面",
+        '便捷方法 go_to_sortie()',
+        '地图页面',
         MapPage.is_current_page,
         lambda: main_page.go_to_sortie(),
     )
@@ -252,8 +253,8 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     runner.execute_step(
-        "地图页面 → ◁ 主页面 (收尾)",
-        "主页面",
+        '地图页面 → ◁ 主页面 (收尾)',
+        '主页面',
         MainPage.is_current_page,
         lambda: map_page.go_back(),
     )
@@ -261,7 +262,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
         return
 
     # ───── Step 10: 最终验证 ─────────────────────────────────────────
-    runner.verify_current("最终验证: 主页面", "主页面", MainPage.is_current_page)
+    runner.verify_current('最终验证: 主页面', '主页面', MainPage.is_current_page)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -276,14 +277,14 @@ def _navigate_to(ctrl, pause: float) -> None:
 
 def main() -> None:
     args = parse_e2e_args(
-        "主页面 (MainPage) e2e 测试",
-        precondition="游戏位于主页面 (母港/秘书舰界面)",
-        default_log_dir="logs/e2e/main_page",
+        '主页面 (MainPage) e2e 测试',
+        precondition='游戏位于主页面 (母港/秘书舰界面)',
+        default_log_dir='logs/e2e/main_page',
     )
     ctrl = connect_via_launcher(args.serial, args.log_dir, args.log_level)
     from loguru import logger
 
-    logger.info("=== 主页面 e2e 测试开始 ===")
+    logger.info('=== 主页面 e2e 测试开始 ===')
 
     from autowsgr.ui.main_page import MainPage
 
@@ -291,7 +292,7 @@ def main() -> None:
         ctrl,
         MainPage.is_current_page,
         lambda: _navigate_to(ctrl, args.pause),
-        "主页面",
+        '主页面',
         auto_mode=args.auto,
         pause=args.pause,
     ):
@@ -300,7 +301,7 @@ def main() -> None:
 
     runner = UIControllerTestRunner(
         ctrl,
-        controller_name="主页面",
+        controller_name='主页面',
         log_dir=args.log_dir,
         auto_mode=args.auto,
         pause=args.pause,
@@ -308,22 +309,22 @@ def main() -> None:
     try:
         run_test(runner)
     except KeyboardInterrupt:
-        warn("用户中断 (Ctrl+C)")
+        warn('用户中断 (Ctrl+C)')
     except Exception as exc:
         from testing.ui._framework import fail
 
-        fail(f"未预期异常: {exc}")
-        logger.opt(exception=True).error("主页面 e2e 测试异常")
+        fail(f'未预期异常: {exc}')
+        logger.opt(exception=True).error('主页面 e2e 测试异常')
     finally:
         runner.finalize()
         runner.print_summary()
         ctrl.disconnect()
-        info("设备已断开")
+        info('设备已断开')
 
-    logger.info("=== 主页面 e2e 测试结束 ===")
+    logger.info('=== 主页面 e2e 测试结束 ===')
     r = runner.report
     sys.exit(1 if (r.failed > 0 or r.errors > 0) else 0)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

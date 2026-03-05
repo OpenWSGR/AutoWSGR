@@ -10,19 +10,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.constants import DECISIVE_SKILL_NAMES, update_shipnames
-from autowsgr.context import GameContext
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
 
+
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    import numpy as np
-
-    from autowsgr.emulator import AndroidController
+    from autowsgr.context import GameContext
     from autowsgr.infra import DecisiveConfig
-    from autowsgr.vision import OCREngine
 
 
 class DecisiveBase:
@@ -60,7 +55,6 @@ class DecisiveBase:
         self._config = config
         self._ocr = ctx.ocr
 
-
         # 将决战配置中的舰船名 + 技能名合并到全局 SHIPNAMES，
         # 后续 OCR 识别无需再临时拼接候选列表。
         update_shipnames(config.level1 + config.level2 + DECISIVE_SKILL_NAMES)
@@ -69,7 +63,8 @@ class DecisiveBase:
         self._logic = DecisiveLogic(config, self._state)
         self._battle_page = DecisiveBattlePage(self._ctx, ocr=self._ocr)
         self._map = DecisiveMapController(
-            ctx, config,
+            ctx,
+            config,
         )
         self._resume_mode: bool = False
         self._has_chosen_fleet: bool = False

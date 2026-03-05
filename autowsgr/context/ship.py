@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from autowsgr.types import RepairMode, ShipDamageState, ShipType
 
-from .equipment import Equipment
+
+if TYPE_CHECKING:
+    from .equipment import Equipment
 
 
 @dataclass
@@ -16,7 +19,7 @@ class Ship:
     字段值来自画面识别（血条、OCR 等），在出击和检查时更新。
     """
 
-    name: str = ""
+    name: str = ''
     """舰船名称。"""
     ship_type: ShipType | None = None
     """舰种。"""
@@ -56,4 +59,3 @@ class Ship:
                 return self.damage_state == ShipDamageState.SEVERE
             case _:
                 return False
-

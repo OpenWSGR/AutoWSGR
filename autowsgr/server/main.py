@@ -16,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -30,15 +29,13 @@ from autowsgr.server.schemas import (
     DecisiveRequest,
     EventFightRequest,
     ExerciseRequest,
-    LogLevel,
     NormalFightRequest,
-    TaskStatusEnum,
-    TaskStatusResponse,
 )
-from autowsgr.server.task_manager import TaskManager, TaskStatus, task_manager
+from autowsgr.server.task_manager import task_manager
 from autowsgr.server.ws_manager import ws_manager
 
-_log = get_logger("server")
+
+_log = get_logger('server')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -53,7 +50,7 @@ def get_context() -> Any:
     """获取全局 GameContext。"""
     global _ctx
     if _ctx is None:
-        raise RuntimeError("系统未启动，请先调用 POST /api/system/start")
+        raise RuntimeError('系统未启动，请先调用 POST /api/system/start')
     return _ctx
 
 
@@ -68,16 +65,16 @@ async def lifespan(app: FastAPI):
     # 启动时: 设置事件循环引用
     loop = asyncio.get_running_loop()
     task_manager.set_loop(loop)
-    _log.info("[Server] HTTP Server 已启动")
+    _log.info('[Server] HTTP Server 已启动')
 
     yield
 
     # 关闭时: 清理资源
     global _ctx
     if _ctx is not None:
-        _log.info("[Server] 断开模拟器连接")
+        _log.info('[Server] 断开模拟器连接')
         # 如果需要，可以在这里调用清理逻辑
-    _log.info("[Server] HTTP Server 已关闭")
+    _log.info('[Server] HTTP Server 已关闭')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -85,19 +82,19 @@ async def lifespan(app: FastAPI):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 app = FastAPI(
-    title="AutoWSGR HTTP API",
-    description="战舰少女R 自动化脚本 HTTP 接口",
-    version="1.0.0",
+    title='AutoWSGR HTTP API',
+    description='战舰少女R 自动化脚本 HTTP 接口',
+    version='1.0.0',
     lifespan=lifespan,
 )
 
 # CORS 配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应限制
+    allow_origins=['*'],  # 生产环境应限制
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 
@@ -112,56 +109,60 @@ class SystemStartRequest(BaseModel):
     config_path: str | None = None
 
 
-@app.post("/api/system/start", response_model=ApiResponse)
+@app.post('/api/system/start', response_model=ApiResponse)
 async def system_start(request: SystemStartRequest):
     """启动系统 (连接模拟器、启动游戏)。"""
     global _ctx
 
     if _ctx is not None:
-        return ApiResponse(success=True, message="系统已启动")
+        return ApiResponse(success=True, message='系统已启动')
 
     try:
         from autowsgr.scheduler import launch
 
-        config_path = request.config_path or "usersettings.yaml"
-        _log.info("[System] 正在启动, 配置: {}", config_path)
+        config_path = request.config_path or 'usersettings.yaml'
+        _log.info('[System] 正在启动, 配置: {}', config_path)
         _ctx = launch(config_path)
-        _log.info("[System] 启动成功")
+        _log.info('[System] 启动成功')
 
-        return ApiResponse(success=True, message="系统启动成功")
+        return ApiResponse(success=True, message='系统启动成功')
 
     except Exception as e:
-        _log.error("[System] 启动失败: {}", e)
+        _log.error('[System] 启动失败: {}', e)
         return ApiResponse(success=False, error=str(e))
 
 
-@app.post("/api/system/stop", response_model=ApiResponse)
+@app.post('/api/system/stop', response_model=ApiResponse)
 async def system_stop():
     """停止系统。"""
     global _ctx
 
     if _ctx is None:
-        return ApiResponse(success=True, message="系统未运行")
+        return ApiResponse(success=True, message='系统未运行')
 
     # 先停止正在运行的任务
     if task_manager.is_running:
         task_manager.stop_task()
 
     _ctx = None
-    _log.info("[System] 系统已停止")
-    return ApiResponse(success=True, message="系统已停止")
+    _log.info('[System] 系统已停止')
+    return ApiResponse(success=True, message='系统已停止')
 
 
-@app.get("/api/system/status", response_model=ApiResponse)
+@app.get('/api/system/status', response_model=ApiResponse)
 async def system_status():
     """获取系统状态。"""
     return ApiResponse(
         success=True,
         data={
-            "status": task_manager.current_task.status.value if task_manager.current_task else "idle",
-            "emulator_connected": _ctx is not None,
-            "game_running": _ctx is not None,
-            "current_task": task_manager.current_task.task_id if task_manager.current_task else None,
+            'status': task_manager.current_task.status.value
+            if task_manager.current_task
+            else 'idle',
+            'emulator_connected': _ctx is not None,
+            'game_running': _ctx is not None,
+            'current_task': task_manager.current_task.task_id
+            if task_manager.current_task
+            else None,
         },
     )
 
@@ -171,11 +172,17 @@ async def system_status():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@app.post("/api/task/start", response_model=ApiResponse)
-async def task_start(request: NormalFightRequest | EventFightRequest | CampaignRequest | ExerciseRequest | DecisiveRequest):  # type: ignore
+@app.post('/api/task/start', response_model=ApiResponse)
+async def task_start(
+    request: NormalFightRequest
+    | EventFightRequest
+    | CampaignRequest
+    | ExerciseRequest
+    | DecisiveRequest,
+):  # type: ignore
     """启动任务 (异步执行，立即返回)。"""
     if task_manager.is_running:
-        raise HTTPException(status_code=409, detail="已有任务正在运行")
+        raise HTTPException(status_code=409, detail='已有任务正在运行')
 
     try:
         ctx = get_context()
@@ -194,13 +201,13 @@ async def task_start(request: NormalFightRequest | EventFightRequest | CampaignR
     elif isinstance(request, DecisiveRequest):
         return await _start_decisive(ctx, request)
     else:
-        raise HTTPException(status_code=400, detail="未知的任务类型")
+        raise HTTPException(status_code=400, detail='未知的任务类型')
 
 
 async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiResponse:
     """启动常规战任务。"""
     from autowsgr.combat import CombatPlan
-    from autowsgr.ops import run_normal_fight, run_normal_fight_from_yaml
+    from autowsgr.ops import run_normal_fight
 
     def executor(task_info: Any) -> list[dict[str, Any]]:
         """执行常规战。"""
@@ -212,42 +219,42 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
         elif request.plan:
             plan = _build_combat_plan(request.plan)
         else:
-            raise ValueError("必须提供 plan 或 plan_id")
+            raise ValueError('必须提供 plan 或 plan_id')
 
         for i in range(request.times):
             if task_manager.should_stop():
                 break
 
             task_manager.update_progress(current_round=i + 1)
-            _log.info("[Task] 常规战第 {}/{} 轮", i + 1, request.times)
+            _log.info('[Task] 常规战第 {}/{} 轮', i + 1, request.times)
 
             try:
                 result = run_normal_fight(ctx, plan, times=1)[0]
                 results.append(_convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
             except Exception as e:
-                _log.error("[Task] 第 {} 轮失败: {}", i + 1, e)
-                results.append({"round": i + 1, "success": False, "error": str(e)})
+                _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
+                results.append({'round': i + 1, 'success': False, 'error': str(e)})
 
         return results
 
     task_id = task_manager.start_task(
-        task_type="normal_fight",
+        task_type='normal_fight',
         total_rounds=request.times,
         executor=executor,
     )
 
     return ApiResponse(
         success=True,
-        data={"task_id": task_id, "status": "running"},
-        message="任务已启动",
+        data={'task_id': task_id, 'status': 'running'},
+        message='任务已启动',
     )
 
 
 async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiResponse:
     """启动活动战任务。"""
     from autowsgr.combat import CombatPlan
-    from autowsgr.ops import run_event_fight, run_event_fight_from_yaml
+    from autowsgr.ops import run_event_fight
 
     def executor(task_info: Any) -> list[dict[str, Any]]:
         results = []
@@ -257,7 +264,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
         elif request.plan:
             plan = _build_combat_plan(request.plan)
         else:
-            raise ValueError("必须提供 plan 或 plan_id")
+            raise ValueError('必须提供 plan 或 plan_id')
 
         fleet_id = request.fleet_id or plan.fleet_id
 
@@ -266,28 +273,28 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
                 break
 
             task_manager.update_progress(current_round=i + 1)
-            _log.info("[Task] 活动战第 {}/{} 轮", i + 1, request.times)
+            _log.info('[Task] 活动战第 {}/{} 轮', i + 1, request.times)
 
             try:
                 result = run_event_fight(ctx, plan, times=1, fleet_id=fleet_id)[0]
                 results.append(_convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
             except Exception as e:
-                _log.error("[Task] 第 {} 轮失败: {}", i + 1, e)
-                results.append({"round": i + 1, "success": False, "error": str(e)})
+                _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
+                results.append({'round': i + 1, 'success': False, 'error': str(e)})
 
         return results
 
     task_id = task_manager.start_task(
-        task_type="event_fight",
+        task_type='event_fight',
         total_rounds=request.times,
         executor=executor,
     )
 
     return ApiResponse(
         success=True,
-        data={"task_id": task_id, "status": "running"},
-        message="任务已启动",
+        data={'task_id': task_id, 'status': 'running'},
+        message='任务已启动',
     )
 
 
@@ -308,32 +315,34 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
                 break
 
             task_manager.update_progress(current_round=i + 1)
-            _log.info("[Task] 战役第 {}/{} 轮", i + 1, request.times)
+            _log.info('[Task] 战役第 {}/{} 轮', i + 1, request.times)
 
             try:
                 result = runner.run()
                 # CampaignRunner.run() 返回完整结果列表
-                results.append({
-                    "round": i + 1,
-                    "success": True,
-                })
+                results.append(
+                    {
+                        'round': i + 1,
+                        'success': True,
+                    }
+                )
                 task_manager.add_result(results[-1])
             except Exception as e:
-                _log.error("[Task] 第 {} 轮失败: {}", i + 1, e)
-                results.append({"round": i + 1, "success": False, "error": str(e)})
+                _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
+                results.append({'round': i + 1, 'success': False, 'error': str(e)})
 
         return results
 
     task_id = task_manager.start_task(
-        task_type="campaign",
+        task_type='campaign',
         total_rounds=request.times,
         executor=executor,
     )
 
     return ApiResponse(
         success=True,
-        data={"task_id": task_id, "status": "running"},
-        message="任务已启动",
+        data={'task_id': task_id, 'status': 'running'},
+        message='任务已启动',
     )
 
 
@@ -343,27 +352,24 @@ async def _start_exercise(ctx: Any, request: ExerciseRequest) -> ApiResponse:
 
     def executor(task_info: Any) -> list[dict[str, Any]]:
         runner = ExerciseRunner(ctx, fleet_id=request.fleet_id)
-        task_manager.update_progress(current_round=1, current_node="演习")
+        task_manager.update_progress(current_round=1, current_node='演习')
 
         try:
             results = runner.run()
-            return [
-                {"round": i + 1, "success": True}
-                for i in range(len(results))
-            ]
+            return [{'round': i + 1, 'success': True} for i in range(len(results))]
         except Exception as e:
-            return [{"round": 1, "success": False, "error": str(e)}]
+            return [{'round': 1, 'success': False, 'error': str(e)}]
 
     task_id = task_manager.start_task(
-        task_type="exercise",
+        task_type='exercise',
         total_rounds=1,
         executor=executor,
     )
 
     return ApiResponse(
         success=True,
-        data={"task_id": task_id, "status": "running"},
-        message="任务已启动",
+        data={'task_id': task_id, 'status': 'running'},
+        message='任务已启动',
     )
 
 
@@ -381,48 +387,48 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
         )
 
         controller = DecisiveController(ctx, config)
-        task_manager.update_progress(current_round=1, current_node="决战")
+        task_manager.update_progress(current_round=1, current_node='决战')
 
         try:
             result = controller.run()
-            return [{"round": 1, "success": True, "result": result.value}]
+            return [{'round': 1, 'success': True, 'result': result.value}]
         except Exception as e:
-            return [{"round": 1, "success": False, "error": str(e)}]
+            return [{'round': 1, 'success': False, 'error': str(e)}]
 
     task_id = task_manager.start_task(
-        task_type="decisive",
+        task_type='decisive',
         total_rounds=1,
         executor=executor,
     )
 
     return ApiResponse(
         success=True,
-        data={"task_id": task_id, "status": "running"},
-        message="任务已启动",
+        data={'task_id': task_id, 'status': 'running'},
+        message='任务已启动',
     )
 
 
-@app.post("/api/task/stop", response_model=ApiResponse)
+@app.post('/api/task/stop', response_model=ApiResponse)
 async def task_stop():
     """停止当前任务。"""
     if not task_manager.is_running:
-        return ApiResponse(success=True, message="没有正在运行的任务")
+        return ApiResponse(success=True, message='没有正在运行的任务')
 
     success = task_manager.stop_task()
     if success:
         return ApiResponse(
             success=True,
             data={
-                "task_id": task_manager.current_task.task_id,
-                "status": "stopped",
+                'task_id': task_manager.current_task.task_id,
+                'status': 'stopped',
             },
-            message="已请求停止任务",
+            message='已请求停止任务',
         )
     else:
-        return ApiResponse(success=False, error="停止失败")
+        return ApiResponse(success=False, error='停止失败')
 
 
-@app.get("/api/task/status", response_model=ApiResponse)
+@app.get('/api/task/status', response_model=ApiResponse)
 async def task_status():
     """查询当前任务状态。"""
     status = task_manager.get_status()
@@ -434,7 +440,7 @@ async def task_status():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@app.websocket("/ws/logs")
+@app.websocket('/ws/logs')
 async def ws_logs(websocket: WebSocket):
     """实时日志流。"""
     await ws_manager.connect(websocket)
@@ -445,15 +451,15 @@ async def ws_logs(websocket: WebSocket):
             # 可以处理客户端发来的控制消息
             try:
                 msg = json.loads(data)
-                if msg.get("type") == "ping":
-                    await websocket.send_text(json.dumps({"type": "pong"}))
+                if msg.get('type') == 'ping':
+                    await websocket.send_text(json.dumps({'type': 'pong'}))
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
         await ws_manager.disconnect(websocket)
 
 
-@app.websocket("/ws/task")
+@app.websocket('/ws/task')
 async def ws_task(websocket: WebSocket):
     """任务状态更新流。"""
     await ws_manager.connect(websocket)
@@ -462,8 +468,8 @@ async def ws_task(websocket: WebSocket):
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)
-                if msg.get("type") == "ping":
-                    await websocket.send_text(json.dumps({"type": "pong"}))
+                if msg.get('type') == 'ping':
+                    await websocket.send_text(json.dumps({'type': 'pong'}))
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
@@ -490,9 +496,7 @@ def _build_combat_plan(request: Any) -> Any:
             detour=node_req.detour,
         )
 
-    node_args = {
-        k: build_node_decision(v) for k, v in request.node_args.items()
-    }
+    node_args = {k: build_node_decision(v) for k, v in request.node_args.items()}
 
     return CombatPlan(
         name=request.name,
@@ -523,19 +527,19 @@ def _convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:
     if result.history:
         fight_results = result.history.get_fight_results()
         if isinstance(fight_results, dict):
-            for node, fr in fight_results.items():
+            for fr in fight_results.values():
                 if fr.mvp and fr.mvp > 0:
                     # MVP 是位置 (1-6)，需要转换
-                    mvp = f"位置{fr.mvp}"
+                    mvp = f'位置{fr.mvp}'
                     break
 
     return {
-        "round": round_num,
-        "success": result.flag.value == "success",
-        "nodes": nodes,
-        "mvp": mvp,
-        "ship_damage": [s.value for s in result.ship_stats] if result.ship_stats else [],
-        "node_count": result.node_count,
+        'round': round_num,
+        'success': result.flag.value == 'success',
+        'nodes': nodes,
+        'mvp': mvp,
+        'ship_damage': [s.value for s in result.ship_stats] if result.ship_stats else [],
+        'node_count': result.node_count,
     }
 
 
@@ -543,7 +547,7 @@ def _convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:
 # 入口
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host='0.0.0.0', port=8000)

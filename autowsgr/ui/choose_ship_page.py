@@ -13,12 +13,9 @@
 
 from __future__ import annotations
 
-import numpy as np
+from typing import TYPE_CHECKING
+
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
-
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
@@ -26,7 +23,14 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 点击坐标 (960×540 基准)
@@ -45,7 +49,7 @@ CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
 """搜索结果列表中的第一个结果。"""
 
 PAGE_SIGNATURE = PixelSignature(
-    name="skill_used",
+    name='skill_used',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.8594, 0.1514, (31, 46, 69), tolerance=30.0),
@@ -99,7 +103,7 @@ class ChooseShipPage:
 
     def click_search_box(self) -> None:
         """点击搜索框，准备输入舰船名。"""
-        _log.info("[UI] 选船 → 打开搜索框")
+        _log.info('[UI] 选船 → 打开搜索框')
         self._ctrl.click(*CLICK_SEARCH_BOX)
 
     def input_ship_name(self, name: str) -> None:
@@ -117,15 +121,15 @@ class ChooseShipPage:
 
     def dismiss_keyboard(self) -> None:
         """点击空白区域关闭软键盘。"""
-        _log.info("[UI] 选船 → 关闭键盘")
+        _log.info('[UI] 选船 → 关闭键盘')
         self._ctrl.click(*CLICK_DISMISS_KEYBOARD)
 
     def click_first_result(self) -> None:
         """点击搜索结果中的第一个舰船。"""
-        _log.info("[UI] 选船 → 点击第一个结果")
+        _log.info('[UI] 选船 → 点击第一个结果')
         self._ctrl.click(*CLICK_FIRST_RESULT)
 
     def click_remove(self) -> None:
         """点击「移除」按钮，移除当前槽位的舰船。"""
-        _log.info("[UI] 选船 → 移除舰船")
+        _log.info('[UI] 选船 → 移除舰船')
         self._ctrl.click(*CLICK_REMOVE_SHIP)

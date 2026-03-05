@@ -7,26 +7,29 @@ from __future__ import annotations
 
 import datetime
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
-from dataclasses import dataclass, field
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("infra")
 
-from .file_utils import load_yaml
+_log = get_logger('infra')
+
 from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
     GameAPP,
+    MapEntrance,
     OcrBackend,
     OSType,
     RepairMode,
     ShipType,
-    MapEntrance,
 )
+
+from .file_utils import load_yaml
 
 
 # ── 子配置模型 ──
@@ -35,7 +38,7 @@ from autowsgr.types import (
 class EmulatorConfig(BaseModel):
     """模拟器配置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     type: EmulatorType = EmulatorType.leidian
     """模拟器类型"""
@@ -50,7 +53,7 @@ class EmulatorConfig(BaseModel):
 class AccountConfig(BaseModel):
     """游戏账号配置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     game_app: GameAPP = GameAPP.official
     """游戏渠道"""
@@ -68,7 +71,7 @@ class AccountConfig(BaseModel):
 class OCRConfig(BaseModel):
     """OCR 引擎配置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     backend: OcrBackend = OcrBackend.easyocr
     """OCR 后端"""
@@ -79,11 +82,11 @@ class OCRConfig(BaseModel):
 class LogConfig(BaseModel):
     """日志配置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
-    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "DEBUG"
+    level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
     """日志级别"""
-    root: Path = Path("log")
+    root: Path = Path('log')
     """日志保存根目录"""
     dir: Path | None = None
     """日志保存路径。自动按日期生成"""
@@ -115,11 +118,11 @@ class LogConfig(BaseModel):
     详见 :func:`~autowsgr.infra.logger.setup_logger`。
     此处的显式配置优先级高于上方所有 show_*_debug 布尔开关。"""
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def _set_log_dir(self) -> LogConfig:
         if self.dir is None:
-            ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            object.__setattr__(self, "dir", self.root / ts)
+            ts = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            object.__setattr__(self, 'dir', self.root / ts)
         return self
 
     @property
@@ -132,24 +135,24 @@ class LogConfig(BaseModel):
         """
         merged: dict[str, str] = {}
         if not self.show_emulator_debug:
-            merged["emulator"] = "INFO"
+            merged['emulator'] = 'INFO'
         if not self.show_ui_debug:
-            merged["ui"] = "INFO"
+            merged['ui'] = 'INFO'
         if not self.show_vision_debug:
-            merged["vision"] = "INFO"
+            merged['vision'] = 'INFO'
         if not self.show_ops_debug:
-            merged["ops"] = "INFO"
+            merged['ops'] = 'INFO'
         if not self.show_combat_state_debug:
-            merged["combat.engine"] = "INFO"
+            merged['combat.engine'] = 'INFO'
         if not self.show_combat_recognition_debug:
-            merged["combat.recognition"] = "INFO"
+            merged['combat.recognition'] = 'INFO'
 
         # 决战调试：show_decisive_battle_info 为 True 时，即使父通道
         # (ui / ops) 被设为 INFO，也要让决战子通道输出 DEBUG 日志。
         if self.show_decisive_battle_info:
-            merged["decisive"] = "DEBUG"
-            merged["ops.decisive"] = "DEBUG"
-            merged["ui.decisive"] = "DEBUG"
+            merged['decisive'] = 'DEBUG'
+            merged['ops.decisive'] = 'DEBUG'
+            merged['ui.decisive'] = 'DEBUG'
 
         # 显式 channels 配置覆盖布尔开关
         merged.update(self.channels)
@@ -159,7 +162,7 @@ class LogConfig(BaseModel):
 class DailyAutomationConfig(BaseModel):
     """日常自动化设置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     # 基础日常
     auto_expedition: bool = True
@@ -175,17 +178,17 @@ class DailyAutomationConfig(BaseModel):
     auto_battle: bool = True
     """自动打完每日战役次数"""
     battle_type: Literal[
-        "简单航母",
-        "简单潜艇",
-        "简单驱逐",
-        "简单巡洋",
-        "简单战列",
-        "困难航母",
-        "困难潜艇",
-        "困难驱逐",
-        "困难巡洋",
-        "困难战列",
-    ] = "困难潜艇"
+        '简单航母',
+        '简单潜艇',
+        '简单驱逐',
+        '简单巡洋',
+        '简单战列',
+        '困难航母',
+        '困难潜艇',
+        '困难驱逐',
+        '困难巡洋',
+        '困难战列',
+    ] = '困难潜艇'
     """打哪个战役"""
 
     # 演习
@@ -210,18 +213,18 @@ class DailyAutomationConfig(BaseModel):
 class DecisiveBattleConfig(BaseModel):
     """决战自动化配置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     chapter: int = 6
     """决战章节 (1-6)"""
     level1: list[str] = Field(
-        default_factory=lambda: ["鲃鱼", "U-1206", "U-47", "射水鱼", "U-96", "U-1405"]
+        default_factory=lambda: ['鲃鱼', 'U-1206', 'U-47', '射水鱼', 'U-96', 'U-1405']
     )
     """一级舰队"""
-    level2: list[str] = Field(default_factory=lambda: ["U-81", "大青花鱼"])
+    level2: list[str] = Field(default_factory=lambda: ['U-81', '大青花鱼'])
     """二级舰队"""
     flagship_priority: list[str] = Field(
-        default_factory=lambda: ["U-1405", "U-47", "U-96", "U-1206"]
+        default_factory=lambda: ['U-1405', 'U-47', 'U-96', 'U-1206']
     )
     """旗舰优先级队列"""
     repair_level: int = 1
@@ -233,11 +236,11 @@ class DecisiveBattleConfig(BaseModel):
     useful_skill_strict: bool = False
     """严格利用技能"""
 
-    @field_validator("chapter")
+    @field_validator('chapter')
     @classmethod
     def _validate_chapter(cls, v: int) -> int:
         if not 1 <= v <= 6:
-            raise ValueError("决战章节必须为 1–6 之间的整数")
+            raise ValueError('决战章节必须为 1–6 之间的整数')
         return v
 
 
@@ -247,7 +250,7 @@ class DecisiveBattleConfig(BaseModel):
 class UserConfig(BaseModel):
     """用户配置（顶层聚合）。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     # 子配置块
     emulator: EmulatorConfig = Field(default_factory=EmulatorConfig)
@@ -283,17 +286,17 @@ class UserConfig(BaseModel):
     remove_equipment_mode: bool = True
     """默认卸下装备"""
 
-    @field_validator("destroy_ship_work_mode", mode="before")
+    @field_validator('destroy_ship_work_mode', mode='before')
     @classmethod
     def _coerce_destroy_mode(cls, v: object) -> object:
         """允许用中文别名或英文成员名指定解装模式。"""
         _ALIAS: dict[str, int] = {
-            "不启用": 0,
-            "disable": 0,
-            "黑名单": 1,
-            "include": 1,
-            "白名单": 2,
-            "exclude": 2,
+            '不启用': 0,
+            'disable': 0,
+            '黑名单': 1,
+            'include': 1,
+            '白名单': 2,
+            'exclude': 2,
         }
         if isinstance(v, str):
             key = v.strip()
@@ -310,7 +313,7 @@ class UserConfig(BaseModel):
     ship_name_file: Path | None = None
     """自定义舰船名文件"""
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def _resolve_emulator_defaults(self) -> UserConfig:
         """自动填充模拟器 serial、path、process_name。"""
         emu = self.emulator
@@ -321,26 +324,26 @@ class UserConfig(BaseModel):
         if os_type == OSType.linux:
             # WSL 需要用户显式配置
             if emu.serial is None:
-                raise ValueError("WSL 需要显式设置 emulator.serial")
+                raise ValueError('WSL 需要显式设置 emulator.serial')
             if emu.path is None:
-                raise ValueError("WSL 需要显式设置 emulator.path")
+                raise ValueError('WSL 需要显式设置 emulator.path')
             if emu.process_name is None:
-                updates["process_name"] = os.path.basename(emu.path)
+                updates['process_name'] = os.path.basename(emu.path)
         else:
             if emu.serial is None:
-                updates["serial"] = emu.type.default_emulator_name(os_type)
+                updates['serial'] = emu.type.default_emulator_name(os_type)
             if emu.path is None:
                 try:
-                    updates["path"] = emu.type.auto_emulator_path(os_type)
+                    updates['path'] = emu.type.auto_emulator_path(os_type)
                 except (ValueError, FileNotFoundError) as e:
-                    _log.warning("自动检测模拟器路径失败: {}", e)
-            resolved_path = updates.get("path", emu.path)
+                    _log.warning('自动检测模拟器路径失败: {}', e)
+            resolved_path = updates.get('path', emu.path)
             if emu.process_name is None and resolved_path is not None:
-                updates["process_name"] = os.path.basename(str(resolved_path))
+                updates['process_name'] = os.path.basename(str(resolved_path))
 
         if updates:
             new_emu = emu.model_copy(update=updates)
-            object.__setattr__(self, "emulator", new_emu)
+            object.__setattr__(self, 'emulator', new_emu)
 
         return self
 
@@ -357,7 +360,7 @@ class UserConfig(BaseModel):
 class NodeConfig(BaseModel):
     """单个地图节点的战斗配置。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     # 索敌阶段
     long_missile_support: bool = False
@@ -394,7 +397,7 @@ class NodeConfig(BaseModel):
 class FightConfig(BaseModel):
     """出征配置（通用）。"""
 
-    model_config = {"frozen": True}
+    model_config = {'frozen': True}
 
     chapter: int | str = 1
     """章节号"""
@@ -415,12 +418,12 @@ class FightConfig(BaseModel):
     map_entrance: MapEntrance | None = None
     """入口选择"""
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def _normalize_repair_mode(self) -> FightConfig:
         """将单个 repair_mode 展开为 6 个位置的列表。"""
         if not isinstance(self.repair_mode, list):
             modes = [self.repair_mode] * 6
-            object.__setattr__(self, "repair_mode", modes)
+            object.__setattr__(self, 'repair_mode', modes)
         return self
 
 
@@ -433,7 +436,7 @@ class BattleConfig(FightConfig):
 class ExerciseConfig(FightConfig):
     """演习配置。"""
 
-    selected_nodes: list[str] = Field(default_factory=lambda: ["player", "robot"])
+    selected_nodes: list[str] = Field(default_factory=lambda: ['player', 'robot'])
     discard: bool = False
     exercise_times: int = 4
     """最大演习次数"""
@@ -472,11 +475,12 @@ class DecisiveConfig:
     destroy_ship_types: list[ShipType] = field(default_factory=list)
     """解装时指定的舰种列表。空列表 = 不过滤，全部解装。"""
 
+
 # ── ConfigManager ──
 
 
 # 默认配置文件名（当前目录下）
-_DEFAULT_CONFIG_FILENAME = "usersettings.yaml"
+_DEFAULT_CONFIG_FILENAME = 'usersettings.yaml'
 
 
 class ConfigManager:
@@ -505,19 +509,19 @@ class ConfigManager:
         if path is not None:
             path = Path(path)
             if not path.exists():
-                _log.warning("配置文件 {} 不存在，使用默认配置", path)
+                _log.warning('配置文件 {} 不存在，使用默认配置', path)
                 return UserConfig()
             config = UserConfig.from_yaml(path)
-            _log.info("已加载配置: {}", path)
+            _log.info('已加载配置: {}', path)
             return config
 
         # 未指定路径 → 尝试当前目录下的默认配置
         default = Path.cwd() / _DEFAULT_CONFIG_FILENAME
         if default.exists():
-            _log.info("检测到默认配置文件: {}", default)
+            _log.info('检测到默认配置文件: {}', default)
             config = UserConfig.from_yaml(default)
-            _log.info("已加载配置: {}", default)
+            _log.info('已加载配置: {}', default)
             return config
 
-        _log.info("未指定配置文件且未检测到 {}，使用内置默认配置", _DEFAULT_CONFIG_FILENAME)
+        _log.info('未指定配置文件且未检测到 {}，使用内置默认配置', _DEFAULT_CONFIG_FILENAME)
         return UserConfig()

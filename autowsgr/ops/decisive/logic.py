@@ -6,14 +6,21 @@
 
 from __future__ import annotations
 
-from autowsgr.infra.logger import get_logger
+from typing import TYPE_CHECKING
 
-from autowsgr.infra import DecisiveConfig
-from .config import MapData
-from .state import DecisiveState
+from autowsgr.infra.logger import get_logger
 from autowsgr.types import FleetSelection, Formation
 
-_log = get_logger("ops.decisive")
+from .config import MapData
+
+
+if TYPE_CHECKING:
+    from autowsgr.infra import DecisiveConfig
+
+    from .state import DecisiveState
+
+
+_log = get_logger('ops.decisive')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 辅助数据类
@@ -22,16 +29,13 @@ _log = get_logger("ops.decisive")
 
 def _is_ship(name: str) -> bool:
     """判断名称是否为舰船（而非增益技能）。"""
-    return name not in {"长跑训练", "肌肉记忆", "黑科技"}
+    return name not in {'长跑训练', '肌肉记忆', '黑科技'}
 
 
 def _count_anti_sub(enemy: list[str]) -> int:
     """统计敌方反潜单位数量（Legacy: CL/DD/CVL）。"""
-    anti_sub_set = {"CL", "DD", "CVL"}
+    anti_sub_set = {'CL', 'DD', 'CVL'}
     return sum(1 for ship_type in enemy if ship_type in anti_sub_set)
-
-
-
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -58,9 +62,7 @@ class DecisiveLogic:
         self.state = state
         self._level1_set = set(config.level1)
         # level2_full = level1 ∪ level2 ∪ 增益技能
-        self._level2_full = list(
-            {"长跑训练", "肌肉记忆", *config.level1, *config.level2, "黑科技"}
-        )
+        self._level2_full = list({'长跑训练', '肌肉记忆', *config.level1, *config.level2, '黑科技'})
 
     # ── 战备舰队选择 ───────────────────────────────────────────────────
 
@@ -102,9 +104,7 @@ class DecisiveLogic:
         elif not {s for s in self.state.fleet[1:] if s}.issubset(self._level1_set):
             candidates = self.config.level1
         else:
-            candidates = self.config.level1 + [
-                e for e in self._level2_full if not _is_ship(e)
-            ]
+            candidates = self.config.level1 + [e for e in self._level2_full if not _is_ship(e)]
 
         lim = 6 if fleet_count < 6 else score
         result: list[str] = []
@@ -133,16 +133,14 @@ class DecisiveLogic:
         - 其他节点: < 1 艘则撤退
         """
         ship_count = sum(1 for s in fleet[1:] if s)
-        if self.state.node == "A":
+        if self.state.node == 'A':
             return ship_count < 2
         return ship_count < 1
 
     def should_repair(self) -> bool:
         """根据修理等级判断是否需要修理。"""
         return any(
-            status >= self.config.repair_level
-            for status in self.state.ship_stats
-            if status > 0
+            status >= self.config.repair_level for status in self.state.ship_stats if status > 0
         )
 
     def is_stage_end(self, node: str | None = None) -> bool:
@@ -159,7 +157,9 @@ class DecisiveLogic:
         if node is None:
             node = self.state.node
         return MapData.is_stage_end(
-            self.config.chapter, self.state.stage, node,
+            self.config.chapter,
+            self.state.stage,
+            node,
         )
 
     def is_key_point(self, node: str | None = None) -> bool:
@@ -173,7 +173,9 @@ class DecisiveLogic:
         if node is None:
             node = self.state.node
         return MapData.is_key_point(
-            self.config.chapter, self.state.stage, node,
+            self.config.chapter,
+            self.state.stage,
+            node,
         )
 
     # ── 编队计算 ───────────────────────────────────────────────────────
@@ -187,8 +189,8 @@ class DecisiveLogic:
             长度 7 的列表：索引 0 留空，1–6 为各位置舰船名。
         """
         ships = self.state.ships
-        best: list[str] = [""]
-        _log.debug("[决战] 当前舰船: {}", ships)
+        best: list[str] = ['']
+        _log.debug('[决战] 当前舰船: {}', ships)
         for ship in self.config.level1:
             if ship in ships and len(best) < 7:
                 best.append(ship)
@@ -204,9 +206,9 @@ class DecisiveLogic:
                 break
 
         while len(best) < 7:
-            best.append("")
+            best.append('')
 
-        _log.debug("[决战] 最优编队: {}", best)
+        _log.debug('[决战] 最优编队: {}', best)
         return best
 
     # ── 路径选择 ───────────────────────────────────────────────────────
@@ -241,6 +243,6 @@ class DecisiveLogic:
         )
         anti_sub = _count_anti_sub(enemy)
 
-        if ("U-1206" in self.state.fleet and anti_sub <= 1) or anti_sub <= 0:
+        if ('U-1206' in self.state.fleet and anti_sub <= 1) or anti_sub <= 0:
             return Formation.wedge
         return Formation.double_column

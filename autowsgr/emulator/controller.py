@@ -25,23 +25,31 @@ from __future__ import annotations
 import subprocess
 import sys
 import time
-import cv2
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from .detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
+from typing import TYPE_CHECKING
 
-import numpy as np
-from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
-from autowsgr.infra.logger import caller_info, get_logger
+import cv2
 from airtest.core.api import connect_device
 from airtest.core.api import device as get_device
 from airtest.core.error import AdbError, DeviceConnectionError
-from airtest.core.android import Android
 
-_log = get_logger("emulator")
+from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
+from autowsgr.infra.logger import caller_info, get_logger
+
+from .detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
+
+
+if TYPE_CHECKING:
+    import numpy as np
+    from airtest.core.android import Android
+
+
+_log = get_logger('emulator')
 
 
 # ── ADB 进程清理辅助 ──
+
 
 def _kill_adb_process(adb_path: str | None = None) -> None:
     """终止已有的 adb 服务/进程，以便重新建立干净的连接。
@@ -58,44 +66,44 @@ def _kill_adb_process(adb_path: str | None = None) -> None:
     try:
         adb = adb_path or _find_adb()
         subprocess.run(
-            [adb, "kill-server"],
+            [adb, 'kill-server'],
             timeout=5,
             capture_output=True,
         )
-        _log.debug("[Emulator] adb kill-server 已执行")
+        _log.debug('[Emulator] adb kill-server 已执行')
     except Exception as exc:
-        _log.debug("[Emulator] adb kill-server 失败: {}", exc)
+        _log.debug('[Emulator] adb kill-server 失败: {}', exc)
 
     # Step 2: OS 级强制终止（兜底，防止 adb kill-server 本身挂起或找不到 adb）
     try:
-        if sys.platform.startswith("win"):
+        if sys.platform.startswith('win'):
             subprocess.run(
-                ["taskkill", "/F", "/IM", "adb.exe"],
+                ['taskkill', '/F', '/IM', 'adb.exe'],
                 timeout=5,
                 capture_output=True,
             )
-            _log.debug("[Emulator] taskkill adb.exe 已执行")
+            _log.debug('[Emulator] taskkill adb.exe 已执行')
         else:
             subprocess.run(
-                ["pkill", "-f", "adb"],
+                ['pkill', '-f', 'adb'],
                 timeout=5,
                 capture_output=True,
             )
-            _log.debug("[Emulator] pkill adb 已执行")
+            _log.debug('[Emulator] pkill adb 已执行')
     except Exception as exc:
-        _log.debug("[Emulator] OS 级终止 adb 进程失败: {}", exc)
+        _log.debug('[Emulator] OS 级终止 adb 进程失败: {}', exc)
 
     # Step 3: 重新启动 adb server，确保后续连接时 server 已就绪
     try:
         adb = adb_path or _find_adb()
         subprocess.run(
-            [adb, "start-server"],
+            [adb, 'start-server'],
             timeout=8,
             capture_output=True,
         )
-        _log.debug("[Emulator] adb start-server 已执行")
+        _log.debug('[Emulator] adb start-server 已执行')
     except Exception as exc:
-        _log.debug("[Emulator] adb start-server 失败（连接时会自动启动）: {}", exc)
+        _log.debug('[Emulator] adb start-server 失败（连接时会自动启动）: {}', exc)
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,7 +291,7 @@ class ADBController(AndroidController):
     def __init__(
         self,
         serial: str | None = None,
-        config: "EmulatorConfig | None" = None,
+        config: EmulatorConfig | None = None,
         screenshot_timeout: float = 10.0,
     ) -> None:
         self._serial = serial
@@ -306,20 +314,19 @@ class ADBController(AndroidController):
             candidates = detect_emulators()
             if len(candidates) == 1:
                 resolved = candidates[0].serial
-                _log.info("[Emulator] 自动检测到唯一设备: {}", candidates[0].description)
+                _log.info('[Emulator] 自动检测到唯一设备: {}', candidates[0].description)
             elif len(candidates) == 0:
-                resolved = ""  # 交给 airtest "Android:///" 兜底
+                resolved = ''  # 交给 airtest "Android:///" 兜底
             else:
                 resolved = prompt_user_select(candidates)
         self._serial = resolved or None
 
         # 使用 javacap 截图（minicap 在 Android 12+ x86_64 模拟器上不可用）
         uri = (
-            f"Android:///{resolved}?cap_method=javacap"
+            f'Android:///{resolved}?cap_method=javacap'
             if resolved
-            else "Android:///?cap_method=javacap"
+            else 'Android:///?cap_method=javacap'
         )
-
 
         self._connect_with_retry(uri)
         assert self._device is not None  # _try_connect 成功后保证非 None
@@ -328,14 +335,13 @@ class ADBController(AndroidController):
         display = self._device.display_info
         if not isinstance(display, dict):
             raise EmulatorConnectionError(
-                f"display_info 返回非 dict 类型 {type(display).__name__}，"
-                f"serial={self._serial}"
+                f'display_info 返回非 dict 类型 {type(display).__name__}，serial={self._serial}'
             )
-        width = display.get("width")
-        height = display.get("height")
+        width = display.get('width')
+        height = display.get('height')
         if width is None or height is None:
             raise EmulatorConnectionError(
-                f"无法获取设备分辨率: {self._serial}, display_info: {display}"
+                f'无法获取设备分辨率: {self._serial}, display_info: {display}'
             )
         self._resolution = (int(width), int(height))
 
@@ -347,25 +353,25 @@ class ADBController(AndroidController):
             if raw is not None:
                 h_s, w_s = raw.shape[:2]
                 # javacap 在横屏设备上返回竖屏截图，需顺时针旋转 90°
-                orientation = getattr(self._device, "_current_orientation", None)
+                orientation = getattr(self._device, '_current_orientation', None)
                 if orientation == 1 and h_s > w_s:
                     w_s, h_s = h_s, w_s  # 旋转后的尺寸
                 actual = (w_s, h_s)
                 if actual != self._resolution:
                     _log.warning(
-                        "[Emulator] display_info 分辨率 {}x{} 与实际截图 {}x{} 不符 "
-                        "(设备可能处于横屏)，已修正",
-                        *self._resolution, w_s, h_s,
+                        '[Emulator] display_info 分辨率 {}x{} 与实际截图 {}x{} 不符 '
+                        '(设备可能处于横屏)，已修正',
+                        *self._resolution,
+                        w_s,
+                        h_s,
                     )
                     self._resolution = actual
         except Exception as exc:
-            _log.warning("[Emulator] 分辨率校验截图失败，使用 display_info 值: {}", exc)
+            _log.warning('[Emulator] 分辨率校验截图失败，使用 display_info 值: {}', exc)
 
-        _log.info(
-            "[Emulator] 已连接设备: {} ({}x{})", self._serial or "auto", *self._resolution
-        )
+        _log.info('[Emulator] 已连接设备: {} ({}x{})', self._serial or 'auto', *self._resolution)
         return DeviceInfo(
-            serial=self._serial or "auto",
+            serial=self._serial or 'auto',
             resolution=self._resolution,
         )
 
@@ -394,10 +400,10 @@ class ADBController(AndroidController):
             connect_device(uri)
             self._device = get_device()
         except (AdbError, DeviceConnectionError) as exc:
-            raise EmulatorConnectionError(f"连接设备失败: {self._serial}") from exc
+            raise EmulatorConnectionError(f'连接设备失败: {self._serial}') from exc
 
         if self._device is None:
-            raise EmulatorConnectionError(f"连接后设备对象为 None: {self._serial}")
+            raise EmulatorConnectionError(f'连接后设备对象为 None: {self._serial}')
 
     def _connect_with_retry(
         self,
@@ -430,9 +436,10 @@ class ADBController(AndroidController):
             kill_first = attempt > 1
             try:
                 _log.info(
-                    "[Emulator] 连接尝试 {}/{}{}: {}",
-                    attempt, max_attempts,
-                    " (kill-adb)" if kill_first else "",
+                    '[Emulator] 连接尝试 {}/{}{}: {}',
+                    attempt,
+                    max_attempts,
+                    ' (kill-adb)' if kill_first else '',
                     uri,
                 )
                 self._try_connect(uri, kill_first=kill_first)
@@ -441,20 +448,23 @@ class ADBController(AndroidController):
                 last_exc = exc
                 if attempt < max_attempts:
                     _log.warning(
-                        "[Emulator] 连接失败 (尝试 {}/{}): {}，{:.1f}s 后重试...",
-                        attempt, max_attempts, exc, retry_delay,
+                        '[Emulator] 连接失败 (尝试 {}/{}): {}，{:.1f}s 后重试...',
+                        attempt,
+                        max_attempts,
+                        exc,
+                        retry_delay,
                     )
                     time.sleep(retry_delay)
 
         raise EmulatorConnectionError(
-            f"连接失败（共尝试 {max_attempts} 次）: {self._serial}"
+            f'连接失败（共尝试 {max_attempts} 次）: {self._serial}'
         ) from last_exc
 
     def disconnect(self) -> None:
-        serial = self._serial or "auto"
+        serial = self._serial or 'auto'
         self._device = None
         self._resolution = (0, 0)
-        _log.info("[Emulator] 已断开设备连接: {}", serial)
+        _log.info('[Emulator] 已断开设备连接: {}', serial)
 
     @property
     def resolution(self) -> tuple[int, int]:
@@ -463,7 +473,7 @@ class ADBController(AndroidController):
     def _require_device(self) -> Android:
         """返回已连接的设备实例，未连接时抛出异常。"""
         if self._device is None:
-            raise EmulatorConnectionError("设备未连接，请先调用 connect()")
+            raise EmulatorConnectionError('设备未连接，请先调用 connect()')
         return self._device
 
     # ── 截图 ──
@@ -479,7 +489,7 @@ class ADBController(AndroidController):
                 # javacap 在横屏设备上返回未旋转的竖屏截图，
                 # 需要顺时针旋转 90° 使其与显示坐标系一致。
                 h, w = rgb.shape[:2]
-                orientation = getattr(dev, "_current_orientation", None)
+                orientation = getattr(dev, '_current_orientation', None)
                 if orientation == 1 and h > w:
                     rgb = cv2.rotate(rgb, cv2.ROTATE_90_CLOCKWISE)
                     h, w = rgb.shape[:2]
@@ -488,18 +498,22 @@ class ADBController(AndroidController):
                 # 运行时自动同步分辨率（防止旋转后首次使用仍是旧值）
                 if self._resolution != (w, h):
                     _log.warning(
-                        "[Emulator] 截图尺寸 {}x{} 与缓存分辨率 {}x{} 不符，已更新",
-                        w, h, *self._resolution,
+                        '[Emulator] 截图尺寸 {}x{} 与缓存分辨率 {}x{} 不符，已更新',
+                        w,
+                        h,
+                        *self._resolution,
                     )
                     self._resolution = (w, h)
                 _log.trace(
-                    "[Emulator] 截图完成 {}x{} 耗时={:.3f}s",
-                    w, h, elapsed,
+                    '[Emulator] 截图完成 {}x{} 耗时={:.3f}s',
+                    w,
+                    h,
+                    elapsed,
                 )
                 return rgb
             if time.monotonic() - start > self._screenshot_timeout:
                 raise EmulatorConnectionError(
-                    f"截图超时 ({self._screenshot_timeout}s)，设备可能已失去响应"
+                    f'截图超时 ({self._screenshot_timeout}s)，设备可能已失去响应'
                 )
             time.sleep(0.1)
 
@@ -509,8 +523,17 @@ class ADBController(AndroidController):
         dev = self._require_device()
         w, h = self._resolution
         px, py = int(x * w), int(y * h)
-        _log.debug("[Emulator] click({:.3f}, {:.3f}) → pixel({}, {})  res={}x{}  {}", x, y, px, py, w, h, caller_info())
-        dev.shell(f"input tap {px} {py}")
+        _log.debug(
+            '[Emulator] click({:.3f}, {:.3f}) → pixel({}, {})  res={}x{}  {}',
+            x,
+            y,
+            px,
+            py,
+            w,
+            h,
+            caller_info(),
+        )
+        dev.shell(f'input tap {px} {py}')
 
     def swipe(
         self,
@@ -526,10 +549,19 @@ class ADBController(AndroidController):
         ms = int(duration * 1000)
         dev = self._require_device()
         _log.debug(
-            "[Emulator] swipe({:.3f},{:.3f}→{:.3f},{:.3f}) → pixel({},{}→{},{}) {}ms  {}",
-            x1, y1, x2, y2, px1, py1, px2, py2, ms, caller_info(),
+            '[Emulator] swipe({:.3f},{:.3f}→{:.3f},{:.3f}) → pixel({},{}→{},{}) {}ms  {}',
+            x1,
+            y1,
+            x2,
+            y2,
+            px1,
+            py1,
+            px2,
+            py2,
+            ms,
+            caller_info(),
         )
-        dev.shell(f"input swipe {px1} {py1} {px2} {py2} {ms}")
+        dev.shell(f'input swipe {px1} {py1} {px2} {py2} {ms}')
 
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
         self.swipe(x, y, x, y, duration=duration)
@@ -538,7 +570,7 @@ class ADBController(AndroidController):
 
     def key_event(self, key_code: int) -> None:
         dev = self._require_device()
-        _log.debug("[Emulator] key_event({})  {}", key_code, caller_info())
+        _log.debug('[Emulator] key_event({})  {}', key_code, caller_info())
         # airtest keyevent 内部调用 str.upper()，必须传字符串
         dev.keyevent(str(key_code))
 
@@ -551,20 +583,25 @@ class ADBController(AndroidController):
 
     def start_app(self, package: str) -> None:
         dev = self._require_device()
-        _log.info("[Emulator] 启动应用: {}  {}", package, caller_info())
+        _log.info('[Emulator] 启动应用: {}  {}', package, caller_info())
         dev.start_app(package)
 
     def stop_app(self, package: str) -> None:
         dev = self._require_device()
-        _log.info("[Emulator] 停止应用: {}  {}", package, caller_info())
+        _log.info('[Emulator] 停止应用: {}  {}', package, caller_info())
         dev.stop_app(package)
 
     def is_app_running(self, package: str) -> bool:
         try:
             dev = self._require_device()
-            ps_output = dev.shell("ps")
+            ps_output = dev.shell('ps')
         except (AdbError, DeviceConnectionError, EmulatorConnectionError) as exc:
-            _log.debug("[Emulator] is_app_running('{}') → False (设备异常: {})  {}", package, exc, caller_info())
+            _log.debug(
+                "[Emulator] is_app_running('{}') → False (设备异常: {})  {}",
+                package,
+                exc,
+                caller_info(),
+            )
             return False
         if not isinstance(ps_output, str):
             _log.warning(
@@ -583,7 +620,6 @@ class ADBController(AndroidController):
         result = dev.shell(cmd)
         if not isinstance(result, str):
             raise EmulatorConnectionError(
-                f"shell('{cmd}') 返回了非字符串类型 {type(result).__name__}，"
-                "airtest API 契约已变化"
+                f"shell('{cmd}') 返回了非字符串类型 {type(result).__name__}，airtest API 契约已变化"
             )
         return result

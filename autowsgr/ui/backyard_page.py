@@ -14,12 +14,9 @@
 from __future__ import annotations
 
 import enum
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 from autowsgr.types import PageName
 from autowsgr.ui.page import click_and_wait_for_page
 from autowsgr.vision import (
@@ -29,7 +26,14 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
-_log = get_logger("ui")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举
@@ -39,8 +43,8 @@ _log = get_logger("ui")
 class BackyardTarget(enum.Enum):
     """后院页面可导航的目标。"""
 
-    BATH = "浴室"
-    CANTEEN = "食堂"
+    BATH = '浴室'
+    CANTEEN = '食堂'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -48,7 +52,7 @@ class BackyardTarget(enum.Enum):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 PAGE_SIGNATURE = PixelSignature(
-    name="后院",
+    name='后院',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.6990, 0.8389, (193, 98, 66), tolerance=30.0),
@@ -69,7 +73,7 @@ CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """回退按钮 (◁)，返回主页面。"""
 
 CLICK_NAV: dict[BackyardTarget, tuple[float, float]] = {
-    BackyardTarget.BATH:    (0.3125, 0.3704),
+    BackyardTarget.BATH: (0.3125, 0.3704),
     BackyardTarget.CANTEEN: (0.7292, 0.7407),
 }
 """导航按钮点击坐标。
@@ -134,12 +138,12 @@ class BackyardPage:
             BackyardTarget.BATH: BathPage.is_current_page,
             BackyardTarget.CANTEEN: CanteenPage.is_current_page,
         }
-        _log.info("[UI] 后院 → {}", target.value)
+        _log.info('[UI] 后院 → {}', target.value)
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_NAV[target],
             checker=target_checker[target],
-            source="后院",
+            source='后院',
             target=target.value,
         )
 
@@ -163,11 +167,11 @@ class BackyardPage:
         """
         from .main_page import MainPage
 
-        _log.info("[UI] 后院 → 返回主页面")
+        _log.info('[UI] 后院 → 返回主页面')
         click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=MainPage.is_current_page,
-            source="后院",
+            source='后院',
             target=PageName.MAIN,
         )

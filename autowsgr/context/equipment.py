@@ -13,7 +13,7 @@ class Equipment:
     详细属性（火力、命中等）通常无法从游戏画面直接读取，按需扩展。
     """
 
-    name: str = ""
+    name: str = ''
     """装备名称。"""
     locked: bool = False
     """是否锁定（锁定装备不会被误拆解）。"""

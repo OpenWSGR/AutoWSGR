@@ -12,18 +12,26 @@
 from __future__ import annotations
 
 import time
-from numpy import ndarray
-from autowsgr.infra import get_logger
-from autowsgr.emulator import AndroidController
+from typing import TYPE_CHECKING
+
 from autowsgr.image_resources import TemplateKey, Templates
-from autowsgr.types import FightCondition, Formation, RepairMode, ShipDamageState
-from autowsgr.vision import ImageChecker, PixelChecker
 from autowsgr.image_resources.keys import RESULT_GRADE_KEYS
+from autowsgr.infra import get_logger
+from autowsgr.types import FightCondition, Formation, RepairMode, ShipDamageState
 from autowsgr.ui.battle.blood import classify_blood
-from .recognition import recognize_enemy_formation, recognize_enemy_ships, RESULT_BLOOD_BAR_PROBE
+from autowsgr.vision import ImageChecker, PixelChecker
+
+from .recognition import RESULT_BLOOD_BAR_PROBE, recognize_enemy_formation, recognize_enemy_ships
 from .recognizer import CombatRecognitionTimeout
 
-_log = get_logger("combat")
+
+if TYPE_CHECKING:
+    from numpy import ndarray
+
+    from autowsgr.emulator import AndroidController
+
+
+_log = get_logger('combat')
 
 
 class Coords:
@@ -103,7 +111,7 @@ def click_formation(device: AndroidController, formation: Formation) -> None:
     formation:
         目标阵型。
     """
-    _log.debug("[Action] 选择阵型: {} ({})", formation.name, formation.value)
+    _log.debug('[Action] 选择阵型: {} ({})', formation.name, formation.value)
     x, y = formation.relative_position
     device.click(x, y)
     time.sleep(2.0)
@@ -132,7 +140,7 @@ def click_night_battle(device: AndroidController, pursue: bool) -> None:
     pursue:
         ``True`` = 追击（进入夜战），``False`` = 撤退。
     """
-    _log.debug("[Action] 夜战选择: {}", "追击" if pursue else "撤退")
+    _log.debug('[Action] 夜战选择: {}', '追击' if pursue else '撤退')
     if pursue:
         device.click(*Coords.NIGHT_YES)
     else:
@@ -149,7 +157,7 @@ def click_proceed(device: AndroidController, go_forward: bool) -> None:
     go_forward:
         ``True`` = 前进，``False`` = 回港。
     """
-    _log.debug("[Action] 继续前进: {}", "前进" if go_forward else "回港")
+    _log.debug('[Action] 继续前进: {}', '前进' if go_forward else '回港')
     if go_forward:
         device.click(*Coords.PROCEED_YES)
     else:
@@ -309,7 +317,7 @@ def get_ship_drop(device: AndroidController) -> str | None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def get_enemy_info(device: AndroidController, mode: str = "fight") -> dict[str, int]:
+def get_enemy_info(device: AndroidController, mode: str = 'fight') -> dict[str, int]:
     """识别敌方舰类编成。
 
     Parameters
@@ -336,7 +344,7 @@ def get_enemy_formation(device: AndroidController, ocr_engine) -> str:
         敌方阵型名称，如 ``"单纵阵"``；若无 OCR 引擎则返回空字符串。
     """
     if ocr_engine is None:
-        return ""
+        return ''
     screen = device.screenshot()
     return recognize_enemy_formation(screen, ocr_engine)
 
@@ -357,7 +365,7 @@ def detect_result_grade(device: AndroidController) -> str:
                 return grade
         time.sleep(0.25)
         retry += 1
-    raise CombatRecognitionTimeout("战果等级识别超时: 5 次尝试未识别到有效等级")
+    raise CombatRecognitionTimeout('战果等级识别超时: 5 次尝试未识别到有效等级')
 
 
 def detect_ship_stats(
@@ -387,7 +395,7 @@ def detect_ship_stats(
         pixel = PixelChecker.get_pixel(screen, x, y)
         result[slot] = classify_blood(pixel)
 
-    _log.info("[Combat] 结算页血量检测: {}", [s.name for s in result])
+    _log.info('[Combat] 结算页血量检测: {}', [s.name for s in result])
     return result
 
 
@@ -397,12 +405,15 @@ def dismiss_resource_confirm(device: AndroidController, screen: ndarray) -> None
     仅对当前帧做一次快速检测（不阻塞等待），找到任意确认按钮模板就点击。
     """
     detail = ImageChecker.find_any(
-        screen, [Templates.Confirm.CONFIRM_1], confidence=0.75,
+        screen,
+        [Templates.Confirm.CONFIRM_1],
+        confidence=0.75,
     )
     if detail is not None:
         time.sleep(0.25)
         device.click(*detail.center)
         _log.info(
             "[Combat] 点掉资源确认弹窗: '{}' ({:.4f}, {:.4f})",
-            detail.template_name, *detail.center,
+            detail.template_name,
+            *detail.center,
         )

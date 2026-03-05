@@ -25,22 +25,27 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
-
-import numpy as np
-from autowsgr.infra.logger import get_logger
+from typing import TYPE_CHECKING
 
 from autowsgr.constants import SHIPNAMES
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
-from autowsgr.infra import DecisiveConfig
+from autowsgr.infra.logger import get_logger
 from autowsgr.ui.battle.constants import CLICK_SHIP_SLOT
 from autowsgr.ui.battle.preparation import BattlePreparationPage
 from autowsgr.ui.choose_ship_page import ChooseShipPage
-from autowsgr.vision import OCREngine
 from autowsgr.vision.ocr import _fuzzy_match
 
-_log = get_logger("ui.decisive")
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import numpy as np
+
+    from autowsgr.context import GameContext
+    from autowsgr.infra import DecisiveConfig
+    from autowsgr.vision import OCREngine
+
+
+_log = get_logger('ui.decisive')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 内部常量
@@ -145,7 +150,7 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
             ships[slot] = matched
             _log.debug("[决战准备] 槽位 {} OCR → '{}'", slot, matched)
 
-        _log.info("[决战准备] 当前舰队: {}", ships)
+        _log.info('[决战准备] 当前舰队: {}', ships)
         return ships
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -175,7 +180,7 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
             c = current[i]
             d = desired[i]
             if d is None:
-                continue          # 目标留空的槽位不做要求
+                continue  # 目标留空的槽位不做要求
             if c != d:
                 return False
         return True
@@ -216,13 +221,11 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
             ``True`` 表示最终验证通过，``False`` 表示全部重试失败。
         """
         if fleet_id == 1:
-            raise ValueError("不支持更换 1 队舰船编成")
+            raise ValueError('不支持更换 1 队舰船编成')
 
-        names: list[str | None] = [
-            (n if n else None) for n in list(ship_names)[:6]
-        ]
+        names: list[str | None] = [(n or None) for n in list(ship_names)[:6]]
         names += [None] * (6 - len(names))
-        _log.info("[决战准备] 目标编成: {}", names)
+        _log.info('[决战准备] 目标编成: {}', names)
 
         for attempt in range(_MAX_SET_RETRIES + 1):
             # ── 1. 检测当前舰队 ──────────────────────────────────────────
@@ -230,7 +233,7 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
 
             # ── 前置短路：已满足则无需任何操作 ──────────────────────────
             if self._validate_fleet(current, names):
-                _log.info("[决战准备] 舰队已满足目标，跳过换船")
+                _log.info('[决战准备] 舰队已满足目标，跳过换船')
                 return True
 
             desired_set: set[str] = {n for n in names if n is not None}
@@ -253,7 +256,9 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
                 occupied = current[slot] is not None
                 _log.info(
                     "[决战准备] 成员对齐: 槽位 {} ← '{}' (原: '{}')",
-                    slot, name, current[slot],
+                    slot,
+                    name,
+                    current[slot],
                 )
                 self._change_single_ship(slot, name, slot_occupied=occupied)
                 current[slot] = name
@@ -275,19 +280,21 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
             # ── 4. 验证结果 ──────────────────────────────────────────────
             current = self.detect_fleet()
             if self._validate_fleet(current, names):
-                _log.info("[决战准备] 编成更换完成: {}", current)
+                _log.info('[决战准备] 编成更换完成: {}', current)
                 return True
 
             if attempt < _MAX_SET_RETRIES:
                 _log.warning(
-                    "[决战准备] 第 {}/{} 次验证失败，重试...",
-                    attempt + 1, _MAX_SET_RETRIES + 1,
+                    '[决战准备] 第 {}/{} 次验证失败，重试...',
+                    attempt + 1,
+                    _MAX_SET_RETRIES + 1,
                 )
                 time.sleep(0.5)
             else:
                 _log.error(
-                    "[决战准备] 舰队设置在 {} 次尝试后仍然失败，当前: {}",
-                    _MAX_SET_RETRIES + 1, current,
+                    '[决战准备] 舰队设置在 {} 次尝试后仍然失败，当前: {}',
+                    _MAX_SET_RETRIES + 1,
+                    current,
                 )
 
         return False
@@ -316,19 +323,22 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
         for i in range(6):
             target = desired[i]
             if target is None:
-                break   # 对齐 legacy: 遇到空位即停止
+                break  # 对齐 legacy: 遇到空位即停止
             if current[i] == target:
                 continue
             try:
                 src = current.index(target)
             except ValueError:
                 _log.warning(
-                    "[决战准备] 位置对齐: '{}' 不在当前舰队中, 跳过", target,
+                    "[决战准备] 位置对齐: '{}' 不在当前舰队中, 跳过",
+                    target,
                 )
                 continue
             _log.info(
                 "[决战准备] 位置对齐: 槽位 {} ← '{}' (从槽位 {})",
-                i, target, src,
+                i,
+                target,
+                src,
             )
             self._circular_move(src, i, current)
 
@@ -404,9 +414,7 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
         screen = self._ctrl.screenshot()
         while not ChooseShipPage.is_current_page(screen):
             if time.monotonic() >= deadline:
-                _log.error(
-                    "[决战准备] 等待选船页面超时 (槽位={}, 目标='{}')", slot, name
-                )
+                _log.error("[决战准备] 等待选船页面超时 (槽位={}, 目标='{}')", slot, name)
                 return
             time.sleep(0.05)
             screen = self._ctrl.screenshot()
@@ -415,7 +423,7 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
 
         if name is None:
             # ── 移除 ──────────────────────────────────────────────────────
-            _log.info("[决战准备] 移除槽位 {} 的舰船", slot)
+            _log.info('[决战准备] 移除槽位 {} 的舰船', slot)
             time.sleep(0.8)
             choose_page.click_remove()
             return
@@ -425,7 +433,8 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
         if not found:
             _log.error(
                 "[决战准备] 未在选船列表中找到 '{}'，放弃换船（槽位 {}）",
-                name, slot,
+                name,
+                slot,
             )
             # TODO: 细化错误类型
             raise RuntimeError(f"未找到目标舰船 '{name}'")
@@ -464,7 +473,11 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
                     continue
                 _log.info(
                     "[决战准备] DLL+OCR → '{}' (第 {}/{} 次)，点击 ({:.3f}, {:.3f})",
-                    name, attempt + 1, _OCR_MAX_ATTEMPTS, cx, cy,
+                    name,
+                    attempt + 1,
+                    _OCR_MAX_ATTEMPTS,
+                    cx,
+                    cy,
                 )
                 time.sleep(1.0)
                 self._ctrl.click(cx, cy)
@@ -472,12 +485,12 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
 
             _log.warning(
                 "[决战准备] 选船列表未匹配到 '{}' (第 {}/{} 次)，向上滚动",
-                name, attempt + 1, _OCR_MAX_ATTEMPTS,
+                name,
+                attempt + 1,
+                _OCR_MAX_ATTEMPTS,
             )
             if attempt < _OCR_MAX_ATTEMPTS - 1:
-                self._ctrl.swipe(
-                    0.4, _SCROLL_FROM_Y, 0.4, _SCROLL_TO_Y, duration=0.4
-                )
+                self._ctrl.swipe(0.4, _SCROLL_FROM_Y, 0.4, _SCROLL_TO_Y, duration=0.4)
                 time.sleep(0.5)
 
         return False

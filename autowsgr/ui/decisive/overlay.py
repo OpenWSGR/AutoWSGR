@@ -13,10 +13,9 @@
 from __future__ import annotations
 
 import enum
+from typing import TYPE_CHECKING
 
-import numpy as np
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
@@ -24,7 +23,12 @@ from autowsgr.vision import (
     PixelSignature,
 )
 
-_log = get_logger("ui.decisive")
+
+if TYPE_CHECKING:
+    import numpy as np
+
+
+_log = get_logger('ui.decisive')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举
@@ -34,13 +38,13 @@ _log = get_logger("ui.decisive")
 class DecisiveOverlay(enum.Enum):
     """决战地图页上的弹窗类型。"""
 
-    FLEET_ACQUISITION = "fleet_acquisition"
+    FLEET_ACQUISITION = 'fleet_acquisition'
     """战备舰队获取 — 选择购买舰船/技能。"""
 
-    CONFIRM_EXIT = "confirm_exit"
+    CONFIRM_EXIT = 'confirm_exit'
     """确认退出 — 暂离或撤退。"""
 
-    ADVANCE_CHOICE = "advance_choice"
+    ADVANCE_CHOICE = 'advance_choice'
     """选择前进点 — 分支路径选择。"""
 
 
@@ -51,7 +55,7 @@ class DecisiveOverlay(enum.Enum):
 # ── 战备舰队获取 ──
 # 特征: 顶部「战备舰队获取」白色标题 + 底部刷新/关闭按钮区域
 SIG_FLEET_ACQUISITION = PixelSignature(
-    name="决战-战备舰队获取",
+    name='决战-战备舰队获取',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.5305, 0.1014, (254, 254, 254), tolerance=30.0),
@@ -63,39 +67,39 @@ SIG_FLEET_ACQUISITION = PixelSignature(
 # ── 确认退出 ──
 # 特征: 左「暂离」蓝色按钮 + 右「撤退」红色按钮 + 对话框灰色背景
 SIG_CONFIRM_EXIT = PixelSignature(
-    name="决战-确认退出",
+    name='决战-确认退出',
     strategy=MatchStrategy.ALL,
     rules=[
-        PixelRule.of(0.3430, 0.5667, (29, 124, 214),  tolerance=30.0),
-        PixelRule.of(0.4180, 0.5694, (29, 124, 214),  tolerance=30.0),
-        PixelRule.of(0.5813, 0.5667, (152, 36, 36),   tolerance=30.0),
-        PixelRule.of(0.6578, 0.5639, (156, 38, 38),   tolerance=30.0),
+        PixelRule.of(0.3430, 0.5667, (29, 124, 214), tolerance=30.0),
+        PixelRule.of(0.4180, 0.5694, (29, 124, 214), tolerance=30.0),
+        PixelRule.of(0.5813, 0.5667, (152, 36, 36), tolerance=30.0),
+        PixelRule.of(0.6578, 0.5639, (156, 38, 38), tolerance=30.0),
         PixelRule.of(0.4953, 0.4875, (225, 225, 225), tolerance=30.0),
-        PixelRule.of(0.5023, 0.2819, (7, 117, 194),   tolerance=30.0),
+        PixelRule.of(0.5023, 0.2819, (7, 117, 194), tolerance=30.0),
     ],
 )
 
 # ── 选择前进点 ──
 # 特征: 底部「确认」蓝色按钮 + 右侧编队/出征按钮变为深色背景 (被遮挡)
 SIG_ADVANCE_CHOICE = PixelSignature(
-    name="决战-选择前进点",
+    name='决战-选择前进点',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.4484, 0.8333, (37, 146, 249), tolerance=30.0),
         PixelRule.of(0.4484, 0.8833, (28, 136, 237), tolerance=30.0),
         PixelRule.of(0.5492, 0.8306, (38, 147, 250), tolerance=30.0),
         PixelRule.of(0.5516, 0.8833, (28, 136, 237), tolerance=30.0),
-        PixelRule.of(0.7008, 0.9028, (13, 49, 85),   tolerance=30.0),
-        PixelRule.of(0.7031, 0.9514, (9, 45, 79),    tolerance=30.0),
-        PixelRule.of(0.8695, 0.9042, (13, 49, 85),   tolerance=30.0),
-        PixelRule.of(0.8727, 0.9514, (9, 45, 79),    tolerance=30.0),
+        PixelRule.of(0.7008, 0.9028, (13, 49, 85), tolerance=30.0),
+        PixelRule.of(0.7031, 0.9514, (9, 45, 79), tolerance=30.0),
+        PixelRule.of(0.8695, 0.9042, (13, 49, 85), tolerance=30.0),
+        PixelRule.of(0.8727, 0.9514, (9, 45, 79), tolerance=30.0),
     ],
 )
 
 # ── 决战地图页 (无 overlay) ──
 # 特征: 左上角撤退按钮橙色 + 右下角编队/出征三个蓝色按钮
 SIG_MAP_PAGE = PixelSignature(
-    name="决战-地图页",
+    name='决战-地图页',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.0641, 0.0667, (218, 130, 20), tolerance=30.0),
@@ -109,8 +113,8 @@ SIG_MAP_PAGE = PixelSignature(
 # 按优先级排列的 overlay → 签名映射
 OVERLAY_SIGNATURES: list[tuple[DecisiveOverlay, PixelSignature]] = [
     (DecisiveOverlay.FLEET_ACQUISITION, SIG_FLEET_ACQUISITION),
-    (DecisiveOverlay.CONFIRM_EXIT,      SIG_CONFIRM_EXIT),
-    (DecisiveOverlay.ADVANCE_CHOICE,    SIG_ADVANCE_CHOICE),
+    (DecisiveOverlay.CONFIRM_EXIT, SIG_CONFIRM_EXIT),
+    (DecisiveOverlay.ADVANCE_CHOICE, SIG_ADVANCE_CHOICE),
 ]
 
 _SIG_BY_TYPE: dict[DecisiveOverlay, PixelSignature] = dict(OVERLAY_SIGNATURES)
@@ -218,7 +222,7 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
     """
     for overlay_type, sig in OVERLAY_SIGNATURES:
         if PixelChecker.check_signature(screen, sig):
-            _log.debug("[决战] 检测到 overlay: {}", overlay_type.value)
+            _log.debug('[决战] 检测到 overlay: {}', overlay_type.value)
             return overlay_type
     return None
 

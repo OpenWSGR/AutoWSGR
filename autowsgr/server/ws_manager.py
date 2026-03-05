@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
-from typing import Any
-from fastapi import WebSocket
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("server.ws")
+
+if TYPE_CHECKING:
+    from fastapi import WebSocket
+
+
+_log = get_logger('server.ws')
 
 
 class WebSocketManager:
@@ -28,13 +32,13 @@ class WebSocketManager:
         await websocket.accept()
         async with self._lock:
             self._connections.add(websocket)
-        _log.info("[WS] 新连接, 当前连接数: {}", len(self._connections))
+        _log.info('[WS] 新连接, 当前连接数: {}', len(self._connections))
 
     async def disconnect(self, websocket: WebSocket) -> None:
         """断开连接。"""
         async with self._lock:
             self._connections.discard(websocket)
-        _log.info("[WS] 断开连接, 当前连接数: {}", len(self._connections))
+        _log.info('[WS] 断开连接, 当前连接数: {}', len(self._connections))
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         """广播消息到所有连接。"""
@@ -59,16 +63,18 @@ class WebSocketManager:
         self,
         level: str,
         message: str,
-        channel: str = "",
+        channel: str = '',
     ) -> None:
         """发送日志消息。"""
-        await self.broadcast({
-            "type": "log",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "level": level,
-            "channel": channel,
-            "message": message,
-        })
+        await self.broadcast(
+            {
+                'type': 'log',
+                'timestamp': datetime.now(UTC).isoformat(),
+                'level': level,
+                'channel': channel,
+                'message': message,
+            }
+        )
 
     async def send_task_update(
         self,
@@ -79,14 +85,14 @@ class WebSocketManager:
     ) -> None:
         """发送任务状态更新。"""
         payload: dict[str, Any] = {
-            "type": "task_update",
-            "task_id": task_id,
-            "status": status,
+            'type': 'task_update',
+            'task_id': task_id,
+            'status': status,
         }
         if progress:
-            payload["progress"] = progress
+            payload['progress'] = progress
         if result:
-            payload["result"] = result
+            payload['result'] = result
         await self.broadcast(payload)
 
     async def send_task_completed(
@@ -97,13 +103,15 @@ class WebSocketManager:
         error: str | None = None,
     ) -> None:
         """发送任务完成通知。"""
-        await self.broadcast({
-            "type": "task_completed",
-            "task_id": task_id,
-            "success": success,
-            "result": result,
-            "error": error,
-        })
+        await self.broadcast(
+            {
+                'type': 'task_completed',
+                'task_id': task_id,
+                'success': success,
+                'result': result,
+                'error': error,
+            }
+        )
 
 
 # 全局单例

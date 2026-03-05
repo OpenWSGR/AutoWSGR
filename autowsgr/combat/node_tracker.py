@@ -22,12 +22,14 @@ from typing import Any
 import cv2
 import numpy as np
 
-from autowsgr.infra import save_image
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.vision import (
-    MatchStrategy, PixelChecker, PixelRule, PixelSignature,
+    MatchStrategy,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
 )
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 常量
@@ -38,9 +40,9 @@ _SOURCE_WIDTH = 960
 _SOURCE_HEIGHT = 540
 
 # 地图数据根目录
-_MAP_DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "map" / "normal"
+_MAP_DATA_ROOT = Path(__file__).resolve().parent.parent / 'data' / 'map' / 'normal'
 
-_log = get_logger("combat.tracker")
+_log = get_logger('combat.tracker')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -92,7 +94,7 @@ class MapNodeData:
     @property
     def node_names(self) -> list[str]:
         """所有节点名（排除起始点 "0"）。"""
-        return [n for n in self._nodes if n != "0"]
+        return [n for n in self._nodes if n != '0']
 
     def get(self, name: str) -> NodePosition | None:
         """按名称获取节点。"""
@@ -120,9 +122,9 @@ class MapNodeData:
         MapNodeData | None
             加载成功返回数据对象；文件不存在返回 ``None``。
         """
-        path = _MAP_DATA_ROOT / f"{chapter}-{map_id}.yaml"
+        path = _MAP_DATA_ROOT / f'{chapter}-{map_id}.yaml'
         if not path.exists():
-            _log.warning("[NodeTracker] 地图文件不存在: {}", path)
+            _log.warning('[NodeTracker] 地图文件不存在: {}', path)
             return None
 
         from autowsgr.infra.file_utils import load_yaml
@@ -155,16 +157,16 @@ class MapNodeData:
         MapNodeData | None
             加载成功返回数据对象；文件不存在返回 ``None``。
         """
-        _event_root = Path(__file__).resolve().parent.parent / "data" / "map" / "event"
-        path = _event_root / event_name / f"{chapter}-{map_id}.yaml"
+        _event_root = Path(__file__).resolve().parent.parent / 'data' / 'map' / 'event'
+        path = _event_root / event_name / f'{chapter}-{map_id}.yaml'
         if not path.exists():
-            _log.warning("[NodeTracker] 活动地图文件不存在: {}", path)
+            _log.warning('[NodeTracker] 活动地图文件不存在: {}', path)
             return None
 
         from autowsgr.infra.file_utils import load_yaml
 
         raw: dict[str, Any] = load_yaml(path)
-        _log.debug("[NodeTracker] 加载活动地图数据: {}", path)
+        _log.debug('[NodeTracker] 加载活动地图数据: {}', path)
         return cls._parse(raw)
 
     @classmethod
@@ -177,12 +179,14 @@ class MapNodeData:
 
             if isinstance(value, dict):
                 # 新格式: {"position": [x, y], "next": ["B", "C"]}
-                pos = value.get("position", [0, 0])
-                next_nodes = value.get("next", [])
+                pos = value.get('position', [0, 0])
+                next_nodes = value.get('next', [])
                 rel_x = pos[0] / _SOURCE_WIDTH
                 rel_y = pos[1] / _SOURCE_HEIGHT
                 nodes[name] = NodePosition(
-                    name=name, x=rel_x, y=rel_y,
+                    name=name,
+                    x=rel_x,
+                    y=rel_y,
                     next_nodes=list(next_nodes),
                 )
             elif isinstance(value, (list, tuple)):
@@ -192,12 +196,15 @@ class MapNodeData:
                 nodes[name] = NodePosition(name=name, x=rel_x, y=rel_y)
             else:
                 _log.warning(
-                    "[NodeTracker] 忽略无法解析的节点 '{}': {}", name, value,
+                    "[NodeTracker] 忽略无法解析的节点 '{}': {}",
+                    name,
+                    value,
                 )
 
         _log.debug(
-            "[NodeTracker] 加载 {} 个节点: {}",
-            len(nodes), list(nodes.keys()),
+            '[NodeTracker] 加载 {} 个节点: {}',
+            len(nodes),
+            list(nodes.keys()),
         )
         return cls(nodes)
 
@@ -208,7 +215,10 @@ class MapNodeData:
 
 
 def _euclidean_distance(
-    x1: float, y1: float, x2: float, y2: float,
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
 ) -> float:
     """计算两点间欧几里得距离。"""
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
@@ -230,7 +240,7 @@ class NodeTracker:
         self._map_data = map_data
         self._ship_position: tuple[float, float] | None = None
         self._last_ship_position: tuple[float, float] | None = None
-        self._current_node: str = "0"
+        self._current_node: str = '0'
 
     @property
     def current_node(self) -> str:
@@ -246,7 +256,7 @@ class NodeTracker:
         """重置追踪状态。"""
         self._ship_position = None
         self._last_ship_position = None
-        self._current_node = "0"
+        self._current_node = '0'
 
     def _recheck_pixel(self, center: tuple[float, float], screen) -> bool:
         """验证中心及其左右两侧的像素特征。
@@ -259,13 +269,13 @@ class NodeTracker:
 
         # 定义三个检查位置的像素规则
         rules = [
-            PixelRule.of(cx, cy, (239, 219, 106), tolerance=40.0),           # 中心
-            PixelRule.of(cx - 0.03, cy, (231, 222, 101), tolerance=40.0),   # 左侧
-            PixelRule.of(cx + 0.03, cy, (231, 222, 101), tolerance=40.0),   # 右侧
+            PixelRule.of(cx, cy, (239, 219, 106), tolerance=40.0),  # 中心
+            PixelRule.of(cx - 0.03, cy, (231, 222, 101), tolerance=40.0),  # 左侧
+            PixelRule.of(cx + 0.03, cy, (231, 222, 101), tolerance=40.0),  # 右侧
         ]
 
         sig = PixelSignature(
-            name="小船像素验证",
+            name='小船像素验证',
             strategy=MatchStrategy.ALL,
             rules=rules,
         )
@@ -288,7 +298,8 @@ class NodeTracker:
         ).astype(np.uint8)
 
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-            mask, connectivity=8,
+            mask,
+            connectivity=8,
         )
         # label 0 是背景，跳过
         if num_labels <= 1:
@@ -325,14 +336,16 @@ class NodeTracker:
         if self._recheck_pixel(center, screen):
             self._ship_position = center
             _log.debug(
-                "[NodeTracker] 小船位置更新: ({:.3f}, {:.3f}) [黄色簇检测+像素验证]",
-                center[0], center[1],
+                '[NodeTracker] 小船位置更新: ({:.3f}, {:.3f}) [黄色簇检测+像素验证]',
+                center[0],
+                center[1],
             )
             return center
 
         _log.debug(
-            "[NodeTracker] 黄色簇检测到但像素验证失败: ({:.3f}, {:.3f})",
-            center[0], center[1],
+            '[NodeTracker] 黄色簇检测到但像素验证失败: ({:.3f}, {:.3f})',
+            center[0],
+            center[1],
         )
         return None
 
@@ -367,7 +380,8 @@ class NodeTracker:
             # 新格式：仅在 next_nodes 中搜索
             _log.debug(
                 "[NodeTracker] 当前节点 '{}', 下一节点候选列表: {}",
-                self._current_node, current_data.next_nodes,
+                self._current_node,
+                current_data.next_nodes,
             )
             candidate_names = current_data.next_nodes
         else:
@@ -375,7 +389,7 @@ class NodeTracker:
             candidate_names = self._map_data.node_names
 
         best_node = self._current_node
-        best_distance = float("inf")
+        best_distance = float('inf')
 
         for name in candidate_names:
             node = self._map_data.get(name)
@@ -388,15 +402,18 @@ class NodeTracker:
 
         if best_node != self._current_node:
             _log.debug(
-                "[NodeTracker] 节点更新: {} → {} (距离 {:.4f}), 位置: ({:.3f}, {:.3f})",
-                self._current_node, best_node, best_distance, sx, sy
+                '[NodeTracker] 节点更新: {} → {} (距离 {:.4f}), 位置: ({:.3f}, {:.3f})',
+                self._current_node,
+                best_node,
+                best_distance,
+                sx,
+                sy,
             )
             self._current_node = best_node
 
         return self._current_node
 
     def track(self, screen) -> str:
-        """一站式追踪：更新位置 + 判定节点。
-        """
+        """一站式追踪：更新位置 + 判定节点。"""
         self.update_ship_position(screen)
         return self.update_node()

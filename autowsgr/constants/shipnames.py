@@ -1,4 +1,5 @@
 import os
+
 from autowsgr.infra import load_yaml
 
 
@@ -22,14 +23,17 @@ def process_dict(d: dict) -> list[str]:
         舰船名称列表。
     """
     result = []
-    for k, v in d.items():
+    for v in d.values():
         result.extend(v)
     return result
 
-SHIPNAMES: list[str] = process_dict(load_yaml(os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "shipnames.yaml")))
+
+SHIPNAMES: list[str] = process_dict(
+    load_yaml(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'shipnames.yaml'))
+)
 
 # 决战中出现的非舰船名卡片（副官技能等）
-DECISIVE_SKILL_NAMES: list[str] = ["长跑训练", "肌肉记忆", "黑科技"]
+DECISIVE_SKILL_NAMES: list[str] = ['长跑训练', '肌肉记忆', '黑科技']
 
 
 def update_shipnames(extra: list[str]) -> None:
@@ -47,4 +51,3 @@ def update_shipnames(extra: list[str]) -> None:
     to_add = [n for n in extra if n not in existing]
     if to_add:
         SHIPNAMES[:0] = to_add
-

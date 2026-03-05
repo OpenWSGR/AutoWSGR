@@ -6,11 +6,12 @@ from pathlib import Path
 
 from autowsgr.vision import ImageTemplate
 
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 资源根目录 — autowsgr/data/images/
 # ═══════════════════════════════════════════════════════════════════════════════
 
-IMG_ROOT: Path = Path(__file__).resolve().parent.parent / "data" / "images"
+IMG_ROOT: Path = Path(__file__).resolve().parent.parent / 'data' / 'images'
 
 
 def load_template(
@@ -33,7 +34,9 @@ def load_template(
         匹配引擎会据此自动缩放模板以适配当前截图分辨率。
     """
     return ImageTemplate.from_file(
-        IMG_ROOT / relative_path, name=name, source_resolution=source_resolution,
+        IMG_ROOT / relative_path,
+        name=name,
+        source_resolution=source_resolution,
     )
 
 
@@ -73,7 +76,8 @@ class LazyTemplate:
     def __get__(self, obj: object, objtype: type | None = None) -> ImageTemplate:
         if self._template is None:
             self._template = load_template(
-                self._path, name=self._name,
+                self._path,
+                name=self._name,
                 source_resolution=self._source_resolution,
             )
         return self._template
@@ -81,5 +85,5 @@ class LazyTemplate:
     def __repr__(self) -> str:
         res = self._source_resolution
         if res == (960, 540):
-            return f"LazyTemplate({self._path!r}, name={self._name!r})"
-        return f"LazyTemplate({self._path!r}, name={self._name!r}, source_resolution={res!r})"
+            return f'LazyTemplate({self._path!r}, name={self._name!r})'
+        return f'LazyTemplate({self._path!r}, name={self._name!r}, source_resolution={res!r})'

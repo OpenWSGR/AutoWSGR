@@ -23,26 +23,27 @@ from .detector import (
 )
 from .os_control import (
     EmulatorProcessManager,
-    WindowsEmulatorManager,
-    MacEmulatorManager,
     LinuxEmulatorManager,
+    MacEmulatorManager,
+    WindowsEmulatorManager,
     create_emulator_manager,
 )
 
+
 __all__ = [
     # controller
-    "AndroidController",
-    "ADBController",
-    "DeviceInfo",
+    'AndroidController',
+    'ADBController',
+    'DeviceInfo',
     # detector
-    "EmulatorCandidate",
-    "detect_emulators",
-    "prompt_user_select",
-    "resolve_serial",
+    'EmulatorCandidate',
+    'detect_emulators',
+    'prompt_user_select',
+    'resolve_serial',
     # os_control
-    "EmulatorProcessManager",
-    "WindowsEmulatorManager",
-    "MacEmulatorManager",
-    "LinuxEmulatorManager",
-    "create_emulator_manager",
+    'EmulatorProcessManager',
+    'WindowsEmulatorManager',
+    'MacEmulatorManager',
+    'LinuxEmulatorManager',
+    'create_emulator_manager',
 ]

@@ -13,15 +13,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import PageName
 from autowsgr.ui.bath_page import BathPage
 
+
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
-_log = get_logger("ops")
+_log = get_logger('ops')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 公开函数
@@ -43,7 +43,7 @@ def repair_in_bath(ctx: GameContext) -> None:
     page.click_first_repair_ship()
 
     # 点击舰船后 overlay 自动关闭，已回到浴室页面
-    _log.info("[OPS] 浴室修理操作完成")
+    _log.info('[OPS] 浴室修理操作完成')
 
 
 def repair_ship_by_name(ctx: GameContext, ship_name: str) -> None:
@@ -70,4 +70,4 @@ def repair_ship_by_name(ctx: GameContext, ship_name: str) -> None:
     page.go_to_choose_repair()
     page.repair_ship(ship_name)
 
-    _log.info("[OPS] 浴室修理操作完成: {}", ship_name)
+    _log.info('[OPS] 浴室修理操作完成: {}', ship_name)

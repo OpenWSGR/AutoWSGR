@@ -9,10 +9,12 @@ from airtest.core.android.adb import ADB
 
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("emulator")
-from .base import EmulatorProcessManager
+
+_log = get_logger('emulator')
 from autowsgr.infra import EmulatorConfig, EmulatorError, EmulatorNotFoundError
 from autowsgr.types import OSType
+
+from .base import EmulatorProcessManager
 
 
 class LinuxEmulatorManager(EmulatorProcessManager):
@@ -35,7 +37,7 @@ class LinuxEmulatorManager(EmulatorProcessManager):
             return False
         try:
             subprocess.run(
-                ["pgrep", "-f", self._process_name],
+                ['pgrep', '-f', self._process_name],
                 check=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -46,43 +48,39 @@ class LinuxEmulatorManager(EmulatorProcessManager):
 
     def start(self) -> None:
         if not self._path:
-            raise EmulatorNotFoundError(
-                "未设置模拟器路径（WSL 需要显式设置）"
-            )
+            raise EmulatorNotFoundError('未设置模拟器路径（WSL 需要显式设置）')
         try:
             subprocess.Popen(shlex.split(self._path))
-            _log.info("正在启动模拟器: {}", self._path)
+            _log.info('正在启动模拟器: {}', self._path)
             self.wait_until_online()
-            _log.info("模拟器已启动")
+            _log.info('模拟器已启动')
         except EmulatorError:
             raise
         except Exception as exc:
-            raise EmulatorError(f"启动模拟器失败: {exc}") from exc
+            raise EmulatorError(f'启动模拟器失败: {exc}') from exc
 
     def stop(self) -> None:
         if not self._process_name:
-            raise EmulatorError("未设置进程名，无法停止模拟器")
+            raise EmulatorError('未设置进程名，无法停止模拟器')
         try:
             if self._is_wsl:
                 result = subprocess.run(
-                    ["taskkill.exe", "/f", "/im", self._process_name],
+                    ['taskkill.exe', '/f', '/im', self._process_name],
                     capture_output=True,
                     text=True,
                 )
                 if result.returncode != 0:
-                    raise EmulatorError(
-                        result.stderr.strip() or result.stdout.strip()
-                    )
+                    raise EmulatorError(result.stderr.strip() or result.stdout.strip())
             else:
                 subprocess.run(
-                    ["pkill", "-9", "-f", self._process_name],
+                    ['pkill', '-9', '-f', self._process_name],
                     check=True,
                 )
-            _log.info("模拟器已停止: {}", self._process_name)
+            _log.info('模拟器已停止: {}', self._process_name)
         except EmulatorError:
             raise
         except Exception as exc:
-            raise EmulatorError(f"停止模拟器失败: {exc}") from exc
+            raise EmulatorError(f'停止模拟器失败: {exc}') from exc
 
     # ── 辅助 ──
 
@@ -92,22 +90,22 @@ class LinuxEmulatorManager(EmulatorProcessManager):
         try:
             adb = ADB().get_adb_path()
             result = subprocess.run(
-                [adb, "devices"],
+                [adb, 'devices'],
                 capture_output=True,
                 text=True,
                 check=True,
             )
         except (ImportError, OSError, subprocess.CalledProcessError) as exc:
-            _log.debug("[OS-Linux] ADB 设备列表获取失败: {}", exc)
+            _log.debug('[OS-Linux] ADB 设备列表获取失败: {}', exc)
             return []
 
         devices: list[str] = []
         for line in result.stdout.splitlines():
             line = line.strip()
-            if not line or line.startswith("List of devices"):
+            if not line or line.startswith('List of devices'):
                 continue
             parts = line.split()
-            if len(parts) >= 2 and parts[1] == "device":
+            if len(parts) >= 2 and parts[1] == 'device':
                 devices.append(parts[0])
         return devices
 
@@ -116,11 +114,11 @@ class LinuxEmulatorManager(EmulatorProcessManager):
         if not self._process_name:
             return False
         result = subprocess.run(
-            ["tasklist.exe", "/fi", f"IMAGENAME eq {self._process_name}"],
+            ['tasklist.exe', '/fi', f'IMAGENAME eq {self._process_name}'],
             capture_output=True,
             text=True,
         )
-        output = (result.stdout or "").lower()
-        if "no tasks" in output:
+        output = (result.stdout or '').lower()
+        if 'no tasks' in output:
             return False
         return self._process_name.lower() in output

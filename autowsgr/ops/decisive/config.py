@@ -8,7 +8,8 @@ from pathlib import Path
 from autowsgr.infra.file_utils import load_yaml
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("decisive")
+
+_log = get_logger('decisive')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -19,20 +20,20 @@ _log = get_logger("decisive")
 # map_end[chapter][stage] → 该小关最后一个节点字母
 # chapter 索引 0 为占位; 有效章节 1–6; stage 索引 0 为占位, 有效小关 1–3。
 _MAP_END: list[str] = [
-    "",       # 0: 占位
-    " FHH",   # chapter 1: stage1=F, stage2=H, stage3=H
-    " FHH",   # chapter 2
-    " HHJ",   # chapter 3
-    " HHJ",   # chapter 4
-    " HJJ",   # chapter 5
-    " JJJ",   # chapter 6
+    '',  # 0: 占位
+    ' FHH',  # chapter 1: stage1=F, stage2=H, stage3=H
+    ' FHH',  # chapter 2
+    ' HHJ',  # chapter 3
+    ' HHJ',  # chapter 4
+    ' HJJ',  # chapter 5
+    ' JJJ',  # chapter 6
 ]
 
 # key_points[chapter][stage] → 需要夜战的关键节点字母集合
 _KEY_POINTS: dict[int, list[str]] = {
-    4: ["", "CFH", "BFH", "DHJ"],
-    5: ["", "DFH", "DGJ", "CGJ"],
-    6: ["", "BGJ", "CHJ", "DGJ"],
+    4: ['', 'CFH', 'BFH', 'DHJ'],
+    5: ['', 'DFH', 'DGJ', 'CGJ'],
+    6: ['', 'BGJ', 'CHJ', 'DGJ'],
 }
 
 
@@ -40,11 +41,7 @@ _KEY_POINTS: dict[int, list[str]] = {
 def _load_enemy_spec_data() -> dict:
     """加载决战 enemy_spec.yaml 数据。"""
     data_path = (
-        Path(__file__).resolve().parents[2]
-        / "data"
-        / "map"
-        / "decisive_battle"
-        / "enemy_spec.yaml"
+        Path(__file__).resolve().parents[2] / 'data' / 'map' / 'decisive_battle' / 'enemy_spec.yaml'
     )
     return load_yaml(data_path)
 
@@ -74,7 +71,7 @@ class MapData:
         """
         if 1 <= chapter < len(_MAP_END) and 1 <= stage <= 3:
             return _MAP_END[chapter][stage]
-        raise ValueError(f"无效章节/小关: chapter={chapter}, stage={stage}")
+        raise ValueError(f'无效章节/小关: chapter={chapter}, stage={stage}')
 
     @staticmethod
     def is_stage_end(chapter: int, stage: int, node: str) -> bool:
@@ -122,15 +119,19 @@ class MapData:
         """获取指定章节/小关/节点的敌方编成。"""
         try:
             data = _load_enemy_spec_data()
-            enemy_data = data.get("enemy", [])
+            enemy_data = data.get('enemy', [])
             chapter_data = enemy_data[chapter]
             stage_data = chapter_data[stage]
             node_data = stage_data.get(node.upper())
             if isinstance(node_data, list):
                 return [str(x) for x in node_data if x]
         except Exception:
-            _log.debug("[决战] 敌方规格数据查询失败: chapter={}, stage={}, node={}", chapter, stage, node, exc_info=True)
+            _log.debug(
+                '[决战] 敌方规格数据查询失败: chapter={}, stage={}, node={}',
+                chapter,
+                stage,
+                node,
+                exc_info=True,
+            )
             return []
         return []
-
-

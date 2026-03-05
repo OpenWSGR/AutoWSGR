@@ -72,11 +72,7 @@ class Color:
 
     def distance(self, other: Color) -> float:
         """欧几里得色彩距离。"""
-        return (
-            (self.b - other.b) ** 2
-            + (self.g - other.g) ** 2
-            + (self.r - other.r) ** 2
-        ) ** 0.5
+        return ((self.b - other.b) ** 2 + (self.g - other.g) ** 2 + (self.r - other.r) ** 2) ** 0.5
 
     def near(self, other: Color, tolerance: float = 30.0) -> bool:
         """判断两个颜色是否在容差范围内。"""
@@ -91,7 +87,7 @@ class Color:
         return (self.b, self.g, self.r)
 
     def __repr__(self) -> str:
-        return f"Color(r={self.r}, g={self.g}, b={self.b})"
+        return f'Color(r={self.r}, g={self.g}, b={self.b})'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,27 +136,27 @@ class PixelRule:
 
         其中 color 为 RGB 顺序 ``[R, G, B]``。
         """
-        color = d["color"]
+        color = d['color']
         if isinstance(color, (list, tuple)):
             c = Color.from_rgb_tuple(tuple(color))  # type: ignore[arg-type]
         elif isinstance(color, dict):
-            c = Color(r=color["r"], g=color["g"], b=color["b"])
+            c = Color(r=color['r'], g=color['g'], b=color['b'])
         else:
-            raise ValueError(f"无法解析颜色: {color}")
+            raise ValueError(f'无法解析颜色: {color}')
         return cls(
-            x=float(d["x"]),
-            y=float(d["y"]),
+            x=float(d['x']),
+            y=float(d['y']),
             color=c,
-            tolerance=d.get("tolerance", 30.0),
+            tolerance=d.get('tolerance', 30.0),
         )
 
     def to_dict(self) -> dict:
         """序列化为字典（color 为 RGB 顺序 ``[R, G, B]``）。"""
         return {
-            "x": self.x,
-            "y": self.y,
-            "color": list(self.color.as_rgb_tuple()),
-            "tolerance": self.tolerance,
+            'x': self.x,
+            'y': self.y,
+            'color': list(self.color.as_rgb_tuple()),
+            'tolerance': self.tolerance,
         }
 
 
@@ -172,13 +168,13 @@ class PixelRule:
 class MatchStrategy(enum.Enum):
     """多像素点匹配策略。"""
 
-    ALL = "all"
+    ALL = 'all'
     """所有规则都必须匹配。"""
 
-    ANY = "any"
+    ANY = 'any'
     """至少一条规则匹配即可。"""
 
-    COUNT = "count"
+    COUNT = 'count'
     """匹配数量 ≥ threshold 即可（需配合 PixelSignature.threshold）。"""
 
 
@@ -210,7 +206,7 @@ class PixelSignature:
 
     def __post_init__(self) -> None:
         if isinstance(self.rules, list):
-            object.__setattr__(self, "rules", tuple(self.rules))
+            object.__setattr__(self, 'rules', tuple(self.rules))
 
     @classmethod
     def from_dict(cls, d: dict) -> PixelSignature:
@@ -225,22 +221,22 @@ class PixelSignature:
               - {x: 70, y: 485, color: [201, 129, 54]}
               - {x: 35, y: 297, color: [47, 253, 226]}
         """
-        rules = [PixelRule.from_dict(r) for r in d["rules"]]
-        strategy = MatchStrategy(d.get("strategy", "all"))
+        rules = [PixelRule.from_dict(r) for r in d['rules']]
+        strategy = MatchStrategy(d.get('strategy', 'all'))
         return cls(
-            name=d["name"],
+            name=d['name'],
             rules=rules,
             strategy=strategy,
-            threshold=d.get("threshold", 0),
+            threshold=d.get('threshold', 0),
         )
 
     def to_dict(self) -> dict:
         """序列化为字典。"""
         return {
-            "name": self.name,
-            "strategy": self.strategy.value,
-            "threshold": self.threshold,
-            "rules": [r.to_dict() for r in self.rules],
+            'name': self.name,
+            'strategy': self.strategy.value,
+            'threshold': self.threshold,
+            'rules': [r.to_dict() for r in self.rules],
         }
 
     def __len__(self) -> int:
@@ -267,7 +263,7 @@ class CompositePixelSignature:
 
     def __post_init__(self) -> None:
         if isinstance(self.signatures, list):
-            object.__setattr__(self, "signatures", tuple(self.signatures))
+            object.__setattr__(self, 'signatures', tuple(self.signatures))
 
     def __len__(self) -> int:
         return sum(len(s) for s in self.signatures)

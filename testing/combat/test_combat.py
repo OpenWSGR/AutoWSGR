@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from autowsgr.combat.state import (
-    CombatPhase,
-    ModeCategory,
-    build_transitions,
-    resolve_successors,
+from autowsgr.combat.actions import check_blood
+from autowsgr.combat.history import (
+    CombatEvent,
+    CombatHistory,
+    EventType,
+    FightResult,
 )
-from autowsgr.combat.plan import MODE_TRANSITIONS, _MODE_SPECS
+from autowsgr.combat.plan import _MODE_SPECS, MODE_TRANSITIONS, CombatMode, CombatPlan, NodeDecision
 from autowsgr.combat.rules import (
     Condition,
     Rule,
@@ -19,14 +20,12 @@ from autowsgr.combat.rules import (
     RuleResult,
     _parse_legacy_condition,
 )
-from autowsgr.combat.history import (
-    CombatEvent,
-    CombatHistory,
-    EventType,
-    FightResult,
+from autowsgr.combat.state import (
+    CombatPhase,
+    ModeCategory,
+    build_transitions,
+    resolve_successors,
 )
-from autowsgr.combat.plan import CombatPlan, NodeDecision, CombatMode
-from autowsgr.combat.actions import check_blood
 from autowsgr.types import Formation, RepairMode, ShipDamageState
 
 
@@ -40,60 +39,56 @@ class TestResolveSuccessors:
 
     def test_normal_proceed_yes(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
-        result = resolve_successors(normal, CombatPhase.PROCEED, "yes")
+        result = resolve_successors(normal, CombatPhase.PROCEED, 'yes')
         assert CombatPhase.FIGHT_CONDITION in result
         assert CombatPhase.MAP_PAGE in result
 
     def test_normal_proceed_no(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
-        result = resolve_successors(normal, CombatPhase.PROCEED, "no")
+        result = resolve_successors(normal, CombatPhase.PROCEED, 'no')
         assert result == [CombatPhase.MAP_PAGE]
 
     def test_normal_night_no(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
-        result = resolve_successors(normal, CombatPhase.NIGHT_PROMPT, "no")
+        result = resolve_successors(normal, CombatPhase.NIGHT_PROMPT, 'no')
         assert result == [CombatPhase.RESULT]
 
     def test_normal_formation_no_branch(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
-        result = resolve_successors(normal, CombatPhase.FORMATION, "")
+        result = resolve_successors(normal, CombatPhase.FORMATION, '')
         assert CombatPhase.FIGHT_PERIOD in result
 
     def test_battle_transitions(self):
         battle = MODE_TRANSITIONS[CombatMode.BATTLE]
         # SINGLE 模式无 PROCEED，直接从 START_FIGHT 开始
-        result = resolve_successors(battle, CombatPhase.START_FIGHT, "")
+        result = resolve_successors(battle, CombatPhase.START_FIGHT, '')
         assert CombatPhase.SPOT_ENEMY_SUCCESS in result
         assert CombatPhase.FORMATION in result
 
     def test_exercise_transitions(self):
         exercise = MODE_TRANSITIONS[CombatMode.EXERCISE]
-        result = resolve_successors(exercise, CombatPhase.RESULT, "")
+        result = resolve_successors(exercise, CombatPhase.RESULT, '')
         assert CombatPhase.EXERCISE_PAGE in result
 
     def test_unknown_phase_raises(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
         with pytest.raises(KeyError):
-            resolve_successors(normal, CombatPhase.EXERCISE_PAGE, "")
+            resolve_successors(normal, CombatPhase.EXERCISE_PAGE, '')
 
     def test_spot_enemy_retreat_branch(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
-        result = resolve_successors(
-            normal, CombatPhase.SPOT_ENEMY_SUCCESS, "retreat"
-        )
+        result = resolve_successors(normal, CombatPhase.SPOT_ENEMY_SUCCESS, 'retreat')
         assert result == [CombatPhase.MAP_PAGE]
 
     def test_spot_enemy_fight_branch(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
-        result = resolve_successors(
-            normal, CombatPhase.SPOT_ENEMY_SUCCESS, "fight"
-        )
+        result = resolve_successors(normal, CombatPhase.SPOT_ENEMY_SUCCESS, 'fight')
         assert CombatPhase.FORMATION in result
         assert CombatPhase.MISSILE_ANIMATION in result
 
     def test_build_transitions_categories(self):
         """ModeCategory + build_transitions 一致性检查。"""
-        for mode, (cat, ep) in _MODE_SPECS.items():
+        for cat, ep in _MODE_SPECS.values():
             t = build_transitions(cat, ep)
             # 核心循环必须存在
             assert CombatPhase.FIGHT_PERIOD in t
@@ -116,23 +111,23 @@ class TestCondition:
     """Condition 评估测试。"""
 
     def test_greater(self):
-        c = Condition(field="BB", op=">=", value=2)
-        assert c.evaluate({"BB": 2})
-        assert c.evaluate({"BB": 3})
-        assert not c.evaluate({"BB": 1})
+        c = Condition(field='BB', op='>=', value=2)
+        assert c.evaluate({'BB': 2})
+        assert c.evaluate({'BB': 3})
+        assert not c.evaluate({'BB': 1})
 
     def test_less_than(self):
-        c = Condition(field="CV", op="<", value=2)
-        assert c.evaluate({"CV": 1})
-        assert not c.evaluate({"CV": 2})
+        c = Condition(field='CV', op='<', value=2)
+        assert c.evaluate({'CV': 1})
+        assert not c.evaluate({'CV': 2})
 
     def test_missing_field(self):
-        c = Condition(field="SS", op=">", value=0)
-        assert not c.evaluate({"BB": 1})  # SS defaults to 0
+        c = Condition(field='SS', op='>', value=0)
+        assert not c.evaluate({'BB': 1})  # SS defaults to 0
 
     def test_invalid_op(self):
-        with pytest.raises(ValueError, match="不支持"):
-            Condition(field="BB", op="~=", value=1)
+        with pytest.raises(ValueError, match='不支持'):
+            Condition(field='BB', op='~=', value=1)
 
 
 class TestRule:
@@ -141,14 +136,14 @@ class TestRule:
     def test_all_conditions_must_match(self):
         rule = Rule(
             conditions=[
-                Condition("BB", ">=", 2),
-                Condition("CV", ">", 0),
+                Condition('BB', '>=', 2),
+                Condition('CV', '>', 0),
             ],
             action=RuleAction.retreat(),
         )
-        assert rule.evaluate({"BB": 3, "CV": 1})
-        assert not rule.evaluate({"BB": 3, "CV": 0})
-        assert not rule.evaluate({"BB": 1, "CV": 1})
+        assert rule.evaluate({'BB': 3, 'CV': 1})
+        assert not rule.evaluate({'BB': 3, 'CV': 0})
+        assert not rule.evaluate({'BB': 1, 'CV': 1})
 
 
 class TestRuleEngine:
@@ -157,52 +152,54 @@ class TestRuleEngine:
     def test_first_match_wins(self):
         engine = RuleEngine(
             rules=[
-                Rule([Condition("BB", ">=", 3)], RuleAction.retreat()),
-                Rule([Condition("CV", ">", 0)], RuleAction.detour()),
+                Rule([Condition('BB', '>=', 3)], RuleAction.retreat()),
+                Rule([Condition('CV', '>', 0)], RuleAction.detour()),
             ]
         )
         # BB=3 matches first rule
-        result = engine.evaluate({"BB": 3, "CV": 1})
+        result = engine.evaluate({'BB': 3, 'CV': 1})
         assert result.result == RuleResult.RETREAT
 
         # BB=1, CV=1 matches second rule
-        result = engine.evaluate({"BB": 1, "CV": 1})
+        result = engine.evaluate({'BB': 1, 'CV': 1})
         assert result.result == RuleResult.DETOUR
 
     def test_default_action(self):
-        engine = RuleEngine(
-            rules=[Rule([Condition("BB", ">=", 10)], RuleAction.retreat())]
-        )
-        result = engine.evaluate({"BB": 1})
+        engine = RuleEngine(rules=[Rule([Condition('BB', '>=', 10)], RuleAction.retreat())])
+        result = engine.evaluate({'BB': 1})
         assert result.result == RuleResult.NO_ACTION
 
     def test_from_legacy_rules(self):
-        engine = RuleEngine.from_legacy_rules([
-            ["(BB >= 2) and (CV > 0)", "retreat"],
-            ["(SS >= 3)", 4],
-        ])
+        engine = RuleEngine.from_legacy_rules(
+            [
+                ['(BB >= 2) and (CV > 0)', 'retreat'],
+                ['(SS >= 3)', 4],
+            ]
+        )
         assert len(engine.rules) == 2
 
-        result = engine.evaluate({"BB": 3, "CV": 1})
+        result = engine.evaluate({'BB': 3, 'CV': 1})
         assert result.result == RuleResult.RETREAT
 
-        result = engine.evaluate({"SS": 3})
+        result = engine.evaluate({'SS': 3})
         assert result.result == RuleResult.FORMATION
         assert result.formation == Formation.wedge
 
     def test_from_formation_rules(self):
-        engine = RuleEngine.from_formation_rules([
-            ["单纵阵", "retreat"],
-            ["复纵阵", 4],
-        ])
-        result = engine.evaluate_formation("单纵阵")
+        engine = RuleEngine.from_formation_rules(
+            [
+                ['单纵阵', 'retreat'],
+                ['复纵阵', 4],
+            ]
+        )
+        result = engine.evaluate_formation('单纵阵')
         assert result.result == RuleResult.RETREAT
 
-        result = engine.evaluate_formation("复纵阵")
+        result = engine.evaluate_formation('复纵阵')
         assert result.result == RuleResult.FORMATION
         assert result.formation == Formation.wedge
 
-        result = engine.evaluate_formation("轮型阵")
+        result = engine.evaluate_formation('轮型阵')
         assert result.result == RuleResult.NO_ACTION
 
 
@@ -210,29 +207,29 @@ class TestParseLegacyCondition:
     """旧格式条件解析测试。"""
 
     def test_simple(self):
-        conditions = _parse_legacy_condition("(BB >= 2)")
+        conditions = _parse_legacy_condition('(BB >= 2)')
         assert len(conditions) == 1
-        assert conditions[0].field == "BB"
-        assert conditions[0].op == ">="
+        assert conditions[0].field == 'BB'
+        assert conditions[0].op == '>='
         assert conditions[0].value == 2
 
     def test_compound_and(self):
-        conditions = _parse_legacy_condition("(BB >= 2) and (CV > 0)")
+        conditions = _parse_legacy_condition('(BB >= 2) and (CV > 0)')
         assert len(conditions) == 2
-        assert conditions[0].field == "BB"
-        assert conditions[1].field == "CV"
+        assert conditions[0].field == 'BB'
+        assert conditions[1].field == 'CV'
 
     def test_complex(self):
-        conditions = _parse_legacy_condition("(SS >= 2) and (DD <= 3)")
+        conditions = _parse_legacy_condition('(SS >= 2) and (DD <= 3)')
         assert len(conditions) == 2
-        assert conditions[0].field == "SS"
-        assert conditions[0].op == ">="
-        assert conditions[1].field == "DD"
-        assert conditions[1].op == "<="
+        assert conditions[0].field == 'SS'
+        assert conditions[0].op == '>='
+        assert conditions[1].field == 'DD'
+        assert conditions[1].op == '<='
 
     def test_invalid_raises(self):
-        with pytest.raises(ValueError, match="无法解析"):
-            _parse_legacy_condition("hello world")
+        with pytest.raises(ValueError, match='无法解析'):
+            _parse_legacy_condition('hello world')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -244,20 +241,20 @@ class TestFightResult:
     """FightResult 比较测试。"""
 
     def test_comparison(self):
-        s = FightResult(grade="S")
-        a = FightResult(grade="A")
-        b = FightResult(grade="B")
+        s = FightResult(grade='S')
+        a = FightResult(grade='A')
+        b = FightResult(grade='B')
 
         assert a < s
         assert b < a
         assert s > a
-        assert s >= "S"
-        assert a < "S"
+        assert s >= 'S'
+        assert a < 'S'
 
     def test_str(self):
-        fr = FightResult(mvp=3, grade="S")
-        assert "MVP=3" in str(fr)
-        assert "S" in str(fr)
+        fr = FightResult(mvp=3, grade='S')
+        assert 'MVP=3' in str(fr)
+        assert 'S' in str(fr)
 
 
 class TestCombatHistory:
@@ -265,32 +262,32 @@ class TestCombatHistory:
 
     def test_add_and_reset(self):
         h = CombatHistory()
-        h.add(CombatEvent(EventType.SPOT_ENEMY, node="A", action="战斗"))
+        h.add(CombatEvent(EventType.SPOT_ENEMY, node='A', action='战斗'))
         assert len(h) == 1
         h.reset()
         assert len(h) == 0
 
     def test_last_node(self):
         h = CombatHistory()
-        h.add(CombatEvent(EventType.SPOT_ENEMY, node="A"))
-        h.add(CombatEvent(EventType.RESULT, node="B"))
-        assert h.last_node == "B"
+        h.add(CombatEvent(EventType.SPOT_ENEMY, node='A'))
+        h.add(CombatEvent(EventType.RESULT, node='B'))
+        assert h.last_node == 'B'
 
     def test_get_fight_results(self):
         h = CombatHistory()
-        h.add(CombatEvent(EventType.RESULT, node="A", result="S"))
-        h.add(CombatEvent(EventType.RESULT, node="B", result="A"))
+        h.add(CombatEvent(EventType.RESULT, node='A', result='S'))
+        h.add(CombatEvent(EventType.RESULT, node='B', result='A'))
         results = h.get_fight_results()
         assert isinstance(results, dict)
-        assert "A" in results
-        assert "B" in results
+        assert 'A' in results
+        assert 'B' in results
 
     def test_str(self):
         h = CombatHistory()
-        h.add(CombatEvent(EventType.SPOT_ENEMY, node="A", action="战斗"))
+        h.add(CombatEvent(EventType.SPOT_ENEMY, node='A', action='战斗'))
         text = str(h)
-        assert "SPOT_ENEMY" in text
-        assert "A" in text
+        assert 'SPOT_ENEMY' in text
+        assert 'A' in text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -309,11 +306,13 @@ class TestNodeDecision:
         assert nd.proceed_stop == 2
 
     def test_from_dict(self):
-        nd = NodeDecision.from_dict({
-            "formation": 1,
-            "night": True,
-            "proceed": False,
-        })
+        nd = NodeDecision.from_dict(
+            {
+                'formation': 1,
+                'night': True,
+                'proceed': False,
+            }
+        )
         assert nd.formation == Formation.single_column
         assert nd.night is True
         assert nd.proceed is False
@@ -323,31 +322,33 @@ class TestCombatPlan:
     """CombatPlan 测试。"""
 
     def test_from_dict_basic(self):
-        plan = CombatPlan.from_dict({
-            "chapter": 5,
-            "map": 4,
-            "fleet_id": 1,
-            "selected_nodes": ["A", "B", "C"],
-            "node_defaults": {"formation": 2, "night": False},
-            "node_args": {
-                "C": {"formation": 1, "night": True},
-            },
-        })
+        plan = CombatPlan.from_dict(
+            {
+                'chapter': 5,
+                'map': 4,
+                'fleet_id': 1,
+                'selected_nodes': ['A', 'B', 'C'],
+                'node_defaults': {'formation': 2, 'night': False},
+                'node_args': {
+                    'C': {'formation': 1, 'night': True},
+                },
+            }
+        )
         assert plan.chapter == 5
         assert plan.map_id == 4
         assert len(plan.selected_nodes) == 3
-        assert plan.get_node_decision("A").formation == Formation.double_column
-        assert plan.get_node_decision("C").formation == Formation.single_column
-        assert plan.get_node_decision("C").night is True
+        assert plan.get_node_decision('A').formation == Formation.double_column
+        assert plan.get_node_decision('C').formation == Formation.single_column
+        assert plan.get_node_decision('C').night is True
 
     def test_is_selected_node(self):
-        plan = CombatPlan(selected_nodes=["A", "B"])
-        assert plan.is_selected_node("A") is True
-        assert plan.is_selected_node("C") is False
+        plan = CombatPlan(selected_nodes=['A', 'B'])
+        assert plan.is_selected_node('A') is True
+        assert plan.is_selected_node('C') is False
 
     def test_empty_selected_nodes_allows_all(self):
         plan = CombatPlan(selected_nodes=[])
-        assert plan.is_selected_node("A") is True
+        assert plan.is_selected_node('A') is True
 
     def test_mode_transitions(self):
         plan = CombatPlan(mode=CombatMode.NORMAL)
@@ -358,21 +359,23 @@ class TestCombatPlan:
         assert plan.end_phase == CombatPhase.RESULT
 
     def test_with_enemy_rules(self):
-        plan = CombatPlan.from_dict({
-            "chapter": 1,
-            "map": 1,
-            "selected_nodes": ["A"],
-            "node_args": {
-                "A": {
-                    "enemy_rules": [
-                        ["(BB >= 2) and (CV > 0)", "retreat"],
-                    ],
+        plan = CombatPlan.from_dict(
+            {
+                'chapter': 1,
+                'map': 1,
+                'selected_nodes': ['A'],
+                'node_args': {
+                    'A': {
+                        'enemy_rules': [
+                            ['(BB >= 2) and (CV > 0)', 'retreat'],
+                        ],
+                    },
                 },
-            },
-        })
-        decision = plan.get_node_decision("A")
+            }
+        )
+        decision = plan.get_node_decision('A')
         assert decision.enemy_rules is not None
-        result = decision.enemy_rules.evaluate({"BB": 3, "CV": 1})
+        result = decision.enemy_rules.evaluate({'BB': 3, 'CV': 1})
         assert result.result == RuleResult.RETREAT
 
 
@@ -412,7 +415,14 @@ class TestCheckBlood:
         S = ShipDamageState
         R = RepairMode
         stats = [S.NORMAL, S.MODERATE, S.SEVERE, S.NORMAL, S.NORMAL, S.NORMAL]
-        rules = [R.severe_damage, R.moderate_damage, R.severe_damage, R.severe_damage, R.severe_damage, R.severe_damage]
+        rules = [
+            R.severe_damage,
+            R.moderate_damage,
+            R.severe_damage,
+            R.severe_damage,
+            R.severe_damage,
+            R.severe_damage,
+        ]
         assert check_blood(stats, rules) is False  # position 1 has MODERATE >= moderate_damage
 
     def test_severe_always_stops(self):

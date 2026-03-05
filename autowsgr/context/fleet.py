@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from autowsgr.types import RepairMode, ShipDamageState
 
-from .ship import Ship
+
+if TYPE_CHECKING:
+    from .ship import Ship
 
 
 @dataclass

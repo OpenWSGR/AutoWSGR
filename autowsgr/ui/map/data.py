@@ -10,10 +10,10 @@ import re
 from dataclasses import dataclass
 
 from autowsgr.infra.logger import get_logger
-
 from autowsgr.vision import Color
 
-_log = get_logger("ui")
+
+_log = get_logger('ui')
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 数据类
@@ -48,57 +48,57 @@ class MapIdentity:
 
 MAP_DATABASE: dict[tuple[int, int], str] = {
     # 第一章：母港周边哨戒
-    (1, 1): "母港附近海域",
-    (1, 2): "东北防线海域",
-    (1, 3): "仁州附近海域",
-    (1, 4): "深海仁州基地",
-    (1, 5): "乌兰巴托附近水域",
+    (1, 1): '母港附近海域',
+    (1, 2): '东北防线海域',
+    (1, 3): '仁州附近海域',
+    (1, 4): '深海仁州基地',
+    (1, 5): '乌兰巴托附近水域',
     # 第二章：扶桑海域攻略
-    (2, 1): "扶桑西部海域",
-    (2, 2): "扶桑西南海域",
-    (2, 3): "扶桑南部海域",
-    (2, 4): "深海扶桑基地",
-    (2, 5): "深海前哨核心地区",
-    (2, 6): "深海前哨北方地区",
+    (2, 1): '扶桑西部海域',
+    (2, 2): '扶桑西南海域',
+    (2, 3): '扶桑南部海域',
+    (2, 4): '深海扶桑基地',
+    (2, 5): '深海前哨核心地区',
+    (2, 6): '深海前哨北方地区',
     # 第三章：星洲海峡突破
-    (3, 1): "母港南部海域",
-    (3, 2): "东南群岛（1）",
-    (3, 3): "东南群岛（2）",
-    (3, 4): "星洲海峡",
+    (3, 1): '母港南部海域',
+    (3, 2): '东南群岛（1）',
+    (3, 3): '东南群岛（2）',
+    (3, 4): '星洲海峡',
     # 第四章：西行航线开辟
-    (4, 1): "克拉代夫东部海域",
-    (4, 2): "克拉代夫西部海域",
-    (4, 3): "泪之扉附近海域",
-    (4, 4): "泪之扉防线",
+    (4, 1): '克拉代夫东部海域',
+    (4, 2): '克拉代夫西部海域',
+    (4, 3): '泪之扉附近海域',
+    (4, 4): '泪之扉防线',
     # 第五章：地中海死斗
-    (5, 1): "塞浦路斯附近海域",
-    (5, 2): "克里特附近海域",
-    (5, 3): "马耳他附近海域",
-    (5, 4): "直布罗陀东部海域",
-    (5, 5): "直布罗陀要塞",
+    (5, 1): '塞浦路斯附近海域',
+    (5, 2): '克里特附近海域',
+    (5, 3): '马耳他附近海域',
+    (5, 4): '直布罗陀东部海域',
+    (5, 5): '直布罗陀要塞',
     # 第六章：北海风暴
-    (6, 1): "洛里昂南部海域",
-    (6, 2): "英吉利海峡",
-    (6, 3): "斯卡帕湾",
-    (6, 4): "丹麦海峡",
+    (6, 1): '洛里昂南部海域',
+    (6, 2): '英吉利海峡',
+    (6, 3): '斯卡帕湾',
+    (6, 4): '丹麦海峡',
     # 第七章：比斯开湾战役
-    (7, 1): "比斯开湾",
-    (7, 2): "马德拉海域",
-    (7, 3): "亚速尔海域",
-    (7, 4): "百慕大三角附近海域",
-    (7, 5): "百慕大三角防波堤",
+    (7, 1): '比斯开湾',
+    (7, 2): '马德拉海域',
+    (7, 3): '亚速尔海域',
+    (7, 4): '百慕大三角附近海域',
+    (7, 5): '百慕大三角防波堤',
     # 第八章：新大陆海域鏖战
-    (8, 1): "百慕大中心海域",
-    (8, 2): "百慕大南群岛",
-    (8, 3): "北加勒比海域",
-    (8, 4): "东部海岸群岛",
-    (8, 5): "地峡海湾",
+    (8, 1): '百慕大中心海域',
+    (8, 2): '百慕大南群岛',
+    (8, 3): '北加勒比海域',
+    (8, 4): '东部海岸群岛',
+    (8, 5): '地峡海湾',
     # 第九章：南狭长海域
-    (9, 1): "地峡外海",
-    (9, 2): "大洋南湾",
-    (9, 3): "南入海口海域",
-    (9, 4): "河口外海",
-    (9, 5): "南大洋群岛",
+    (9, 1): '地峡外海',
+    (9, 2): '大洋南湾',
+    (9, 3): '南入海口海域',
+    (9, 4): '河口外海',
+    (9, 5): '南大洋群岛',
 }
 """已知地图 (章节, 关卡号) → 名称。"""
 
@@ -227,14 +227,14 @@ def parse_map_title(text: str) -> MapIdentity | None:
         解析成功返回地图信息，失败返回 ``None``。
     """
     # ── 第 1 步: 严格单位数匹配 ──
-    m = re.search(r"(\d)\s*[-–—]\s*(\d)\s*[/／]?\s*(.*)", text)
+    m = re.search(r'(\d)\s*[-–—]\s*(\d)\s*[/／]?\s*(.*)', text)
     if m:
         chapter = int(m.group(1))
         map_num = int(m.group(2))
         name = m.group(3).strip()
 
         # OCR 粘连修正: 名称开头可能残留数字
-        cleaned_name = re.sub(r"^\d+", "", name).strip()
+        cleaned_name = re.sub(r'^\d+', '', name).strip()
 
         db_name = MAP_DATABASE.get((chapter, map_num))
         if db_name is not None:
@@ -255,7 +255,7 @@ def parse_map_title(text: str) -> MapIdentity | None:
         )
 
     # ── 第 2 步: 多位数匹配 + 校正 ──
-    m = re.search(r"(\d+)\s*[-–—]\s*(\d+)\s*[/／]?\s*(.*)", text)
+    m = re.search(r'(\d+)\s*[-–—]\s*(\d+)\s*[/／]?\s*(.*)', text)
     if not m:
         return None
 
@@ -301,11 +301,11 @@ def parse_map_title(text: str) -> MapIdentity | None:
 # ── 战役坐标 ──
 
 CAMPAIGN_POSITIONS: dict[int, tuple[float, float]] = {
-    1: (0.17, 0.5),   # 驱逐 (carrier)
-    2: (0.34, 0.5),   # 巡洋 (submarine)
-    3: (0.51, 0.5),   # 战列 (destroyer)
-    4: (0.68, 0.5),   # 航母 (cruiser)
-    5: (0.85, 0.5),   # 潜艇 (battleship)
+    1: (0.17, 0.5),  # 驱逐 (carrier)
+    2: (0.34, 0.5),  # 巡洋 (submarine)
+    3: (0.51, 0.5),  # 战列 (destroyer)
+    4: (0.68, 0.5),  # 航母 (cruiser)
+    5: (0.85, 0.5),  # 潜艇 (battleship)
 }
 """5 种战役类型的点击位置。"""
 
@@ -386,12 +386,18 @@ EXERCISE_CHALLENGE_PROBES: list[tuple[float, float]] = [
 """
 
 EXERCISE_SWIPE_TO_TOP: tuple[float, float, float, float] = (
-    800 / 960, 200 / 540, 800 / 960, 400 / 540,
+    800 / 960,
+    200 / 540,
+    800 / 960,
+    400 / 540,
 )
 """演习列表滑动: 上滑至顶部 (起点→终点)。"""
 
 EXERCISE_SWIPE_TO_BOTTOM: tuple[float, float, float, float] = (
-    800 / 960, 400 / 540, 800 / 960, 200 / 540,
+    800 / 960,
+    400 / 540,
+    800 / 960,
+    200 / 540,
 )
 """演习列表滑动: 下滑至底部 (起点→终点)。"""
 
@@ -431,25 +437,23 @@ SHIP_COUNT_CROP: tuple[float, float, float, float] = (0.904, 0.025, 0.975, 0.064
 class MapPanel(enum.Enum):
     """地图页面顶部导航面板。"""
 
-    SORTIE = "出征"
-    EXERCISE = "演习"
-    EXPEDITION = "远征"
-    BATTLE = "战役"
-    DECISIVE = "决战"
+    SORTIE = '出征'
+    EXERCISE = '演习'
+    EXPEDITION = '远征'
+    BATTLE = '战役'
+    DECISIVE = '决战'
 
 
 PANEL_LIST: list[MapPanel] = list(MapPanel)
 """面板枚举值列表 — 索引与标签栏探测位置一一对应。"""
 
-PANEL_TO_INDEX: dict[MapPanel, int] = {
-    panel: i for i, panel in enumerate(PANEL_LIST)
-}
+PANEL_TO_INDEX: dict[MapPanel, int] = {panel: i for i, panel in enumerate(PANEL_LIST)}
 
 CLICK_PANEL: dict[MapPanel, tuple[float, float]] = {
-    MapPanel.SORTIE:     (0.1396, 0.0574),
-    MapPanel.EXERCISE:   (0.2745, 0.0537),
+    MapPanel.SORTIE: (0.1396, 0.0574),
+    MapPanel.EXERCISE: (0.2745, 0.0537),
     MapPanel.EXPEDITION: (0.4042, 0.0556),
-    MapPanel.BATTLE:     (0.5276, 0.0519),
-    MapPanel.DECISIVE:   (0.6620, 0.0556),
+    MapPanel.BATTLE: (0.5276, 0.0519),
+    MapPanel.DECISIVE: (0.6620, 0.0556),
 }
 """面板标签点击位置。"""

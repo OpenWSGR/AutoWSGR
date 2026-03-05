@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from .fleet import Fleet
+
+if TYPE_CHECKING:
+    from .fleet import Fleet
+
 
 # 游戏最多同时进行 4 条远征
 _MAX_EXPEDITIONS = 4

@@ -4,9 +4,10 @@
 需根据自己的舰船配置修改 level1 / level2 / flagship_priority。
 """
 
-from autowsgr.scheduler import launch
 from autowsgr.infra import DecisiveConfig
 from autowsgr.ops import DecisiveController
+from autowsgr.scheduler import launch
+
 
 # 1. 启动
 ctx = launch('usersettings.yaml')
@@ -14,8 +15,8 @@ ctx = launch('usersettings.yaml')
 # 2. 配置决战参数
 config = DecisiveConfig(
     chapter=6,
-    level1=['U-1206', 'U-96', 'U-47', '鹦鹉螺', '鲃鱼', "伊-25"],
-    level2=['M-296', '大青花鱼', "U-1405"],
+    level1=['U-1206', 'U-96', 'U-47', '鹦鹉螺', '鲃鱼', '伊-25'],
+    level2=['M-296', '大青花鱼', 'U-1405'],
     flagship_priority=['U-1206'],
 )
 

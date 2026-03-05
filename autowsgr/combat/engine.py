@@ -1,29 +1,35 @@
-"""战斗引擎 — 状态机主循环。
-"""
+"""战斗引擎 — 状态机主循环。"""
 
 from __future__ import annotations
 
 import time
-import numpy as np
-from typing import Callable
-from autowsgr.infra.logger import get_logger
+from typing import TYPE_CHECKING
 
-from .actions import dismiss_resource_confirm, click_speed_up
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import ConditionFlag, Formation, ShipDamageState
+
+from .actions import click_speed_up, dismiss_resource_confirm
 from .handlers import PhaseHandlersMixin
 from .history import CombatHistory, CombatResult
 from .node_tracker import MapNodeData, NodeTracker
-from .plan import CombatMode, CombatPlan, MODE_CATEGORIES, NodeDecision
+from .plan import MODE_CATEGORIES, CombatMode, CombatPlan, NodeDecision
 from .recognizer import (
     CombatRecognitionTimeout,
     CombatRecognizer,
 )
 from .state import CombatPhase, ModeCategory, resolve_successors
-from autowsgr.types import ConditionFlag, Formation, ShipDamageState
-from autowsgr.context import GameContext
-from autowsgr.vision import OCREngine
 
-_log = get_logger("combat")
-_log_sm = get_logger("combat.engine")  # 状态机转移专用，可单独静默
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import numpy as np
+
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('combat')
+_log_sm = get_logger('combat.engine')  # 状态机转移专用，可单独静默
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -54,11 +60,11 @@ class CombatEngine(PhaseHandlersMixin):
         self._ocr = ctx.ocr
 
         # 运行时状态 (由 fight() 重置)
-        self._plan: CombatPlan = CombatPlan(name="", mode=CombatMode.BATTLE)
+        self._plan: CombatPlan = CombatPlan(name='', mode=CombatMode.BATTLE)
         self._recognizer: CombatRecognizer = None  # type: ignore[assignment]  # set in fight()
         self._phase = CombatPhase.PROCEED
-        self._last_action = "yes"
-        self._node = "0"
+        self._last_action = 'yes'
+        self._node = '0'
         self._ship_stats: list[ShipDamageState] = [ShipDamageState.NORMAL] * 6
         self._history = CombatHistory()
         self._node_count = 0
@@ -106,30 +112,36 @@ class CombatEngine(PhaseHandlersMixin):
             if map_data is not None:
                 self._tracker = NodeTracker(map_data)
                 _log.info(
-                    "[Combat] 节点追踪器已加载: {}-{} ({} 个节点)",
-                    plan.chapter, plan.map_id, len(map_data),
+                    '[Combat] 节点追踪器已加载: {}-{} ({} 个节点)',
+                    plan.chapter,
+                    plan.map_id,
+                    len(map_data),
                 )
             else:
                 self._tracker = None
                 _log.warning(
-                    "[Combat] 无法加载地图数据 {}-{}，节点追踪将不可用",
-                    plan.chapter, plan.map_id,
+                    '[Combat] 无法加载地图数据 {}-{}，节点追踪将不可用',
+                    plan.chapter,
+                    plan.map_id,
                 )
         elif plan.mode == CombatMode.EVENT and plan.event_name:
-            map_data = MapNodeData.load_event(
-                plan.event_name, plan.chapter, plan.map_id
-            )
+            map_data = MapNodeData.load_event(plan.event_name, plan.chapter, plan.map_id)
             if map_data is not None:
                 self._tracker = NodeTracker(map_data)
                 _log.info(
-                    "[Combat] 活动节点追踪器已加载: {}/{}-{} ({} 个节点)",
-                    plan.event_name, plan.chapter, plan.map_id, len(map_data),
+                    '[Combat] 活动节点追踪器已加载: {}/{}-{} ({} 个节点)',
+                    plan.event_name,
+                    plan.chapter,
+                    plan.map_id,
+                    len(map_data),
                 )
             else:
                 self._tracker = None
                 _log.warning(
-                    "[Combat] 无法加载活动地图数据 {}/{}-{}，节点追踪将不可用",
-                    plan.event_name, plan.chapter, plan.map_id,
+                    '[Combat] 无法加载活动地图数据 {}/{}-{}，节点追踪将不可用',
+                    plan.event_name,
+                    plan.chapter,
+                    plan.map_id,
                 )
         else:
             self._tracker = None
@@ -143,7 +155,7 @@ class CombatEngine(PhaseHandlersMixin):
             try:
                 decision = self._step()
             except CombatRecognitionTimeout as e:
-                _log.warning("[Combat] 状态识别超时: {}", e)
+                _log.warning('[Combat] 状态识别超时: {}', e)
                 if self._try_recovery():
                     continue
                 result.flag = ConditionFlag.SL
@@ -152,24 +164,25 @@ class CombatEngine(PhaseHandlersMixin):
             if decision == ConditionFlag.FIGHT_CONTINUE:
                 continue
             elif decision == ConditionFlag.DOCK_FULL:
-                _log.warning("[Combat] 战斗进入失败：船坞已满")
+                _log.warning('[Combat] 战斗进入失败：船坞已满')
                 result.flag = ConditionFlag.DOCK_FULL
                 break
             elif decision == ConditionFlag.SL:
                 # TODO: 这里出现了轻微的抽象泄露，因为 SL 需要调用 restart_game
                 result.flag = ConditionFlag.SL
                 from autowsgr.ops import restart_game
+
                 restart_game(self._device)
                 break
             elif decision == ConditionFlag.FIGHT_END:
-                _log.debug("[Combat] 战斗已结束，日志: {}", self._history)
+                _log.debug('[Combat] 战斗已结束，日志: {}', self._history)
                 result.flag = ConditionFlag.OPERATION_SUCCESS
                 break
 
         result.ship_stats = self._ship_stats[:]
         result.node_count = self._node_count
         _log.info(
-            "[Combat] 战斗结束: {} (节点数={})",
+            '[Combat] 战斗结束: {} (节点数={})',
             result.flag.value,
             result.node_count,
         )
@@ -179,16 +192,16 @@ class CombatEngine(PhaseHandlersMixin):
     # 内部方法
     # ═══════════════════════════════════════════════════════════════════════════
     def _is_map_routing_phase(self, last_phase: CombatPhase):
-        return last_phase in (
-            CombatPhase.PROCEED,
-            CombatPhase.FIGHT_CONDITION,
-            CombatPhase.START_FIGHT
-        ) or self._last_action == "detour"
+        return (
+            last_phase
+            in (CombatPhase.PROCEED, CombatPhase.FIGHT_CONDITION, CombatPhase.START_FIGHT)
+            or self._last_action == 'detour'
+        )
 
     def _reset(self) -> None:
         """重置运行时状态。"""
         self._history.reset()
-        self._node = "0"
+        self._node = '0'
         self._node_count = 0
         self._formation_by_rule = None
 
@@ -197,7 +210,7 @@ class CombatEngine(PhaseHandlersMixin):
             self._tracker.reset()
 
         self._phase = CombatPhase.START_FIGHT
-        self._last_action = ""
+        self._last_action = ''
 
     def _step(self) -> ConditionFlag:
         """执行一步: 状态更新 + 决策。"""
@@ -215,7 +228,7 @@ class CombatEngine(PhaseHandlersMixin):
         )
 
         _log_sm.debug(
-            "[Combat] 当前: {} (action={}) → 候选: {}",
+            '[Combat] 当前: {} (action={}) → 候选: {}',
             last_phase.name,
             self._last_action,
             [c.name for c in candidates],
@@ -230,7 +243,7 @@ class CombatEngine(PhaseHandlersMixin):
 
         self._phase = new_phase
         return new_phase
-    
+
     def _get_poll_action(self, last_phase: CombatPhase) -> Callable[[np.ndarray], None] | None:
         """根据当前状态和模式大类，返回每轮匹配前执行的动作。
 
@@ -244,6 +257,7 @@ class CombatEngine(PhaseHandlersMixin):
             if self._is_map_routing_phase(last_phase):
                 tracker = self._tracker
                 device = self._device
+
                 def _poll_map(screen: np.ndarray) -> None:
                     click_speed_up(device)
                     if tracker is not None:
@@ -252,14 +266,16 @@ class CombatEngine(PhaseHandlersMixin):
                         if new_node != self._node:
                             self._node = new_node
                         dismiss_resource_confirm(device, screen)
+
                 return _poll_map
-            
-        elif category is ModeCategory.SINGLE:
-            if last_phase is CombatPhase.START_FIGHT:
-                def _poll_single(_: np.ndarray) -> None:
-                    click_speed_up(self._device)
-                return _poll_single
-            
+
+        elif category is ModeCategory.SINGLE and last_phase is CombatPhase.START_FIGHT:
+
+            def _poll_single(_: np.ndarray) -> None:
+                click_speed_up(self._device)
+
+            return _poll_single
+
         return None
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -272,7 +288,7 @@ class CombatEngine(PhaseHandlersMixin):
 
     def _try_recovery(self) -> bool:
         """尝试从错误中恢复。"""
-        _log.warning("[Combat] 尝试错误恢复...")
+        _log.warning('[Combat] 尝试错误恢复...')
         time.sleep(3.0)
 
         screen = self._device.screenshot()

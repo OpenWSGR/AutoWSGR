@@ -30,10 +30,11 @@ import numpy as np
 
 from autowsgr.infra.logger import get_logger
 
-_log = get_logger("vision.dll")
+
+_log = get_logger('vision.dll')
 
 # DLL 所在目录 — autowsgr/data/bin/
-_BIN_DIR = Path(__file__).resolve().parent.parent / "data" / "bin"
+_BIN_DIR = Path(__file__).resolve().parent.parent / 'data' / 'bin'
 
 
 class ApiDll:
@@ -47,17 +48,17 @@ class ApiDll:
 
     def __init__(self, bin_dir: str | Path | None = None) -> None:
         bin_dir = Path(bin_dir) if bin_dir else _BIN_DIR
-        dll_name = f"{sys.platform}_image_autowsgrs.bin"
+        dll_name = f'{sys.platform}_image_autowsgrs.bin'
         dll_path = bin_dir / dll_name
 
         if not dll_path.exists():
             raise FileNotFoundError(
-                f"找不到 DLL: {dll_path}\n"
-                f"当前平台: {sys.platform}，"
-                f"可用文件: {list(bin_dir.glob('*.bin'))}"
+                f'找不到 DLL: {dll_path}\n'
+                f'当前平台: {sys.platform}，'
+                f'可用文件: {list(bin_dir.glob("*.bin"))}'
             )
 
-        _log.info("[DLL] 加载: {}", dll_path)
+        _log.info('[DLL] 加载: {}', dll_path)
         self._dll = cdll.LoadLibrary(str(dll_path))
 
         # 设置函数签名
@@ -111,9 +112,9 @@ class ApiDll:
         """
         images_p = [self._wrap_img_input(img) for img in images]
         input_p = self._wrap_recognize_enemy_input(images_p)
-        ret = ctypes.create_string_buffer(b"\0", 100)
+        ret = ctypes.create_string_buffer(b'\0', 100)
         self._dll.recognize_enemy(input_p, ret)
-        return ret.value.decode("ascii")
+        return ret.value.decode('ascii')
 
     def recognize_map(self, image: np.ndarray) -> str:
         """识别决战地图节点。
@@ -145,9 +146,7 @@ class ApiDll:
         channels = c_size_t(1) if len(image.shape) == 2 else c_size_t(image.shape[2])
         img = image.astype(np.uint8)
         pixels_p = POINTER(c_uint8)
-        pixels_p = c_size_t(
-            ctypes.cast(img.ctypes.data_as(pixels_p), c_void_p).value
-        )
+        pixels_p = c_size_t(ctypes.cast(img.ctypes.data_as(pixels_p), c_void_p).value)
         return cast(arr(width, height, channels, pixels_p), c_void_p)
 
     @staticmethod

@@ -13,25 +13,34 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
+from autowsgr.combat import CombatEngine, CombatMode, CombatPlan, CombatResult, NodeDecision
 from autowsgr.infra.logger import get_logger
-
-from autowsgr.combat import CombatResult, CombatMode, CombatPlan, NodeDecision, CombatEngine
 from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, Formation, PageName, RepairMode, ShipDamageState
-from autowsgr.ui import BattlePreparationPage, NavigationError, RepairStrategy, MapPage, wait_leave_page
+from autowsgr.ui import (
+    BattlePreparationPage,
+    MapPage,
+    NavigationError,
+    RepairStrategy,
+    wait_leave_page,
+)
 from autowsgr.ui.battle.base import BaseBattlePreparation
-from autowsgr.emulator import AndroidController
-from autowsgr.context import GameContext
 
-_log = get_logger("ops")
+
+if TYPE_CHECKING:
+    from autowsgr.context import GameContext
+
+
+_log = get_logger('ops')
 
 CAMPAIGN_NAMES: dict[int, str] = {
-    1: "驱逐",
-    2: "巡洋",
-    3: "战列",
-    4: "航母",
-    5: "潜艇",
+    1: '驱逐',
+    2: '巡洋',
+    3: '战列',
+    4: '航母',
+    5: '潜艇',
 }
 """战役编号 → 中文名称。"""
 
@@ -41,8 +50,9 @@ CAMPAIGN_NAME_MAP: dict[str, tuple[int, str]] = {}
 """战役中文名 → ``(map_index, difficulty)``。"""
 
 for _idx, _short_name in CAMPAIGN_NAMES.items():
-    CAMPAIGN_NAME_MAP[f"简单{_short_name}"] = (_idx, "easy")
-    CAMPAIGN_NAME_MAP[f"困难{_short_name}"] = (_idx, "hard")
+    CAMPAIGN_NAME_MAP[f'简单{_short_name}'] = (_idx, 'easy')
+    CAMPAIGN_NAME_MAP[f'困难{_short_name}'] = (_idx, 'hard')
+
 
 def parse_campaign_name(name: str) -> tuple[int, str]:
     """解析战役名称为 ``(map_index, difficulty)``。
@@ -65,8 +75,7 @@ def parse_campaign_name(name: str) -> tuple[int, str]:
     result = CAMPAIGN_NAME_MAP.get(name)
     if result is None:
         raise ValueError(
-            f"无法识别的战役名称: {name!r}，"
-            f"可选: {', '.join(sorted(CAMPAIGN_NAME_MAP))}"
+            f'无法识别的战役名称: {name!r}，可选: {", ".join(sorted(CAMPAIGN_NAME_MAP))}'
         )
     return result
 
@@ -126,7 +135,7 @@ class CampaignRunner:
         list[CombatResult]
         """
         _log.info(
-            "[OPS] 战役: {} 阵型={} 夜战={} 共 {} 次",
+            '[OPS] 战役: {} 阵型={} 夜战={} 共 {} 次',
             self._campaign_name,
             self._formation.name,
             self._night,
@@ -135,7 +144,7 @@ class CampaignRunner:
         results: list[CombatResult] = []
 
         for i in range(self._times):
-            _log.info("[OPS] 战役第 {}/{} 次", i + 1, self._times)
+            _log.info('[OPS] 战役第 {}/{} 次', i + 1, self._times)
 
             # 1. 进入战役
             self._enter_battle()
@@ -149,7 +158,7 @@ class CampaignRunner:
                     ship_stats=ship_stats,
                 )
                 results.append(result)
-                _log.info("[OPS] 战役次数已用完")
+                _log.info('[OPS] 战役次数已用完')
                 break
 
             # 3. 构建计划并执行战斗
@@ -157,15 +166,15 @@ class CampaignRunner:
             results.append(result)
 
             if result.flag == ConditionFlag.BATTLE_TIMES_EXCEED:
-                _log.info("[OPS] 战役次数已用完")
+                _log.info('[OPS] 战役次数已用完')
                 break
 
             if result.flag == ConditionFlag.DOCK_FULL:
-                _log.warning("[OPS] 船坞已满, 停止战役")
+                _log.warning('[OPS] 船坞已满, 停止战役')
                 break
 
         _log.info(
-            "[OPS] 战役完成: {} 次 (成功 {} 次)",
+            '[OPS] 战役完成: {} 次 (成功 {} 次)',
             len(results),
             sum(1 for r in results if r.flag == ConditionFlag.OPERATION_SUCCESS),
         )
@@ -197,7 +206,7 @@ class CampaignRunner:
             ``(战前血量状态, 是否成功出征)``。
             当 ``False`` 时表示战役次数已用完。
         """
-        time.sleep(0.25) # 等待页面稳定
+        time.sleep(0.25)  # 等待页面稳定
         page = BattlePreparationPage(self._ctx)
 
         # 修理策略
@@ -232,7 +241,7 @@ class CampaignRunner:
                 checker=BaseBattlePreparation.is_current_page,
                 timeout=1.5,
                 source=PageName.BATTLE_PREP,
-                target="combat",
+                target='combat',
             )
             return True
         except NavigationError:
@@ -249,11 +258,11 @@ class CampaignRunner:
         if self._try_start_battle(page):
             return True
 
-        _log.warning("[OPS] 出征后未离开准备页面，重试一次")
+        _log.warning('[OPS] 出征后未离开准备页面，重试一次')
         if self._try_start_battle(page):
             return True
 
-        _log.info("[OPS] 两次出征均未离开准备页面，判定为战役次数已用完")
+        _log.info('[OPS] 两次出征均未离开准备页面，判定为战役次数已用完')
         return False
 
     # ── 战斗 ──
@@ -261,7 +270,7 @@ class CampaignRunner:
     def _do_combat(self, ship_stats: list[ShipDamageState]) -> CombatResult:
         """构建 CombatPlan 并执行战斗。"""
         plan = CombatPlan(
-            name=f"战役-{self._campaign_name}",
+            name=f'战役-{self._campaign_name}',
             mode=CombatMode.BATTLE,
             default_node=NodeDecision(
                 formation=self._formation,

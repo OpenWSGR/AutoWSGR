@@ -32,87 +32,85 @@ import io
 import sys
 from pathlib import Path
 
+
 # ── UTF-8 输出兼容（Windows 终端）──
 try:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
 except Exception:
     try:
         if isinstance(sys.stdout, io.TextIOWrapper):
             sys.stdout = io.TextIOWrapper(
-                sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True
+                sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True
             )
         if isinstance(sys.stderr, io.TextIOWrapper):
             sys.stderr = io.TextIOWrapper(
-                sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True
+                sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True
             )
     except Exception:
         pass
 
 from loguru import logger
 
-from autowsgr.combat.engine import CombatEngine
-from autowsgr.ops.campaign import CampaignRunner, CAMPAIGN_NAME_MAP
-from testing.ops._framework import launch_for_test
+from autowsgr.ops.campaign import CAMPAIGN_NAME_MAP, CampaignRunner
 from autowsgr.types import ConditionFlag, Formation, RepairMode
+from testing.ops._framework import launch_for_test
 
 
 # ── 默认值 ──────────────────────────────────────────────────────────────────
-_DEFAULT_CAMPAIGN = "困难驱逐"
+_DEFAULT_CAMPAIGN = '困难驱逐'
 _DEFAULT_TIMES = 1
-_DEFAULT_FORMATION = "double_column"
+_DEFAULT_FORMATION = 'double_column'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="战役交互式测试",
+        description='战役交互式测试',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "可选战役名称:\n  "
-            + "\n  ".join(sorted(CAMPAIGN_NAME_MAP))
-        ),
+        epilog=('可选战役名称:\n  ' + '\n  '.join(sorted(CAMPAIGN_NAME_MAP))),
     )
     parser.add_argument(
-        "serial",
-        nargs="?",
+        'serial',
+        nargs='?',
         default=None,
-        metavar="SERIAL",
-        help="ADB serial（留空则自动检测唯一设备）",
+        metavar='SERIAL',
+        help='ADB serial（留空则自动检测唯一设备）',
     )
     parser.add_argument(
-        "campaign",
-        nargs="?",
+        'campaign',
+        nargs='?',
         default=_DEFAULT_CAMPAIGN,
-        metavar="CAMPAIGN",
-        help=f"战役名称，默认: {_DEFAULT_CAMPAIGN}",
+        metavar='CAMPAIGN',
+        help=f'战役名称，默认: {_DEFAULT_CAMPAIGN}',
     )
     parser.add_argument(
-        "times",
-        nargs="?",
+        'times',
+        nargs='?',
         type=int,
         default=_DEFAULT_TIMES,
-        metavar="TIMES",
-        help=f"战役次数，默认: {_DEFAULT_TIMES}",
+        metavar='TIMES',
+        help=f'战役次数，默认: {_DEFAULT_TIMES}',
     )
     parser.add_argument(
-        "--formation",
+        '--formation',
         default=_DEFAULT_FORMATION,
         choices=[f.name for f in Formation],
-        help=f"舰队阵型，默认: {_DEFAULT_FORMATION}",
+        help=f'舰队阵型，默认: {_DEFAULT_FORMATION}',
     )
     parser.add_argument(
-        "--no-night",
-        action="store_true",
-        help="不进行夜战（默认开启夜战）",
+        '--no-night',
+        action='store_true',
+        help='不进行夜战（默认开启夜战）',
     )
     parser.add_argument(
-        "--log-dir",
+        '--log-dir',
         default=None,
-        metavar="DIR",
-        help="日志输出目录（默认: logs/interactive/campaign）",
+        metavar='DIR',
+        help='日志输出目录（默认: logs/interactive/campaign）',
     )
     return parser.parse_args()
 
@@ -120,7 +118,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    log_dir = Path(args.log_dir) if args.log_dir else Path("logs/interactive/campaign")
+    log_dir = Path(args.log_dir) if args.log_dir else Path('logs/interactive/campaign')
     serial: str | None = args.serial or None
     campaign_name: str = args.campaign
     times: int = args.times
@@ -131,19 +129,19 @@ def main() -> None:
     try:
         ctx = launch_for_test(serial, log_dir=log_dir)
     except Exception as exc:
-        print(f"[ERROR] 启动失败: {exc}")
+        print(f'[ERROR] 启动失败: {exc}')
         sys.exit(1)
     ctrl = ctx.ctrl
 
-    logger.info("=" * 50)
-    logger.info("战役交互式测试")
-    logger.info("  战役: {}", campaign_name)
-    logger.info("  次数: {}", times)
-    logger.info("  阵型: {}", formation.name)
-    logger.info("  夜战: {}", night)
-    logger.info("  日志: {}", log_dir)
-    logger.info("已连接: {}", ctrl.serial)
-    logger.info("=" * 50)
+    logger.info('=' * 50)
+    logger.info('战役交互式测试')
+    logger.info('  战役: {}', campaign_name)
+    logger.info('  次数: {}', times)
+    logger.info('  阵型: {}', formation.name)
+    logger.info('  夜战: {}', night)
+    logger.info('  日志: {}', log_dir)
+    logger.info('已连接: {}', ctrl.serial)
+    logger.info('=' * 50)
 
     # ── 初始化战役执行器 ──────────────────────────────────────────────────────
     runner = CampaignRunner(
@@ -156,34 +154,32 @@ def main() -> None:
     )
 
     # ── 运行战役 ──────────────────────────────────────────────────────────────
-    logger.info("开始运行战役...")
+    logger.info('开始运行战役...')
     try:
         results = runner.run()
     except Exception as exc:
-        logger.exception("战役运行异常: {}", exc)
+        logger.exception('战役运行异常: {}', exc)
         sys.exit(1)
 
     # ── 结果汇总 ──────────────────────────────────────────────────────────────
-    logger.info("=" * 50)
-    logger.info("战役结束，共 {} 场", len(results))
+    logger.info('=' * 50)
+    logger.info('战役结束，共 {} 场', len(results))
 
     for i, r in enumerate(results, start=1):
-        flag_str = str(r.flag.value) if r.flag is not None else "N/A"
+        flag_str = str(r.flag.value) if r.flag is not None else 'N/A'
         stats = r.ship_stats if r.ship_stats is not None else []
         logger.info(
-            "  [{}] 状态={:<20} 节点数={} 舰船血量={}",
+            '  [{}] 状态={:<20} 节点数={} 舰船血量={}',
             i,
             flag_str,
             r.node_count,
             stats,
         )
 
-    success_count = sum(
-        1 for r in results if r.flag == ConditionFlag.OPERATION_SUCCESS
-    )
-    logger.info("成功完成: {}/{}", success_count, len(results))
-    logger.info("=" * 50)
+    success_count = sum(1 for r in results if r.flag == ConditionFlag.OPERATION_SUCCESS)
+    logger.info('成功完成: {}/{}', success_count, len(results))
+    logger.info('=' * 50)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

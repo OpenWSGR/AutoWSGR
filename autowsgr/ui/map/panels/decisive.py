@@ -5,13 +5,14 @@ from __future__ import annotations
 import time
 
 from autowsgr.infra.logger import get_logger
-
+from autowsgr.types import PageName
 from autowsgr.ui.map.base import BaseMapPage
 from autowsgr.ui.map.data import CLICK_ENTER_DECISIVE, MapPanel
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.types import PageName
 
-_log = get_logger("ui")
+
+_log = get_logger('ui')
+
 
 class DecisivePanelMixin(BaseMapPage):
     """Mixin: 决战面板操作 — 进入决战。"""
@@ -26,7 +27,7 @@ class DecisivePanelMixin(BaseMapPage):
         """
         from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
 
-        _log.info("[UI] 地图页面 → 决战页面")
+        _log.info('[UI] 地图页面 → 决战页面')
 
         # 1. 确保在决战面板
         self.ensure_panel(MapPanel.DECISIVE)
@@ -37,6 +38,6 @@ class DecisivePanelMixin(BaseMapPage):
             self._ctrl,
             click_coord=CLICK_ENTER_DECISIVE,
             checker=DecisiveBattlePage.is_current_page,
-            source="地图-决战面板",
+            source='地图-决战面板',
             target=PageName.DECISIVE_BATTLE,
         )

@@ -46,7 +46,7 @@ python tools/debug_screenshot.py --check-page decisive_battle
 
 ### OCR 调试常见问题
 
-- **数字被识别为字母** (如 `6` → `G`): 使用 `allowlist` 参数限制候选字符集  
+- **数字被识别为字母** (如 `6` → `G`): 使用 `allowlist` 参数限制候选字符集
   ```python
   result = ocr.recognize_single(cropped, allowlist='0123456789Ex-')
   ```

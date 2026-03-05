@@ -9,8 +9,7 @@
 from __future__ import annotations
 
 import time
-
-from autowsgr.infra.logger import get_logger
+from typing import TYPE_CHECKING
 
 from autowsgr.combat.actions import (
     check_blood,
@@ -30,32 +29,38 @@ from autowsgr.combat.actions import (
     get_ship_drop,
     image_exist,
 )
-from .history import CombatEvent, EventType, CombatHistory, FightResult
-from .plan import CombatMode, NodeDecision, CombatPlan
+from autowsgr.image_resources import TemplateKey
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import ConditionFlag, Formation, ShipDamageState
+
+from .history import CombatEvent, CombatHistory, EventType, FightResult
+from .plan import CombatMode, CombatPlan, NodeDecision
 from .rules import RuleResult
 from .state import CombatPhase
-from autowsgr.image_resources import TemplateKey
-from autowsgr.types import ConditionFlag, Formation, ShipDamageState
-from autowsgr.emulator import AndroidController
-from autowsgr.vision import OCREngine
 
-_log = get_logger("combat")
+
+if TYPE_CHECKING:
+    from autowsgr.emulator import AndroidController
+    from autowsgr.vision import OCREngine
+
+
+_log = get_logger('combat')
 
 
 # ── 状态 → 处理器方法名映射  ────────────────────────────────────────────────
 
 _PHASE_HANDLERS: dict[CombatPhase, str] = {
-    CombatPhase.FIGHT_CONDITION: "_handle_fight_condition",
-    CombatPhase.SPOT_ENEMY_SUCCESS: "_handle_spot_enemy",
-    CombatPhase.FORMATION: "_handle_formation",
-    CombatPhase.MISSILE_ANIMATION: "_handle_missile_animation",
-    CombatPhase.FIGHT_PERIOD: "_handle_fight_period",
-    CombatPhase.NIGHT_PROMPT: "_handle_night_prompt",
-    CombatPhase.RESULT: "_handle_result",
-    CombatPhase.GET_SHIP: "_handle_get_ship",
-    CombatPhase.PROCEED: "_handle_proceed",
-    CombatPhase.FLAGSHIP_SEVERE_DAMAGE: "_handle_flagship_severe_damage",
-    CombatPhase.DOCK_FULL: "_handle_dock_full",
+    CombatPhase.FIGHT_CONDITION: '_handle_fight_condition',
+    CombatPhase.SPOT_ENEMY_SUCCESS: '_handle_spot_enemy',
+    CombatPhase.FORMATION: '_handle_formation',
+    CombatPhase.MISSILE_ANIMATION: '_handle_missile_animation',
+    CombatPhase.FIGHT_PERIOD: '_handle_fight_period',
+    CombatPhase.NIGHT_PROMPT: '_handle_night_prompt',
+    CombatPhase.RESULT: '_handle_result',
+    CombatPhase.GET_SHIP: '_handle_get_ship',
+    CombatPhase.PROCEED: '_handle_proceed',
+    CombatPhase.FLAGSHIP_SEVERE_DAMAGE: '_handle_flagship_severe_damage',
+    CombatPhase.DOCK_FULL: '_handle_dock_full',
 }
 
 
@@ -112,11 +117,13 @@ class PhaseHandlersMixin:
 
         # ── 终止态检查 ──
         if phase == self._plan.end_phase:
-            self._history.add(CombatEvent(
-                event_type=EventType.AUTO_RETURN,
-                node=self._node,
-                action="正常",
-            ))
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.AUTO_RETURN,
+                    node=self._node,
+                    action='正常',
+                )
+            )
             return ConditionFlag.FIGHT_END
 
         return result
@@ -131,11 +138,13 @@ class PhaseHandlersMixin:
         click_fight_condition(self._device, condition)
         self._last_action = str(condition.value)
 
-        self._history.add(CombatEvent(
-            event_type=EventType.FIGHT_CONDITION,
-            node=self._node,
-            action=str(condition.value),
-        ))
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.FIGHT_CONDITION,
+                node=self._node,
+                action=str(condition.value),
+            )
+        )
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_spot_enemy(self) -> ConditionFlag:
@@ -149,23 +158,25 @@ class PhaseHandlersMixin:
         5. 根据结果执行: 撤退 / 迂回 / 设置阵型 / 进入战斗
         """
         # ── 信息采集 ──
-        mode = "exercise" if self._plan.mode == CombatMode.EXERCISE else "fight"
+        mode = 'exercise' if self._plan.mode == CombatMode.EXERCISE else 'fight'
         enemies = get_enemy_info(self._device, mode=mode)
         enemy_formation = get_enemy_formation(self._device, self._ocr)
-        _log.info("[Combat] 敌方编成: {} 阵型: {}", enemies, enemy_formation)
+        _log.info('[Combat] 敌方编成: {} 阵型: {}', enemies, enemy_formation)
 
         decision = self._get_current_decision()
 
         # 白名单检查
         if not self._plan.is_selected_node(self._node):
             click_retreat(self._device)
-            self._last_action = "retreat"
-            self._history.add(CombatEvent(
-                event_type=EventType.SPOT_ENEMY,
-                node=self._node,
-                action="撤退",
-                extra={"reason": "不在预设点"},
-            ))
+            self._last_action = 'retreat'
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.SPOT_ENEMY,
+                    node=self._node,
+                    action='撤退',
+                    extra={'reason': '不在预设点'},
+                )
+            )
             return ConditionFlag.FIGHT_END
 
         # 检查迂回按钮是否可用
@@ -175,9 +186,7 @@ class PhaseHandlersMixin:
         # 阵型规则优先
         rule_action = None
         if decision.formation_rules and enemy_formation:
-            rule_action = decision.formation_rules.evaluate_formation(
-                enemy_formation
-            )
+            rule_action = decision.formation_rules.evaluate_formation(enemy_formation)
 
         # 敌舰规则
         if rule_action is None or rule_action.result == RuleResult.NO_ACTION:
@@ -188,19 +197,21 @@ class PhaseHandlersMixin:
         if rule_action is not None:
             if rule_action.result == RuleResult.RETREAT:
                 click_retreat(self._device)
-                self._last_action = "retreat"
-                self._history.add(CombatEvent(
-                    event_type=EventType.SPOT_ENEMY,
-                    node=self._node,
-                    action="撤退",
-                    enemies=enemies.copy(),
-                ))
+                self._last_action = 'retreat'
+                self._history.add(
+                    CombatEvent(
+                        event_type=EventType.SPOT_ENEMY,
+                        node=self._node,
+                        action='撤退',
+                        enemies=enemies.copy(),
+                    )
+                )
                 return ConditionFlag.FIGHT_END
 
             if rule_action.result == RuleResult.DETOUR:
                 if not can_detour:
-                    _log.error("[Combat] 规则指定迂回, 但该点无法迂回")
-                    raise ValueError("该点无法迂回, 但在规则中指定了迂回")
+                    _log.error('[Combat] 规则指定迂回, 但该点无法迂回')
+                    raise ValueError('该点无法迂回, 但在规则中指定了迂回')
                 want_detour = True
 
             if rule_action.result == RuleResult.FORMATION and rule_action.formation:
@@ -210,65 +221,75 @@ class PhaseHandlersMixin:
         if want_detour:
             clicked = click_image(self._device, TemplateKey.BYPASS, 2.5)
             if clicked:
-                _log.info("[Combat] 执行迂回")
+                _log.info('[Combat] 执行迂回')
             else:
-                _log.warning("[Combat] 未找到迂回按钮")
-            self._last_action = "detour"
-            self._history.add(CombatEvent(
-                event_type=EventType.SPOT_ENEMY,
-                node=self._node,
-                action="迂回",
-                enemies=enemies.copy(),
-            ))
+                _log.warning('[Combat] 未找到迂回按钮')
+            self._last_action = 'detour'
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.SPOT_ENEMY,
+                    node=self._node,
+                    action='迂回',
+                    enemies=enemies.copy(),
+                )
+            )
             return ConditionFlag.FIGHT_CONTINUE
 
         # 远程导弹支援
         if decision.long_missile_support:
             clicked = click_image(self._device, TemplateKey.MISSILE_SUPPORT, 2.5)
             if clicked:
-                _log.info("[Combat] 开启远程导弹支援")
+                _log.info('[Combat] 开启远程导弹支援')
             else:
-                _log.warning("[Combat] 未找到远程支援按钮")
+                _log.warning('[Combat] 未找到远程支援按钮')
 
         # 进入战斗
         click_enter_fight(self._device)
-        self._last_action = "fight"
-        self._history.add(CombatEvent(
-            event_type=EventType.SPOT_ENEMY,
-            node=self._node,
-            action="战斗",
-            enemies=enemies.copy(),
-        ))
+        self._last_action = 'fight'
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.SPOT_ENEMY,
+                node=self._node,
+                action='战斗',
+                enemies=enemies.copy(),
+            )
+        )
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_formation(self) -> ConditionFlag:
         """处理阵型选择。"""
         decision = self._get_current_decision()
-        is_from_spot_enemy = self._last_action in ("fight", "detour")
+        is_from_spot_enemy = self._last_action in ('fight', 'detour')
 
         # 白名单检查
         if not self._plan.is_selected_node(self._node):
-            self._history.add(CombatEvent(
-                event_type=EventType.FORMATION,
-                node=self._node,
-                action="SL",
-                extra={"reason": "不在预设点"},
-            ))
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.FORMATION,
+                    node=self._node,
+                    action='SL',
+                    extra={'reason': '不在预设点'},
+                )
+            )
             return ConditionFlag.SL
 
         # 迂回失败 SL
-        if is_from_spot_enemy and self._last_action == "detour":
+        if is_from_spot_enemy and self._last_action == 'detour':
             if decision.SL_when_detour_fails:
-                self._history.add(CombatEvent(
-                    event_type=EventType.DETOUR,
-                    node=self._node,
-                    result="失败",
-                ))
-                self._history.add(CombatEvent(
-                    event_type=EventType.FORMATION,
-                    node=self._node,
-                    action="SL",
-                ))
+                self._history.add(
+                    CombatEvent(
+                        event_type=EventType.DETOUR,
+                        node=self._node,
+                        result='失败',
+                    )
+                )
+                self._history.add(
+                    CombatEvent(
+                        event_type=EventType.FORMATION,
+                        node=self._node,
+                        action='SL',
+                    )
+                )
                 return ConditionFlag.SL
 
         # 确定阵型
@@ -277,48 +298,54 @@ class PhaseHandlersMixin:
         if is_from_spot_enemy and self._formation_by_rule is not None:
             formation = self._formation_by_rule
             self._formation_by_rule = None
-            _log.debug("[Combat] 使用规则阵型: {}", formation.name)
+            _log.debug('[Combat] 使用规则阵型: {}', formation.name)
         elif not is_from_spot_enemy:
             # 索敌失败
             if decision.SL_when_spot_enemy_fails:
-                self._history.add(CombatEvent(
-                    event_type=EventType.FORMATION,
-                    node=self._node,
-                    action="SL",
-                    extra={"reason": "索敌失败"},
-                ))
+                self._history.add(
+                    CombatEvent(
+                        event_type=EventType.FORMATION,
+                        node=self._node,
+                        action='SL',
+                        extra={'reason': '索敌失败'},
+                    )
+                )
                 return ConditionFlag.SL
             if decision.formation_when_spot_enemy_fails is not None:
                 formation = decision.formation_when_spot_enemy_fails
 
         # 选择阵型
-        _log.info("[Combat] 阵型选择: {}", formation.name)
+        _log.info('[Combat] 阵型选择: {}', formation.name)
         click_formation(self._device, formation)
 
         self._last_action = str(formation.value)
-        self._history.add(CombatEvent(
-            event_type=EventType.FORMATION,
-            node=self._node,
-            action=f"阵型{formation.value} ({formation.name})",
-        ))
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.FORMATION,
+                node=self._node,
+                action=f'阵型{formation.value} ({formation.name})',
+            )
+        )
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_missile_animation(self) -> ConditionFlag:
         """跳过导弹支援动画。"""
-        _log.info("[Combat] 跳过导弹支援动画")
+        _log.info('[Combat] 跳过导弹支援动画')
         click_skip_missile_animation(self._device)
-        self._last_action = "skip_animation"
+        self._last_action = 'skip_animation'
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_fight_period(self) -> ConditionFlag:
         """处理战斗进行中。"""
         decision = self._get_current_decision()
         if decision.SL_when_enter_fight:
-            self._history.add(CombatEvent(
-                event_type=EventType.ENTER_FIGHT,
-                node=self._node,
-                action="SL",
-            ))
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.ENTER_FIGHT,
+                    node=self._node,
+                    action='SL',
+                )
+            )
             return ConditionFlag.SL
         return ConditionFlag.FIGHT_CONTINUE
 
@@ -327,15 +354,17 @@ class PhaseHandlersMixin:
         decision = self._get_current_decision()
         pursue = decision.night
 
-        _log.info("[Combat] 夜战选择: {}", "追击" if pursue else "撤退")
+        _log.info('[Combat] 夜战选择: {}', '追击' if pursue else '撤退')
         click_night_battle(self._device, pursue=pursue)
-        self._last_action = "yes" if pursue else "no"
+        self._last_action = 'yes' if pursue else 'no'
 
-        self._history.add(CombatEvent(
-            event_type=EventType.NIGHT_BATTLE,
-            node=self._node,
-            action="追击" if pursue else "撤退",
-        ))
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.NIGHT_BATTLE,
+                node=self._node,
+                action='追击' if pursue else '撤退',
+            )
+        )
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_result(self) -> ConditionFlag:
@@ -344,12 +373,14 @@ class PhaseHandlersMixin:
         grade = detect_result_grade(self._device)
         self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
         fight_result = FightResult(grade=grade, ship_stats=self._ship_stats[:])
-        self._history.add(CombatEvent(
-            event_type=EventType.RESULT,
-            node=self._node,
-            result=str(fight_result),
-        ))
-        _log.info("[Combat] 战果: {} 节点: {}", fight_result, self._node)
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.RESULT,
+                node=self._node,
+                result=str(fight_result),
+            )
+        )
+        _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
 
         # ── 关闭结算界面 ──
         time.sleep(1)
@@ -362,13 +393,15 @@ class PhaseHandlersMixin:
         """处理获取舰船。"""
         ship_name = get_ship_drop(self._device)
         if ship_name:
-            _log.info("[Combat] 获得舰船: {}", ship_name)
+            _log.info('[Combat] 获得舰船: {}', ship_name)
 
-        self._history.add(CombatEvent(
-            event_type=EventType.GET_SHIP,
-            node=self._node,
-            result=ship_name or "",
-        ))
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.GET_SHIP,
+                node=self._node,
+                result=ship_name or '',
+            )
+        )
         click_result(self._device)
         return ConditionFlag.FIGHT_CONTINUE
 
@@ -382,20 +415,20 @@ class PhaseHandlersMixin:
         self._node_count += 1
         decision = self._get_current_decision()
 
-        should_proceed = decision.proceed and check_blood(
-            self._ship_stats, decision.proceed_stop
-        )
+        should_proceed = decision.proceed and check_blood(self._ship_stats, decision.proceed_stop)
 
-        _log.info("[Combat] 继续前进决策: {}", "前进" if should_proceed else "回港")
+        _log.info('[Combat] 继续前进决策: {}', '前进' if should_proceed else '回港')
         click_proceed(self._device, go_forward=should_proceed)
-        self._last_action = "yes" if should_proceed else "no"
+        self._last_action = 'yes' if should_proceed else 'no'
 
-        self._history.add(CombatEvent(
-            event_type=EventType.PROCEED,
-            node=self._node,
-            action="前进" if should_proceed else "回港",
-            ship_stats=self._ship_stats[:],
-        ))
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.PROCEED,
+                node=self._node,
+                action='前进' if should_proceed else '回港',
+                ship_stats=self._ship_stats[:],
+            )
+        )
 
         if should_proceed:
             return ConditionFlag.FIGHT_CONTINUE
@@ -403,27 +436,31 @@ class PhaseHandlersMixin:
 
     def _handle_flagship_severe_damage(self) -> ConditionFlag:
         """处理旗舰大破。"""
-        _log.info("[Combat] 旗舰大破, 强制回港")
+        _log.info('[Combat] 旗舰大破, 强制回港')
         click_image(self._device, TemplateKey.FLAGSHIP_DAMAGE, 2.0)
         time.sleep(0.25)
 
-        self._history.add(CombatEvent(
-            event_type=EventType.FLAGSHIP_DAMAGE,
-            node=self._node,
-            action="回港",
-        ))
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.FLAGSHIP_DAMAGE,
+                node=self._node,
+                action='回港',
+            )
+        )
         return ConditionFlag.FIGHT_END
 
     def _handle_dock_full(self) -> ConditionFlag:
-        """处理船坞已满弹窗 — 返回 DOCK_FULL 标志交由上层处理。
-        """
-        _log.warning("[Combat] 检测到船坞已满，战斗无法开始")
-        self._history.add(CombatEvent(
-            event_type=EventType.AUTO_RETURN,
-            node=self._node,
-            action="船坞已满",
-        ))
+        """处理船坞已满弹窗 — 返回 DOCK_FULL 标志交由上层处理。"""
+        _log.warning('[Combat] 检测到船坞已满，战斗无法开始')
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.AUTO_RETURN,
+                node=self._node,
+                action='船坞已满',
+            )
+        )
         return ConditionFlag.DOCK_FULL
+
     # ── Mixin 所需的方法签名 (由宿主类提供) ──
 
     def _get_current_decision(self) -> NodeDecision:
