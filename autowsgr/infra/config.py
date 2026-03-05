@@ -367,9 +367,9 @@ class NodeConfig(BaseModel):
     """是否开启远程导弹支援"""
     detour: bool = False
     """是否进行迂回"""
-    enemy_rules: list[str] = Field(default_factory=list)
+    enemy_rules: list[str | list] = Field(default_factory=list)
     """索敌规则列表"""
-    enemy_formation_rules: list[str] = Field(default_factory=list)
+    enemy_formation_rules: list[str | list] = Field(default_factory=list)
     """阵型规则（优先级高于 enemy_rules）"""
 
     SL_when_spot_enemy_fails: bool = False
