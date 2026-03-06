@@ -73,6 +73,10 @@ import numpy as np
 from autowsgr.types import PageName
 from autowsgr.vision import Color, PixelChecker
 
+from autowsgr.infra.logger import get_logger
+
+_log = get_logger('ui.tabbed')
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -99,7 +103,7 @@ class TabbedPageType(enum.Enum):
 
 TAB_PROBES: list[tuple[float, float]] = [
     (0.1415, 0.0650),
-    (0.2727, 0.0486),
+    (0.2727, 0.0650),
     (0.4031, 0.0486),
     (0.5352, 0.0486),
     (0.6617, 0.0542),
@@ -107,7 +111,7 @@ TAB_PROBES: list[tuple[float, float]] = [
 """5 个固定标签栏探测点 (相对坐标)。
 
 激活标签处显示蓝色 ≈ (15, 132, 228)，其余为深色 (max < 80)。
-第 0 号探测点 y 下移至 0.065 以避开 "战利品▲" 徽标遮挡区域。
+第 0、1 号探测点 y 下移至 0.065 以避开标签文字及 "战利品▲" 徽标遮挡区域。
 """
 
 TAB_BLUE = Color.of(15, 132, 228)
@@ -296,13 +300,21 @@ def is_tabbed_page(screen: np.ndarray) -> bool:
     """
     blue_count = 0
     dark_count = 0
-    for x, y in TAB_PROBES:
+    for i, (x, y) in enumerate(TAB_PROBES):
         pixel = PixelChecker.get_pixel(screen, x, y)
-        if pixel.near(TAB_BLUE, TAB_BLUE_TOLERANCE):
+        is_blue = pixel.near(TAB_BLUE, TAB_BLUE_TOLERANCE)
+        is_dark = max(pixel.r, pixel.g, pixel.b) < TAB_DARK_MAX
+        _log.debug(
+            '[TabCheck] probe[{}] ({:.4f},{:.4f}) → ({},{},{}) blue={} dark={}',
+            i, x, y, pixel.r, pixel.g, pixel.b, is_blue, is_dark,
+        )
+        if is_blue:
             blue_count += 1
-        elif max(pixel.r, pixel.g, pixel.b) < TAB_DARK_MAX:
+        elif is_dark:
             dark_count += 1
-    return blue_count == 1 and dark_count == len(TAB_PROBES) - 1
+    result = blue_count == 1 and dark_count == len(TAB_PROBES) - 1
+    _log.debug('[TabCheck] blue={} dark={} → is_tabbed={}', blue_count, dark_count, result)
+    return result
 
 
 def get_active_tab_index(screen: np.ndarray) -> int | None:
