@@ -1,11 +1,12 @@
 """FastAPI 主应用 — HTTP REST API 和 WebSocket 端点。
 
 本模块提供以下接口:
-- POST /api/task/start  — 启动任务 (异步执行)
-- POST /api/task/stop   — 停止任务
-- GET  /api/task/status — 查询状态
-- WS   /ws/logs         — 实时日志流
-- WS   /ws/task         — 任务状态更新
+- POST /api/task/start       — 启动任务 (异步执行)
+- POST /api/task/stop        — 停止任务
+- GET  /api/task/status      — 查询状态
+- POST /api/expedition/check — 检查并收取远征
+- WS   /ws/logs              — 实时日志流
+- WS   /ws/task              — 任务状态更新
 
 使用方式:
     uvicorn autowsgr.server.main:app --host 0.0.0.0 --port 8000
@@ -438,6 +439,36 @@ async def task_status():
     """查询当前任务状态。"""
     status = task_manager.get_status()
     return ApiResponse(success=True, data=status)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 远征接口
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.post('/api/expedition/check', response_model=ApiResponse)
+async def expedition_check():
+    """检查并收取已完成的远征。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法检查远征')
+
+    from autowsgr.ops.expedition import collect_expedition
+
+    try:
+        result = await asyncio.to_thread(collect_expedition, ctx)
+        return ApiResponse(
+            success=True,
+            data={'collected': result},
+            message='远征检查完成',
+        )
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 远征检查失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
