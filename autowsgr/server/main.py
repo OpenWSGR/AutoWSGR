@@ -5,6 +5,8 @@
 - POST /api/task/stop        — 停止任务
 - GET  /api/task/status      — 查询状态
 - POST /api/expedition/check — 检查并收取远征
+- GET  /api/game/acquisition — OCR 识别今日舰船/战利品获取数量
+- GET  /api/game/context     — 查询游戏运行时计数器
 - WS   /ws/logs              — 实时日志流
 - WS   /ws/task              — 任务状态更新
 
@@ -469,6 +471,67 @@ async def expedition_check():
     except Exception as e:
         _log.opt(exception=True).warning('[API] 远征检查失败: {}', e)
         return ApiResponse(success=False, error=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 游戏状态查询接口
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.get('/api/game/acquisition', response_model=ApiResponse)
+async def game_acquisition():
+    """从出征面板截图 OCR 识别今日舰船 (X/500) 与战利品 (X/50) 获取数量。
+
+    仅在空闲时可用 (需要控制画面导航到出征面板)。
+    """
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法查询获取数量')
+
+    from autowsgr.ui.map.page import MapPage
+
+    def _recognize() -> dict[str, int | None]:
+        map_page = MapPage(ctx)
+        counts = map_page.get_acquisition_counts()
+        return {
+            'ship_count': counts.ship_count,
+            'ship_max': counts.ship_max,
+            'loot_count': counts.loot_count,
+            'loot_max': counts.loot_max,
+        }
+
+    try:
+        data = await asyncio.to_thread(_recognize)
+        return ApiResponse(success=True, data=data, message='获取数量识别完成')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 获取数量识别失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get('/api/game/context', response_model=ApiResponse)
+async def game_context_info():
+    """返回当前游戏上下文中的运行时计数器和状态。
+
+    不需要截图或画面操作，直接读取内存中的计数器。
+    """
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    return ApiResponse(
+        success=True,
+        data={
+            'dropped_ship_count': ctx.dropped_ship_count,
+            'dropped_loot_count': ctx.dropped_loot_count,
+            'quick_repair_used': ctx.quick_repair_used,
+            'current_page': ctx.current_page,
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

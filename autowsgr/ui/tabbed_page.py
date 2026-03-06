@@ -287,6 +287,7 @@ def is_tabbed_page(screen: np.ndarray) -> bool:
     """判断截图是否为标签页面 (地图/建造/强化/任务 之一)。
 
     检测逻辑: 5 个标签栏探测点中恰好 1 个蓝色 + 其余全部暗色。
+    允许 1 个探测点被覆盖 (如 "战利品▲" 徽标遮挡激活标签)。
 
     Parameters
     ----------
@@ -301,7 +302,8 @@ def is_tabbed_page(screen: np.ndarray) -> bool:
             blue_count += 1
         elif max(pixel.r, pixel.g, pixel.b) < TAB_DARK_MAX:
             dark_count += 1
-    return blue_count == 1 and dark_count == len(TAB_PROBES) - 1
+    # 允许 1 个探测点为非蓝非暗 (徽标遮挡), 要求至少 4 个可识别
+    return blue_count <= 1 and blue_count + dark_count >= len(TAB_PROBES) - 1
 
 
 def get_active_tab_index(screen: np.ndarray) -> int | None:
