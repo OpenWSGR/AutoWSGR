@@ -73,9 +73,9 @@ import numpy as np
 from autowsgr.types import PageName
 from autowsgr.vision import Color, PixelChecker
 
-from autowsgr.infra.logger import get_logger
+# from autowsgr.infra.logger import get_logger
 
-_log = get_logger('ui.tabbed')
+# _log = get_logger('ui.tabbed')
 
 
 if TYPE_CHECKING:
@@ -304,16 +304,16 @@ def is_tabbed_page(screen: np.ndarray) -> bool:
         pixel = PixelChecker.get_pixel(screen, x, y)
         is_blue = pixel.near(TAB_BLUE, TAB_BLUE_TOLERANCE)
         is_dark = max(pixel.r, pixel.g, pixel.b) < TAB_DARK_MAX
-        _log.debug(
-            '[TabCheck] probe[{}] ({:.4f},{:.4f}) → ({},{},{}) blue={} dark={}',
-            i, x, y, pixel.r, pixel.g, pixel.b, is_blue, is_dark,
-        )
+        # _log.debug(
+        #     '[TabCheck] probe[{}] ({:.4f},{:.4f}) → ({},{},{}) blue={} dark={}',
+        #     i, x, y, pixel.r, pixel.g, pixel.b, is_blue, is_dark,
+        # )
         if is_blue:
             blue_count += 1
         elif is_dark:
             dark_count += 1
     result = blue_count == 1 and dark_count == len(TAB_PROBES) - 1
-    _log.debug('[TabCheck] blue={} dark={} → is_tabbed={}', blue_count, dark_count, result)
+    # _log.debug('[TabCheck] blue={} dark={} → is_tabbed={}', blue_count, dark_count, result)
     return result
 
 
