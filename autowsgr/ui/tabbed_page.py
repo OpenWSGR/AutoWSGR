@@ -73,6 +73,7 @@ import numpy as np
 from autowsgr.types import PageName
 from autowsgr.vision import Color, PixelChecker
 
+
 # from autowsgr.infra.logger import get_logger
 
 # _log = get_logger('ui.tabbed')
