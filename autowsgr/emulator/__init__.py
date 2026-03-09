@@ -11,7 +11,6 @@
 """
 
 from .controller import (
-    ADBController,
     AndroidController,
     DeviceInfo,
     ScrcpyController,
@@ -32,7 +31,6 @@ from .os_control import (
 
 
 __all__ = [
-    'ADBController',
     'AndroidController',
     'DeviceInfo',
     'EmulatorCandidate',

@@ -265,7 +265,8 @@ class SidebarPage:
                 )
 
         raise NavigationError(
-            f'导航失败 (已重试 {config.max_retries} 次): 侧边栏 → {target.value}'
+            f'导航失败 (已重试 {config.max_retries} 次): 侧边栏 → {target.value}',
+            screen=self._ctrl.screenshot(),
         ) from last_err
 
     def go_to_build(self) -> None:

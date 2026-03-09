@@ -194,10 +194,10 @@ _SIGNATURES: dict[Sig, PixelSignature] = {
         name='sign_overlay',
         strategy=MatchStrategy.ALL,
         rules=[
-            PixelRule.of(0.8766, 0.3046, (216, 218, 215), tolerance=40.0),
-            PixelRule.of(0.1490, 0.3000, (255, 255, 255), tolerance=40.0),
-            PixelRule.of(0.1786, 0.4019, (250, 255, 255), tolerance=40.0),
-            PixelRule.of(0.4432, 0.4019, (254, 255, 255), tolerance=40.0),
+            PixelRule.of(0.4484, 0.6514, (250, 215, 40), tolerance=30.0),
+            PixelRule.of(0.4516, 0.6903, (253, 219, 48), tolerance=30.0),
+            PixelRule.of(0.5500, 0.6528, (254, 215, 44), tolerance=30.0),
+            PixelRule.of(0.5508, 0.6917, (253, 219, 48), tolerance=30.0),
         ],
     ),
     Sig.BOOKING: PixelSignature(

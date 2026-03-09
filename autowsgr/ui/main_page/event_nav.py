@@ -152,4 +152,5 @@ def navigate_to_event(
 
     raise NavigationError(
         f'活动导航失败: {max_retries} 次尝试后仍未进入活动地图页面',
+        screen=ctrl.screenshot(),
     )

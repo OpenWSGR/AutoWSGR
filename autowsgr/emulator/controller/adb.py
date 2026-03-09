@@ -1,5 +1,7 @@
 """ADB 设备控制器 — 基于 Airtest / ADB 的具体实现。
 
+已弃用
+
 使用方式::
 
     from autowsgr.emulator.controller import ADBController

@@ -300,7 +300,8 @@ class DecisiveBattlePage:
                 self.go_next_chapter()
 
         raise NavigationError(
-            f'决战章节导航失败: 超过 {_CHAPTER_NAV_MAX_ATTEMPTS} 次尝试, 目标 Ex-{target}'
+            f'决战章节导航失败: 超过 {_CHAPTER_NAV_MAX_ATTEMPTS} 次尝试, 目标 Ex-{target}',
+            screen=self._ctrl.screenshot(),
         )
 
     # ── 磁盘购买 ─────────────────────────────────────────────────────────

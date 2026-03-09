@@ -86,7 +86,10 @@ def _goto_page(ctx: GameContext, target: str) -> None:
         # 1. 识别
         current = identify_current_page(ctx)
         if current is None:
-            raise NavigationError(f'无法识别当前页面，导航中止 (目标: {target})')
+            raise NavigationError(
+                f'无法识别当前页面，导航中止 (目标: {target})',
+                screen=ctx.ctrl.screenshot(),
+            )
 
         # 2. 检查
         if current == target:
@@ -96,7 +99,10 @@ def _goto_page(ctx: GameContext, target: str) -> None:
         # 3. 寻路
         path = find_path(current, target)
         if path is None:
-            raise NavigationError(f"无法找到从 '{current}' 到 '{target}' 的路径")
+            raise NavigationError(
+                f"无法找到从 '{current}' 到 '{target}' 的路径",
+                screen=ctx.ctrl.screenshot(),
+            )
 
         if not path:  # Should be covered by current == target, but safe check
             _log.info('[OPS] 已在目标页面: {}', target)
@@ -114,7 +120,10 @@ def _goto_page(ctx: GameContext, target: str) -> None:
         )
         edge.action(ctx)
 
-    raise NavigationError(f'导航步数超限 ({MAX_STEPS})，目标: {target}')
+    raise NavigationError(
+        f'导航步数超限 ({MAX_STEPS})，目标: {target}',
+        screen=ctx.ctrl.screenshot(),
+    )
 
 
 def goto_page(ctx: GameContext, target: str) -> None:

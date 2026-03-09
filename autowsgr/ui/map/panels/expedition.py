@@ -91,7 +91,10 @@ class ExpeditionPanelMixin(BaseMapPage):
                 else:
                     from autowsgr.ui.utils import NavigationError
 
-                    raise NavigationError('远征收取超时: 通知仍在但 10s 内未检测到就绪槽位')
+                    raise NavigationError(
+                        '远征收取超时: 通知仍在但 10s 内未检测到就绪槽位',
+                        screen=screen,
+                    )
 
                 if slot_idx is None:
                     break

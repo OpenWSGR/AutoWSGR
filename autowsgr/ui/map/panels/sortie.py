@@ -57,7 +57,10 @@ class SortiePanelMixin(BaseMapPage):
             if result is None:
                 from autowsgr.ui.utils import NavigationError
 
-                raise NavigationError(f'无法导航到第 {chapter} 章')
+                raise NavigationError(
+                    f'无法导航到第 {chapter} 章',
+                    screen=self._ctrl.screenshot(),
+                )
 
         # 3. 切换到指定地图节点
         self.navigate_to_map(map_num)

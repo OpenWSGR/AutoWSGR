@@ -20,13 +20,11 @@
     ctrl.disconnect()
 """
 
-from .adb import ADBController
 from .protocol import AndroidController, DeviceInfo
 from .scrcpy import ScrcpyController
 
 
 __all__ = [
-    'ADBController',
     'AndroidController',
     'DeviceInfo',
     'ScrcpyController',

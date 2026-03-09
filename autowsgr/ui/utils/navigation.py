@@ -37,6 +37,13 @@ _log = get_logger('ui')
 class NavigationError(Exception):
     """页面导航验证失败 - 超时未到达目标页面，或重试耗尽。"""
 
+    def __init__(self, msg: str = '', screen: np.ndarray | None = None) -> None:
+        if screen is not None:
+            from autowsgr.infra.logger import save_image
+
+            save_image(screen, tag='NavError')
+        super().__init__(msg)
+
 
 # ---------------------------------------------------------------------------
 # 导航配置
@@ -128,7 +135,7 @@ def wait_for_page(
                 f'{attempt} 次截图后仍未到达, 当前: {current or "未知"}'
             )
             _log.error('[UI] {}', msg)
-            raise NavigationError(msg)
+            raise NavigationError(msg, screen=screen)
 
         time.sleep(interval)
 
@@ -183,7 +190,7 @@ def wait_leave_page(
                 f'{attempt} 次截图后仍在 {source or "?"}'
             )
             _log.error('[UI] {}', msg)
-            raise NavigationError(msg)
+            raise NavigationError(msg, screen=screen)
 
         time.sleep(interval)
 
@@ -301,7 +308,7 @@ def confirm_operation(
         time.sleep(0.3)
 
     if must_confirm:
-        raise NavigationError('确认操作超时: 未找到确认按钮')
+        raise NavigationError('确认操作超时: 未找到确认按钮', screen=ctrl.screenshot())
     return False
 
 
@@ -363,5 +370,6 @@ def click_and_wait_leave_page(
             )
 
     raise NavigationError(
-        f'离开失败 (已重试 {config.max_retries} 次): {source or "?"} -> {target or "?"}'
+        f'离开失败 (已重试 {config.max_retries} 次): {source or "?"} -> {target or "?"}',
+        screen=ctrl.screenshot(),
     ) from last_err

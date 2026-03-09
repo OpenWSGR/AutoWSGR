@@ -197,9 +197,7 @@ class BathPage:
         if PixelChecker.check_signature(screen, PAGE_SIGNATURE).matched:
             return True
         # overlay 打开时基础签名可能被遮挡，单独检查 overlay 签名
-        if PixelChecker.check_signature(screen, CHOOSE_REPAIR_OVERLAY_SIGNATURE).matched:
-            return True
-        return False
+        return PixelChecker.check_signature(screen, CHOOSE_REPAIR_OVERLAY_SIGNATURE).matched
 
     @staticmethod
     def has_choose_repair_overlay(screen: np.ndarray) -> bool:
@@ -281,7 +279,7 @@ class BathPage:
         # 确认 overlay 已打开
         screen = self._ctrl.screenshot()
         if not BathPage.has_choose_repair_overlay(screen):
-            raise NavigationError('选择修理 overlay 未打开，无法点击舰船')
+            raise NavigationError('选择修理 overlay 未打开，无法点击舰船', screen=screen)
 
         self._ctrl.click(*CLICK_FIRST_REPAIR_SHIP)
 
@@ -311,7 +309,7 @@ class BathPage:
 
         screen = self._ctrl.screenshot()
         if not BathPage.has_choose_repair_overlay(screen):
-            raise NavigationError('选择修理 overlay 未打开，无法修理指定舰船')
+            raise NavigationError('选择修理 overlay 未打开，无法修理指定舰船', screen=screen)
 
         # TODO: 实现 OCR 识别 + 滑动查找
         # 大致流程:

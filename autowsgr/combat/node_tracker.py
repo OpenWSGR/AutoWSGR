@@ -22,7 +22,6 @@ from typing import Any
 import cv2
 import numpy as np
 
-from autowsgr.infra import save_image
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
     MatchStrategy,
@@ -298,7 +297,7 @@ class NodeTracker:
             & (b.astype(np.int16) < 150)
         ).astype(np.uint8)
 
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        num_labels, _labels, stats, centroids = cv2.connectedComponentsWithStats(
             mask,
             connectivity=8,
         )
@@ -333,7 +332,7 @@ class NodeTracker:
         center = self._find_yellow_cluster(screen)
         if center is None:
             return None
-        save_image(screen, 'debug_node_tracker_cluster.png')
+        # save_image(screen, 'debug_node_tracker_cluster.png')
         if self._recheck_pixel(center, screen):
             self._ship_position = center
             _log.debug(

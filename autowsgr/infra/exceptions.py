@@ -19,7 +19,7 @@
     │   ├── DockFullError
     │   └── ResourceError
     ├── CombatError
-    │   ├── CombatRecognitionTimeout
+    │   ├── CombatRecognitionTimeoutError
     │   └── CombatDecisionError
     └── CriticalError
 """
@@ -63,15 +63,6 @@ class VisionError(AutoWSGRError):
     """视觉识别相关错误。"""
 
 
-class ImageNotFoundError(VisionError):
-    """图像模板匹配超时。"""
-
-    def __init__(self, template_name: str = '', timeout: float = 0) -> None:
-        self.template_name = template_name
-        self.timeout = timeout
-        super().__init__(f"未找到图像 '{template_name}'（超时 {timeout:.1f}s）")
-
-
 class OCRError(VisionError):
     """OCR 识别失败。"""
 
@@ -85,18 +76,6 @@ class UIError(AutoWSGRError):
 
 class PageNotFoundError(UIError):
     """无法识别当前页面。"""
-
-
-class NavigationError(UIError):
-    """页面导航失败。"""
-
-    def __init__(self, source: str, target: str, reason: str = '') -> None:
-        self.source = source
-        self.target = target
-        msg = f'导航失败: {source} → {target}'
-        if reason:
-            msg += f' ({reason})'
-        super().__init__(msg)
 
 
 class ActionFailedError(UIError):
@@ -136,7 +115,7 @@ class CombatError(AutoWSGRError):
     """战斗系统错误。"""
 
 
-class CombatRecognitionTimeout(CombatError):
+class CombatRecognitionTimeoutError(CombatError):
     """战斗状态识别超时。"""
 
     def __init__(self, candidates: list[str] | None = None, timeout: float = 0) -> None:

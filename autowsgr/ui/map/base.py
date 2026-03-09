@@ -233,7 +233,8 @@ class BaseMapPage:
                 )
 
         raise NavigationError(
-            f'面板切换失败 (已重试 {self._PANEL_SWITCH_MAX_RETRIES} 次): {source} -> {target}'
+            f'面板切换失败 (已重试 {self._PANEL_SWITCH_MAX_RETRIES} 次): {source} -> {target}',
+            screen=self._ctrl.screenshot(),
         ) from last_err
 
     def ensure_panel(self, panel: MapPanel) -> None:
