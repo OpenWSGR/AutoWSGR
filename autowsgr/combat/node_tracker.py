@@ -21,6 +21,7 @@ from typing import Any
 
 import cv2
 import numpy as np
+
 from autowsgr.infra import save_image
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (

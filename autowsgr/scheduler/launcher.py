@@ -82,6 +82,7 @@ class Launcher:
         setup_logger(
             log_cfg.dir,
             log_cfg.level,
+            save_images=True,
             channels=log_cfg.effective_channels or None,
         )
         ch_summary = log_cfg.effective_channels
