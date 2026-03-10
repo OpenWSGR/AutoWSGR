@@ -69,12 +69,24 @@
 """
 
 # ── 控制器 ─────────────────────────────────────────────────────────────
+from autowsgr.types import PageName
 from autowsgr.ui.main_page.constants import OverlayKind
-from autowsgr.ui.overlay import NetworkError
+from autowsgr.ui.page import (
+    get_current_page,
+    get_registered_pages,
+    register_page,
+)
 
 # ── 标签页统一检测层 ──────────────────────────────────────────────
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
+)
+from autowsgr.ui.utils import (
+    NavConfig,
+    NavigationError,
+    click_and_wait_for_page,
+    wait_for_page,
+    wait_leave_page,
 )
 
 from .backyard_page import BackyardPage, BackyardTarget
@@ -90,7 +102,7 @@ from .intensify_page import IntensifyPage, IntensifyTab
 from .main_page import MainPage
 from .map.data import MAP_DATABASE, MapIdentity, MapPanel
 from .map.page import MapPage
-from .mission_page import MissionPage
+from .mission_page import MissionInfo, MissionPage, MissionPanel
 from .sidebar_page import SidebarPage, SidebarTarget
 
 
@@ -98,21 +110,7 @@ from .sidebar_page import SidebarPage, SidebarTarget
 MainPageTarget = MainPage.Target
 OverlayType = OverlayKind
 
-# ── 导航基础设施 ───────────────────────────────────────────────────────
 # ── 注册所有页面识别器 ──
-from autowsgr.types import PageName
-from autowsgr.ui.page import (
-    get_current_page,
-    get_registered_pages,
-    register_page,
-)
-from autowsgr.ui.utils import (
-    NavConfig,
-    NavigationError,
-    click_and_wait_for_page,
-    wait_for_page,
-    wait_leave_page,
-)
 
 
 register_page(PageName.MAIN, MainPage.is_current_page)
@@ -130,9 +128,12 @@ register_page(PageName.DECISIVE_BATTLE, DecisiveBattlePage.is_current_page)
 register_page(PageName.EVENT_MAP, BaseEventPage.is_current_page)
 
 __all__ = [
+    # ── 数据 ──
+    'MAP_DATABASE',
     # ── 控制器 ──
     'BackyardPage',
     'BackyardTarget',
+    'BaseEventPage',
     'BathPage',
     'BattlePreparationPage',
     'BuildPage',
@@ -141,7 +142,6 @@ __all__ = [
     'ChooseShipPage',
     'DecisiveBattlePage',
     'DecisiveMapController',
-    'BaseEventPage',
     'FriendPage',
     'IntensifyPage',
     'IntensifyTab',
@@ -150,26 +150,25 @@ __all__ = [
     'MapIdentity',
     'MapPage',
     'MapPanel',
+    'MissionInfo',
     'MissionPage',
+    'MissionPanel',
+    # ── 导航基础设施 ──
+    'NavConfig',
+    'NavigationError',
+    # ── 浮层 ──
+    'OverlayKind',
+    'OverlayType',
     'Panel',
     'RepairStrategy',
     'SidebarPage',
     'SidebarTarget',
     # ── 标签页统一检测 ──
     'TabbedPageType',
-    # ── 浮层 ──
-    'NetworkError',
-    'OverlayKind',
-    'OverlayType',
-    # ── 导航基础设施 ──
-    'NavConfig',
-    'NavigationError',
     'click_and_wait_for_page',
     'get_current_page',
     'get_registered_pages',
     'register_page',
     'wait_for_page',
     'wait_leave_page',
-    # ── 数据 ──
-    'MAP_DATABASE',
 ]

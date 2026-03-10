@@ -101,8 +101,6 @@ def wait_for_page(
     ------
     NavigationError
         超时仍未匹配。
-    NetworkError
-        遇到无法自动消除的浮层。
     """
     from autowsgr.ui.page import get_current_page
 
@@ -158,8 +156,6 @@ def wait_leave_page(
     ------
     NavigationError
         超时仍在原页面。
-    NetworkError
-        遇到无法自动消除的浮层。
     """
     from autowsgr.ui.page import get_current_page
 
@@ -215,8 +211,7 @@ def click_and_wait_for_page(
     ------
     NavigationError
         点击后未到达目标页面。
-    NetworkError
-        遇到无法自动消除的浮层。
+
     """
     ctrl.click(*click_coord)
     return wait_for_page(
@@ -330,8 +325,6 @@ def click_and_wait_leave_page(
     ------
     NavigationError
         所有重试均超时。
-    NetworkError
-        遇到无法自动消除的浮层。
     """
     last_err: NavigationError | None = None
 

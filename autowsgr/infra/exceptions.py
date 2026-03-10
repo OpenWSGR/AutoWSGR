@@ -15,7 +15,6 @@
     │   ├── NavigationError
     │   └── ActionFailedError
     ├── GameError
-    │   ├── NetworkError
     │   ├── DockFullError
     │   └── ResourceError
     ├── CombatError

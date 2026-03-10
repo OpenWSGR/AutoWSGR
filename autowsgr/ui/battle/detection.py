@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import cv2
+
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 from autowsgr.ui.battle.base import BaseBattlePreparation
@@ -119,15 +121,22 @@ class DetectionMixin(BaseBattlePreparation):
                 continue
 
             cropped = PixelChecker.crop(screen, *crop_region)
-            text = ocr.recognize_single(cropped, allowlist='0123456789Llv.V').text.strip()
+            # 4x 上采样提升小字 OCR 准确率 (对齐 legacy check_level)
+            upscaled = cv2.resize(
+                cropped,
+                (cropped.shape[1] * 4, cropped.shape[0] * 4),
+            )
 
-            level = self._parse_level(text)
+            # 用多结果模式避免 recognize_single 选中噪声文本
+            level = self._best_level_from_results(
+                ocr.recognize(upscaled, allowlist='0123456789Llv.V'),
+            )
             levels[slot] = level
 
             if level is not None:
                 _log.debug('[UI] 槽位{} 等级: Lv.{}', slot, level)
             else:
-                _log.debug("[UI] 槽位{} 等级识别失败: '{}'", slot, text)
+                _log.debug('[UI] 槽位{} 等级识别失败', slot)
 
         _log.info(
             '[准备页] 等级检测: {}',
@@ -194,11 +203,65 @@ class DetectionMixin(BaseBattlePreparation):
         """解析等级文本。
 
         支持格式: ``"Lv.120"``, ``"Lv120"``, ``"lv 98"``, ``"120"`` 等。
+        OCR 常见噪声: ``"0.106"`` (L 误识为 0), ``"1V.31"`` (前缀数字),
+        ``"497"`` (星级数字粘连) 等。
         """
-        cleaned = re.sub(r'(?i)^l\s*v\.?\s*', '', text)
-        m = re.search(r'(\d+)', cleaned)
+        # 1) 尝试匹配 [L10I]V.XX 模式 (L 可被 OCR 误识为 1/0/I)
+        m = re.search(r'(?i)[l10i]\s*v\.?\s*(\d{1,3})', text)
         if m:
             val = int(m.group(1))
             if 1 <= val <= 200:
                 return val
+
+        # 2) 尝试匹配 V.XX 模式 (缺失 L)
+        m = re.search(r'(?i)v\.?\s*(\d{1,3})', text)
+        if m:
+            val = int(m.group(1))
+            if 1 <= val <= 200:
+                return val
+
+        # 3) 回退: 取最后一个合法数字 (跳过星级等前缀噪声)
+        for m in reversed(list(re.finditer(r'\d+', text))):
+            val = int(m.group())
+            if 1 <= val <= 200:
+                return val
+            # 3 位以上数字 > 200 时尝试去掉首位 (星级粘连)
+            s = m.group()
+            if val > 200 and len(s) >= 3:
+                val2 = int(s[1:])
+                if 1 <= val2 <= 200:
+                    return val2
+
+        return None
+
+    @classmethod
+    def _best_level_from_results(cls, results: list) -> int | None:
+        """从多个 OCR 结果中选取最佳等级值。
+
+        优先选择包含 LV/V 模式的结果 (更可能是等级文本),
+        其次选择纯数字回退结果，避免噪声文本干扰。
+        """
+        # 按优先级分桶: lv_match > fallback
+        lv_candidates: list[int] = []
+        fallback_candidates: list[int] = []
+
+        for r in results:
+            text = r.text.strip()
+            if not text:
+                continue
+
+            # 有 V 字母 → 大概率是 LV.XX
+            if re.search(r'(?i)v', text):
+                val = cls._parse_level(text)
+                if val is not None:
+                    lv_candidates.append(val)
+            else:
+                val = cls._parse_level(text)
+                if val is not None:
+                    fallback_candidates.append(val)
+
+        if lv_candidates:
+            return lv_candidates[0]
+        if fallback_candidates:
+            return fallback_candidates[0]
         return None

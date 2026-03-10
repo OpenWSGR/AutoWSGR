@@ -32,6 +32,8 @@ from autowsgr.combat.actions import (
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, Formation, ShipDamageState
+from autowsgr.ui.utils import wait_leave_page
+from autowsgr.vision import ImageChecker
 
 from .history import CombatEvent, CombatHistory, EventType, FightResult
 from .plan import CombatMode, CombatPlan, NodeDecision
@@ -189,9 +191,10 @@ class PhaseHandlersMixin:
             rule_action = decision.formation_rules.evaluate_formation(enemy_formation)
 
         # 敌舰规则
-        if rule_action is None or rule_action.result == RuleResult.NO_ACTION:
-            if decision.enemy_rules:
-                rule_action = decision.enemy_rules.evaluate(enemies)
+        if (
+            rule_action is None or rule_action.result == RuleResult.NO_ACTION
+        ) and decision.enemy_rules:
+            rule_action = decision.enemy_rules.evaluate(enemies)
 
         # 应用规则结果
         if rule_action is not None:
@@ -220,9 +223,18 @@ class PhaseHandlersMixin:
         # 执行迂回
         if want_detour:
             clicked = click_image(self._device, TemplateKey.BYPASS, 2.5)
-            time.sleep(1.5)
             if clicked:
                 _log.info('[Combat] 执行迂回')
+                spot_templates = TemplateKey.SPOT_ENEMY.templates
+                wait_leave_page(
+                    self._device,
+                    checker=lambda screen: (
+                        ImageChecker.find_any(screen, spot_templates, confidence=0.8) is not None
+                    ),
+                    timeout=10.0,
+                    source='spot_enemy_success',
+                    target='map_routing',
+                )
             else:
                 _log.warning('[Combat] 未找到迂回按钮')
             self._last_action = 'detour'
@@ -275,23 +287,22 @@ class PhaseHandlersMixin:
             return ConditionFlag.SL
 
         # 迂回失败 SL
-        if is_from_spot_enemy and self._last_action == 'detour':
-            if decision.SL_when_detour_fails:
-                self._history.add(
-                    CombatEvent(
-                        event_type=EventType.DETOUR,
-                        node=self._node,
-                        result='失败',
-                    )
+        if is_from_spot_enemy and self._last_action == 'detour' and decision.SL_when_detour_fails:
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.DETOUR,
+                    node=self._node,
+                    result='失败',
                 )
-                self._history.add(
-                    CombatEvent(
-                        event_type=EventType.FORMATION,
-                        node=self._node,
-                        action='SL',
-                    )
+            )
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.FORMATION,
+                    node=self._node,
+                    action='SL',
                 )
-                return ConditionFlag.SL
+            )
+            return ConditionFlag.SL
 
         # 确定阵型
         formation = decision.formation

@@ -12,12 +12,7 @@ from typing import TYPE_CHECKING
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.map.data import (
-    CHAPTER_NAV_DELAY,
-    CHAPTER_NAV_MAX_ATTEMPTS,
-    CHAPTER_SPACING,
     CLICK_BACK,
-    CLICK_MAP_NEXT,
-    CLICK_MAP_PREV,
     CLICK_PANEL,
     CLICK_SCREEN_CENTER,
     EXPEDITION_NOTIF_COLOR,
@@ -26,12 +21,10 @@ from autowsgr.ui.map.data import (
     PANEL_LIST,
     PANEL_TO_INDEX,
     SIDEBAR_BRIGHTNESS_THRESHOLD,
-    SIDEBAR_CLICK_X,
     SIDEBAR_SCAN_STEP,
     SIDEBAR_SCAN_X,
     SIDEBAR_SCAN_Y_RANGE,
     TITLE_CROP_REGION,
-    TOTAL_CHAPTERS,
     MapIdentity,
     MapPanel,
     parse_map_title,
@@ -246,106 +239,3 @@ class BaseMapPage:
     def click_screen_center(self) -> None:
         """点击屏幕中央 — 用于跳过动画/确认弹窗。"""
         self._ctrl.click(*CLICK_SCREEN_CENTER)
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # 动作 — 章节导航 (出征面板共用)
-    # ═══════════════════════════════════════════════════════════════════════
-
-    def click_prev_chapter(self, screen: np.ndarray | None = None) -> bool:
-        """点击侧边栏上方章节 (前一章)。"""
-        if screen is None:
-            screen = self._ctrl.screenshot()
-        sel_y = self.find_selected_chapter_y(screen)
-        if sel_y is None:
-            _log.warning('[UI] 侧边栏未找到选中章节，无法切换')
-            return False
-        target_y = sel_y - CHAPTER_SPACING
-        if target_y < SIDEBAR_SCAN_Y_RANGE[0]:
-            _log.warning('[UI] 已在最前章节，无法继续向前')
-            return False
-        _log.info('[UI] 地图页面 → 上一章 (y={:.3f})', target_y)
-        self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-        return True
-
-    def click_next_chapter(self, screen: np.ndarray | None = None) -> bool:
-        """点击侧边栏下方章节 (后一章)。"""
-        if screen is None:
-            screen = self._ctrl.screenshot()
-        sel_y = self.find_selected_chapter_y(screen)
-        if sel_y is None:
-            _log.warning('[UI] 侧边栏未找到选中章节，无法切换')
-            return False
-        target_y = sel_y + CHAPTER_SPACING
-        if target_y > SIDEBAR_SCAN_Y_RANGE[1]:
-            _log.warning('[UI] 已在最后章节，无法继续向后')
-            return False
-        _log.info('[UI] 地图页面 → 下一章 (y={:.3f})', target_y)
-        self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-        return True
-
-    def navigate_to_chapter(self, target: int) -> int | None:
-        """导航到指定章节 (通过 OCR 识别当前位置并逐步点击)。
-
-        Parameters
-        ----------
-        target:
-            目标章节编号 (1-9)。
-        """
-        if not 1 <= target <= TOTAL_CHAPTERS:
-            raise ValueError(f'章节编号必须为 1-{TOTAL_CHAPTERS}，收到: {target}')
-        if self._ocr is None:
-            raise RuntimeError('需要 OCR 引擎才能导航到指定章节')
-
-        for attempt in range(CHAPTER_NAV_MAX_ATTEMPTS):
-            screen = self._ctrl.screenshot()
-            info = self.recognize_map(screen, self._ocr)
-            if info is None:
-                _log.warning('[UI] 章节导航: OCR 识别失败 (第 {} 次尝试)', attempt + 1)
-                return None
-
-            current = info.chapter
-            if current == target:
-                _log.info('[UI] 章节导航: 已到达第 {} 章', target)
-                return current
-
-            _log.info(
-                '[UI] 章节导航: 当前第 {} 章 → 目标第 {} 章',
-                current,
-                target,
-            )
-
-            if current > target:
-                ok = self.click_prev_chapter(screen)
-            else:
-                ok = self.click_next_chapter(screen)
-
-            if not ok:
-                _log.warning('[UI] 章节导航: 点击失败，终止')
-                return None
-
-            time.sleep(CHAPTER_NAV_DELAY)
-
-        _log.warning(
-            '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
-            CHAPTER_NAV_MAX_ATTEMPTS,
-            target,
-        )
-        return None
-
-    def navigate_to_map(self, map_num: int | str) -> None:
-        map_num = int(map_num)
-        screen = self._ctrl.screenshot()
-        info = self.recognize_map(screen, self._ocr)
-        if info is not None:
-            current_map = info.map_num
-            if current_map != map_num:
-                delta = map_num - current_map
-                if delta > 0:
-                    for _ in range(delta):
-                        self._ctrl.click(*CLICK_MAP_NEXT)
-                        time.sleep(0.3)
-                else:
-                    for _ in range(-delta):
-                        self._ctrl.click(*CLICK_MAP_PREV)
-                        time.sleep(0.3)
-                time.sleep(0.5)

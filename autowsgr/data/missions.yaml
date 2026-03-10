@@ -1,0 +1,246 @@
+# 任务数据库 - 日常/周常任务
+# 数据来源: https://www.zjsnrwiki.com/wiki/任务#每日任务
+#
+# 字段说明:
+#   id: 唯一标识符
+#   name: 任务名称 (游戏内显示)
+#   category: daily / weekly
+#   description: 任务目标描述
+#   chain_parent: 前置任务 id (null 表示根任务)
+#   rewards: 资源奖励 {oil, ammo, steel, aluminum, instant_repair, blueprint, core, other}
+
+daily:
+  # ── 根任务 (无前置) ──
+  - id: d_beat_enemy
+    name: '击退敌军舰队'
+    description: '舰队出征,获得一次胜利'
+    chain_parent: null
+    rewards: {oil: 30, ammo: 30, steel: 30, aluminum: 10}
+
+  - id: d_expedition_regular
+    name: '常规[远征]'
+    description: '完成3次远征'
+    chain_parent: null
+    rewards: {oil: 30, ammo: 30, steel: 30, aluminum: 10}
+
+  - id: d_exercise_regular
+    name: '常规[演习]'
+    description: '获得1次舰队演习胜利'
+    chain_parent: null
+    rewards: {oil: 30, ammo: 30, steel: 30, aluminum: 10}
+
+  - id: d_canteen
+    name: '食堂开饭'
+    description: '在生活区的食堂制作1次料理'
+    chain_parent: null
+    rewards: {oil: 100, ammo: 100, steel: 100, aluminum: 100, blueprint: 1}
+
+  # ── 击退敌军舰队 子链 ──
+  - id: d_break_enemy_main
+    name: '击破敌军主力'
+    description: '舰队出征,击破任意关卡最终节点敌军舰队'
+    chain_parent: d_beat_enemy
+    rewards: {oil: 50, ammo: 50, steel: 50, aluminum: 20, instant_repair: 1}
+
+  - id: d_beat_enemy_10
+    name: '击退敌军舰队10次'
+    description: '舰队出征,获得10次战斗胜利'
+    chain_parent: d_beat_enemy
+    rewards: {oil: 100, ammo: 100, steel: 100, aluminum: 50, blueprint: 2}
+
+  - id: d_fleet_supply
+    name: '舰队补给'
+    description: '进行10次补给'
+    chain_parent: d_beat_enemy
+    rewards: {oil: 100, ammo: 100, instant_repair: 1}
+
+  - id: d_fleet_repair
+    name: '舰队休整'
+    description: '进行5次修理'
+    chain_parent: d_beat_enemy
+    rewards: {oil: 100, steel: 100, blueprint: 1}
+
+  # ── 击破敌军主力 子链 ──
+  - id: d_sortie_combat_1
+    name: '[出征]作战'
+    description: '舰队出征,击破任意关卡最终节点敌军舰队(随机一种)'
+    chain_parent: d_break_enemy_main
+    rewards: {core: 1}
+
+  # ── 击退敌军舰队10次 子链 ──
+  - id: d_sortie_combat_2
+    name: '[出征]作战'
+    description: '舰队出征(随机两种条件)'
+    chain_parent: d_beat_enemy_10
+    rewards: {oil: 100, ammo: 100, steel: 100, aluminum: 100, blueprint: 1}
+
+  # ── 舰队补给 子链 ──
+  - id: d_develop_equip
+    name: '[开发]新装备'
+    description: '进行3次装备开发'
+    chain_parent: d_fleet_supply
+    rewards: {oil: 30, ammo: 30, steel: 30, aluminum: 30}
+
+  # ── 舰队休整 子链 ──
+  - id: d_build_ship
+    name: '[建造]新船只'
+    description: '进行1次建造'
+    chain_parent: d_fleet_repair
+    rewards: {oil: 30, ammo: 30, steel: 30, aluminum: 30}
+
+  # ── 建造新船只 子链 ──
+  - id: d_intensify_ship
+    name: '[强化]船只'
+    description: '进行3次强化'
+    chain_parent: d_build_ship
+    rewards: {oil: 30, ammo: 30, steel: 30, aluminum: 10}
+
+  # ── 常规[远征] 子链 ──
+  - id: d_expedition_great_success
+    name: '[远征]大成功!'
+    description: '完成1次大成功远征'
+    chain_parent: d_expedition_regular
+    rewards: {oil: 100, ammo: 100, steel: 100, aluminum: 50}
+
+  # ── 常规[演习] 子链 ──
+  - id: d_exercise_victory
+    name: '胜利的滋味'
+    description: '获得3次舰队演习胜利'
+    chain_parent: d_exercise_regular
+    rewards: {oil: 50, ammo: 50, steel: 50, aluminum: 50}
+
+weekly:
+  # ── 自动刷新 ──
+  - id: w_win_50
+    name: '50场战斗胜利'
+    description: '舰队出征,获得50次战斗胜利'
+    chain_parent: null
+    rewards: {oil: 500, ammo: 500, steel: 500, aluminum: 200, instant_repair: 3}
+
+  # ── 50场胜利 子链 ──
+  - id: w_sink_100
+    name: '击沉100艘'
+    description: '舰队出征,击沉100艘敌舰'
+    chain_parent: w_win_50
+    rewards: {oil: 500, ammo: 500, steel: 500, aluminum: 300, blueprint: 3}
+
+  # ── 击沉100艘 子链: 各图旗舰5次 ──
+  - id: w_boss_1
+    name: '旗舰击破(1图)'
+    description: '在任意1图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_sink_100
+    rewards: {oil: 200, steel: 300, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_2
+    name: '旗舰击破(2图)'
+    description: '在任意2图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_1
+    rewards: {oil: 200, steel: 300, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_3
+    name: '旗舰击破(3图)'
+    description: '在任意3图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_2
+    rewards: {oil: 300, steel: 400, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_4
+    name: '旗舰击破(4图)'
+    description: '在任意4图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_3
+    rewards: {oil: 300, steel: 400, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_5
+    name: '旗舰击破(5图)'
+    description: '在任意5图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_4
+    rewards: {oil: 400, steel: 500, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_6
+    name: '旗舰击破(6图)'
+    description: '在任意6图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_5
+    rewards: {oil: 500, steel: 600, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_7
+    name: '旗舰击破(7图)'
+    description: '在任意7图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_6
+    rewards: {oil: 600, steel: 700, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_8
+    name: '旗舰击破(8图)'
+    description: '在任意8图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_7
+    rewards: {oil: 700, steel: 800, other: '战利品x7, 大胃王的藏品x2'}
+
+  - id: w_boss_9
+    name: '旗舰击破(9图)'
+    description: '在任意9图关卡中击沉最终节点敌军舰队旗舰5次'
+    chain_parent: w_boss_8
+    rewards: {oil: 1000, steel: 1500, other: '战利品x7, 大胃王的藏品x2'}
+
+  # ── 需完成一次日常后刷新的周常 ──
+  - id: w_expedition
+    name: '大规模[远征]'
+    description: '进行20次远征'
+    chain_parent: null
+    rewards: {oil: 300, ammo: 300, steel: 300, aluminum: 200}
+
+  - id: w_exercise
+    name: '大规模[演习]'
+    description: '进行20次舰队演习'
+    chain_parent: null
+    rewards: {oil: 300, ammo: 300, steel: 300, aluminum: 200}
+
+  - id: w_develop
+    name: '大规模[开发]'
+    description: '进行20次装备开发'
+    chain_parent: null
+    rewards: {oil: 200, ammo: 200, steel: 200, aluminum: 200}
+
+  - id: w_build
+    name: '大规模[建造]'
+    description: '进行10次舰船建造'
+    chain_parent: null
+    rewards: {oil: 200, ammo: 200, steel: 200, aluminum: 200}
+
+  - id: w_intensify
+    name: '大规模[强化]'
+    description: '进行20次舰船强化'
+    chain_parent: null
+    rewards: {oil: 200, ammo: 200, steel: 200, aluminum: 100}
+
+  - id: w_cook
+    name: '大规模[料理]'
+    description: '进行10次料理制作'
+    chain_parent: null
+    rewards: {oil: 200, ammo: 200, steel: 200, aluminum: 200}
+
+# 任务名称 -> OCR 匹配用关键词列表
+# OCR 不总是精确识别，这里列出用于模糊匹配的核心文本片段
+ocr_keywords:
+  daily:
+    - '击退敌军舰队'
+    - '击破敌军主力'
+    - '击退敌军舰队10次'
+    - '舰队补给'
+    - '舰队休整'
+    - '常规[远征]'
+    - '常规[演习]'
+    - '食堂开饭'
+    - '[出征]作战'
+    - '[开发]新装备'
+    - '[建造]新船只'
+    - '[强化]船只'
+    - '[远征]大成功'
+    - '胜利的滋味'
+  weekly:
+    - '50场战斗胜利'
+    - '击沉100艘'
+    - '旗舰击破'
+    - '大规模[远征]'
+    - '大规模[演习]'
+    - '大规模[开发]'
+    - '大规模[建造]'
+    - '大规模[强化]'
+    - '大规模[料理]'
