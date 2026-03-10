@@ -11,6 +11,7 @@ from autowsgr.server.task_manager import task_manager
 
 from .. import main as _main
 
+
 router = APIRouter(tags=['health'])
 
 _server_start_time = time.monotonic()

@@ -11,6 +11,7 @@ from autowsgr.server.task_manager import task_manager
 
 from .. import main as _main
 
+
 _log = get_logger('server')
 
 router = APIRouter(prefix='/api/system', tags=['system'])

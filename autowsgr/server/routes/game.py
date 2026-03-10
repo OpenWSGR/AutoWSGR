@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
@@ -18,6 +17,7 @@ from autowsgr.server.serializers import (
 from autowsgr.server.task_manager import task_manager
 
 from ..main import get_context
+
 
 _log = get_logger('server')
 

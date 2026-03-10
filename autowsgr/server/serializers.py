@@ -97,7 +97,7 @@ def convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:
 
         fight_results = result.history.get_fight_results()
         if isinstance(fight_results, dict):
-            for _node_name, fr in fight_results.items():
+            for fr in fight_results.values():
                 if fr.mvp and fr.mvp > 0 and mvp is None:
                     mvp = f'位置{fr.mvp}'
                 if fr.grade and grade is None:

@@ -98,6 +98,7 @@ from autowsgr.server.routes.ops import router as ops_router  # noqa: E402
 from autowsgr.server.routes.system import router as system_router  # noqa: E402
 from autowsgr.server.routes.task import router as task_router  # noqa: E402
 
+
 app.include_router(system_router)
 app.include_router(task_router)
 app.include_router(game_router)
