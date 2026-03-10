@@ -1,14 +1,23 @@
 """FastAPI 主应用 — HTTP REST API 和 WebSocket 端点。
 
 本模块提供以下接口:
-- POST /api/task/start       — 启动任务 (异步执行)
-- POST /api/task/stop        — 停止任务
-- GET  /api/task/status      — 查询状态
-- POST /api/expedition/check — 检查并收取远征
-- GET  /api/game/acquisition — OCR 识别今日舰船/战利品获取数量
-- GET  /api/game/context     — 查询游戏运行时计数器
-- WS   /ws/logs              — 实时日志流
-- WS   /ws/task              — 任务状态更新
+- POST /api/task/start         — 启动任务 (异步执行)
+- POST /api/task/stop          — 停止任务
+- GET  /api/task/status        — 查询状态
+- POST /api/expedition/check   — 检查并收取远征
+- GET  /api/expedition/status  — 查询远征槽位状态
+- GET  /api/game/acquisition   — OCR 识别今日舰船/战利品获取数量
+- GET  /api/game/context       — 查询游戏运行时状态 (资源/舰队/远征/建造)
+- GET  /api/build/status       — 查询建造队列状态
+- POST /api/build/collect      — 收取已完成的建造
+- POST /api/build/start        — 开始建造
+- POST /api/reward/collect     — 收取任务奖励
+- POST /api/cook               — 食堂烹饪
+- POST /api/repair/bath        — 浴室修理
+- POST /api/destroy            — 解装/解体
+- GET  /api/health             — 健康检查
+- WS   /ws/logs                — 实时日志流
+- WS   /ws/task                — 任务状态更新
 
 使用方式:
     uvicorn autowsgr.server.main:app --host 0.0.0.0 --port 8000
@@ -18,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
@@ -327,14 +337,11 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
 
             try:
                 result = runner.run()
-                # CampaignRunner.run() 返回完整结果列表
-                results.append(
-                    {
-                        'round': i + 1,
-                        'success': True,
-                    }
-                )
-                task_manager.add_result(results[-1])
+                # CampaignRunner.run() 返回完整 CombatResult 列表
+                for j, r in enumerate(result):
+                    converted = _convert_combat_result(r, i * len(result) + j + 1)
+                    results.append(converted)
+                    task_manager.add_result(converted)
             except Exception as e:
                 _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
                 results.append({'round': i + 1, 'success': False, 'error': str(e)})
@@ -364,7 +371,7 @@ async def _start_exercise(ctx: Any, request: ExerciseRequest) -> ApiResponse:
 
         try:
             results = runner.run()
-            return [{'round': i + 1, 'success': True} for i in range(len(results))]
+            return [_convert_combat_result(r, i + 1) for i, r in enumerate(results)]
         except Exception as e:
             return [{'round': 1, 'success': False, 'error': str(e)}]
 
@@ -514,9 +521,10 @@ async def game_acquisition():
 
 @app.get('/api/game/context', response_model=ApiResponse)
 async def game_context_info():
-    """返回当前游戏上下文中的运行时计数器和状态。
+    """返回当前游戏上下文中的运行时状态。
 
-    不需要截图或画面操作，直接读取内存中的计数器。
+    包含资源、舰队、远征、建造等完整游戏状态数据。
+    不需要截图或画面操作，直接读取内存中的状态。
     """
     try:
         ctx = get_context()
@@ -530,6 +538,273 @@ async def game_context_info():
             'dropped_loot_count': ctx.dropped_loot_count,
             'quick_repair_used': ctx.quick_repair_used,
             'current_page': ctx.current_page,
+            'resources': _serialize_resources(ctx.resources),
+            'fleets': [_serialize_fleet(f) for f in ctx.fleets],
+            'expeditions': _serialize_expedition_queue(ctx.expeditions),
+            'build_queue': _serialize_build_queue(ctx.build_queue),
+        },
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 远征状态查询
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.get('/api/expedition/status', response_model=ApiResponse)
+async def expedition_status():
+    """查询远征槽位状态（4 个槽位的章节、节点、剩余时间等）。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    return ApiResponse(
+        success=True,
+        data=_serialize_expedition_queue(ctx.expeditions),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 建造接口
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.get('/api/build/status', response_model=ApiResponse)
+async def build_status():
+    """查询建造队列状态。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    return ApiResponse(
+        success=True,
+        data=_serialize_build_queue(ctx.build_queue),
+    )
+
+
+class BuildStartRequest(BaseModel):
+    """建造请求。"""
+
+    fuel: int = 30
+    ammo: int = 30
+    steel: int = 30
+    bauxite: int = 30
+    build_type: str = 'ship'
+    allow_fast_build: bool = False
+
+
+@app.post('/api/build/collect', response_model=ApiResponse)
+async def build_collect():
+    """收取已完成的建造。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
+
+    from autowsgr.ops import collect_built_ships
+
+    try:
+        count = await asyncio.to_thread(collect_built_ships, ctx)
+        return ApiResponse(success=True, data={'collected': count}, message=f'收取了 {count} 艘')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 收取建造失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post('/api/build/start', response_model=ApiResponse)
+async def build_start(request: BuildStartRequest):
+    """开始建造。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
+
+    from autowsgr.ops import BuildRecipe, build_ship
+
+    recipe = BuildRecipe(
+        fuel=request.fuel,
+        ammo=request.ammo,
+        steel=request.steel,
+        bauxite=request.bauxite,
+    )
+
+    try:
+        await asyncio.to_thread(
+            build_ship,
+            ctx,
+            recipe=recipe,
+            build_type=request.build_type,
+            allow_fast_build=request.allow_fast_build,
+        )
+        return ApiResponse(success=True, message='建造已开始')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 建造失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 任务奖励
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.post('/api/reward/collect', response_model=ApiResponse)
+async def reward_collect():
+    """收取任务奖励。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
+
+    from autowsgr.ops import collect_rewards
+
+    try:
+        collected = await asyncio.to_thread(collect_rewards, ctx)
+        return ApiResponse(success=True, data={'collected': collected}, message='奖励收取完成')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 收取奖励失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 食堂烹饪
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class CookRequest(BaseModel):
+    """烹饪请求。"""
+
+    position: int = 1
+    force_cook: bool = False
+
+
+@app.post('/api/cook', response_model=ApiResponse)
+async def cook_action(request: CookRequest):
+    """食堂烹饪。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
+
+    from autowsgr.ops import cook
+
+    try:
+        result = await asyncio.to_thread(
+            cook, ctx, position=request.position, force_cook=request.force_cook
+        )
+        return ApiResponse(success=True, data={'cooked': result}, message='烹饪完成')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 烹饪失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 浴室修理
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@app.post('/api/repair/bath', response_model=ApiResponse)
+async def repair_bath():
+    """浴室修理。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
+
+    from autowsgr.ops import repair_in_bath
+
+    try:
+        await asyncio.to_thread(repair_in_bath, ctx)
+        return ApiResponse(success=True, message='浴室修理完成')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 浴室修理失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 解装 / 解体
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class DestroyRequest(BaseModel):
+    """解装请求。"""
+
+    ship_types: list[str] | None = None
+    remove_equipment: bool = True
+
+
+@app.post('/api/destroy', response_model=ApiResponse)
+async def destroy_action(request: DestroyRequest):
+    """解装/解体舰船。"""
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if task_manager.is_running:
+        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
+
+    from autowsgr.ops import destroy_ships
+    from autowsgr.types import ShipType
+
+    ship_types = None
+    if request.ship_types:
+        ship_types = [ShipType(t) for t in request.ship_types]
+
+    try:
+        await asyncio.to_thread(
+            destroy_ships,
+            ctx,
+            ship_types=ship_types,
+            remove_equipment=request.remove_equipment,
+        )
+        return ApiResponse(success=True, message='解装完成')
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 解装失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 健康检查
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_server_start_time = time.monotonic()
+
+
+@app.get('/api/health', response_model=ApiResponse)
+async def health_check():
+    """健康检查端点。"""
+    uptime = int(time.monotonic() - _server_start_time)
+    task_info = None
+    if task_manager.current_task and task_manager.is_running:
+        task_info = {
+            'task_id': task_manager.current_task.task_id,
+            'status': task_manager.current_task.status.value,
+        }
+
+    return ApiResponse(
+        success=True,
+        data={
+            'status': 'ok',
+            'uptime_seconds': uptime,
+            'emulator_connected': _ctx is not None,
+            'current_task': task_info,
         },
     )
 
@@ -576,6 +851,84 @@ async def ws_task(websocket: WebSocket):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 序列化辅助函数
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _serialize_resources(resources: Any) -> dict[str, int]:
+    """序列化 Resources 对象。"""
+    return {
+        'fuel': resources.fuel,
+        'ammo': resources.ammo,
+        'steel': resources.steel,
+        'aluminum': resources.aluminum,
+        'diamond': resources.diamond,
+        'fast_repair': resources.fast_repair,
+        'fast_build': resources.fast_build,
+        'ship_blueprint': resources.ship_blueprint,
+        'equipment_blueprint': resources.equipment_blueprint,
+    }
+
+
+def _serialize_ship(ship: Any) -> dict[str, Any]:
+    """序列化 Ship 对象。"""
+    return {
+        'name': ship.name,
+        'ship_type': ship.ship_type.value if ship.ship_type else None,
+        'level': ship.level,
+        'health': ship.health,
+        'max_health': ship.max_health,
+        'damage_state': ship.damage_state.value,
+        'locked': ship.locked,
+    }
+
+
+def _serialize_fleet(fleet: Any) -> dict[str, Any]:
+    """序列化 Fleet 对象。"""
+    return {
+        'fleet_id': fleet.fleet_id,
+        'ships': [_serialize_ship(s) for s in fleet.ships],
+        'size': fleet.size,
+        'has_severely_damaged': fleet.has_severely_damaged,
+    }
+
+
+def _serialize_expedition_queue(expeditions: Any) -> dict[str, Any]:
+    """序列化 ExpeditionQueue 对象。"""
+    return {
+        'slots': [
+            {
+                'chapter': e.chapter,
+                'node': e.node,
+                'fleet_id': e.fleet.fleet_id if e.fleet else None,
+                'is_active': e.is_active,
+                'remaining_seconds': e.remaining_seconds,
+            }
+            for e in expeditions.expeditions
+        ],
+        'active_count': expeditions.active_count,
+        'idle_count': expeditions.idle_count,
+    }
+
+
+def _serialize_build_queue(build_queue: Any) -> dict[str, Any]:
+    """序列化 BuildQueue 对象。"""
+    return {
+        'slots': [
+            {
+                'occupied': s.occupied,
+                'remaining_seconds': s.remaining_seconds,
+                'is_complete': s.is_complete,
+                'is_idle': s.is_idle,
+            }
+            for s in build_queue.slots
+        ],
+        'idle_count': build_queue.idle_count,
+        'complete_count': build_queue.complete_count,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # 辅助函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -614,31 +967,60 @@ def _build_combat_plan(request: Any) -> Any:
 
 def _convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:
     """转换 CombatResult 为响应格式。"""
-    # 提取节点列表
     nodes = []
+    mvp = None
+    grade = None
+    enemies_per_node: dict[str, dict[str, int]] = {}
+    events: list[dict[str, Any]] = []
+
     if result.history:
+        # 提取节点列表
         for event in result.history.events:
             if event.node and event.node not in nodes:
                 nodes.append(event.node)
 
-    # 提取 MVP
-    mvp = None
-    if result.history:
+        # 提取 MVP 和 Grade
         fight_results = result.history.get_fight_results()
         if isinstance(fight_results, dict):
-            for fr in fight_results.values():
-                if fr.mvp and fr.mvp > 0:
-                    # MVP 是位置 (1-6)，需要转换
+            for node_name, fr in fight_results.items():
+                if fr.mvp and fr.mvp > 0 and mvp is None:
                     mvp = f'位置{fr.mvp}'
-                    break
+                if fr.grade and grade is None:
+                    grade = fr.grade
+        elif isinstance(fight_results, list):
+            for fr in fight_results:
+                if fr.mvp and fr.mvp > 0 and mvp is None:
+                    mvp = f'位置{fr.mvp}'
+                if fr.grade and grade is None:
+                    grade = fr.grade
+
+        # 提取敌方编成和完整事件链
+        for event in result.history.events:
+            ev = {
+                'type': event.event_type.name,
+                'node': event.node,
+                'action': event.action,
+            }
+            if event.result:
+                ev['result'] = event.result
+            if event.enemies:
+                ev['enemies'] = event.enemies
+                if event.node:
+                    enemies_per_node[event.node] = event.enemies
+            if event.ship_stats:
+                ev['ship_stats'] = [s.value for s in event.ship_stats]
+            events.append(ev)
 
     return {
         'round': round_num,
         'success': result.flag.value == 'success',
         'nodes': nodes,
         'mvp': mvp,
+        'grade': grade,
         'ship_damage': [s.value for s in result.ship_stats] if result.ship_stats else [],
         'node_count': result.node_count,
+        'enemies': enemies_per_node,
+        'events': events,
     }
 
 
