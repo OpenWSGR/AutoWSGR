@@ -136,7 +136,11 @@ class Condition:
 
     def evaluate(self, context: dict[str, int | float]) -> bool:
         """在给定上下文中评估此条件。"""
-        actual = context.get(self.field, 0)
+        if '+' in self.field:
+            parts = [p.strip() for p in self.field.split('+')]
+            actual = sum(context.get(p, 0) for p in parts)
+        else:
+            actual = context.get(self.field, 0)
         return _OPERATORS[self.op](actual, self.value)
 
 
@@ -275,8 +279,10 @@ class RuleEngine:
 # 旧格式解析
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 匹配 "BB >= 2" 形式的条件片段
-_CONDITION_PIECE_RE = re.compile(r'([A-Z]{2,4})\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)')
+# 匹配 "BB >= 2" 或 "CL + DD >= 1" 形式的条件片段
+_CONDITION_PIECE_RE = re.compile(
+    r'([A-Z]{2,4}(?:\s*\+\s*[A-Z]{2,4})*)\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)'
+)
 
 
 def _parse_legacy_condition(condition_str: str) -> list[Condition]:
@@ -287,15 +293,19 @@ def _parse_legacy_condition(condition_str: str) -> list[Condition]:
 
     用 ``and`` 连接的条件被拆分为独立的 ``Condition`` （AND 语义）。
     不支持 ``or`` — 用多条规则替代。
+
+    支持 ``+`` 运算符将多个舰种求和，如 ``CL + DD >= 1``。
     """
     matches = _CONDITION_PIECE_RE.findall(condition_str)
     if not matches:
         raise ValueError(f"无法解析规则条件: '{condition_str}'")
 
     conditions: list[Condition] = []
-    for field_name, op, value_str in matches:
+    for field_expr, op, value_str in matches:
         value = float(value_str) if '.' in value_str else int(value_str)
-        conditions.append(Condition(field=field_name, op=op, value=value))
+        # 规范化字段表达式：去除空格，如 'CL + DD' -> 'CL+DD'
+        field_key = '+'.join(p.strip() for p in field_expr.split('+'))
+        conditions.append(Condition(field=field_key, op=op, value=value))
     return conditions
 
 

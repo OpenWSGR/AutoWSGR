@@ -227,9 +227,49 @@ class TestParseLegacyCondition:
         assert conditions[1].field == 'DD'
         assert conditions[1].op == '<='
 
+    def test_sum_expression(self):
+        conditions = _parse_legacy_condition('(CL + DD >= 1)')
+        assert len(conditions) == 1
+        assert conditions[0].field == 'CL+DD'
+        assert conditions[0].op == '>='
+        assert conditions[0].value == 1
+
+    def test_sum_expression_triple(self):
+        conditions = _parse_legacy_condition('(CL + DD + CA >= 3)')
+        assert len(conditions) == 1
+        assert conditions[0].field == 'CL+DD+CA'
+        assert conditions[0].op == '>='
+        assert conditions[0].value == 3
+
+    def test_sum_compound_and(self):
+        conditions = _parse_legacy_condition('(CL + DD >= 1) and (BB >= 2)')
+        assert len(conditions) == 2
+        assert conditions[0].field == 'CL+DD'
+        assert conditions[1].field == 'BB'
+
     def test_invalid_raises(self):
         with pytest.raises(ValueError, match='无法解析'):
             _parse_legacy_condition('hello world')
+
+
+class TestConditionSumEvaluation:
+    """Condition '+' sum evaluation tests."""
+
+    def test_sum_basic(self):
+        c = Condition(field='CL+DD', op='>=', value=2)
+        assert c.evaluate({'CL': 1, 'DD': 1})
+        assert c.evaluate({'CL': 2, 'DD': 0})
+        assert not c.evaluate({'CL': 0, 'DD': 1})
+
+    def test_sum_missing_fields(self):
+        c = Condition(field='CL+DD', op='>=', value=1)
+        assert c.evaluate({'CL': 1})
+        assert not c.evaluate({'BB': 5})
+
+    def test_sum_legacy_roundtrip(self):
+        engine = RuleEngine.from_legacy_rules([['(CL + DD >= 2) and (BB > 0)', 'retreat']])
+        assert engine.evaluate({'CL': 1, 'DD': 1, 'BB': 1}).result == RuleResult.RETREAT
+        assert engine.evaluate({'CL': 0, 'DD': 0, 'BB': 3}).result == RuleResult.NO_ACTION
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
