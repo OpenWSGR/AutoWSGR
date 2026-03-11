@@ -1,3 +1,3 @@
 """AutoWSGR — 战舰少女R 自动化框架 (v2)"""
 
-__version__ = '2.1.4.post1'
+__version__ = '2.1.5'
