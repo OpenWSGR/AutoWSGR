@@ -60,7 +60,7 @@ class DecisiveBase:
         update_shipnames(config.level1 + config.level2 + DECISIVE_SKILL_NAMES)
 
         self._state = DecisiveState(chapter=config.chapter)
-        self._logic = DecisiveLogic(config, self._state)
+        self._logic = DecisiveLogic(config, self._state, ctx=ctx)
         self._battle_page = DecisiveBattlePage(self._ctx, ocr=self._ocr)
         self._map = DecisiveMapController(
             ctx,

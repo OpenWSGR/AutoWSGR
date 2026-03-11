@@ -238,6 +238,7 @@ class CombatHistory:
                 continue
             fr = FightResult(
                 node=event.node,
+                mvp=event.extra.get('mvp'),
                 grade=event.result,
                 ship_stats=(
                     event.ship_stats[:] if event.ship_stats else [ShipDamageState.NORMAL] * 6

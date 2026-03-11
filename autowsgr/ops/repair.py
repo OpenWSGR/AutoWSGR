@@ -46,11 +46,8 @@ def repair_in_bath(ctx: GameContext) -> None:
     _log.info('[OPS] 浴室修理操作完成')
 
 
-def repair_ship_by_name(ctx: GameContext, ship_name: str) -> None:
+def repair_ship_by_name(ctx: GameContext, ship_name: str) -> int:
     """使用浴室修理指定名称的舰船。
-
-    .. note::
-        当前为预留接口，依赖 BathPage.repair_ship() 的 OCR 实现。
 
     Parameters
     ----------
@@ -59,15 +56,22 @@ def repair_ship_by_name(ctx: GameContext, ship_name: str) -> None:
     ship_name:
         要修理的舰船名称 (中文)。
 
-    Raises
-    ------
-    NotImplementedError
-        OCR 识别功能尚未实现。
+    Returns
+    -------
+    int
+        修理时间 (秒)。若浴场已满则返回 ``-1``。
     """
     goto_page(ctx, PageName.BATH)
 
     page = BathPage(ctx)
     page.go_to_choose_repair()
-    page.repair_ship(ship_name)
+    repair_secs = page.repair_ship(ship_name)
 
-    _log.info('[OPS] 浴室修理操作完成: {}', ship_name)
+    if repair_secs >= 0:
+        ship = ctx.get_ship(ship_name)
+        ship.set_repair(repair_secs)
+        _log.info('[OPS] 浴室修理操作完成: {} ({}s)', ship_name, repair_secs)
+    else:
+        _log.warning('[OPS] 浴场已满, 无法修理 {}', ship_name)
+
+    return repair_secs

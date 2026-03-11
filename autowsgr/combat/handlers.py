@@ -29,6 +29,7 @@ from autowsgr.combat.actions import (
     get_ship_drop,
     image_exist,
 )
+from autowsgr.combat.recognition import detect_mvp
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, Formation, ShipDamageState
@@ -380,12 +381,18 @@ class PhaseHandlersMixin:
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_result(self) -> ConditionFlag:
-        """处理战果结算 — 识别评级、更新血量、关闭界面。"""
+        """处理战果结算 -- 识别评级、更新血量、MVP、关闭界面。"""
         # ── 信息采集 ──
         grade = detect_result_grade(self._device)
         self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
+
+        # MVP 识别 (在关闭结算界面之前)
+        screen = self._device.screenshot()
+        mvp = detect_mvp(screen)
+
         fight_result = FightResult(
             node=self._node,
+            mvp=mvp,
             grade=grade,
             ship_stats=self._ship_stats[:],
         )
@@ -395,6 +402,7 @@ class PhaseHandlersMixin:
                 node=self._node,
                 result=grade,
                 ship_stats=self._ship_stats[:],
+                extra={'mvp': mvp},
             )
         )
         _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)

@@ -1,19 +1,8 @@
 """浴室页面 UI 控制器。
 
-已完成
-
 页面入口:
-    - 主页面 → 后院 → 浴室
-    - 出征准备 → 右上角 🔧 → 浴室 (跨级快捷通道)
-
-导航目标:
-
-- **选择修理 (overlay)**: 右上角按钮，弹出选择修理浮层
-
-跨级通道:
-
-- 从出征准备页面可直接进入浴室 (旧代码的 cross-edge)
-- 浴室可直接返回战斗准备页面 (旧代码的 cross-edge)
+    - 主页面 -> 后院 -> 浴室
+    - 出征准备 -> 右上角 -> 浴室 (跨级快捷通道)
 
 Overlay 机制:
 
@@ -30,8 +19,8 @@ Overlay 机制:
     page.go_to_choose_repair()   # 打开 overlay
     page.click_first_repair_ship()  # 点击第一个需修理舰船 (自动关闭 overlay)
     # 或
-    page.repair_ship("胡德")  # 按名字修理指定舰船 (TODO: 待实现 OCR)
-    page.go_back()  # overlay 打开时关闭 overlay，否则返回上一页
+    secs = page.repair_ship("胡德")  # 按名字修理指定舰船, 返回修理秒数或 -1(浴场满)
+    page.go_back()  # overlay 打开时关闭 overlay, 否则返回上一页
 """
 
 from __future__ import annotations
@@ -41,12 +30,20 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-from autowsgr.vision import (
-    MatchStrategy,
-    PixelChecker,
-    PixelRule,
-    PixelSignature,
+from autowsgr.ui.bath_page.signatures import (
+    BATH_FULL_TIMEOUT,
+    CHOOSE_REPAIR_OVERLAY_SIGNATURE,
+    CLICK_BACK,
+    CLICK_CHOOSE_REPAIR,
+    CLICK_CLOSE_OVERLAY,
+    CLICK_FIRST_REPAIR_SHIP,
+    PAGE_SIGNATURE,
+    SWIPE_DELAY,
+    SWIPE_DURATION,
+    SWIPE_END,
+    SWIPE_START,
 )
+from autowsgr.vision import PixelChecker
 
 
 if TYPE_CHECKING:
@@ -57,91 +54,10 @@ if TYPE_CHECKING:
 
 _log = get_logger('ui')
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 页面识别签名
-# ═══════════════════════════════════════════════════════════════════════════════
-
-PAGE_SIGNATURE = PixelSignature(
-    name='浴场页',
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.8458, 0.1102, (74, 132, 178), tolerance=30.0),
-        PixelRule.of(0.8604, 0.0889, (253, 254, 255), tolerance=30.0),
-        PixelRule.of(0.8734, 0.0454, (52, 146, 198), tolerance=30.0),
-        PixelRule.of(0.9875, 0.1019, (69, 133, 181), tolerance=30.0),
-    ],
-)
-"""浴室页面像素签名 (无 overlay 时)。"""
-
-CHOOSE_REPAIR_OVERLAY_SIGNATURE = PixelSignature(
-    name='选择修理',
-    strategy=MatchStrategy.ALL,
-    rules=[
-        PixelRule.of(0.6797, 0.1750, (27, 122, 212), tolerance=30.0),
-        PixelRule.of(0.8383, 0.1750, (25, 123, 210), tolerance=30.0),
-        PixelRule.of(0.3039, 0.1750, (93, 183, 122), tolerance=30.0),
-        PixelRule.of(0.2852, 0.0944, (23, 90, 158), tolerance=30.0),
-        PixelRule.of(0.9047, 0.0958, (3, 124, 207), tolerance=30.0),
-    ],
-)
-"""选择修理 overlay 像素签名。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 点击坐标 (相对坐标 0.0-1.0, 参考分辨率 960x540)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-CLICK_BACK: tuple[float, float] = (0.022, 0.058)
-"""回退按钮 (◁)。"""
-
-CLICK_CHOOSE_REPAIR: tuple[float, float] = (0.9375, 0.0556)
-"""选择修理按钮 (右上角)。
-
-坐标换算: 旧代码 (900, 30) ÷ (960, 540)。
-"""
-
-CLICK_CLOSE_OVERLAY: tuple[float, float] = (0.9563, 0.0903)
-"""关闭选择修理 overlay 的按钮。
-
-坐标换算: 旧代码 (916, 45 附近) ÷ (960, 540)。
-"""
-
-CLICK_FIRST_REPAIR_SHIP: tuple[float, float] = (0.1198, 0.4315)
-"""选择修理 overlay 中第一个舰船的位置。
-
-旧代码: timer.click(115, 233) → (115/960, 233/540)。
-"""
-
-# ── 滑动坐标 ──────────────────────────────────────────────────────────
-
-_SWIPE_START: tuple[float, float] = (0.66, 0.5)
-"""overlay 内向左滑动起始点 (右侧)。"""
-
-_SWIPE_END: tuple[float, float] = (0.33, 0.5)
-"""overlay 内向左滑动终点 (左侧)。
-
-旧代码: relative_swipe(0.33, 0.5, 0.66, 0.5) 为向右滑，
-此处反向 (0.66→0.33) 为向左滑，用于查看更多待修理舰船。
-"""
-
-_SWIPE_DURATION: float = 0.5
-"""滑动持续时间 (秒)。"""
-
-_SWIPE_DELAY: float = 1.0
-"""滑动后等待内容刷新的延迟 (秒)。"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 舰船修理信息 (预留数据结构)
-# ═══════════════════════════════════════════════════════════════════════════════
-
 
 @dataclass(frozen=True, slots=True)
 class RepairShipInfo:
     """选择修理 overlay 中识别到的舰船信息。
-
-    .. note::
-        目前为预留结构，待 OCR 识别接口实现后填充。
 
     Attributes
     ----------
@@ -156,6 +72,35 @@ class RepairShipInfo:
     name: str
     position: tuple[float, float]
     repair_time: str = ''
+
+    @property
+    def repair_seconds(self) -> int:
+        """将 repair_time (HH:MM:SS) 转换为秒数。解析失败返回 0。"""
+        return _time_str_to_seconds(self.repair_time)
+
+
+def _time_str_to_seconds(time_str: str) -> int:
+    """将 HH:MM:SS 格式的时间字符串转换为秒数。
+
+    Parameters
+    ----------
+    time_str:
+        格式为 ``"HH:MM:SS"`` 的时间字符串。
+
+    Returns
+    -------
+    int
+        总秒数, 解析失败返回 0。
+    """
+    if not time_str:
+        return 0
+    parts = time_str.split(':')
+    if len(parts) != 3:
+        return 0
+    try:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except ValueError:
+        return 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -286,15 +231,20 @@ class BathPage:
         # 点击舰船后 overlay 自动关闭，等待回到浴室基础页面
         self._wait_overlay_auto_close()
 
-    def repair_ship(self, ship_name: str) -> None:
+    def repair_ship(self, ship_name: str) -> int:
         """在选择修理 overlay 中修理指定名称的舰船。
 
-        扫描 overlay 并逐页滑动查找指定舰船，找到后点击。
+        扫描 overlay 并逐页滑动查找指定舰船，找到后点击修理。
 
         Parameters
         ----------
         ship_name:
             要修理的舰船名称 (中文)。
+
+        Returns
+        -------
+        int
+            修理时间 (秒)。若浴场已满 (点击后 overlay 未关闭) 则返回 ``-1``。
 
         Raises
         ------
@@ -312,10 +262,17 @@ class BathPage:
             ships = self.recognize_repair_ships()
             for ship in ships:
                 if ship.name == ship_name:
-                    _log.info('[UI] 选择修理: 找到 {}，点击', ship_name)
+                    _log.info('[UI] 选择修理: 找到 {} (耗时 {})，点击', ship_name, ship.repair_time)
+                    repair_secs = ship.repair_seconds
                     self._ctrl.click(*ship.position)
-                    self._wait_overlay_auto_close()
-                    return
+
+                    # 检测浴场是否已满: overlay 未关闭说明浴场满
+                    if self._try_wait_overlay_close():
+                        _log.info('[UI] 修理成功: {} ({}s)', ship_name, repair_secs)
+                        return repair_secs
+
+                    _log.warning('[UI] 浴场已满, 无法修理 {}', ship_name)
+                    return -1
             # 未找到，滑动翻页
             self._swipe_left()
 
@@ -348,11 +305,11 @@ class BathPage:
         """
         _log.debug('[UI] 选择修理 overlay: 向左滑动')
         self._ctrl.swipe(
-            *_SWIPE_START,
-            *_SWIPE_END,
-            duration=_SWIPE_DURATION,
+            *SWIPE_START,
+            *SWIPE_END,
+            duration=SWIPE_DURATION,
         )
-        time.sleep(_SWIPE_DELAY)
+        time.sleep(SWIPE_DELAY)
 
     def _wait_overlay_auto_close(self) -> None:
         """等待选择修理 overlay 自动关闭 (点击舰船后)。
@@ -370,6 +327,25 @@ class BathPage:
             source='选择修理 overlay (自动关闭)',
             target='浴室',
         )
+
+    def _try_wait_overlay_close(self) -> bool:
+        """尝试等待 overlay 关闭, 超时返回 False (浴场已满)。
+
+        Returns
+        -------
+        bool
+            ``True`` 表示 overlay 已关闭 (修理成功),
+            ``False`` 表示超时 overlay 仍打开 (浴场已满)。
+        """
+        deadline = time.monotonic() + BATH_FULL_TIMEOUT
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            if PixelChecker.check_signature(
+                screen, PAGE_SIGNATURE
+            ).matched and not BathPage.has_choose_repair_overlay(screen):
+                return True
+            time.sleep(0.5)
+        return False
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 

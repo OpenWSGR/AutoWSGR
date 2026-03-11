@@ -6,17 +6,25 @@ import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import ShipDamageState
+
 from .build import BuildQueue
 from .expedition import ExpeditionQueue
 from .fleet import Fleet
 from .resources import Resources
+from .ship import Ship
 
 
 if TYPE_CHECKING:
+    from autowsgr.combat.history import CombatResult
     from autowsgr.emulator import AndroidController
     from autowsgr.infra import UserConfig
     from autowsgr.types import PageName
     from autowsgr.vision import OCREngine
+
+
+_log = get_logger('context')
 
 # 游戏固定 4 支舰队
 _NUM_FLEETS = 4
@@ -71,6 +79,8 @@ class GameContext:
     """远征队列。"""
     build_queue: BuildQueue = field(default_factory=BuildQueue)
     """建造队列。"""
+    ship_registry: dict[str, Ship] = field(default_factory=dict)
+    """舰船注册表, 以名称为键。"""
     current_page: PageName | None = None
     """当前游戏页面。"""
 
@@ -93,3 +103,109 @@ class GameContext:
         if not 1 <= fleet_id <= len(self.fleets):
             raise ValueError(f'fleet_id 应在 1-{len(self.fleets)} 范围内，收到 {fleet_id}')
         return self.fleets[fleet_id - 1]
+
+    def get_ship(self, name: str) -> Ship:
+        """按名称获取舰船, 不存在则自动注册。"""
+        if name not in self.ship_registry:
+            self.ship_registry[name] = Ship(name=name)
+        return self.ship_registry[name]
+
+    def is_ship_available(self, name: str) -> bool:
+        """判断舰船是否可用 (非大破 且 非修理中)。"""
+        return self.get_ship(name).available
+
+    def update_ship_damage(self, name: str, state: ShipDamageState) -> None:
+        """更新舰船的破损状态。"""
+        self.get_ship(name).damage_state = state
+
+    # ── 战斗上下文同步 ──
+
+    def sync_before_combat(
+        self,
+        fleet_id: int,
+        ships: list[Ship] | None = None,
+        *,
+        loot_count: int | None = None,
+        ship_acquired_count: int | None = None,
+    ) -> None:
+        """战斗开始前, 用识别到的信息更新上下文。
+
+        Parameters
+        ----------
+        fleet_id:
+            出击舰队编号 (1-4)。
+        ships:
+            从准备页面识别到的舰船列表 (含等级、血量状态)。
+        loot_count:
+            今日已获取战利品数量 (出征面板识别)。
+        ship_acquired_count:
+            今日已获取舰船数量 (出征面板识别)。
+        """
+        # 同步每日计数器
+        if loot_count is not None:
+            self.dropped_loot_count = loot_count
+            _log.debug('[Context] 今日战利品数: {}', loot_count)
+        if ship_acquired_count is not None:
+            self.dropped_ship_count = ship_acquired_count
+            _log.debug('[Context] 今日舰船数: {}', ship_acquired_count)
+
+        # 同步出击舰队信息
+        if ships is not None:
+            fleet = self.fleet(fleet_id)
+            fleet.ships = ships
+            # 同步到舰船注册表
+            for s in ships:
+                if s.name:
+                    registered = self.get_ship(s.name)
+                    registered.level = s.level or registered.level
+                    registered.damage_state = s.damage_state
+            _log.info(
+                '[Context] 舰队 {} 出击编成: {}',
+                fleet_id,
+                ', '.join(f'{s.name or "?"} Lv.{s.level}' for s in ships),
+            )
+
+    def sync_after_combat(
+        self,
+        fleet_id: int,
+        result: CombatResult,
+    ) -> None:
+        """战斗结束后, 用结果更新上下文。
+
+        Parameters
+        ----------
+        fleet_id:
+            出击舰队编号 (1-4)。
+        result:
+            战斗结果。
+        """
+        from autowsgr.types import ConditionFlag
+
+        if result.flag not in (
+            ConditionFlag.OPERATION_SUCCESS,
+            ConditionFlag.FIGHT_END,
+        ):
+            return
+
+        # 更新舰队战后血量
+        fleet = self.fleet(fleet_id)
+        for i, ship in enumerate(fleet.ships):
+            if i < len(result.ship_stats):
+                state = result.ship_stats[i]
+                if state != ShipDamageState.NO_SHIP:
+                    ship.damage_state = state
+                    if ship.name:
+                        self.get_ship(ship.name).damage_state = state
+
+        # 统计本次掉落舰船数
+        fight_results = result.fight_results
+        new_drops = sum(1 for fr in fight_results if fr.dropped_ship)
+        if new_drops:
+            self.dropped_ship_count += new_drops
+            _log.info('[Context] 本次掉落 {} 艘, 今日累计 {}', new_drops, self.dropped_ship_count)
+
+        _log.debug(
+            '[Context] 舰队 {} 战后状态: {}',
+            fleet_id,
+            [s.damage_state.name for s in fleet.ships],
+        )
