@@ -192,7 +192,7 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
         runner = CampaignRunner(
             ctx,
             campaign_name=request.campaign_name,
-            times=request.times,
+            times=1,
         )
 
         results = []
