@@ -16,12 +16,17 @@ from typing import TYPE_CHECKING
 
 from autowsgr.image_resources import TemplateKey, Templates
 from autowsgr.image_resources.keys import RESULT_GRADE_KEYS
-from autowsgr.infra import get_logger
+from autowsgr.infra import get_logger, save_image
 from autowsgr.types import FightCondition, Formation, RepairMode, ShipDamageState
 from autowsgr.ui.battle.blood import classify_blood
 from autowsgr.vision import ImageChecker, PixelChecker
 
-from .recognition import RESULT_BLOOD_BAR_PROBE, recognize_enemy_formation, recognize_enemy_ships
+from .recognition import (
+    RESULT_BLOOD_BAR_PROBE,
+    recognize_enemy_formation,
+    recognize_enemy_ships,
+    recognize_ship_drop,
+)
 from .recognizer import CombatRecognitionTimeout
 
 
@@ -308,8 +313,15 @@ def get_ship_drop(device: AndroidController) -> str | None:
     str | None
         掉落的舰船名称，或 ``None`` 如果未获取到。
     """
-    # TODO: OCR 实现获取掉落舰船名
-    return None
+    from autowsgr.vision import EasyOCREngine
+
+    screen = device.screenshot()
+    save_image(screen, 'debug_ship_drop.png')
+    ocr = EasyOCREngine.create(gpu=False)
+    result = recognize_ship_drop(screen, ocr)
+    if result.ship_name:
+        _log.info('[Combat] 掉落识别: {} ({})', result.ship_name, result.ship_type or '未知')
+    return result.ship_name
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -357,6 +369,7 @@ def detect_result_grade(device: AndroidController) -> str:
         战果等级。
     """
     retry = 0
+    save_image(device.screenshot(), 'debug_combat_result.png')
     while retry < 5:
         screen = device.screenshot()
         for grade, key in RESULT_GRADE_KEYS.items():

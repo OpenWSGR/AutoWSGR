@@ -80,6 +80,9 @@ class CombatTemplates:
     END_BATTLE_PAGE = LazyTemplate('combat/end_battle_page_540p.png', 'end_battle_page')
     END_EXERCISE_PAGE = LazyTemplate('combat/end_exercise_page_540p.png', 'end_exercise_page')
 
+    # ── MVP ──
+    MVP_BADGE = LazyTemplate('combat/mvp_badge_540p.png', 'mvp_badge')
+
     # ── 船坞已满 ──
     DOCK_FULL = LazyTemplate('build/ship_full_depot_540p.png', 'dock_full')
 

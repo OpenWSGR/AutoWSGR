@@ -15,7 +15,7 @@ from autowsgr.combat.engine import run_combat
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
-from autowsgr.ui import BattlePreparationPage, MapPage, RepairStrategy
+from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel, RepairStrategy
 
 
 if TYPE_CHECKING:
@@ -54,6 +54,8 @@ class NormalFightRunner:
             plan.mode = CombatMode.NORMAL
 
         self._results: list[CombatResult] = []
+        self._loot_count: int | None = None
+        self._ship_acquired_count: int | None = None
 
     # ── 公共接口 ──
 
@@ -86,6 +88,10 @@ class NormalFightRunner:
 
         # 3. 执行战斗
         result = self._do_combat(ship_stats)
+
+        # 赋值出征面板识别到的今日获取数量
+        result.loot_count = self._loot_count
+        result.ship_acquired_count = self._ship_acquired_count
 
         # 4. 处理结果
         self._handle_result(result)
@@ -140,6 +146,17 @@ class NormalFightRunner:
         """导航到目标地图并进入。"""
         goto_page(self._ctx, PageName.MAP)
         map_page = MapPage(self._ctx)
+
+        # 在出征面板读取今日已获取数量
+        map_page.ensure_panel(MapPanel.SORTIE)
+        time.sleep(0.25)
+        try:
+            counts = map_page.get_loot_and_ship_count()
+            self._loot_count = counts.loot
+            self._ship_acquired_count = counts.ship
+        except RuntimeError:
+            _log.warning('[OPS] 无法读取今日获取数量 (OCR 不可用)')
+
         map_page.enter_sortie(self._plan.chapter, self._plan.map_id)
 
     # ── 出征准备 ──

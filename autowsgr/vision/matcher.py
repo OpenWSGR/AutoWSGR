@@ -26,6 +26,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import cv2
+import numpy as np
+
 from autowsgr.infra.logger import get_logger
 
 # 从 pixel.py 导入所有数据类型 (保持向后兼容)
@@ -42,8 +45,6 @@ from .pixel import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    import numpy as np
 
 
 _log = get_logger('vision.pixel')
@@ -178,20 +179,19 @@ class PixelChecker:
                         matched_count=matched_count,
                         total_count=len(signature),
                     )
-            elif signature.strategy == MatchStrategy.ANY and is_match:
-                if not with_details:
-                    _log.trace(
-                        "[Matcher] '{}' OK 短路退出 - ANY 首次成功于 [{:.4f},{:.4f}]",
-                        signature.name,
-                        rule.x,
-                        rule.y,
-                    )
-                    return PixelMatchResult(
-                        matched=True,
-                        signature_name=signature.name,
-                        matched_count=matched_count,
-                        total_count=len(signature),
-                    )
+            elif signature.strategy == MatchStrategy.ANY and is_match and not with_details:
+                _log.trace(
+                    "[Matcher] '{}' OK 短路退出 - ANY 首次成功于 [{:.4f},{:.4f}]",
+                    signature.name,
+                    rule.x,
+                    rule.y,
+                )
+                return PixelMatchResult(
+                    matched=True,
+                    signature_name=signature.name,
+                    matched_count=matched_count,
+                    total_count=len(signature),
+                )
 
         # 根据策略判定最终结果
         total = len(signature)
@@ -360,3 +360,76 @@ class PixelChecker:
         px1, py1 = int(x1 * w), int(y1 * h)
         px2, py2 = int(x2 * w), int(y2 * h)
         return screen[py1:py2, px1:px2].copy()
+
+    @staticmethod
+    def crop_rotated(
+        screen: np.ndarray,
+        bl_x: float,
+        bl_y: float,
+        tr_x: float,
+        tr_y: float,
+        angle: float,
+    ) -> np.ndarray:
+        """裁切旋转矩形区域（相对坐标）。
+
+        适用于截图中文字倾斜排列的场景（如舰船掉落页的舰名/舰种）。
+        给定对角线两端点（左下、右上）和旋转角度，计算旋转矩形并裁切。
+
+        Parameters
+        ----------
+        screen:
+            截图 (HxWx3, RGB)。
+        bl_x, bl_y:
+            左下角相对坐标。
+        tr_x, tr_y:
+            右上角相对坐标。
+        angle:
+            顺时针旋转角度（度），正值表示文字向右上方倾斜。
+        """
+        h, w = screen.shape[:2]
+        x1, y2 = int(bl_x * w), int(bl_y * h)
+        x2, y1 = int(tr_x * w), int(tr_y * h)
+
+        # 对角线长度及方向
+        diag = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        diag_orientation = np.arctan2(y2 - y1, x2 - x1)
+        diag_angle = diag_orientation - np.radians(angle)
+        rect_w = int(diag * np.cos(diag_angle))
+        rect_h = int(diag * np.sin(diag_angle))
+
+        center = ((x1 + x2) // 2, (y1 + y2) // 2)
+        rot_angle = 360 - angle
+
+        # 计算旋转矩形的轴对齐包围盒
+        cos_a = abs(np.cos(np.radians(rot_angle)))
+        sin_a = abs(np.sin(np.radians(rot_angle)))
+        bbx_w = int(rect_w * cos_a + rect_h * sin_a)
+        bbx_h = int(rect_w * sin_a + rect_h * cos_a)
+
+        # 裁切包围盒
+        bbx_x1 = max(center[0] - bbx_w // 2, 0)
+        bbx_y1 = max(center[1] - bbx_h // 2, 0)
+        bbx_x2 = min(center[0] + bbx_w // 2, w)
+        bbx_y2 = min(center[1] + bbx_h // 2, h)
+        bbx_crop = screen[bbx_y1:bbx_y2, bbx_x1:bbx_x2]
+
+        # 在裁切后的图像上旋转
+        crop_h, crop_w = bbx_crop.shape[:2]
+        crop_center = (crop_w / 2, crop_h / 2)
+        rot_mat = cv2.getRotationMatrix2D(crop_center, rot_angle, 1.0)
+
+        bound_w = int(crop_h * abs(rot_mat[0, 1]) + crop_w * abs(rot_mat[0, 0]))
+        bound_h = int(crop_h * abs(rot_mat[0, 0]) + crop_w * abs(rot_mat[0, 1]))
+        rot_mat[0, 2] += bound_w / 2 - crop_center[0]
+        rot_mat[1, 2] += bound_h / 2 - crop_center[1]
+
+        rotated = cv2.warpAffine(bbx_crop, rot_mat, (bound_w, bound_h))
+
+        # 从旋转后的图像中心裁切目标矩形
+        rc = (rotated.shape[1] // 2, rotated.shape[0] // 2)
+        half_w, half_h = rect_w // 2, rect_h // 2
+        result = rotated[
+            max(rc[1] - half_h, 0) : rc[1] + (rect_h - half_h),
+            max(rc[0] - half_w, 0) : rc[0] + (rect_w - half_w),
+        ]
+        return result.copy()

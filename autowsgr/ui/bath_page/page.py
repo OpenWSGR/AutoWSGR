@@ -289,9 +289,7 @@ class BathPage:
     def repair_ship(self, ship_name: str) -> None:
         """在选择修理 overlay 中修理指定名称的舰船。
 
-        .. note::
-            当前实现为 **预留接口**，待 OCR 识别接口完成后实现。
-            目前会扫描 overlay 并逐页滑动查找指定舰船。
+        扫描 overlay 并逐页滑动查找指定舰船，找到后点击。
 
         Parameters
         ----------
@@ -301,9 +299,7 @@ class BathPage:
         Raises
         ------
         NavigationError
-            选择修理 overlay 未打开。
-        NotImplementedError
-            OCR 识别功能尚未实现。
+            选择修理 overlay 未打开，或舰船未找到。
         """
         from autowsgr.ui.utils import NavigationError
 
@@ -311,41 +307,37 @@ class BathPage:
         if not BathPage.has_choose_repair_overlay(screen):
             raise NavigationError('选择修理 overlay 未打开，无法修理指定舰船', screen=screen)
 
-        # TODO: 实现 OCR 识别 + 滑动查找
-        # 大致流程:
-        # 1. recognize_repair_ships() 获取当前可见舰船
-        # 2. 在列表中查找 ship_name
-        # 3. 若未找到，_swipe_left() 翻页后重复
-        # 4. 找到后点击对应位置
-        # 5. _wait_overlay_auto_close()
-        raise NotImplementedError(
-            f"repair_ship('{ship_name}') 尚未实现: 需要 OCR 识别接口完成后实现舰船名称匹配"
+        # 最多翻页 10 次查找
+        for _attempt in range(10):
+            ships = self.recognize_repair_ships()
+            for ship in ships:
+                if ship.name == ship_name:
+                    _log.info('[UI] 选择修理: 找到 {}，点击', ship_name)
+                    self._ctrl.click(*ship.position)
+                    self._wait_overlay_auto_close()
+                    return
+            # 未找到，滑动翻页
+            self._swipe_left()
+
+        raise NavigationError(
+            f'选择修理 overlay 中未找到舰船 "{ship_name}"',
+            screen=self._ctrl.screenshot(),
         )
 
     def recognize_repair_ships(self) -> list[RepairShipInfo]:
         """识别选择修理 overlay 中当前可见的待修理舰船。
 
-        .. note::
-            当前实现为 **预留接口**，待 OCR 识别接口完成后实现。
-            将返回当前 overlay 中可见的所有舰船信息 (名称、位置、修理时间)。
-
         Returns
         -------
         list[RepairShipInfo]
             当前可见待修理舰船列表。
-
-        Raises
-        ------
-        NotImplementedError
-            OCR 识别功能尚未实现。
         """
-        # TODO: 实现 OCR 识别
-        # 大致流程:
-        # 1. 截图
-        # 2. 对 overlay 区域进行 OCR
-        # 3. 解析舰船名称和修理时间
-        # 4. 返回 RepairShipInfo 列表
-        raise NotImplementedError('recognize_repair_ships() 尚未实现: 需要 OCR 识别接口')
+        from autowsgr.ui.bath_page.recognition import recognize_repair_cards
+        from autowsgr.vision import OCREngine
+
+        screen = self._ctrl.screenshot()
+        ocr = OCREngine.create()
+        return recognize_repair_cards(screen, ocr)
 
     def _swipe_left(self) -> None:
         """在选择修理 overlay 中向左滑动，查看更多待修理舰船。

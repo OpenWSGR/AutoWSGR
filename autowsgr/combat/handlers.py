@@ -384,12 +384,17 @@ class PhaseHandlersMixin:
         # ── 信息采集 ──
         grade = detect_result_grade(self._device)
         self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
-        fight_result = FightResult(grade=grade, ship_stats=self._ship_stats[:])
+        fight_result = FightResult(
+            node=self._node,
+            grade=grade,
+            ship_stats=self._ship_stats[:],
+        )
         self._history.add(
             CombatEvent(
                 event_type=EventType.RESULT,
                 node=self._node,
-                result=str(fight_result),
+                result=grade,
+                ship_stats=self._ship_stats[:],
             )
         )
         _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)

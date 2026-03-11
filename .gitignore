@@ -1,5 +1,6 @@
 .env
 logs/
+log/
 .vscode/
 
 # 测试图片包

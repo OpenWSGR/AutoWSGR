@@ -1,22 +1,25 @@
-"""敌方编成识别 — DLL 舰类识别 + OCR 阵型识别。
+"""战斗识别 — DLL 舰类识别 + OCR 阵型/掉落识别。
 
 包含核心识别函数:
 
 - :func:`recognize_enemy_ships` — 6 张缩略图 → DLL → 舰类计数
 - :func:`recognize_enemy_formation` — OCR 识别阵型文字
+- :func:`recognize_ship_drop` — OCR 识别掉落舰船名称和类型
 
 这些函数由 :mod:`~autowsgr.combat.actions` 中的高级接口调用。
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 from PIL import Image
 
 from autowsgr.infra.logger import get_logger
-from autowsgr.vision import ROI, ApiDll, get_api_dll
+from autowsgr.vision import ROI, ApiDll, PixelChecker, get_api_dll
+from autowsgr.vision.pixel import MatchStrategy, PixelRule, PixelSignature
 
 
 _log = get_logger('combat.recognition')
@@ -204,6 +207,165 @@ def recognize_enemy_formation(
     # 模糊返回原文
     _log.info('[识别] 敌方阵型 (原文): {}', text)
     return text
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 舰船掉落识别
+# ═══════════════════════════════════════════════════════════════════════════════
+
+SHIP_DROP_PAGE_SIGNATURE = PixelSignature(
+    name='ship_drop_page',
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(0.0500, 0.9500, (20, 40, 68), tolerance=15.0),
+        PixelRule.of(0.9500, 0.9500, (12, 35, 60), tolerance=15.0),
+        PixelRule.of(0.9070, 0.1569, (16, 26, 46), tolerance=15.0),
+        PixelRule.of(0.8906, 0.0972, (20, 26, 45), tolerance=15.0),
+        PixelRule.of(0.8016, 0.2361, (33, 82, 125), tolerance=30.0),
+        PixelRule.of(0.8300, 0.3000, (253, 236, 166), tolerance=15.0),
+        PixelRule.of(0.8719, 0.2333, (23, 41, 67), tolerance=15.0),
+        PixelRule.of(0.8109, 0.2681, (36, 58, 72), tolerance=30.0),
+    ],
+)
+"""舰船掉落页面像素签名。"""
+
+# 旋转裁切区域 (左下角, 右上角, 旋转角度)
+_SHIP_NAME_CROP = (0.754, 0.268, 0.983, 0.009, 25)
+"""舰名 OCR 裁切参数 (bl_x, bl_y, tr_x, tr_y, angle)。"""
+
+_SHIP_TYPE_CROP = (0.79, 0.29, 0.95, 0.1, 25)
+"""舰种 OCR 裁切参数 (bl_x, bl_y, tr_x, tr_y, angle)。"""
+
+# 画面中显示的舰种全称 -> 标准中文短名
+_SHIP_TYPE_DISPLAY_MAP: dict[str, str] = {
+    '航空母舰': '航母',
+    '轻型航母': '轻母',
+    '装甲航母': '装母',
+    '战列舰': '战列',
+    '航空战列舰': '航战',
+    '战列巡洋舰': '战巡',
+    '重巡洋舰': '重巡',
+    '航空巡洋舰': '航巡',
+    '雷击巡洋舰': '雷巡',
+    '轻巡洋舰': '轻巡',
+    '重炮舰': '重炮',
+    '驱逐舰': '驱逐',
+    '导弹潜艇': '导潜',
+    '潜艇': '潜艇',
+    '炮击潜艇': '炮潜',
+    '补给舰': '补给',
+    '导弹驱逐舰': '导驱',
+    '防空驱逐舰': '防驱',
+    '导弹巡洋舰': '导巡',
+    '防空巡洋舰': '防巡',
+    '大型巡洋舰': '大巡',
+    '导弹战列舰': '导战',
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ShipDropResult:
+    """舰船掉落识别结果。"""
+
+    ship_name: str | None
+    """匹配到的舰船名，识别失败时为 None。"""
+    ship_type: str | None
+    """舰种显示名称 (如 '驱逐舰')，识别失败时为 None。"""
+
+
+def recognize_ship_drop(
+    screen: np.ndarray,
+    ocr: OCREngine,
+) -> ShipDropResult:
+    """识别舰船掉落页面的舰名和舰种。
+
+    对截图中斜置的舰名和舰种文字区域进行旋转裁切后 OCR 识别。
+    舰名通过模糊匹配校正，舰种直接读取。
+
+    Parameters
+    ----------
+    screen:
+        舰船掉落页面截图 (HxWx3, RGB)。
+    ocr:
+        OCR 引擎实例。
+
+    Returns
+    -------
+    ShipDropResult
+        包含舰名和舰种的识别结果。
+    """
+    # 裁切舰名区域
+    name_img = PixelChecker.crop_rotated(screen, *_SHIP_NAME_CROP)
+    ship_name = ocr.recognize_ship_name(name_img)
+    _log.debug('[识别] 掉落舰名: {}', ship_name or '未识别')
+
+    # 裁切舰种区域
+    type_img = PixelChecker.crop_rotated(screen, *_SHIP_TYPE_CROP)
+    type_result = ocr.recognize_single(type_img)
+    ship_type = type_result.text.strip() or None
+    _log.debug('[识别] 掉落舰种: {}', ship_type or '未识别')
+
+    return ShipDropResult(ship_name=ship_name, ship_type=ship_type)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MVP 识别
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 结算页 6 个舰船 y 中心坐标 (960x540 归一化)
+_SHIP_SLOT_Y = [
+    142 / 540,  # slot 1
+    217 / 540,  # slot 2
+    292 / 540,  # slot 3
+    367 / 540,  # slot 4
+    442 / 540,  # slot 5
+    517 / 540,  # slot 6
+]
+
+
+def detect_mvp(
+    screen: np.ndarray,
+    confidence: float = 0.8,
+) -> int | None:
+    """从战斗结算截图中识别 MVP 位置。
+
+    通过模板匹配定位 MVP 徽章，然后根据 y 坐标确定对应的舰船槽位。
+
+    Parameters
+    ----------
+    screen:
+        战斗结算页面截图 (HxWx3, RGB)。
+    confidence:
+        模板匹配最低置信度。
+
+    Returns
+    -------
+    int | None
+        MVP 舰船的位置 (1-6, 1-indexed)，未识别到返回 None。
+    """
+    from autowsgr.image_resources.combat import CombatTemplates
+    from autowsgr.vision import ImageChecker
+
+    tmpl = CombatTemplates.MVP_BADGE
+    detail = ImageChecker.find_template(screen, tmpl, confidence=confidence)
+    if detail is None:
+        _log.debug('[识别] 未检测到 MVP 徽章')
+        return None
+
+    mvp_cy = detail.center[1]
+
+    # 找到 y 坐标最近的舰船槽位
+    best_slot = 0
+    best_dist = abs(mvp_cy - _SHIP_SLOT_Y[0])
+    for i in range(1, len(_SHIP_SLOT_Y)):
+        dist = abs(mvp_cy - _SHIP_SLOT_Y[i])
+        if dist < best_dist:
+            best_dist = dist
+            best_slot = i
+
+    slot = best_slot + 1  # 1-indexed
+    _log.info('[识别] MVP 位置: {} (conf={:.3f})', slot, detail.confidence)
+    return slot
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

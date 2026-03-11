@@ -7,12 +7,17 @@
 
 from __future__ import annotations
 
+import typing
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, ShipDamageState
+
+
+if TYPE_CHECKING:
+    from autowsgr.context.ship import Ship
 
 
 _log = get_logger('combat')
@@ -109,24 +114,36 @@ class FightResult:
 
     Attributes
     ----------
+    node:
+        节点名称 (如 ``"A"``, ``"B"``)。
     mvp:
-        MVP 位置 (1-6)。
+        MVP 位置 (1-6), ``None`` 表示未识别。
     grade:
         战果等级 (``"D"``/``"C"``/``"B"``/``"A"``/``"S"``/``"SS"``)。
     ship_stats:
         战后我方血量状态。
+    dropped_ship:
+        本节点掉落的舰船名称, 空字符串表示无掉落。
     """
 
-    mvp: int = 0
+    node: str = ''
+    mvp: int | None = None
     grade: str = ''
     ship_stats: list[ShipDamageState] = field(
         default_factory=lambda: [ShipDamageState.NORMAL] * 6,
     )
+    dropped_ship: str = ''
 
-    _GRADE_ORDER = ['D', 'C', 'B', 'A', 'S', 'SS']
+    _GRADE_ORDER: typing.ClassVar[list[str]] = ['D', 'C', 'B', 'A', 'S', 'SS']
 
     def __str__(self) -> str:
-        return f'MVP={self.mvp} 评价={self.grade}'
+        parts = []
+        if self.mvp is not None:
+            parts.append(f'MVP={self.mvp}')
+        if self.dropped_ship:
+            parts.append(f'掉落={self.dropped_ship}')
+        parts.append(f'评价={self.grade}')
+        return ' '.join(parts)
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, FightResult):
@@ -192,24 +209,44 @@ class CombatHistory:
         Returns
         -------
         dict[str, FightResult] | list[FightResult]
-            如果节点名为字母 → 按节点索引的字典。
-            否则 → 按顺序的列表。
+            如果节点名为字母 -> 按节点索引的字典。
+            否则 -> 按顺序的列表。
         """
+        fight_results = self._build_fight_results()
+
         results_dict: dict[str, FightResult] = {}
         results_list: list[FightResult] = []
-
-        for event in self.events:
-            if event.event_type != EventType.RESULT:
-                continue
-            # 尝试解析结果
-            fr = FightResult(grade=event.result)
-            if event.node and event.node.isalpha():
-                results_dict[event.node] = fr
+        for fr in fight_results:
+            if fr.node and fr.node.isalpha():
+                results_dict[fr.node] = fr
             else:
                 results_list.append(fr)
 
         results = results_list or results_dict
         _log.debug('[History] 提取战果: {} 条结算记录', len(results))
+        return results
+
+    def get_fight_results_list(self) -> list[FightResult]:
+        """提取所有战果结算信息 (始终返回列表)。"""
+        return self._build_fight_results()
+
+    def _build_fight_results(self) -> list[FightResult]:
+        """从事件列表构建 FightResult。"""
+        results: list[FightResult] = []
+        for i, event in enumerate(self.events):
+            if event.event_type != EventType.RESULT:
+                continue
+            fr = FightResult(
+                node=event.node,
+                grade=event.result,
+                ship_stats=(
+                    event.ship_stats[:] if event.ship_stats else [ShipDamageState.NORMAL] * 6
+                ),
+            )
+            # 查找紧邻的 GET_SHIP 事件
+            if i + 1 < len(self.events) and self.events[i + 1].event_type == EventType.GET_SHIP:
+                fr.dropped_ship = self.events[i + 1].result
+            results.append(fr)
         return results
 
     def __str__(self) -> str:
@@ -236,6 +273,14 @@ class CombatResult:
         战后血量状态。
     node_count:
         推进节点数。
+    loot_count:
+        战斗开始时今日已获取战利品数量 (仅常规战, 出征面板识别)。
+    ship_acquired_count:
+        战斗开始时今日已获取舰船数量 (仅常规战, 出征面板识别)。
+    fleet:
+        出击舰队 (含等级、血量等信息, 战斗准备页面识别)。
+    ship_full:
+        是否已获取满 500 船。
     """
 
     flag: ConditionFlag = ConditionFlag.FIGHT_END
@@ -244,3 +289,12 @@ class CombatResult:
         default_factory=lambda: [ShipDamageState.NORMAL] * 6,
     )
     node_count: int = 0
+    loot_count: int | None = None
+    ship_acquired_count: int | None = None
+    fleet: list[Ship] | None = None
+    ship_full: bool = False
+
+    @property
+    def fight_results(self) -> list[FightResult]:
+        """各节点战斗结算信息列表, 从 history 解析。"""
+        return self.history.get_fight_results_list()
