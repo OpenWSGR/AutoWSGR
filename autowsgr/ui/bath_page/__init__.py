@@ -1,7 +1,5 @@
 """浴室页面 UI 模块。
 
-将 bath_page 从单文件重构为 package，便于拆分页面控制与 OCR 识别逻辑。
-
 公开 API::
 
     from autowsgr.ui.bath_page import BathPage, RepairShipInfo
@@ -12,9 +10,15 @@ from .page import (
     RepairShipInfo,
 )
 from .recognition import recognize_repair_cards
+from .signatures import (
+    CHOOSE_REPAIR_OVERLAY_SIGNATURE,
+    PAGE_SIGNATURE,
+)
 
 
 __all__ = [
+    'CHOOSE_REPAIR_OVERLAY_SIGNATURE',
+    'PAGE_SIGNATURE',
     'BathPage',
     'RepairShipInfo',
     'recognize_repair_cards',

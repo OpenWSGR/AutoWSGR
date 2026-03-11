@@ -27,6 +27,8 @@ from .constants import (
 if TYPE_CHECKING:
     import numpy as np
 
+    from autowsgr.context.ship import Ship
+
 
 _log = get_logger('ui.preparation')
 
@@ -46,6 +48,39 @@ class FleetInfo:
     """槽位号 (0-5) → 等级，无法识别或无舰船则为 ``None``。"""
     ship_damage: dict[int, ShipDamageState] = field(default_factory=dict)
     """槽位号 (0-5) → 血量状态。"""
+
+    def to_ships(self, names: list[str | None] | None = None) -> list[Ship]:
+        """将舰队信息转换为 Ship 列表。
+
+        Parameters
+        ----------
+        names:
+            可选的舰船名称列表 (0-indexed, 与槽位对应)。
+            ``None`` 元素或缺少的索引将使用空字符串。
+
+        Returns
+        -------
+        list[Ship]
+            按槽位顺序排列，跳过无舰船的槽位。
+        """
+        from autowsgr.context.ship import Ship
+
+        ships: list[Ship] = []
+        for i in range(6):
+            damage = self.ship_damage.get(i, ShipDamageState.NORMAL)
+            if damage == ShipDamageState.NO_SHIP:
+                continue
+            name = ''
+            if names and i < len(names) and names[i] is not None:
+                name = names[i]
+            ships.append(
+                Ship(
+                    name=name,
+                    level=self.ship_levels.get(i) or 0,
+                    damage_state=damage,
+                )
+            )
+        return ships
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

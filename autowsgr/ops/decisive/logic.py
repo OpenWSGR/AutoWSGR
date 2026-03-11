@@ -15,6 +15,7 @@ from .config import MapData
 
 
 if TYPE_CHECKING:
+    from autowsgr.context import GameContext
     from autowsgr.infra import DecisiveConfig
 
     from .state import DecisiveState
@@ -57,11 +58,17 @@ class DecisiveLogic:
         决战运行状态（共享引用，只读取，不修改）。
     """
 
-    def __init__(self, config: DecisiveConfig, state: DecisiveState) -> None:
+    def __init__(
+        self,
+        config: DecisiveConfig,
+        state: DecisiveState,
+        ctx: GameContext | None = None,
+    ) -> None:
         self.config = config
         self.state = state
+        self._ctx = ctx
         self._level1_set = set(config.level1)
-        # level2_full = level1 ∪ level2 ∪ 增益技能
+        # level2_full = level1 + level2 + 增益技能
         self._level2_full = list({'长跑训练', '肌肉记忆', *config.level1, *config.level2, '黑科技'})
 
     # ── 战备舰队选择 ───────────────────────────────────────────────────
@@ -192,11 +199,11 @@ class DecisiveLogic:
         best: list[str] = ['']
         _log.debug('[决战] 当前舰船: {}', ships)
         for ship in self.config.level1:
-            if ship in ships and len(best) < 7:
+            if ship in ships and self._is_available(ship) and len(best) < 7:
                 best.append(ship)
 
         for ship in self.config.level2:
-            if ship in ships and ship not in best and len(best) < 7:
+            if ship in ships and ship not in best and self._is_available(ship) and len(best) < 7:
                 best.append(ship)
 
         for flag_ship in self.config.flagship_priority:
@@ -246,3 +253,11 @@ class DecisiveLogic:
         if ('U-1206' in self.state.fleet and anti_sub <= 1) or anti_sub <= 0:
             return Formation.wedge
         return Formation.double_column
+
+    # ── 内部辅助 ───────────────────────────────────────────────────────
+
+    def _is_available(self, name: str) -> bool:
+        """判断舰船是否可用 (有 ctx 时查注册表, 否则始终可用)。"""
+        if self._ctx is None:
+            return True
+        return self._ctx.is_ship_available(name)

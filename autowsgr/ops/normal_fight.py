@@ -20,6 +20,7 @@ from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel, RepairStrategy
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
+    from autowsgr.context.ship import Ship
 
 
 _log = get_logger('ops')
@@ -56,6 +57,7 @@ class NormalFightRunner:
         self._results: list[CombatResult] = []
         self._loot_count: int | None = None
         self._ship_acquired_count: int | None = None
+        self._fleet_ships: list[Ship] | None = None
 
     # ── 公共接口 ──
 
@@ -86,12 +88,24 @@ class NormalFightRunner:
         # 2. 出征准备
         ship_stats = self._prepare_for_battle()
 
+        # 同步战前信息到上下文
+        self._ctx.sync_before_combat(
+            self._fleet_id,
+            self._fleet_ships,
+            loot_count=self._loot_count,
+            ship_acquired_count=self._ship_acquired_count,
+        )
+
         # 3. 执行战斗
         result = self._do_combat(ship_stats)
 
-        # 赋值出征面板识别到的今日获取数量
+        # 赋值出征面板识别到的今日获取数量和舰队信息
         result.loot_count = self._loot_count
         result.ship_acquired_count = self._ship_acquired_count
+        result.fleet = self._fleet_ships
+
+        # 同步战后信息到上下文
+        self._ctx.sync_after_combat(self._fleet_id, result)
 
         # 4. 处理结果
         self._handle_result(result)
@@ -200,10 +214,10 @@ class NormalFightRunner:
         elif min_mode <= RepairMode.severe_damage.value:
             page.apply_repair(RepairStrategy.SEVERE)
 
-        # 检测战前血量
-        screen = self._ctrl.screenshot()
-        damage = page.detect_ship_damage(screen)
-        ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
+        # 检测战前舰队信息 (血量 + 等级)
+        fleet_info = page.detect_fleet_info()
+        ship_stats = [fleet_info.ship_damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
+        self._fleet_ships = fleet_info.to_ships(self._fleet)
 
         # 出征
         page.start_battle()

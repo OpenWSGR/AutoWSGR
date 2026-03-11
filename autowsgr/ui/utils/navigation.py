@@ -161,7 +161,7 @@ def wait_leave_page(
 
     deadline = time.monotonic() + timeout
     attempt = 0
-    _log.info('[UI] 等待离开: {} -> {} (超时 {:.1f}s)', source or '?', target or '?', timeout)
+    _log.debug('[UI] 等待离开: {} -> {} (超时 {:.1f}s)', source or '?', target or '?', timeout)
 
     while True:
         attempt += 1
@@ -169,7 +169,7 @@ def wait_leave_page(
 
         if not checker(screen):
             current = get_current_page(screen)
-            _log.info(
+            _log.debug(
                 '[UI] 已离开: {} -> {} (第 {} 次截图, 到达={})',
                 source or '?',
                 target or '?',

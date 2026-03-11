@@ -29,6 +29,17 @@ _log = get_logger('ops.decisive')
 
 
 class DecisivePhaseHandlers(DecisiveBase):
+    # ── 状态同步 ──────────────────────────────────────────────────────────
+
+    def _sync_ship_states(self) -> None:
+        """将 ship_stats 同步到 ctx.ship_registry。"""
+        for i, stat in enumerate(self._state.ship_stats):
+            idx = i + 1
+            if idx < len(self._state.fleet):
+                name = self._state.fleet[idx]
+                if name and stat != ShipDamageState.NO_SHIP:
+                    self._ctx.update_ship_damage(name, stat)
+
     """决战阶段处理器子类。
 
     包含所有 ``_handle_<phase>`` 方法:
@@ -214,6 +225,7 @@ class DecisivePhaseHandlers(DecisiveBase):
             for i, name in enumerate(fleet):
                 if i < 6:
                     self._state.fleet[i + 1] = name or ''
+            self._sync_ship_states()
             self._resume_mode = False  # 扫描完成后退出恢复模式
 
         if self._state.node == 'A' and not self._map.is_skill_used():
@@ -246,6 +258,7 @@ class DecisivePhaseHandlers(DecisiveBase):
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
         self._state.ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
+        self._sync_ship_states()
 
         page.start_battle()
         time.sleep(1.0)
@@ -273,6 +286,7 @@ class DecisivePhaseHandlers(DecisiveBase):
             ship_stats=self._state.ship_stats[:],
         )
         self._state.ship_stats = result.ship_stats[:]
+        self._sync_ship_states()
         _log.info(
             '[决战] 战斗结束: {} (节点 {} 血量 {})',
             result.flag.value,
