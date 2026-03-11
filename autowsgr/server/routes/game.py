@@ -38,9 +38,11 @@ async def game_acquisition():
     if task_manager.is_running:
         raise HTTPException(status_code=409, detail='任务执行中，无法查询获取数量')
 
+    from autowsgr.ops.navigate import goto_page
     from autowsgr.ui.map.page import MapPage
 
     def _recognize() -> dict[str, int | None]:
+        goto_page(ctx, '地图页面')
         map_page = MapPage(ctx)
         counts = map_page.get_acquisition_counts()
         return {
