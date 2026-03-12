@@ -165,23 +165,23 @@ class SortiePanelMixin(BaseMapPage):
 
     def navigate_to_map(self, map_num: int | str, max_attempts: int = 10) -> bool:
         """通过 OCR 识别当前地图编号并左右翻页至目标。
-        
+
         每次翻页后重新识别，应对模拟器卡顿。
-        
+
         Parameters
         ----------
         map_num:
             目标地图编号。
         max_attempts:
             最大尝试次数。
-            
+
         Returns
         -------
         bool
             是否成功到达目标地图。
         """
         map_num = int(map_num)
-        
+
         for attempt in range(max_attempts):
             screen = self._ctrl.screenshot()
             info = self.recognize_map(screen, self._ocr)
@@ -189,12 +189,12 @@ class SortiePanelMixin(BaseMapPage):
                 _log.debug('[UI] 地图识别失败 (第 {} 次尝试)', attempt + 1)
                 time.sleep(0.5)
                 continue
-            
+
             current_map = info.map_num
             if current_map == map_num:
                 _log.info('[UI] 已到达目标地图: {}-{}', info.chapter, map_num)
                 return True
-            
+
             # 计算并执行翻页
             delta = map_num - current_map
             if delta > 0:
@@ -203,10 +203,12 @@ class SortiePanelMixin(BaseMapPage):
             else:
                 _log.debug('[UI] 向左翻页 (当前: {}, 目标: {})', current_map, map_num)
                 self._ctrl.click(*CLICK_MAP_PREV)
-            
+
             time.sleep(0.5)  # 增加延迟应对模拟器卡顿
-        
-        _log.warning('[UI] 地图导航超时: 超过最大尝试次数 ({}), 目标地图: {}', max_attempts, map_num)
+
+        _log.warning(
+            '[UI] 地图导航超时: 超过最大尝试次数 ({}), 目标地图: {}', max_attempts, map_num
+        )
         return False
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -309,6 +311,7 @@ class SortiePanelMixin(BaseMapPage):
         # 3. 切换到指定地图节点
         if not self.navigate_to_map(map_num):
             from autowsgr.ui.utils import NavigationError
+
             raise NavigationError(
                 f'无法导航到地图 {map_num}',
                 screen=self._ctrl.screenshot(),
