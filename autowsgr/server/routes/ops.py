@@ -220,9 +220,7 @@ async def repair_ship(request: RepairShipRequest):
     from autowsgr.ops.repair import repair_ship_by_name
 
     try:
-        repair_secs = await asyncio.to_thread(
-            repair_ship_by_name, ctx, request.ship_name
-        )
+        repair_secs = await asyncio.to_thread(repair_ship_by_name, ctx, request.ship_name)
         if repair_secs < 0:
             return ApiResponse(
                 success=False,
