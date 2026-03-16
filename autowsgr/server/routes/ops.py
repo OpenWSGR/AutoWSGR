@@ -197,6 +197,47 @@ async def repair_bath():
         return ApiResponse(success=False, error=str(e))
 
 
+class RepairShipRequest(BaseModel):
+    """按舰船名泡澡修理请求。"""
+
+    ship_name: str
+
+
+@router.post('/api/repair/ship', response_model=ApiResponse)
+async def repair_ship(request: RepairShipRequest):
+    """使用浴室修理指定名称的舰船。
+
+    前端泡澡修理系统调用此端点，将指定舰船送入浴室修理。
+    后端会导航到浴室页面，打开选择修理 overlay，查找并点击指定舰船。
+    """
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    _require_idle()
+
+    from autowsgr.ops.repair import repair_ship_by_name
+
+    try:
+        repair_secs = await asyncio.to_thread(
+            repair_ship_by_name, ctx, request.ship_name
+        )
+        if repair_secs < 0:
+            return ApiResponse(
+                success=False,
+                error=f'浴场已满，无法修理 {request.ship_name}',
+            )
+        return ApiResponse(
+            success=True,
+            data={'ship_name': request.ship_name, 'repair_seconds': repair_secs},
+            message=f'{request.ship_name} 已送入泡澡修理 ({repair_secs}s)',
+        )
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 泡澡修理失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
+
+
 # ── 解装 / 解体 ──
 
 
