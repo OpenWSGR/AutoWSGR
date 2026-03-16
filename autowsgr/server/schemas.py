@@ -176,6 +176,10 @@ class DecisiveRequest(BaseModel):
         default_factory=lambda: ['U-1206'],
         description='旗舰优先级',
     )
+    use_quick_repair: bool = Field(
+        default=True,
+        description='是否启用快修（桶修），关闭后不修理受损舰船',
+    )
 
     model_config = {'extra': 'forbid'}
 

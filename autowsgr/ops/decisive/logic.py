@@ -146,6 +146,8 @@ class DecisiveLogic:
 
     def should_repair(self) -> bool:
         """根据修理等级判断是否需要修理。"""
+        if not self.config.use_quick_repair:
+            return False
         return any(
             status >= self.config.repair_level for status in self.state.ship_stats if status > 0
         )

@@ -251,7 +251,9 @@ class DecisivePhaseHandlers(DecisiveBase):
             self._state.fleet = best_fleet
 
         strategy = (
-            RepairStrategy.MODERATE if self._config.repair_level <= 1 else RepairStrategy.SEVERE
+            RepairStrategy.NEVER if not self._config.use_quick_repair
+            else RepairStrategy.MODERATE if self._config.repair_level <= 1
+            else RepairStrategy.SEVERE
         )
         page.apply_repair(strategy)
 
