@@ -266,6 +266,7 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
             level1=request.level1,
             level2=request.level2,
             flagship_priority=request.flagship_priority,
+            use_quick_repair=request.use_quick_repair,
         )
 
         controller = DecisiveController(ctx, config)

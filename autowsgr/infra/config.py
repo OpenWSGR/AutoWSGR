@@ -474,6 +474,8 @@ class DecisiveConfig:
     full_destroy: bool = False
     destroy_ship_types: list[ShipType] = field(default_factory=list)
     """解装时指定的舰种列表。空列表 = 不过滤，全部解装。"""
+    use_quick_repair: bool = True
+    """是否启用快修（桶修），关闭后不修理受损舰船。"""
 
 
 # ── ConfigManager ──
