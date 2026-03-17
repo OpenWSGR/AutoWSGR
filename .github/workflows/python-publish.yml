@@ -19,6 +19,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.repository == 'OpenWSGR/AutoWSGR'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6

@@ -66,12 +66,26 @@ class LootShipCount:
 _FRACTION_RE = re.compile(r'(\d+)\s*[/|]\s*(\d+)')
 """匹配 "X/Y" 格式的正则 (兼容 OCR 把 / 识别为 | 的情况)。"""
 
+_KNOWN_DENOMS = (500, 50)
+"""已知分母值, 用于 OCR 将 ``/`` 误识为 ``1`` 时的回退解析 (长的优先匹配)。"""
+
 
 def _parse_fraction(text: str) -> tuple[int, int] | None:
     """解析 ``"123/500"`` 格式文本, 返回 ``(numerator, denominator)``。"""
     m = _FRACTION_RE.search(text)
     if m:
         return int(m.group(1)), int(m.group(2))
+
+    # 回退: OCR 有时将 '/' 误识为 '1', 导致纯数字串如 "17150" (实为 "17/50")。
+    # 尝试去掉已知分母前的多余 '1' 来还原。
+    digits = ''.join(c for c in text if c.isdigit())
+    if digits:
+        for denom in _KNOWN_DENOMS:
+            suffix = '1' + str(denom)
+            if digits.endswith(suffix) and len(digits) > len(suffix):
+                numerator = int(digits[: -len(suffix)])
+                if numerator >= 0 and numerator <= denom:
+                    return numerator, denom
     return None
 
 
