@@ -50,4 +50,5 @@ class DecisiveState:
 
     def is_begin(self) -> bool:
         """是否在第一小关第一节点。"""
-        return self.stage <= 1 and self.node == 'A'
+        # 如果在第一关且是未知节点，仍返回True，以防不选船导致无法推进
+        return self.stage <= 1 and (self.node == 'A' or self.node == 'U')

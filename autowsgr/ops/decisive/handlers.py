@@ -214,8 +214,9 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._has_chosen_fleet,
             )
 
-        # 先使用技能，再注册舰船
-        if self._state.node == 'A' and not self._map.is_skill_used():
+        # 先使用技能，再注册舰船，如果是未知节点，也判定一下技能是否使用
+        current_node = self._state.node
+        if (current_node == 'A' or current_node == 'U') and not self._map.is_skill_used():
             gained = self._map.use_skill()
             if gained:
                 _log.info('[决战] 使用技能获得: {}', gained)

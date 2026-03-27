@@ -132,6 +132,7 @@ decisive_battle:
     - U-96
     - U-1206
   repair_level: 1                  # 维修策略 (1=中破修, 2=大破修)
+  use_quick_repair: true           # 是否启用快修（桶修），关闭后不修理受损舰船。
   full_destroy: false              # 船舱满了是否解装舰船
   useful_skill: false              # 充分利用技能
   useful_skill_strict: false       # 严格利用技能 (useful_skill 为 true 时才生效)
