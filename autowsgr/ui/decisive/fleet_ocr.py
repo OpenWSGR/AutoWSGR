@@ -135,7 +135,7 @@ def use_skill(
     ship_area = ROI(x1=0.26, y1=0.685, x2=0.74, y2=0.715)
 
     ctrl.click(*skill_pos)
-    time.sleep(0.5)
+    time.sleep(1.0)
 
     screen = ctrl.screenshot()
     crop = ship_area.crop(screen)

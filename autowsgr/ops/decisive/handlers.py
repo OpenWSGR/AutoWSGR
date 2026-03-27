@@ -250,6 +250,7 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         current_fleet = self._state.fleet[:]
         if current_fleet != best_fleet:
+            time.sleep(0.5)  # 等待进入出征准备页面
             page.change_fleet(None, best_fleet[1:])
             self._state.fleet = best_fleet
         else:

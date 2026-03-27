@@ -29,6 +29,9 @@ class DecisivePanelMixin(BaseMapPage):
 
         _log.info('[UI] 地图页面 → 决战页面')
 
+        # 0. 等待一下，确保地图页面加载完成
+        time.sleep(0.5)
+
         # 1. 确保在决战面板
         self.ensure_panel(MapPanel.DECISIVE)
         time.sleep(0.5)
