@@ -201,11 +201,11 @@ class DecisiveLogic:
         best: list[str] = ['']
         _log.debug('[决战] 当前舰船: {}', ships)
         for ship in self.config.level1:
-            if ship in ships and self._is_available(ship) and len(best) < 7:
+            if ship in ships and self._is_available(ship) and len(best) <= 7:
                 best.append(ship)
 
         for ship in self.config.level2:
-            if ship in ships and ship not in best and self._is_available(ship) and len(best) < 7:
+            if ship in ships and ship not in best and self._is_available(ship) and len(best) <= 7:
                 best.append(ship)
 
         for flag_ship in self.config.flagship_priority:
@@ -214,7 +214,7 @@ class DecisiveLogic:
                 best[idx], best[1] = best[1], best[idx]
                 break
 
-        while len(best) < 7:
+        while len(best) <= 7:
             best.append('')
 
         _log.debug('[决战] 最优编队: {}', best)

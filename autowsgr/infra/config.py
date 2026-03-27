@@ -228,6 +228,8 @@ class DecisiveConfig(BaseModel):
     """旗舰优先级队列"""
     repair_level: int = 1
     """维修策略 (1=中破修, 2=大破修)"""
+    use_quick_repair: bool = True
+    """是否使用快修"""
     full_destroy: bool = False
     """船舱满了是否解装舰船"""
     useful_skill: bool = False
