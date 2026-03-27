@@ -13,11 +13,11 @@ from autowsgr.constants import DECISIVE_SKILL_NAMES, update_shipnames
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
-
+from autowsgr.infra import DecisiveConfig
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
-    from autowsgr.infra import DecisiveConfig
+
 
 
 class DecisiveBase:
@@ -52,19 +52,25 @@ class DecisiveBase:
     ) -> None:
         self._ctx = ctx
         self._ctrl = ctx.ctrl
-        self._config = config
+        # 合并配置：传入的 config 覆盖 ctx.config，未指定的字段使用 ctx.config 的值
+        merged_config_dict = {
+            **ctx.config.decisive_battle.model_dump(),
+            **config.model_dump(exclude_unset=True),
+        }
+        merged_config = DecisiveConfig(**merged_config_dict)
+        self._config = merged_config
         self._ocr = ctx.ocr
 
         # 将决战配置中的舰船名 + 技能名合并到全局 SHIPNAMES，
         # 后续 OCR 识别无需再临时拼接候选列表。
-        update_shipnames(config.level1 + config.level2 + DECISIVE_SKILL_NAMES)
+        update_shipnames(merged_config.level1 + merged_config.level2 + DECISIVE_SKILL_NAMES)
 
-        self._state = DecisiveState(chapter=config.chapter)
-        self._logic = DecisiveLogic(config, self._state, ctx=ctx)
+        self._state = DecisiveState(chapter=merged_config.chapter)
+        self._logic = DecisiveLogic(merged_config, self._state, ctx=ctx)
         self._battle_page = DecisiveBattlePage(self._ctx, ocr=self._ocr)
         self._map = DecisiveMapController(
             ctx,
-            config,
+            merged_config,
         )
         self._resume_mode: bool = False
         self._has_chosen_fleet: bool = False
