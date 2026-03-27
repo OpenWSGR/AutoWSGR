@@ -207,11 +207,10 @@ class DecisiveLogic:
                 )
                 return False
             # 检查是否在 level2 列表中
-            all_ships = self.config.level1 + self.config.level2
-            return ship in all_ships
+            return ship in self._level2_full
 
         # 多艘船：检查 level1 舰船是否占一半以上
-        useful_ships = set(gained) & set(self.config.level1)
+        useful_ships = set(gained) & self._level1_set
         return len(useful_ships) >= len(gained) / 2
 
     # ── 编队计算 ───────────────────────────────────────────────────────
