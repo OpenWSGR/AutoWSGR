@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import datetime
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -210,7 +209,7 @@ class DailyAutomationConfig(BaseModel):
     """获取当天上限 50 胖次后终止"""
 
 
-class DecisiveBattleConfig(BaseModel):
+class DecisiveConfig(BaseModel):
     """决战自动化配置。"""
 
     model_config = {'frozen': True}
@@ -232,9 +231,9 @@ class DecisiveBattleConfig(BaseModel):
     full_destroy: bool = False
     """船舱满了是否解装舰船"""
     useful_skill: bool = False
-    """充分利用技能"""
+    """充分利用技能, 开启时要求地图1必须为Lv1+Lv2中的船; 其余地图至少一半的船为Lv1中的船"""
     useful_skill_strict: bool = False
-    """严格利用技能"""
+    """严格利用技能, 开启时要求地图1技能不能获取+1的船; useful_skill为True时本设置才生效"""
 
     @field_validator('chapter')
     @classmethod
@@ -258,7 +257,7 @@ class UserConfig(BaseModel):
     ocr: OCRConfig = Field(default_factory=OCRConfig)
     log: LogConfig = Field(default_factory=LogConfig)
     daily_automation: DailyAutomationConfig | None = None
-    decisive_battle: DecisiveBattleConfig | None = None
+    decisive_battle: DecisiveConfig | None = None
 
     # 系统（自动检测）
     os_type: OSType = Field(default_factory=OSType.auto)
@@ -444,42 +443,6 @@ class ExerciseConfig(FightConfig):
     """是否打机器人"""
     max_refresh_times: int = 2
     """最大刷新次数"""
-
-
-@dataclass
-class DecisiveConfig:
-    """决战控制器配置。
-
-    Parameters
-    ----------
-    chapter:
-        目标章节 (4-6)。
-    level1:
-        一级优先舰船 (核心编队成员)。
-    level2:
-        二级舰船 (补充编队 + 增益技能)。
-    flagship_priority:
-        旗舰优先级列表，按优先级排列。
-    repair_level:
-        修理等级 (1=中破修, 2=大破修)。
-    full_destroy:
-        船舱满时是否自动解装。
-    """
-
-    chapter: int = 6
-    level1: list[str] = field(default_factory=list)
-    level2: list[str] = field(default_factory=list)
-    flagship_priority: list[str] = field(default_factory=list)
-    repair_level: int = 2
-    full_destroy: bool = False
-    destroy_ship_types: list[ShipType] = field(default_factory=list)
-    """解装时指定的舰种列表。空列表 = 不过滤，全部解装。"""
-    use_quick_repair: bool = True
-    """是否启用快修（桶修），关闭后不修理受损舰船。"""
-    useful_skill: bool = True
-    """充分利用技能, 开启时要求地图1必须为Lv1+Lv2中的船; 其余地图至少一半的船为Lv1中的船"""
-    useful_skill_strict: bool = False
-    """严格利用技能, 开启时要求地图1技能不能获取+1的船; useful_skill为True时本设置才生效"""
 
 
 # ── ConfigManager ──

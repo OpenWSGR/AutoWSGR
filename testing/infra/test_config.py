@@ -7,7 +7,7 @@ import pytest
 from autowsgr.infra import (
     BattleConfig,
     ConfigManager,
-    DecisiveBattleConfig,
+    DecisiveConfig,
     EmulatorConfig,
     FightConfig,
     UserConfig,
@@ -32,10 +32,10 @@ class TestEmulatorConfig:
 # ── DecisiveBattleConfig ──
 
 
-class TestDecisiveBattleConfig:
+class TestDecisiveConfig:
     def test_invalid_chapter(self):
         with pytest.raises(Exception):
-            DecisiveBattleConfig(chapter=0)
+            DecisiveConfig(chapter=0)
 
 
 # ── UserConfig ──
