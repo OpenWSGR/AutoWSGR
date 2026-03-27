@@ -10,14 +10,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.constants import DECISIVE_SKILL_NAMES, update_shipnames
+from autowsgr.infra import DecisiveConfig
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
-from autowsgr.infra import DecisiveConfig
+
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
-
 
 
 class DecisiveBase:
