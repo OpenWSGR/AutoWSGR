@@ -50,4 +50,5 @@ class DecisiveState:
 
     def is_begin(self) -> bool:
         """是否在第一小关第一节点。"""
-        return self.stage <= 1 and self.node == 'A'
+        # 第一关第一节点或未知节点
+        return self.stage <= 1 and (self.node == 'A' or self.node == 'U')

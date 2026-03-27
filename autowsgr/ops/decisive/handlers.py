@@ -215,7 +215,7 @@ class DecisivePhaseHandlers(DecisiveBase):
             )
 
         # 先使用技能，再注册舰船
-        if self._state.node == 'A' and not self._map.is_skill_used():
+        if (self._state.node == 'A' or self._state.node == 'U') and not self._map.is_skill_used():
             gained = self._map.use_skill()
             if gained:
                 if self._config.useful_skill and not self._logic.check_useful_skill(gained):
