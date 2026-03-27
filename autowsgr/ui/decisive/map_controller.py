@@ -368,6 +368,7 @@ class DecisiveMapController:
         _log.info('[地图控制器] 扫描当前编队与可用舰船')
 
         self.enter_formation()
+        time.sleep(0.5)
         page = DecisiveBattlePreparationPage(self._ctx, self._config, self._ocr)
 
         screen = self._ctrl.screenshot()
