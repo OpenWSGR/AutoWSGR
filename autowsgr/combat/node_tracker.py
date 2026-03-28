@@ -325,7 +325,9 @@ class NodeTracker:
         return (cx_abs / w, cy_abs / h)
 
     def is_spot_page(self, screen):
-        return CombatRecognizer.identify_current(screen, [CombatPhase.SPOT_ENEMY_SUCCESS]) is not None
+        return (
+            CombatRecognizer.identify_current(screen, [CombatPhase.SPOT_ENEMY_SUCCESS]) is not None
+        )
 
     def update_ship_position(self, screen) -> tuple[float, float] | None:
         """在战斗移动界面检测黄色小船图标的位置。
