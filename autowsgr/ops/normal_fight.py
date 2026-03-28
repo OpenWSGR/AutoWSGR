@@ -197,7 +197,7 @@ class NormalFightRunner:
             or ord(last_point.upper()) > ord('Z')
             or ord(last_point.upper()) < ord('A')
         ):
-            raise ValueError(f"最后一个节点: {last_point}, 不合法, 应为A到Z的字母")
+            raise ValueError(f'最后一个节点: {last_point}, 不合法, 应为A到Z的字母')
 
         result_list = ['D', 'C', 'B', 'A', 'S', 'SS']
         target_result_index = result_list.index(result.upper())
@@ -223,8 +223,7 @@ class NormalFightRunner:
             fight_result_index = result_list.index(last_result.grade)
             # 检查是否满足条件
             finish = (
-                last_result.node == last_point.upper()
-                and fight_result_index >= target_result_index
+                last_result.node == last_point.upper() and fight_result_index >= target_result_index
             )
 
             if not finish:
@@ -364,12 +363,14 @@ class NormalFightRunner:
 # 便捷函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def get_normal_fight_plan(yaml_path: str) -> CombatPlan:
     """从 YAML 文件加载常规战计划。"""
     from autowsgr.infra.file_utils import resolve_plan_path
 
     resolved = resolve_plan_path(yaml_path, category='normal_fight')
     return CombatPlan.from_yaml(resolved)
+
 
 def run_normal_fight(
     ctx: GameContext,
