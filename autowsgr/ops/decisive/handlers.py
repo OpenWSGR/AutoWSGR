@@ -219,6 +219,10 @@ class DecisivePhaseHandlers(DecisiveBase):
         if (current_node == 'A' or current_node == 'U') and not self._map.is_skill_used():
             gained = self._map.use_skill()
             if gained:
+                if self._config.useful_skill and not self._logic.check_useful_skill(gained):
+                    _log.info('[决战] 技能获得: {}, 效果不佳，撤退重试', gained)
+                    self._state.phase = DecisivePhase.RETREAT
+                    return
                 _log.info('[决战] 使用技能获得: {}', gained)
                 self._state.ships.update(gained)
 

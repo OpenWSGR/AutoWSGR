@@ -187,6 +187,32 @@ class DecisiveLogic:
             node,
         )
 
+    def check_useful_skill(self, gained: list[str]) -> bool:
+        """充分利用技能, 要求地图1必须为Lv1+Lv2中的船; 其余地图至少一半的船为Lv1中的船。
+        严格利用技能, 开启时要求地图1技能不能获取+1的船;
+
+        Parameters
+        ----------
+        gained:
+            技能获得的舰船列表
+        """
+        if len(gained) == 1:
+            ship = gained[0]
+            # 严格模式下检查重复舰船
+            if self.config.useful_skill_strict and ship in self.state.ships:
+                _log.info(
+                    '[决战] 处于严格模式，获取到重复舰船：{}, 舰队{}',
+                    ship,
+                    self.state.ships,
+                )
+                return False
+            # 检查是否在 level2 列表中
+            return ship in self._level2_full
+
+        # 多艘船：检查 level1 舰船是否占一半以上
+        useful_ships = set(gained) & self._level1_set
+        return len(useful_ships) >= len(gained) / 2
+
     # ── 编队计算 ───────────────────────────────────────────────────────
 
     def get_best_fleet(self) -> list[str]:
