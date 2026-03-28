@@ -154,6 +154,98 @@ class NormalFightRunner:
         )
         return self._results
 
+    def run_for_times_condition(
+        self,
+        times: int,
+        last_point: str,
+        *,
+        result: str = 'S',
+        insist_time: float = 900.0,
+    ) -> list[CombatResult] | bool:
+        """有战果要求的多次运行。
+
+        循环执行战斗直到满足预设条件。如果最后一个节点的战果未达到要求，
+        此次战斗不计入次数。超过指定时间仍未完成则返回 False。
+
+        Parameters
+        ----------
+        times:
+            需要完成的次数。
+        last_point:
+            最后一个节点（如 "A"、"B" 等）。
+        result:
+            战果要求（"S"、"A"、"B"、"C"、"D"、"SS"），默认为 "S"。
+        insist_time:
+            超时时间（秒）。如果超过这个时间仍未完成则返回 False，默认为 900 秒。
+
+        Returns
+        -------
+        list[CombatResult] | bool
+            成功时返回战斗结果列表，超时返回 False。
+
+        Raises
+        ------
+        ValueError:
+            result 或 last_point 值不合法。
+        """
+        if result.upper() not in ['SS', 'S', 'A', 'B', 'C', 'D']:
+            raise ValueError(
+                f"战果要求: {result}, 不合法, 应为 'SS','S','A','B','C' 或 'D'",
+            )
+        if (
+            len(last_point) != 1
+            or ord(last_point.upper()) > ord('Z')
+            or ord(last_point.upper()) < ord('A')
+        ):
+            raise ValueError(f"最后一个节点: {last_point}, 不合法, 应为A到Z的字母")
+
+        result_list = ['D', 'C', 'B', 'A', 'S', 'SS']
+        target_result_index = result_list.index(result.upper())
+        start_time = time.time()
+        self._results = []
+
+        while times > 0:
+            _log.info('[OPS] 条件战斗，剩余次数：{}', times)
+            r = self.run()
+            self._results.append(r)
+
+            if r.flag == ConditionFlag.DOCK_FULL:
+                _log.error('[OPS] 条件战斗，船坞已满，无法继续')
+                return self._results
+
+            # 获取最后一个节点的战果
+            fight_results = r.fight_results
+            if not fight_results:
+                _log.warning('[OPS] 条件战斗，未获取到有效战果')
+                continue
+
+            last_result = fight_results[-1]
+            fight_result_index = result_list.index(last_result.grade)
+            # 检查是否满足条件
+            finish = (
+                last_result.node == last_point.upper()
+                and fight_result_index >= target_result_index
+            )
+
+            if not finish:
+                _log.info(
+                    '[OPS] 不满足预设条件 (节点={}, 战果={}), 此次战斗不计入次数，剩余次数: {}',
+                    last_result.node,
+                    last_result.grade,
+                    times,
+                )
+                if time.time() - start_time > insist_time:
+                    return False
+            else:
+                start_time = time.time()
+                times -= 1
+                _log.info(
+                    '[OPS] 完成了一次满足预设条件的战斗，剩余次数: {}',
+                    times,
+                )
+
+        return self._results
+
     # ── 进入地图 ──
 
     def _enter_fight(self) -> None:
@@ -272,6 +364,12 @@ class NormalFightRunner:
 # 便捷函数
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def get_normal_fight_plan(yaml_path: str) -> CombatPlan:
+    """从 YAML 文件加载常规战计划。"""
+    from autowsgr.infra.file_utils import resolve_plan_path
+
+    resolved = resolve_plan_path(yaml_path, category='normal_fight')
+    return CombatPlan.from_yaml(resolved)
 
 def run_normal_fight(
     ctx: GameContext,
@@ -308,8 +406,5 @@ def run_normal_fight_from_yaml(
     - 策略名称 (如 ``"7-4千伪"``): 自动在 ``autowsgr/data/plan/normal_fight/``
       包数据目录中查找，可省略 ``.yaml`` 后缀。
     """
-    from autowsgr.infra.file_utils import resolve_plan_path
-
-    resolved = resolve_plan_path(yaml_path, category='normal_fight')
-    plan = CombatPlan.from_yaml(resolved)
+    plan = get_normal_fight_plan(yaml_path)
     return run_normal_fight(ctx, plan, times=times, fleet_id=fleet_id, fleet=fleet)
