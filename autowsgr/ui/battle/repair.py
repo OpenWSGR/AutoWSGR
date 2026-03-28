@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import time
 
+from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 from autowsgr.ui.battle.base import BaseBattlePreparation, RepairStrategy
@@ -80,6 +81,8 @@ class RepairMixin(BaseBattlePreparation):
                 positions.append(slot)
 
         if positions:
+            if self._ctx.config.repair_manually:
+                raise ActionFailedError('需要进行手动修理')
             self.repair_slots(positions)
             _log.info('[UI] 修理位置: {} (策略: {})', positions, strategy.value)
         return positions
