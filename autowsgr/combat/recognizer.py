@@ -221,16 +221,16 @@ class CombatRecognizer:
         """检查截图是否匹配像素特征签名（支持单签名或组合签名）。"""
         return PixelChecker.check_signature(screen, sig).matched
 
+    @staticmethod
     def _match_phase(
-        self,
         screen: np.ndarray,
         sig: PhaseSignature,
     ) -> bool:
         """检查截图是否匹配指定状态的视觉签名（模板或像素）。"""
         if sig.template_key is not None:
-            return self._match_template(screen, sig.template_key, sig.confidence)
+            return CombatRecognizer._match_template(screen, sig.template_key, sig.confidence)
         if sig.pixel_signature is not None:
-            return self._match_pixel(screen, sig.pixel_signature)
+            return CombatRecognizer._match_pixel(screen, sig.pixel_signature)
         return False
 
     @staticmethod
@@ -305,8 +305,8 @@ class CombatRecognizer:
         phase_names = [p.name for p, _ in phase_sigs]
         raise CombatRecognitionTimeout(f'等待状态超时 ({max_timeout:.1f}s): {phase_names}')
 
+    @staticmethod
     def identify_current(
-        self,
         screen: np.ndarray,
         candidates: list[CombatPhase],
     ) -> CombatPhase | None:
@@ -325,10 +325,10 @@ class CombatRecognizer:
             匹配到的状态，或 ``None``。
         """
         for phase in candidates:
-            sig = self.get_signature(phase)
+            sig = CombatRecognizer.get_signature(phase)
             if sig.template_key is None and sig.pixel_signature is None:
                 continue
-            if self._match_phase(screen, sig):
+            if CombatRecognizer._match_phase(screen, sig):
                 return phase
         return None
 

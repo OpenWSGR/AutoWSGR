@@ -22,6 +22,8 @@ from typing import Any
 import cv2
 import numpy as np
 
+from autowsgr.combat.recognizer import CombatRecognizer
+from autowsgr.combat.state import CombatPhase
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
     MatchStrategy,
@@ -322,6 +324,9 @@ class NodeTracker:
         cx_abs, cy_abs = centroids[best_label]
         return (cx_abs / w, cy_abs / h)
 
+    def is_spot_page(self, screen):
+        return CombatRecognizer.identify_current(screen, [CombatPhase.SPOT_ENEMY_SUCCESS]) is not None
+
     def update_ship_position(self, screen) -> tuple[float, float] | None:
         """在战斗移动界面检测黄色小船图标的位置。
         Returns
@@ -329,6 +334,13 @@ class NodeTracker:
         tuple[float, float] | None
             检测到的相对坐标 ``(x, y)``；未检测到或像素验证失败返回 ``None``。
         """
+        # 检查是否为索敌页面，如果是索敌页面，则返回None
+        if self.is_spot_page(screen):
+            _log.debug(
+                '[NodeTracker] 检测到是索敌页面，不更新位置',
+            )
+            return None
+
         center = self._find_yellow_cluster(screen)
         if center is None:
             return None
