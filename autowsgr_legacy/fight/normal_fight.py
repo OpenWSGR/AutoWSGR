@@ -525,7 +525,7 @@ class NormalFightPlan(FightPlan):
 
             time.sleep(0.15)
             self._move_chapter(target_chapter, now_chapter)
-        except:
+        except Exception:
             self.logger.warning(
                 f'切换章节失败 target_chapter: {target_chapter}   now: {now_chapter}',
             )
@@ -599,7 +599,7 @@ class NormalFightPlan(FightPlan):
                             "after 'move map' operation but the chapter do not move",
                         )
                     time.sleep(0.15)
-        except:
+        except Exception:
             if self.timer.process_bad_network():
                 self._move_map(target_map, chapter)
             elif retry_times > 0:
@@ -608,7 +608,7 @@ class NormalFightPlan(FightPlan):
                 )
                 self._move_map(target_map, chapter, retry_times - 1)
             else:
-                self.timer.logger.error(
+                self.timer.logger.exception(
                     f'切换地图失败, 目标: {target_map}, 当前: {now_map}, 重试失败',
                 )
                 raise ImageNotFoundErr(

@@ -91,7 +91,7 @@ class EventFightPlan20230927(Event, NormalFightPlan):
         self.timer.click(850, 490)
         try:
             self.timer.wait_pages('fight_prepare_page', after_wait=0.15)
-        except:
+        except Exception:
             self.timer.logger.warning('匹配战斗准备页面失败，尝试重新匹配')
             self.timer.go_main_page()
             self._go_map_page()

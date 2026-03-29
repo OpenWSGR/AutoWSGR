@@ -240,7 +240,7 @@ class Timer(AndroidController):
                 self.everyday_check = False
             self.go_main_page()
             self.logger.info('游戏启动成功!')
-        except:
+        except Exception:
             raise CriticalErr('fail to start game')
 
     def restart(self, times=0, *args, **kwargs):

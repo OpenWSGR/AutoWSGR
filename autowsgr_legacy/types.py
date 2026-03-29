@@ -144,7 +144,7 @@ class EmulatorType(StrEnum):
                             return os.path.join(
                                 os.path.dirname(path), 'shell', 'MuMuPlayer.exe'
                             ).strip('"')
-                    except:
+                    except Exception:
                         with winreg.OpenKey(
                             winreg.HKEY_LOCAL_MACHINE,
                             r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer',

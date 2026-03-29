@@ -63,7 +63,7 @@ class OSController(Protocol):
                 self.logger.info('Android Connected!')
                 return dev
             except (AdbError, DeviceConnectionError):
-                self.logger.error('Adb 连接模拟器失败, 正在清除原有连接并重试')
+                self.logger.exception('Adb 连接模拟器失败, 正在清除原有连接并重试')
                 from airtest.core.android.adb import ADB
 
                 adb = ADB().get_adb_path()
@@ -298,8 +298,8 @@ class MacController(OSController):
         tempStr = output.decode()
         try:
             return json.loads(tempStr)
-        except Exception as e:
-            self.logger.error(f'{cmd} {e}')
+        except Exception:
+            self.logger.exception(f'{cmd}')
         return {}
 
 
@@ -382,8 +382,8 @@ class LinuxController(OSController):
                 text=True,
                 check=True,
             )
-        except Exception as e:
-            self.logger.error(f'adb devices 失败: {e}')
+        except Exception:
+            self.logger.exception('adb devices 失败')
             return []
 
         devices = []

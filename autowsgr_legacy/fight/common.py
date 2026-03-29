@@ -3,7 +3,7 @@ import time
 from typing import Protocol
 
 from autowsgr.configs import NodeConfig
-from autowsgr.constants.custom_exceptions import ImageNotFoundErr, NetworkErr
+from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, NetworkErr
 from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.other_constants import ALL_SHIP_TYPES
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
@@ -396,7 +396,7 @@ class FightPlan(Protocol):
         else:
             self.logger.error('无法进入战斗, 原因未知! 屏幕状态已记录')
             self.timer.log_screen()
-            raise BaseException(str(time.time()) + 'enter fight error')
+            raise CriticalErr(str(time.time()) + 'enter fight error')
 
         # 战斗中逻辑
         return self.fight()
@@ -793,4 +793,4 @@ class DecisionBlock:
             get_ship(self.timer)
             return None, ConditionFlag.FIGHT_CONTINUE
         self.logger.error('Unknown State')
-        raise BaseException
+        raise CriticalErr('Unknown State')

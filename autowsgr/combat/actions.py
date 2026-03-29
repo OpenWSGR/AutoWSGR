@@ -223,10 +223,7 @@ def check_blood(
     bool
         ``True`` = 可以继续前进，``False`` = 应当回港。
     """
-    if isinstance(proceed_stop, RepairMode):
-        rules = [proceed_stop] * 6
-    else:
-        rules = proceed_stop
+    rules = [proceed_stop] * 6 if isinstance(proceed_stop, RepairMode) else proceed_stop
 
     for i in range(min(len(ship_stats), len(rules))):
         stat = ship_stats[i]

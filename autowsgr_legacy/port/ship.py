@@ -81,10 +81,10 @@ class Fleet:
 
         try:
             self.check_level()
-        except IndexError as e:
+        except IndexError:
             self.timer.logger.info('检查等级失败')
             if check_level:
-                raise e
+                raise
 
     def check_level(self):
         LEFT_TOPS = [

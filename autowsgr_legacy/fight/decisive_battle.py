@@ -1,7 +1,7 @@
 import os
 from typing import Literal
 
-from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundErr
+from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, ShipNotFoundErr
 from autowsgr.constants.data_roots import MAP_ROOT
 from autowsgr.constants.image_templates import IMG
 from autowsgr.fight.battle import BattleInfo, BattlePlan
@@ -271,7 +271,7 @@ class DecisiveBattle:
             return result[0]
         if retry > 3:
             self.timer.logger.warning('识别决战地图参数失败, 退出逻辑')
-            raise BaseException
+            raise CriticalErr('识别决战地图参数失败')
         self.timer.logger.warning(
             f'识别决战地图参数失败, 正在重试第 {retry + 1} 次',
         )
@@ -319,7 +319,7 @@ class DecisiveBattle:
                     timeout=5,
                     after_get_delay=1,
                 )
-            except:
+            except Exception:
                 self.timer.logger.warning('进入出征准备页面失败，正在重试')
                 self.go_fleet_page()
 
@@ -365,7 +365,7 @@ class DecisiveBattle:
                 # rgb_select=(250, 250, 250),
                 # tolerance = 50,
             )[1]
-        except:
+        except Exception:
             # TODO: 提高OCR对单个数字的识别率
             self.timer.logger.warning('读取当前可用费用失败')
             self.stats.score = 0
@@ -631,7 +631,7 @@ class DecisiveBattle:
             self.timer.logger.debug(
                 f'当前经验：{self.stats.exp}，升级需要经验：{self.stats.need}',
             )
-        except:
+        except Exception:
             self.timer.logger.warning('识别副官升级经验数值失败')
 
     def _before_fight(self) -> Literal['retreat', 'leave'] | None:

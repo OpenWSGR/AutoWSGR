@@ -104,7 +104,7 @@ def get_resources(timer: Timer):
         image_crop = crop_image(image, *POS['main_page']['resources'][key])
         try:
             ret[key] = timer.recognize_number(image_crop, 'KM.')[1]
-        except:
+        except Exception:
             # 容错处理，如果监测出来不是数字则出错了
             timer.logger.warning(f'读取{key}资源失败')
     timer.logger.info(ret)
@@ -132,14 +132,14 @@ def get_loot_and_ship(timer: Timer):
                     if key == 'ship':
                         ret[key] = int(str(result[1])[:-4])
                         ret[key + '_max'] = 500
-                except:
+                except Exception:
                     timer.logger.warning(f'读取{key}数量失败')
         else:
             timer.logger.warning(f'读取{key}数量失败')
     try:
         ship_num = ret.get('ship')
         timer.got_ship_num = ship_num if ship_num is not None else 0
-    except:
+    except Exception:
         timer.logger.warning('赋值给got_ship_num失败')
         timer.got_ship_num = 0
 
@@ -149,7 +149,7 @@ def get_loot_and_ship(timer: Timer):
             timer.got_loot_num = 0
         else:
             timer.can_get_loot = True
-    except:
+    except Exception:
         timer.logger.warning('赋值给got_loot_num失败')
         timer.got_loot_num = 0
 

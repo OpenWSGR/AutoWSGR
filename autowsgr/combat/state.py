@@ -217,9 +217,7 @@ def _build_single_transitions(
         CombatPhase.FIGHT_PERIOD,
     ]
 
-    t[CombatPhase.START_FIGHT] = list(core) + [
-        CombatPhase.DOCK_FULL,
-    ]
+    t[CombatPhase.START_FIGHT] = [*list(core), CombatPhase.DOCK_FULL]
     t[CombatPhase.DOCK_FULL] = []
 
     t[CombatPhase.SPOT_ENEMY_SUCCESS] = {

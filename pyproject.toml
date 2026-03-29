@@ -108,39 +108,23 @@ ignore = [
     "ANN201",
     "ANN202",
     # TODO: temporarily ignore until all exceptions are handled
-    "E722",
     "BLE001",
     "B904",
-    "TRY002",
-    "TRY201",
     "TRY300",
-    "TRY301",
-    "TRY400",
-    "PERF203",
+    "TRY301",  # raise-within-try
     "T201",    # `print` found
     "N801",    # Class name `EventFightPlan2025_0424` should use CapWords convention
     "N806",    # Variable `EXP_AREA` in function should be lowercase
 
     "ANN002",  # missing-type-args
     "ANN003",  # missing-type-kwargs
-    "ANN204",  # missing-return-type-special-method
     "ANN401",  # any-type
-    "B027",    # empty-method-without-abstract-decorator
-    "B905",    # zip-without-explicit-strict, we use `zip-strict-fixer` instead
-    "C401",    # unnecessary set comprehension
-    "C416",    # unnecessary-comprehension
     "COM812",  # missing-trailing-comma
     "E501",    # line-too-long
-    "N802",    # invalid-function-name
-    "RUF005",  # collection-literal-concatenation
     "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
     "SIM105",  # suppressible-exception
-    "SIM108",  # if-else-block-instead-of-if-exp
     "TID252",  # relative-imports
-    "TRY301",  # raise-within-try
     "TRY003",  # raise-vanilla-args
-    "TRY400",  # error-instead-of-exception
-    "W505",    # doc-line-too-long
     "N818",    # exception-name-not-error (renaming is breaking)
     "RUF022",  # unsorted-all (__all__ grouped by semantic category)
     "TRY004",  # prefer-type-error (debatable for value parsing)

@@ -489,7 +489,7 @@ class RepairTask(Task):
             self.timer.relative_swipe(0.33, 0.5, 0.66, 0.5, delay=1)
             time.sleep(0.5)
             if time_costs == last_result:
-                raise BaseException('未找到目标舰船')
+                raise ShipNotFoundErr('未找到目标舰船')
             last_result = time_costs
 
     def recognize_screen_relative(
@@ -545,7 +545,7 @@ class OtherTask(Task):
                 else:
                     timer.logger.warning('未指定是否使用快修, 默认不使用')
                     self.use_quick_build = False
-            except:
+            except Exception:
                 raise ValueError('未指定油弹钢铝数量')
 
     def run(self):
@@ -689,8 +689,8 @@ class DecisiveFight(DecisiveBattle):
                             self.timer.logger.info(f'舰船 {ship_name} 仍在维修中，重置盲修计时器')
                             ship_obj.blind_repair_start_time = time.time()
 
-        except Exception as e:
-            self.timer.logger.error(f'同步舰船状态出错: {e}')
+        except Exception:
+            self.timer.logger.exception('同步舰船状态出错')
         return 'leave'
 
 

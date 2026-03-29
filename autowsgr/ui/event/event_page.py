@@ -23,6 +23,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Literal
 
+from autowsgr.infra.exceptions import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.utils import click_and_wait_for_page, wait_for_page
@@ -204,7 +205,7 @@ class BaseEventPage:
                 break
             time.sleep(0.25)
         else:
-            raise Exception(f'活动地图: 选择节点 {node_id} 失败，无法进入页面')
+            raise ActionFailedError(f'活动地图: 选择节点 {node_id} 失败，无法进入页面')
 
     # ── 出击 ──────────────────────────────────────────────────────────────
 
@@ -256,7 +257,7 @@ class BaseEventPage:
             self._ctrl.screenshot(), DIFFICULTY_EASY_SIGNATURE
         ).matched:
             return 'E'
-        raise Exception('活动地图: 无法识别当前难度')
+        raise ActionFailedError('活动地图: 无法识别当前难度')
 
     def _change_difficulty(self, target: str) -> None:
         """切换难度到目标。

@@ -1,6 +1,6 @@
 import time
 
-from autowsgr.constants.custom_exceptions import ImageNotFoundErr, ShipNotFoundErr
+from autowsgr.constants.custom_exceptions import CriticalErr, ImageNotFoundErr, ShipNotFoundErr
 from autowsgr.constants.image_templates import IMG, MyTemplate
 from autowsgr.constants.positions import BLOOD_BAR_POSITION
 from autowsgr.game.get_game_info import check_support_stats, detect_ship_stats
@@ -254,7 +254,7 @@ def quick_repair(
         if any(need_repair):
             if timer.config.repair_manually:
                 timer.logger.info('需要手动修理舰船')
-                raise BaseException('需要手动修理舰船')
+                raise CriticalErr('需要手动修理舰船')
             timer.click(420, 420, times=2, delay=0.8)
             # 按逻辑修理
             for i in range(1, 7):
@@ -487,7 +487,7 @@ def cook(timer: Timer, position: int, force_click=False):
                 timer.relative_click(0.788, 0.207)
         return True
 
-    except:
+    except Exception:
         timer.logger.warning(
             f'不支持的菜谱编号:{position}, 请检查该菜谱是否有效, 或者检查今日用餐次数是否已经用尽',
         )

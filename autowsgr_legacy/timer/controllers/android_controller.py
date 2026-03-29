@@ -83,8 +83,8 @@ class AndroidController:
         """
         try:
             return app in self.list_apps()  # type: ignore
-        except Exception as e:
-            self.logger.error(f'检查游戏是否在运行失败: {e}')
+        except Exception:
+            self.logger.exception('检查游戏是否在运行失败')
             return False
 
     # ========= 输入控制信号 =========
