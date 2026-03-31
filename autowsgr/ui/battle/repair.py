@@ -103,20 +103,20 @@ class RepairMixin(BaseBattlePreparation):
         repair_pos = []
         positions = self.check_repair(strategy)
         for i in range(retry_count):
-          # 没有需要修理的舰船，直接返回
-          if not positions:
-              return []
-          # 需要手动修理，退出程序
-          if self._ctx.config.repair_manually or repair_manually:
-              raise ActionFailedError('需要进行手动修理')
-          self.repair_slots(positions)
-          repair_pos.extend(positions)
-          # 修理完成再检查一遍
-          positions = self.check_repair(strategy)
-          if not positions:
-              _log.info('[UI] 修理位置: {} (策略: {})', repair_pos, strategy.value)
-              return repair_pos
-          _log.info(f'[UI] 有舰船修理失败: {positions}, 重试第 {i} 次')
+            # 没有需要修理的舰船，直接返回
+            if not positions:
+                return []
+            # 需要手动修理，退出程序
+            if self._ctx.config.repair_manually or repair_manually:
+                raise ActionFailedError('需要进行手动修理')
+            self.repair_slots(positions)
+            repair_pos.extend(positions)
+            # 修理完成再检查一遍
+            positions = self.check_repair(strategy)
+            if not positions:
+                _log.info('[UI] 修理位置: {} (策略: {})', repair_pos, strategy.value)
+                return repair_pos
+            _log.info(f'[UI] 有舰船修理失败: {positions}, 重试第 {i} 次')
         # 经过重试仍修理失败
         _log.error('[UI] 舰船修理异常(策略: {})', strategy.value)
         raise ActionFailedError('舰船修理异常')
