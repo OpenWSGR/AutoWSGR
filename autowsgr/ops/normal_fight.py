@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat
+from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
@@ -308,6 +309,9 @@ class NormalFightRunner:
         # 检测战前舰队信息 (血量 + 等级)
         fleet_info = page.detect_fleet_info()
         ship_stats = [fleet_info.ship_damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
+        if ShipDamageState.SEVERE in ship_stats:
+            _log.error('[OPS] 出征前检测到大破舰船，退出程序')
+            raise ActionFailedError('出征前检测到大破舰船，退出程序')
         self._fleet_ships = fleet_info.to_ships(self._fleet)
 
         # 出征

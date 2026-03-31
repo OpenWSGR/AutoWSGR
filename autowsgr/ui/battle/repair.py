@@ -42,11 +42,11 @@ class RepairMixin(BaseBattlePreparation):
             time.sleep(1.5)
             _log.info('[UI] 出征准备 → 修理位置 {}', pos)
 
-    def apply_repair(
+    def check_repair(
         self,
-        strategy: RepairStrategy | None = None,
+        strategy: RepairStrategy,
     ) -> list[int]:
-        """根据策略执行快速修理。
+        """根据策略执行快速修理检查（不实际修理）。
 
         Parameters
         ----------
@@ -59,12 +59,6 @@ class RepairMixin(BaseBattlePreparation):
             实际修理的槽位列表。
         """
         from autowsgr.ui.battle.base import RepairStrategy
-
-        if strategy is None:
-            strategy = RepairStrategy.SEVERE
-
-        if strategy is RepairStrategy.NEVER:
-            return []
 
         screen = self._ctrl.screenshot()
         damage = self.detect_ship_damage(screen)
@@ -79,10 +73,50 @@ class RepairMixin(BaseBattlePreparation):
                 or (strategy is RepairStrategy.SEVERE and dmg >= ShipDamageState.SEVERE)
             ):
                 positions.append(slot)
-
-        if positions:
-            if self._ctx.config.repair_manually:
-                raise ActionFailedError('需要进行手动修理')
-            self.repair_slots(positions)
-            _log.info('[UI] 修理位置: {} (策略: {})', positions, strategy.value)
         return positions
+
+    def apply_repair(
+        self,
+        strategy: RepairStrategy | None = None,
+        *,
+        repair_manually: bool = False,
+        retry_count: int = 3,
+    ) -> list[int]:
+        """根据策略执行快速修理。
+
+        Parameters
+        ----------
+        strategy:
+            修理策略，默认 ``RepairStrategy.SEVERE``。
+
+        Returns
+        -------
+        list[int]
+            实际修理的槽位列表。
+        """
+        if strategy is None:
+            strategy = RepairStrategy.SEVERE
+
+        if strategy is RepairStrategy.NEVER:
+            return []
+
+        repair_pos = []
+        positions = self.check_repair(strategy)
+        for i in range(retry_count):
+          # 没有需要修理的舰船，直接返回
+          if not positions:
+              return []
+          # 需要手动修理，退出程序
+          if self._ctx.config.repair_manually or repair_manually:
+              raise ActionFailedError('需要进行手动修理')
+          self.repair_slots(positions)
+          repair_pos.extend(positions)
+          # 修理完成再检查一遍
+          positions = self.check_repair(strategy)
+          if not positions:
+              _log.info('[UI] 修理位置: {} (策略: {})', repair_pos, strategy.value)
+              return repair_pos
+          _log.info(f'[UI] 有舰船修理失败: {positions}, 重试第 {i} 次')
+        # 经过重试仍修理失败
+        _log.error('[UI] 舰船修理异常(策略: {})', strategy.value)
+        raise ActionFailedError('舰船修理异常')
