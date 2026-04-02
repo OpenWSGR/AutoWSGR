@@ -92,6 +92,7 @@ class ScrcpyController(AndroidController):
         self._decode_thread: threading.Thread | None = None
         self._frame_ready = threading.Event()  # 首帧就绪信号
         self._frame_lock = threading.Lock()
+        self._reconnect_lock = threading.Lock()
 
     # ── 连接 ──
 
@@ -307,8 +308,24 @@ class ScrcpyController(AndroidController):
 
     def disconnect(self) -> None:
         serial = self._serial or 'auto'
-        self._alive = False
+        self._close_video_channel()
 
+        self._device = None
+        self._resolution = (0, 0)
+        self._last_frame = None
+        _log.info('[Emulator] 已断开设备连接: {}', serial)
+
+    @property
+    def resolution(self) -> tuple[int, int]:
+        return self._resolution
+
+    def _require_device(self) -> AdbDevice:
+        """返回已连接的设备实例，未连接时抛出异常。"""
+        if self._device is None:
+            raise EmulatorConnectionError('设备未连接，请先调用 connect()')
+        return self._device
+
+    def _close_video_channel(self) -> None:
         if self._video_socket is not None:
             try:
                 self._video_socket.close()
@@ -327,28 +344,42 @@ class ScrcpyController(AndroidController):
             self._decode_thread.join(timeout=3.0)
             self._decode_thread = None
 
-        self._device = None
-        self._resolution = (0, 0)
-        self._last_frame = None
+        self._alive = False
         self._frame_ready.clear()
-        _log.info('[Emulator] 已断开设备连接: {}', serial)
 
-    @property
-    def resolution(self) -> tuple[int, int]:
-        return self._resolution
+    def _reopen_stream(self) -> None:
+        """在保持 ADB 设备连接的前提下重建 scrcpy 视频流。"""
+        self._close_video_channel()
+        self._last_frame = None
+        self._deploy_server()
+        self._start_server()
+        self._connect_video_socket()
+        self._start_decode_thread()
 
-    def _require_device(self) -> AdbDevice:
-        """返回已连接的设备实例，未连接时抛出异常。"""
-        if self._device is None:
-            raise EmulatorConnectionError('设备未连接，请先调用 connect()')
-        return self._device
+        if not self._frame_ready.wait(timeout=self._screenshot_timeout):
+            raise EmulatorConnectionError(
+                f'scrcpy 视频流重连失败：{self._screenshot_timeout}s 内无首帧'
+            )
+
+        _log.info('[Emulator] scrcpy 视频流已重连')
+
+    def _ensure_stream_alive(self) -> None:
+        """确保视频流可用，不可用时尝试一次重连。"""
+        if self._alive:
+            return
+
+        with self._reconnect_lock:
+            if self._alive:
+                return
+
+            _log.warning('[Emulator] 检测到视频流未运行，尝试自动重连')
+            self._reopen_stream()
 
     # ── 截图 ──
 
     def screenshot(self) -> np.ndarray:
 
-        if not self._alive:
-            raise EmulatorConnectionError('scrcpy 视频流未运行')
+        self._ensure_stream_alive()
 
         start = time.monotonic()
         while True:
@@ -365,6 +396,11 @@ class ScrcpyController(AndroidController):
                     elapsed,
                 )
                 return frame
+
+            if not self._alive:
+                self._ensure_stream_alive()
+                start = time.monotonic()
+                continue
 
             if time.monotonic() - start > self._screenshot_timeout:
                 raise EmulatorConnectionError(

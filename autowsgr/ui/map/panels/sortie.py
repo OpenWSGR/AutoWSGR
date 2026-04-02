@@ -194,23 +194,60 @@ class SortiePanelMixin(BaseMapPage):
         if self._ocr is None:
             raise RuntimeError('需要 OCR 引擎才能导航到指定章节')
 
+        def _read_chapter_stable(samples: int = 3) -> tuple[int | None, np.ndarray | None, bool]:
+            chapters: list[int] = []
+            last_screen: np.ndarray | None = None
+
+            for i in range(samples):
+                screen = self._ctrl.screenshot()
+                last_screen = screen
+                info = self.recognize_map(screen, self._ocr)
+                if info is not None:
+                    chapters.append(info.chapter)
+                if i < samples - 1:
+                    time.sleep(0.15)
+
+            if not chapters:
+                return None, last_screen, False
+
+            candidate = max(set(chapters), key=chapters.count)
+            votes = chapters.count(candidate)
+            stable = votes >= 2
+            if not stable:
+                _log.warning('[UI] 章节导航: OCR 抖动 {}，本轮不点击', chapters)
+            return candidate, last_screen, stable
+
+        confirm_hits = 0
+
         for attempt in range(CHAPTER_NAV_MAX_ATTEMPTS):
-            screen = self._ctrl.screenshot()
-            info = self.recognize_map(screen, self._ocr)
-            if info is None:
+            current, screen, stable = _read_chapter_stable()
+            if current is None:
                 _log.warning('[UI] 章节导航: OCR 识别失败 (第 {} 次尝试)', attempt + 1)
                 return None
 
-            current = info.chapter
             if current == target:
-                _log.info('[UI] 章节导航: 已到达第 {} 章', target)
-                return current
+                confirm_hits += 1
+                _log.info(
+                    '[UI] 章节导航: 命中目标第 {} 章，二次确认 {}/2',
+                    target,
+                    confirm_hits,
+                )
+                if confirm_hits >= 2:
+                    _log.info('[UI] 章节导航: 已到达第 {} 章', target)
+                    return current
+                time.sleep(CHAPTER_NAV_DELAY)
+                continue
 
+            confirm_hits = 0
             _log.info(
                 '[UI] 章节导航: 当前第 {} 章 -> 目标第 {} 章',
                 current,
                 target,
             )
+
+            if not stable or screen is None:
+                time.sleep(CHAPTER_NAV_DELAY)
+                continue
 
             if current > target:
                 ok = self.click_prev_chapter(screen)

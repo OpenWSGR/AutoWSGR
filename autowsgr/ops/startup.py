@@ -32,6 +32,7 @@ from autowsgr.ops.navigate import goto_page
 from autowsgr.types import GameAPP, PageName
 from autowsgr.ui.main_page import MainPage
 from autowsgr.ui.start_screen_page import StartScreenPage
+from autowsgr.ui.utils import NavigationError
 
 
 if TYPE_CHECKING:
@@ -58,6 +59,9 @@ _OVERLAY_DISMISS_TIMEOUT: float = 10.0
 
 _OVERLAY_DISMISS_DELAY: float = 1.0
 """消除浮层后的等待时间 (秒)。"""
+
+_RECOVERY_TO_MAIN_TIMEOUT: float = 20.0
+"""页面异常恢复时，尝试回到主界面的超时 (秒)。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -236,6 +240,38 @@ def go_main_page(ctx: GameContext, *, dismiss_overlays: bool = True) -> None:
     goto_page(ctx, PageName.MAIN)
 
 
+def recover_to_main_or_restart(
+    ctx: GameContext,
+    app: GameAPP | str = GameAPP.official,
+    *,
+    timeout: float = _RECOVERY_TO_MAIN_TIMEOUT,
+) -> None:
+    """页面异常时优先回主页面，超时后强制重启游戏。"""
+    ctrl = ctx.ctrl
+    package = app.package_name if isinstance(app, GameAPP) else app
+
+    from .navigate import identify_current_page
+
+    page = identify_current_page(ctx)
+    if page is not None:
+        return
+
+    _log.warning('[Startup] 当前页面无法识别，尝试恢复到主页面')
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        try:
+            goto_page(ctx, PageName.MAIN)
+            _log.info('[Startup] 页面恢复成功，已回到主页面')
+            return
+        except NavigationError as exc:
+            _log.debug('[Startup] 恢复主页面失败，继续重试: {}', exc)
+            time.sleep(1.0)
+
+    _log.warning('[Startup] 页面恢复超时，执行强制重启游戏')
+    restart_game(ctrl, package)
+
+
 def ensure_game_ready(
     ctx: GameContext,
     app: GameAPP | str = GameAPP.official,
@@ -279,11 +315,7 @@ def ensure_game_ready(
         _log.info('[Startup] 游戏未运行，正在启动…')
         start_game(ctrl, package, startup_timeout=startup_timeout)
     else:
-        from .navigate import identify_current_page
-
-        if identify_current_page(ctx) is None:
-            _log.info('[Startup] 游戏已在运行但页面未知，正在重启…')
-            restart_game(ctrl, package, startup_timeout=startup_timeout)
+        recover_to_main_or_restart(ctx, package)
         _log.info('[Startup] 游戏已在运行')
 
     _log.info('[Startup] 游戏就绪')

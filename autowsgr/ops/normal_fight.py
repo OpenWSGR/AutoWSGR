@@ -17,6 +17,7 @@ from autowsgr.infra.logger import get_logger
 from autowsgr.ops import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel, RepairStrategy
+from autowsgr.ui.utils import NavigationError
 
 
 if TYPE_CHECKING:
@@ -263,7 +264,16 @@ class NormalFightRunner:
         except RuntimeError:
             _log.warning('[OPS] 无法读取今日获取数量 (OCR 不可用)')
 
-        map_page.enter_sortie(self._plan.chapter, self._plan.map_id)
+        try:
+            map_page.enter_sortie(self._plan.chapter, self._plan.map_id)
+        except NavigationError as e:
+            _log.error('[OPS] 地图章节导航失败: {}', e)
+            _log.warning('[OPS] 已放弃本轮常规战，尝试返回主页面以继续后续队列')
+            try:
+                goto_page(self._ctx, PageName.MAIN)
+            except NavigationError as back_err:
+                _log.error('[OPS] 返回主页面失败: {}', back_err)
+            raise ActionFailedError('地图章节识别/导航失败，已跳过本轮并返回主页面') from e
 
     # ── 出征准备 ──
 

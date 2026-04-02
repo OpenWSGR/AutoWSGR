@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
+from autowsgr.ops.startup import recover_to_main_or_restart
 from autowsgr.types import PageName
 from autowsgr.ui.main_page import MainPage
 from autowsgr.ui.map.data import MapPanel
@@ -32,6 +33,7 @@ def collect_expedition(ctx: GameContext) -> bool:
         是否执行了收取操作。
     """
     _log.info('[OPS] 开始检查远征收取')
+    recover_to_main_or_restart(ctx, ctx.config.account.game_app)
     goto_page(ctx, PageName.MAIN)
     screen = ctx.ctrl.screenshot()
     if not MainPage.has_expedition_ready(screen):
