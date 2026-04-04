@@ -107,6 +107,11 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
         else:
             raise ValueError('必须提供 plan 或 plan_id')
 
+        # 允许 plan_id + plan 覆盖: 前端可在不改 YAML 的情况下动态指定舰队与舰船名单。
+        request_plan = request.plan
+        override_fleet_id = request_plan.fleet_id if request_plan is not None else None
+        override_fleet = request_plan.fleet if request_plan is not None else None
+
         for i in range(request.times):
             if task_manager.should_stop():
                 break
@@ -115,7 +120,13 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
             _log.info('[Task] 常规战第 {}/{} 轮', i + 1, request.times)
 
             try:
-                result = run_normal_fight(ctx, plan, times=1)[0]
+                result = run_normal_fight(
+                    ctx,
+                    plan,
+                    times=1,
+                    fleet_id=override_fleet_id,
+                    fleet=override_fleet,
+                )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
             except Exception as e:
@@ -152,7 +163,15 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
         else:
             raise ValueError('必须提供 plan 或 plan_id')
 
-        fleet_id = request.fleet_id or plan.fleet_id
+        request_plan = request.plan
+        override_fleet = request_plan.fleet if request_plan is not None else None
+        # 优先级: 顶层 fleet_id > plan 覆盖 fleet_id > YAML 内 fleet_id
+        if request.fleet_id is not None:
+            fleet_id = request.fleet_id
+        elif request_plan is not None and request_plan.fleet_id is not None:
+            fleet_id = request_plan.fleet_id
+        else:
+            fleet_id = plan.fleet_id
 
         for i in range(request.times):
             if task_manager.should_stop():
@@ -162,7 +181,13 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
             _log.info('[Task] 活动战第 {}/{} 轮', i + 1, request.times)
 
             try:
-                result = run_event_fight(ctx, plan, times=1, fleet_id=fleet_id)[0]
+                result = run_event_fight(
+                    ctx,
+                    plan,
+                    times=1,
+                    fleet_id=fleet_id,
+                    fleet=override_fleet,
+                )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
             except Exception as e:
