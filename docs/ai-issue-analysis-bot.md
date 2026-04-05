@@ -32,6 +32,14 @@
 2. 输出分析 prompt、Copilot 原始输出、最终结论
 3. 上传运行产物（artifacts）用于排障
 
+## 模型配置
+
+- 工作流默认使用 `gpt-4.1`，兼容性更高。
+- 可在仓库 `Settings -> Secrets and variables -> Actions -> Variables` 配置：
+  - `COPILOT_MODEL`（例如 `gpt-5.4`）
+  - `COPILOT_REASONING_EFFORT`（例如 `high` / `xhigh`）
+- 如果出现 `Model "..." from --model flag is not available.`，请改为账号可用模型或删除变量回落默认值。
+
 ## 使用建议
 
 - 若要手动重跑某个 Issue：在 Actions 页面手动运行该 workflow，并填写 `issue_number`。

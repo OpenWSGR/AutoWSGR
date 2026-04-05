@@ -41,9 +41,10 @@ jobs:
           copilot-github-token: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           bot-name: "@github-actions"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          # 这里不建议换成免费模型，非常笨，不会调用工具，导致后续流程都不正常
-          copilot-model: gpt-5.4
-          copilot-reasoning-effort: xhigh
+          # 模型默认使用兼容范围更广的 gpt-4.1；可通过仓库变量 COPILOT_MODEL 覆盖。
+          copilot-model: ${{ vars.COPILOT_MODEL || 'gpt-4.1' }}
+          # 推理强度可通过仓库变量 COPILOT_REASONING_EFFORT 覆盖（默认 high）。
+          copilot-reasoning-effort: ${{ vars.COPILOT_REASONING_EFFORT || 'high' }}
 
       - name: 查看完整输入输出
         if: always()
