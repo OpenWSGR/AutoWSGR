@@ -34,9 +34,9 @@
 
 ## 模型配置
 
-- 工作流默认使用 `gpt-4.1`，兼容性更高。
+- 工作流默认使用 `gpt-5.3-codex`。
 - 可在仓库 `Settings -> Secrets and variables -> Actions -> Variables` 配置：
-  - `COPILOT_MODEL`（例如 `gpt-5.4`）
+  - `COPILOT_MODEL`（例如 `gpt-5.3-codex`）
   - `COPILOT_REASONING_EFFORT`（例如 `high` / `xhigh`）
 - 如果出现 `Model "..." from --model flag is not available.`，请改为账号可用模型或删除变量回落默认值。
 

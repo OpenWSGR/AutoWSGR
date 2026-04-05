@@ -41,8 +41,8 @@ jobs:
           copilot-github-token: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           bot-name: "@github-actions"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          # 模型默认使用兼容范围更广的 gpt-4.1；可通过仓库变量 COPILOT_MODEL 覆盖。
-          copilot-model: ${{ vars.COPILOT_MODEL || 'gpt-4.1' }}
+          # 模型默认使用 gpt-5.3-codex；可通过仓库变量 COPILOT_MODEL 覆盖。
+          copilot-model: ${{ vars.COPILOT_MODEL || 'gpt-5.3-codex' }}
           # 推理强度可通过仓库变量 COPILOT_REASONING_EFFORT 覆盖（默认 high）。
           copilot-reasoning-effort: ${{ vars.COPILOT_REASONING_EFFORT || 'high' }}
 
