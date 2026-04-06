@@ -15,8 +15,7 @@
 from __future__ import annotations
 
 import time
-
-import numpy as np
+from typing import TYPE_CHECKING
 
 from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
@@ -25,6 +24,10 @@ from autowsgr.ops.decisive.base import DecisiveBase
 from autowsgr.types import DecisiveEntryStatus, DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui import RepairStrategy
 from autowsgr.ui.decisive import DecisiveBattlePreparationPage
+
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 _log = get_logger('ops.decisive')
