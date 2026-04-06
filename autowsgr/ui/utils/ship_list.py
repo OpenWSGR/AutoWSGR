@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import cv2
 
 from autowsgr.constants import SHIPNAMES
-from autowsgr.infra.logger import get_logger
+from autowsgr.infra.logger import get_logger, save_image
 from autowsgr.vision import get_api_dll
 from autowsgr.vision.ocr import _fuzzy_match
 
@@ -25,7 +25,14 @@ if TYPE_CHECKING:
 
 _log = get_logger('ui')
 
-#: Legacy 标准分辨率 (DLL 校准基准)
+
+def _save_ship_list_debug(image: np.ndarray, tag: str) -> None:
+    """保存选船列表识别 ROI 调试图。"""
+    try:
+        save_image(image, tag=tag)
+    except Exception:
+        _log.debug('[选船列表] 保存调试截图失败: {}', tag, exc_info=True)
+
 LEGACY_WIDTH: int = 1280
 LEGACY_HEIGHT: int = 720
 
@@ -102,6 +109,7 @@ def locate_ship_rows(
     # 在原始分辨率上裁剪并 OCR (用原图的左 82% 区域)
     list_w_native = int(w * LEGACY_LIST_WIDTH / LEGACY_WIDTH)
     list_area_native = screen[:, :list_w_native]
+    _save_ship_list_debug(list_area_native, 'ship_list_roi_overview')
 
     found: list[tuple[str, float, float]] = []
     seen: set[str] = set()

@@ -37,6 +37,7 @@ from autowsgr.ui.decisive.overlay import (
     detect_decisive_overlay,
     get_overlay_signature,
     is_decisive_map_page,
+    is_fleet_acquisition,
 )
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 from autowsgr.ui.utils.ship_list import recognize_ships_in_list as _recognize_ships
@@ -274,11 +275,28 @@ class DecisiveMapController:
     def recognize_fleet_options(
         self,
         screen: np.ndarray | None = None,
+        fallback_score: int | None = None,
     ) -> tuple[int, dict[str, FleetSelection]]:
         """OCR 识别战备舰队获取界面的可选项。"""
         if screen is None:
+            screen = self.wait_for_fleet_overlay_stable()
+        return _fleet_ocr.recognize_fleet_options(
+            self._ocr,
+            screen,
+            fallback_score=fallback_score,
+        )
+
+    def wait_for_fleet_overlay_stable(self, timeout: float = 8.0) -> np.ndarray:
+        """等待战备舰队弹窗稳定后返回截图。"""
+        screen = self.wait_for_overlay(DecisiveOverlay.FLEET_ACQUISITION, timeout=timeout)
+        stable_deadline = time.monotonic() + 2.0
+        while time.monotonic() < stable_deadline:
+            time.sleep(0.25)
             screen = self._ctrl.screenshot()
-        return _fleet_ocr.recognize_fleet_options(self._ocr, screen)
+            if not is_fleet_acquisition(screen):
+                screen = self.wait_for_overlay(DecisiveOverlay.FLEET_ACQUISITION, timeout=timeout)
+                stable_deadline = time.monotonic() + 2.0
+        return screen
 
     def detect_last_offer_name(
         self,
@@ -299,10 +317,21 @@ class DecisiveMapController:
         self._ctrl.click(*CLICK_FLEET_REFRESH)
         time.sleep(1.5)
 
-    def close_fleet_overlay(self) -> None:
-        """关闭战备舰队获取 overlay。"""
+    def close_fleet_overlay(self) -> bool:
+        """关闭战备舰队获取 overlay，并确认已离开该弹窗。"""
         self._ctrl.click(*CLICK_FLEET_CLOSE)
-        time.sleep(1.0)
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            if not is_fleet_acquisition(screen):
+                return True
+            time.sleep(0.2)
+        _log.warning('[地图控制器] 关闭战备舰队弹窗后仍停留在原界面')
+        return False
+
+    def is_fleet_overlay_open(self) -> bool:
+        """当前是否仍停留在战备舰队获取界面。"""
+        return is_fleet_acquisition(self._ctrl.screenshot())
 
     def check_dock_full(self) -> bool:
         """检查当前界面是否出现船坞已满提示。"""
@@ -375,13 +404,26 @@ class DecisiveMapController:
         fleet = page.detect_fleet(screen)
         damage = page.detect_ship_damage(screen)
 
-        # 进入选船列表
+        # 进入选船列表：先确认已离开出征准备页，再进行一次识别
         page.click_ship_slot(0)
-        time.sleep(1.0)
+        deadline = time.monotonic() + 5.0
+        ship_list_screen = None
+        while time.monotonic() < deadline:
+            time.sleep(0.2)
+            screen = self._ctrl.screenshot()
+            if not BattlePreparationPage.is_current_page(screen):
+                ship_list_screen = screen
+                break
 
-        # DLL locate + 逐行 OCR 扫描
-        screen = self._ctrl.screenshot()
-        available = _recognize_ships(self._ocr, screen)
+        if ship_list_screen is None:
+            _log.warning('[地图控制器] 点击舰船位后未确认进入选船列表，按当前截图继续识别')
+            ship_list_screen = self._ctrl.screenshot()
+        else:
+            time.sleep(0.3)  # 等待选船列表内容稳定
+            ship_list_screen = self._ctrl.screenshot()
+
+        available = _recognize_ships(self._ocr, ship_list_screen)
+        _log.debug('[地图控制器] 选船列表识别结果: {}', sorted(available))
 
         # 编队中的舰船也计入可用集合
         all_ships = set(available)
@@ -474,6 +516,7 @@ class DecisiveMapController:
             Templates.Symbol.GET_SHIP,
             Templates.Symbol.GET_ITEM,
         ]
+        entry_templates = Templates.Decisive.entry_status_templates()
         collected: list[str] = []
         for _ in range(10):
             # 等待掉落弹窗出现
@@ -507,6 +550,30 @@ class DecisiveMapController:
             self._ctrl.click(0.953, 0.954)
             time.sleep(0.5)
             confirm_operation(self._ctrl, timeout=1.0)
+
+        # 掉落处理结束后，继续等待回到决战入口页，避免奖励弹窗残留导致后续状态识别超时
+        settle_deadline = time.monotonic() + 12.0
+        reward_ack_pos = (0.5, 0.5)
+        while time.monotonic() < settle_deadline:
+            screen = self._ctrl.screenshot()
+            if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
+                _log.info('[地图控制器] 小关通关结算完成，已回到决战入口页')
+                break
+
+            reward_detail = ImageChecker.find_any(screen, ship_templates, confidence=0.8)
+            if reward_detail is not None:
+                _log.info("[地图控制器] 结算阶段仍有奖励弹窗: '{}'", reward_detail.template_name)
+                self._ctrl.click(*reward_ack_pos)
+                time.sleep(0.35)
+                confirm_operation(self._ctrl, timeout=0.8)
+                continue
+
+            if confirm_operation(self._ctrl, timeout=0.8):
+                continue
+
+            time.sleep(0.3)
+        else:
+            _log.warning('[地图控制器] 小关通关后未能确认已回到决战入口页')
 
         if collected:
             _log.info('[地图控制器] 小关通关共收集 {} 个掉落', len(collected))

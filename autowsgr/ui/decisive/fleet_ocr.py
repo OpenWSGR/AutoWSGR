@@ -14,6 +14,9 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+import cv2
+import numpy as np
+
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import FleetSelection
 from autowsgr.ui.decisive.overlay import (
@@ -36,17 +39,64 @@ if TYPE_CHECKING:
 _log = get_logger('ui.decisive')
 
 
+def _parse_offer_cost_text(text: str) -> int | None:
+    """解析战备舰队购买界面的费用文本，兼容 x4 / X4 格式。"""
+    cleaned = text.strip().replace(' ', '')
+    cleaned = cleaned.lstrip('xX')
+    if not cleaned:
+        return None
+    try:
+        return int(cleaned)
+    except ValueError:
+        return None
+
+
+def _prepare_text_roi(image: np.ndarray, *, scale: int = 4) -> np.ndarray:
+    """对小块文字区域做放大 + 提升对比度，改善 EasyOCR 无结果问题。"""
+    if image.size == 0:
+        return image
+
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    norm = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    binary = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    return cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+
+
+def _prepare_name_roi(image: np.ndarray) -> np.ndarray:
+    """舰名区域做温和增强，保留字形细节。"""
+    if image.size == 0:
+        return image
+
+    enlarged = cv2.resize(image, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    lab = cv2.cvtColor(enlarged, cv2.COLOR_RGB2LAB)
+    l, a, b = cv2.split(lab)
+    l = cv2.equalizeHist(l)
+    enhanced = cv2.merge((l, a, b))
+    return cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
+
+
 def recognize_fleet_options(
     ocr: OCREngine,
     screen: np.ndarray,
+    fallback_score: int | None = None,
 ) -> tuple[int, dict[str, FleetSelection]]:
     """OCR 识别战备舰队获取界面的可选项。
+
+    保留原版识别思路：
+    - 分数仍按单块数字识别
+    - 费用恢复为整行 OCR + 本地解析 x4/x5 文本
+    - 舰名恢复为仅对可购买项识别，避免受调试增强链路影响
 
     Returns
     -------
     tuple[int, dict[str, FleetSelection]]
         ``(score, selections)`` — 当前可用分数与可购买项字典。
+        当右上角分数 OCR 失败时，若提供 ``fallback_score``，则回退为该值。
     """
+    _log.debug('[舰队OCR] 开始识别战备舰队可选项')
+
     # 1. 识别可用分数
     res_roi = ROI(
         x1=RESOURCE_AREA[0][0],
@@ -54,16 +104,19 @@ def recognize_fleet_options(
         x2=RESOURCE_AREA[1][0],
         y2=RESOURCE_AREA[0][1],
     )
-    score_img = res_roi.crop(screen)
+    score_img = _prepare_text_roi(res_roi.crop(screen))
     score_val = ocr.recognize_number(score_img)
-    score = score_val if score_val is not None else 0
-    # TODO: 分数 OCR 需要改进
     if score_val is not None:
+        score = score_val
         _log.debug('[舰队OCR] 可用分数: {}', score_val)
+    elif fallback_score is not None:
+        score = fallback_score
+        _log.warning('[舰队OCR] 分数 OCR 失败，回退使用状态分数: {}', fallback_score)
     else:
+        score = 0
         _log.warning('[舰队OCR] 分数 OCR 失败')
 
-    # 2. 识别费用整行
+    # 2. 恢复原版费用识别：整行 OCR + 本地解析 x4/x5
     cost_roi = ROI(
         x1=COST_AREA[0][0],
         y1=COST_AREA[1][1],
@@ -71,18 +124,18 @@ def recognize_fleet_options(
         y2=COST_AREA[0][1],
     )
     cost_img = cost_roi.crop(screen)
-    cost_results = ocr.recognize(cost_img, allowlist='0123456789x')
+    cost_results = ocr.recognize(cost_img, allowlist='0123456789xX')
 
     costs: list[int] = []
     for r in cost_results:
-        text = r.text.strip().lstrip('xX')
-        try:
-            costs.append(int(text))
-        except (ValueError, TypeError):
+        cost = _parse_offer_cost_text(r.text)
+        if cost is None:
             _log.debug("[舰队OCR] 费用解析跳过: '{}'", r.text)
+            continue
+        costs.append(cost)
     _log.debug('[舰队OCR] 识别到 {} 项费用: {}', len(costs), costs)
 
-    # 3. 对可负担的卡识别舰船名
+    # 3. 恢复原版行为：仅对可购买项识别舰名
     selections: dict[str, FleetSelection] = {}
     for i, cost in enumerate(costs):
         if cost > score:

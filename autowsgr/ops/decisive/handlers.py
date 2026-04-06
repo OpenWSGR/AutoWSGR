@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import time
 
+import numpy as np
+
 from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.decisive.base import DecisiveBase
-from autowsgr.types import DecisiveEntryStatus, DecisivePhase, ShipDamageState
+from autowsgr.types import DecisiveEntryStatus, DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui import RepairStrategy
 from autowsgr.ui.decisive import DecisiveBattlePreparationPage
 
@@ -30,6 +32,37 @@ _log = get_logger('ops.decisive')
 
 class DecisivePhaseHandlers(DecisiveBase):
     # ── 状态同步 ──────────────────────────────────────────────────────────
+
+    def _recognize_fleet_options_with_retry(
+        self,
+        fallback_score: int | None,
+        attempts: int = 3,
+    ) -> tuple[np.ndarray, int, dict[str, FleetSelection]]:
+        """仅在购买界面内重试 OCR；若界面已关闭则不再尝试回到该界面。"""
+        screen = self._map.wait_for_fleet_overlay_stable()
+        last_score = fallback_score or 0
+        last_selections: dict[str, FleetSelection] = {}
+
+        for attempt in range(1, attempts + 1):
+            score, selections = self._map.recognize_fleet_options(
+                screen,
+                fallback_score=fallback_score,
+            )
+            if score:
+                last_score = score
+            last_selections = selections
+            if selections:
+                return screen, last_score, selections
+            if not self._map.is_fleet_overlay_open():
+                raise RuntimeError('战备舰队界面已关闭，无法继续在该界面重试 OCR')
+            if attempt < attempts:
+                _log.warning(
+                    '[决战] 战备舰队 OCR 无结果，第 {} 次重试',
+                    attempt,
+                )
+                screen = self._map.wait_for_fleet_overlay_stable(timeout=3.0)
+
+        return screen, last_score, last_selections
 
     def _sync_ship_states(self) -> None:
         """将 ship_stats 同步到 ctx.ship_registry。"""
@@ -139,9 +172,9 @@ class DecisivePhaseHandlers(DecisiveBase):
         self._has_chosen_fleet = True
 
         _log.info('[决战] 战备舰队获取')
-        time.sleep(0.25)  # 等待动画稳定
-        screen = self._map.screenshot()
-        score, selections = self._map.recognize_fleet_options(screen)
+        screen, score, selections = self._recognize_fleet_options_with_retry(
+            fallback_score=self._state.score,
+        )
         self._state.score = score or self._state.score
 
         if selections:
@@ -156,8 +189,9 @@ class DecisivePhaseHandlers(DecisiveBase):
 
             if not to_buy:
                 self._map.refresh_fleet()
-                screen = self._map.screenshot()
-                score, selections = self._map.recognize_fleet_options(screen)
+                screen, score, selections = self._recognize_fleet_options_with_retry(
+                    fallback_score=self._state.score,
+                )
                 self._state.score = score or self._state.score
                 to_buy = self._logic.choose_ships(
                     selections,
@@ -167,7 +201,8 @@ class DecisivePhaseHandlers(DecisiveBase):
             if not to_buy and len(self._state.ships) == 0 and self._state.is_begin():
                 _log.info('[决战] 未选择舰船, 必须购买一项 → 选择第一项')
                 self._map.buy_fleet_option(next(iter(selections.values())).click_position)
-                self._map.close_fleet_overlay()
+                if not self._map.close_fleet_overlay():
+                    raise RuntimeError('决战关闭战备舰队界面失败')
                 self._state.phase = DecisivePhase.RETREAT
                 return
 
@@ -178,7 +213,8 @@ class DecisivePhaseHandlers(DecisiveBase):
                 if name not in {'长跑训练', '肌肉记忆', '黑科技'}:
                     self._state.ships.add(name)
 
-        self._map.close_fleet_overlay()
+        if not self._map.close_fleet_overlay():
+            raise RuntimeError('决战关闭战备舰队界面失败')
         self._state.phase = DecisivePhase.PREPARE_COMBAT
 
     def _handle_advance_choice(self) -> None:
@@ -194,7 +230,11 @@ class DecisivePhaseHandlers(DecisiveBase):
         """出征准备：编队 → 修理 → 出征。"""
         screen = self._ctrl.screenshot()
         if self._state.node == 'U':
-            self._state.node = self._map.recognize_node(screen)
+            if self._state.stage == 1 and self._has_chosen_fleet:
+                self._state.node = 'A'
+                _log.info('[决战] 首次进入第 1 小节，跳过节点识别并默认使用节点 A')
+            else:
+                self._state.node = self._map.recognize_node(screen)
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,
