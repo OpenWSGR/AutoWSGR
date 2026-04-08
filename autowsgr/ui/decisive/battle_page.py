@@ -107,25 +107,37 @@ _CHAPTER_NAV_MAX_ATTEMPTS: int = 8
 """章节导航最大尝试次数。"""
 
 MAX_CHAPTER: int = 6
-MIN_CHAPTER: int = 4
+MIN_CHAPTER: int = 1
 
-# ── recognize_stage 检测点 ──
+# ── recognize_stage 检测参数 ──
 
 _STAGE_CHECK_POINTS: dict[int, list[tuple[float, float]]] = {
+    2: [(0.381, 0.436), (0.596, 0.636), (0.778, 0.521)],
+    3: [(0.606, 0.375), (0.532, 0.703), (0.862, 0.644)],
     4: [(0.381, 0.436), (0.596, 0.636), (0.778, 0.521)],
     5: [(0.418, 0.378), (0.760, 0.477), (0.550, 0.750)],
     6: [(0.606, 0.375), (0.532, 0.703), (0.862, 0.644)],
 }
-"""每章 3 个小关的像素检测点 (相对坐标)。
-
-若检测点颜色接近白色 (250, 244, 253) 表示该小关已通过。
-"""
+"""第 2-6 章 3 个小关的像素检测点 (相对坐标)。"""
 
 _STAGE_CHECK_COLOR: Color = Color.of(250, 244, 253)
-"""小关已通过标记颜色 (近白色)。"""
+"""第 2-6 章小关已通过标记颜色 (近白色)。"""
 
 _STAGE_CHECK_TOLERANCE: float = 30.0
-"""颜色匹配容差。"""
+"""第 2-6 章颜色匹配容差。"""
+
+_EX1_STAGE_CHECK_POINTS: list[tuple[float, float]] = [
+    (0.455, 0.338),
+    (0.705, 0.386),
+    (0.881, 0.640),
+]
+"""Ex-1 三个小节 icon 右下角“已挑战”徽标的检测点。"""
+
+_EX1_STAGE_CHECK_COLOR: Color = Color.of(255, 215, 28)
+"""Ex-1 “已挑战”徽标高亮黄色。"""
+
+_EX1_STAGE_CHECK_TOLERANCE: float = 75.0
+"""Ex-1 颜色匹配容差。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -167,17 +179,32 @@ class DecisiveBattlePage:
 
     @staticmethod
     def recognize_stage(screen: np.ndarray, chapter: int) -> int:
-        """识别当前决战章节的小关进度 (0-3)。
+        """识别当前决战章节的小关进度 (1-3)。
 
-        检查每个小关位置像素颜色，白色 (250,244,253) 为已通过。
-        返回当前正在进行的小关编号; 3 表示全部通过。
+        检查每个小关位置像素颜色；若检测点不再匹配“已完成”标记颜色，
+        则认为当前正在进行该小关。
         """
+        if chapter == 1:
+            for i, (rx, ry) in enumerate(_EX1_STAGE_CHECK_POINTS, start=1):
+                if not PixelChecker.check_pixel(
+                    screen,
+                    rx,
+                    ry,
+                    _EX1_STAGE_CHECK_COLOR,
+                    _EX1_STAGE_CHECK_TOLERANCE,
+                ):
+                    _log.info('[决战] 识别决战地图参数, 第 {} 小节正在进行', i)
+                    return i
+
+            _log.info('[决战] 识别决战地图参数, 第 3 小节正在进行')
+            return 3
+
         check_points = _STAGE_CHECK_POINTS.get(chapter)
         if check_points is None:
             _log.warning('[决战] 决战 recognize_stage: 未知章节 {}', chapter)
-            return 0
+            return 1
 
-        for i, (rx, ry) in enumerate(check_points):
+        for i, (rx, ry) in enumerate(check_points, start=1):
             if not PixelChecker.check_pixel(
                 screen,
                 rx,
@@ -190,6 +217,34 @@ class DecisiveBattlePage:
 
         _log.info('[决战] 识别决战地图参数, 第 3 小节正在进行')
         return 3
+
+    def detect_stage(self, screen: np.ndarray, chapter: int) -> int:
+        """识别小节号。"""
+        if chapter == 1:
+            stage, matches, actual_colors = self._recognize_ex1_stage_by_pixel(screen)
+            _log.info(
+                '[决战] Ex-1 小节识别: matches={} actual_colors={} -> stage={}',
+                matches,
+                [color.as_rgb_tuple() for color in actual_colors],
+                stage,
+            )
+            return stage
+
+        return self.recognize_stage(screen, chapter)
+
+    def _recognize_ex1_stage_by_pixel(self, screen: np.ndarray) -> tuple[int, list[bool], list[Color]]:
+        matches: list[bool] = []
+        actual_colors: list[Color] = []
+        for rx, ry in _EX1_STAGE_CHECK_POINTS:
+            actual = PixelChecker.get_pixel(screen, rx, ry)
+            matched = actual.near(_EX1_STAGE_CHECK_COLOR, _EX1_STAGE_CHECK_TOLERANCE)
+            actual_colors.append(actual)
+            matches.append(matched)
+
+        for idx, matched in enumerate(matches, start=1):
+            if not matched:
+                return idx, matches, actual_colors
+        return 3, matches, actual_colors
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 
@@ -262,7 +317,7 @@ class DecisiveBattlePage:
         Parameters
         ----------
         target:
-            目标章节编号 (MIN_CHAPTER - MAX_CHAPTER)。
+            目标章节编号 (1-6)。
 
         Raises
         ------

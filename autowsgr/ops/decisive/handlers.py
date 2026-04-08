@@ -125,10 +125,16 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         _log.info('[决战] 入口状态: {}', entry_status.value)
 
-        self._state.stage = self._battle_page.recognize_stage(
+        self._state.stage = self._battle_page.detect_stage(
             self._ctrl.screenshot(),
             self._config.chapter,
         )
+        if self._config.chapter == 1:
+            self._resume_mode = False
+            _log.info(
+                '[决战] Ex-1 总览页仅识别小节号: stage={}，首次进入/恢复模式改由进图后节点判定',
+                self._state.stage,
+            )
         self._battle_page.click_enter_map()
         self._use_last_fleet_attempts = 0
         self._wait_deadline = time.monotonic() + 15.0
@@ -201,14 +207,6 @@ class DecisivePhaseHandlers(DecisiveBase):
                     first_node=first_node,
                 )
 
-            if not to_buy and len(self._state.ships) == 0 and self._state.is_begin():
-                _log.info('[决战] 未选择舰船, 必须购买一项 → 选择第一项')
-                self._map.buy_fleet_option(next(iter(selections.values())).click_position)
-                if not self._map.close_fleet_overlay():
-                    raise RuntimeError('决战关闭战备舰队界面失败')
-                self._state.phase = DecisivePhase.RETREAT
-                return
-
             _log.info('[决战] 选择购买: {}', to_buy)
             for name in to_buy:
                 sel = selections[name]
@@ -245,8 +243,7 @@ class DecisivePhaseHandlers(DecisiveBase):
         )
 
         # ── 恢复模式检测 ─────────────────────────────────────────────
-        # 判定标准: 首次进入时节点不是 1A，
-        # 或者是 1A 但尚未经历过 choose_fleet（已有进度继续）
+        # 统一在进图后根据节点判定：只要不是首次进入的 1A，均视为恢复模式。
         if not self._resume_mode and (
             not self._state.is_begin() or (self._state.is_begin() and not self._has_chosen_fleet)
         ):

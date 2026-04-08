@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.image_resources import TemplateKey, Templates
 from autowsgr.image_resources.keys import RESULT_GRADE_KEYS
-from autowsgr.infra import get_logger, save_image
+from autowsgr.infra import get_logger
 from autowsgr.types import FightCondition, Formation, RepairMode, ShipDamageState
 from autowsgr.ui.battle.blood import classify_blood
 from autowsgr.vision import ImageChecker, PixelChecker
@@ -313,7 +313,6 @@ def get_ship_drop(device: AndroidController) -> str | None:
     from autowsgr.vision import EasyOCREngine
 
     screen = device.screenshot()
-    save_image(screen, 'debug_ship_drop.png')
     ocr = EasyOCREngine.create(gpu=False)
     result = recognize_ship_drop(screen, ocr)
     if result.ship_name:
@@ -366,7 +365,6 @@ def detect_result_grade(device: AndroidController) -> str:
         战果等级。
     """
     retry = 0
-    save_image(device.screenshot(), 'debug_combat_result.png')
     while retry < 5:
         screen = device.screenshot()
         for grade, key in RESULT_GRADE_KEYS.items():

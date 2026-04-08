@@ -30,12 +30,13 @@ ctx = launch('usersettings.yaml')
 # 2. 配置决战参数
 config = DecisiveConfig(
     chapter=6,
+    decisive_rounds=3,
     level1=['U-1206', 'U-96', 'U-47', '鹦鹉螺', '鲃鱼', '伊-25'],
     level2=['M-296', '大青花鱼', 'U-1405', '射水鱼'],
     flagship_priority=['U-1206'],
 )
 
 controller = DecisiveController(ctx, config)
-result = controller.run()
+results = controller.run_for_times(config.decisive_rounds)
 
-print(f'决战结果: {result.value}')
+print(f'决战结果: {[r.value for r in results]}')

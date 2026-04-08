@@ -288,6 +288,7 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
     def executor(task_info: Any) -> list[dict[str, Any]]:
         config = DecisiveConfig(
             chapter=request.chapter,
+            decisive_rounds=request.decisive_rounds,
             level1=request.level1,
             level2=request.level2,
             flagship_priority=request.flagship_priority,
@@ -295,17 +296,31 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
         )
 
         controller = DecisiveController(ctx, config)
-        task_manager.update_progress(current_round=1, current_node='决战')
+        results: list[dict[str, Any]] = []
 
         try:
-            result = controller.run()
-            return [{'round': 1, 'success': True, 'result': result.value}]
+            for i in range(request.decisive_rounds):
+                if task_manager.should_stop():
+                    break
+
+                task_manager.update_progress(current_round=i + 1, current_node='决战')
+                _log.info('[Task] 决战第 {}/{} 轮', i + 1, request.decisive_rounds)
+                result = controller.run()
+                converted = {'round': i + 1, 'success': True, 'result': result.value}
+                results.append(converted)
+                task_manager.add_result(converted)
+
+                if result.value in {'leave', 'error'}:
+                    _log.warning('[Task] 决战第 {} 轮终止: {}', i + 1, result.value)
+                    break
         except Exception as e:
-            return [{'round': 1, 'success': False, 'error': str(e)}]
+            results.append({'round': len(results) + 1, 'success': False, 'error': str(e)})
+
+        return results
 
     task_id = task_manager.start_task(
         task_type='decisive',
-        total_rounds=1,
+        total_rounds=request.decisive_rounds,
         executor=executor,
     )
 

@@ -215,6 +215,8 @@ class DecisiveConfig(BaseModel):
 
     chapter: int = 6
     """决战章节 (1-6)"""
+    decisive_rounds: int = 1
+    """决战连续执行轮数"""
     level1: list[str] = Field(
         default_factory=lambda: ['鲃鱼', 'U-1206', 'U-47', '射水鱼', 'U-96', 'U-1405']
     )

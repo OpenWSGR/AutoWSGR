@@ -16,7 +16,7 @@ class DecisiveState:
     Attributes
     ----------
     chapter:
-        章节 (4-6)。
+        章节 (1-6)。
     stage:
         当前小关 (1-3), 0 表示尚未开始。
     node:

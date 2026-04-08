@@ -115,23 +115,26 @@ daily_automation:
 # 决战 (不需要可删除整个 decisive_battle 块)
 # ═══════════════════════════════════════════
 decisive_battle:
-  chapter: 6                       # 决战章节 (1-6)
+  chapter: 1                       # 决战章节 (1-6)
+  decisive_rounds: 1              # 决战连续执行轮数
   level1:                          # 一级舰队
-    - 鲃鱼
+    - 青波鱼
     - U-1206
     - U-47
     - 射水鱼
     - U-96
-    - U-1405
+    - 鹦鹉螺
   level2:                          # 二级舰队
-    - U-81
-    - 大青花鱼
+    - U-1405
+    - M-296
+    - 伊-25
+    - 351
   flagship_priority:               # 旗舰优先级队列
     - U-1405
     - U-47
     - U-96
     - U-1206
-  repair_level: 1                  # 维修策略 (1=中破修, 2=大破修)
+  repair_level: 2                  # 维修策略 (1=中破修, 2=大破修)
   use_quick_repair: true           # 是否启用快修（桶修），关闭后不修理受损舰船。
   full_destroy: false              # 船舱满了是否解装舰船
   useful_skill: false              # 充分利用技能
