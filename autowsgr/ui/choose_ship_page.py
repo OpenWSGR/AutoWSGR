@@ -58,7 +58,7 @@ _SCROLL_TO_Y: float = 0.30
 _OCR_MAX_ATTEMPTS: int = 3
 
 PAGE_SIGNATURE = PixelSignature(
-    name='skill_used',
+    name='choose_ship_page',
     strategy=MatchStrategy.ALL,
     rules=[
         PixelRule.of(0.8594, 0.1514, (31, 46, 69), tolerance=30.0),

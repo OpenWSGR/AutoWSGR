@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from typing import TYPE_CHECKING
 
@@ -47,8 +48,8 @@ from autowsgr.vision import (
     PixelChecker,
     PixelRule,
     PixelSignature,
-    get_api_dll,
 )
+from autowsgr.vision.ocr import OCREngine
 
 from ..page import click_and_wait_for_page
 
@@ -128,8 +129,8 @@ class DecisiveMapController:
 
             1. dock_full      — 弹窗存活时间极短 (~2s)
             2. use_last_fleet — 进入已有进度章节时弹出
-            3. 地图页 (无 overlay)
-            4. overlay (战备舰队 / 前进点)
+            3. overlay        — 战备舰队 / 前进点（必须先于地图页判断）
+            4. 地图页         — 无 overlay 的正常决战地图页
 
         Returns
         -------
@@ -157,15 +158,31 @@ class DecisiveMapController:
             _log.info('[地图控制器] 检测到「使用上次舰队」按钮')
             return DecisivePhase.USE_LAST_FLEET
 
-        if is_decisive_map_page(screen):
-            return DecisivePhase.PREPARE_COMBAT
-
         overlay = detect_decisive_overlay(screen)
         if overlay is not None:
             if overlay == DecisiveOverlay.ADVANCE_CHOICE:
                 return DecisivePhase.ADVANCE_CHOICE
             if overlay == DecisiveOverlay.FLEET_ACQUISITION:
                 return DecisivePhase.CHOOSE_FLEET
+
+        if is_decisive_map_page(screen):
+            # 进图后的首个稳定帧有时会短暂满足“地图页”特征，但战备舰队
+            # overlay 会在随后 1-2 帧内出现。这里补一次短延迟复检，只把
+            # 连续两次都稳定为地图页的结果视为 PREPARE_COMBAT。
+            time.sleep(0.2)
+            confirm_screen = self._ctrl.screenshot()
+
+            overlay = detect_decisive_overlay(confirm_screen)
+            if overlay is not None:
+                if overlay == DecisiveOverlay.ADVANCE_CHOICE:
+                    _log.debug('[地图控制器] 地图页复检修正为 overlay: advance_choice')
+                    return DecisivePhase.ADVANCE_CHOICE
+                if overlay == DecisiveOverlay.FLEET_ACQUISITION:
+                    _log.debug('[地图控制器] 地图页复检修正为 overlay: fleet_acquisition')
+                    return DecisivePhase.CHOOSE_FLEET
+
+            if is_decisive_map_page(confirm_screen):
+                return DecisivePhase.PREPARE_COMBAT
 
         return None
 
@@ -211,19 +228,18 @@ class DecisiveMapController:
         screen: np.ndarray | None = None,
         fallback: str = 'A',
     ) -> str:
-        """DLL 识别当前决战节点字母 (如 ``'A'``, ``'B'``)。
+        """OCR 识别当前决战节点字母 (如 ``'A'``, ``'B'``)。
 
         算法 (无模板依赖):
 
         1. 轮询截图，通过 **HSV 颜色分割** 定位舰船指示器 X 坐标
            (地图上最大的橙黄色连通区域)。
-        2. 以舰标 X 为参考裁剪全高竖列，送 DLL ``recognize_map`` 识别。
-        3. DLL 返回 ``'0'`` 时重试 (最多 3 次)，全部失败抛出异常。
+        2. 以舰标 X 为参考裁剪竖列，使用 OCR 识别节点字母。
+        3. OCR 失败时重试 (最多 3 次)，全部失败返回 fallback。
         """
         _MAX_RETRY = 3
         _ICON_TIMEOUT = 10.0
         _ICON_GAP = 0.15
-        dll = get_api_dll()
 
         for retry in range(_MAX_RETRY + 1):
             # 1. 轮询等待舰船指示器出现
@@ -243,30 +259,62 @@ class DecisiveMapController:
 
             _log.debug('[地图控制器] 舰船指示器位置: X={:.3f}', icon_rel_x)
 
-            # 2. 取新截图，按舰标 X 裁剪竖列
+            # 2. 取新截图，按舰标 X 裁剪竖列（聚焦节点字母区域）
             fresh_screen = self._ctrl.screenshot()
             h, w = fresh_screen.shape[:2]
-            x1 = max(0, int((icon_rel_x - 0.03) * w))
-            x2 = min(w, int((icon_rel_x - 0.03 + 0.042) * w))
-            col_crop = fresh_screen[0:h, x1:x2]
-
-            # 3. DLL 识别
+            
+            # 裁剪范围：舰标上方区域，节点字母通常位于舰标上方
+            # 相对坐标：Y从0.25到0.55，X左右各0.04
+            y1 = int(0.25 * h)
+            y2 = int(0.55 * h)
+            x1 = max(0, int((icon_rel_x - 0.04) * w))
+            x2 = min(w, int((icon_rel_x + 0.04) * w))
+            node_crop = fresh_screen[y1:y2, x1:x2]
+            
+            # 防御性检查
+            if x1 >= x2 or node_crop.size == 0 or (x2 - x1) < 30:
+                _log.warning(
+                    '[地图控制器] 裁剪区域无效: x1={}, x2={}, width={}, shape={}',
+                    x1, x2, x2 - x1, node_crop.shape
+                )
+                if retry >= _MAX_RETRY:
+                    break
+                _log.warning(
+                    '[地图控制器] 节点识别失败, 正在重试第 {} 次',
+                    retry + 1,
+                )
+                continue
+            
+            # 3. OCR 识别节点字母
             try:
-                result = dll.recognize_map(col_crop)
-                if result != '0':
-                    _log.info('[地图控制器] 识别决战节点: {}', result[0])
-                    return result[0]
-            except Exception:
-                _log.warning('[地图控制器] DLL 节点识别异常', exc_info=True)
+                ocr = OCREngine.create('easyocr', gpu=False)
+                # 限制只识别大写字母，提高准确率
+                result = ocr.recognize_single(node_crop, allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+                text = result.text.strip().upper()
+                
+                _log.debug('[地图控制器] OCR原始结果: "{}" (置信度={:.2f})', text, result.confidence)
+                
+                # 提取单个字母（A-Z）
+                match = re.search(r'[A-Z]', text)
+                if match:
+                    node_letter = match.group(0)
+                    _log.info('[地图控制器] OCR识别节点: {}', node_letter)
+                    return node_letter
+                else:
+                    _log.warning('[地图控制器] OCR未识别到有效节点字母: "{}"', text)
+                    if retry >= _MAX_RETRY:
+                        break
+                    continue
+                    
+            except Exception as e:
+                _log.warning('[地图控制器] OCR识别失败: {}', e)
+                if retry >= _MAX_RETRY:
+                    break
+                time.sleep(0.5)
+                continue
 
-            if retry >= _MAX_RETRY:
-                break
-            _log.warning(
-                '[地图控制器] 节点识别失败, 正在重试第 {} 次',
-                retry + 1,
-            )
-
-        raise RuntimeError(f'决战节点识别失败: 重试 {_MAX_RETRY + 1} 次后仍无法识别')
+        _log.error('[地图控制器] 节点识别失败，返回 fallback: {}', fallback)
+        return fallback
 
     # ══════════════════════════════════════════════════════════════════════
     # 战备舰队获取 overlay
@@ -286,17 +334,26 @@ class DecisiveMapController:
             fallback_score=fallback_score,
         )
 
-    def wait_for_fleet_overlay_stable(self, timeout: float = 8.0) -> np.ndarray:
-        """等待战备舰队弹窗稳定后返回截图。"""
-        screen = self.wait_for_overlay(DecisiveOverlay.FLEET_ACQUISITION, timeout=timeout)
-        stable_deadline = time.monotonic() + 2.0
+    def wait_for_fleet_overlay_stable(
+        self,
+        screen: np.ndarray | None = None,
+        timeout: float = 8.0,
+    ) -> np.ndarray:
+        """等待战备舰队弹窗稳定后返回截图。
+
+        当上层已通过阶段纠偏进入 ``CHOOSE_FLEET`` 时，当前截图本身就可能是
+        首进购买界面，此时不要再次强依赖旧的 overlay 像素签名；直接以当前截图
+        为起点做短暂稳定等待即可。
+        """
+        if screen is None:
+            screen = self.wait_for_overlay(DecisiveOverlay.FLEET_ACQUISITION, timeout=timeout)
+
+        stable_deadline = time.monotonic() + 1.0
+        last_screen = screen
         while time.monotonic() < stable_deadline:
             time.sleep(0.25)
-            screen = self._ctrl.screenshot()
-            if not is_fleet_acquisition(screen):
-                screen = self.wait_for_overlay(DecisiveOverlay.FLEET_ACQUISITION, timeout=timeout)
-                stable_deadline = time.monotonic() + 2.0
-        return screen
+            last_screen = self._ctrl.screenshot()
+        return last_screen
 
     def detect_last_offer_name(
         self,
@@ -466,10 +523,28 @@ class DecisiveMapController:
         """点击右下角「编队」按钮。"""
         # TODO: 改进鲁棒性
         time.sleep(1)
+        from autowsgr.ui.utils.navigation import NavConfig
+
+        # 调试：检测当前页面状态
+        screen = self._ctrl.screenshot()
+        from autowsgr.ui.decisive.overlay import SIG_MAP_PAGE
+        from autowsgr.ui.battle.base import PAGE_SIGNATURE
+        from autowsgr.vision.matcher import PixelChecker
+        
+        map_check = PixelChecker.check_signature(screen, SIG_MAP_PAGE)
+        prep_check = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        _log.debug(
+            '[地图控制器] 点击编队前 - 地图页: {}, 出征准备页: {}',
+            map_check.matched,
+            prep_check.matched,
+        )
+
+        config = NavConfig(timeout=10.0, interval=0.5, max_retries=3)
         click_and_wait_for_page(
             self._ctrl,
             CLICK_FORMATION,
             BattlePreparationPage.is_current_page,
+            config=config,
         )
 
     def click_sortie(self) -> None:

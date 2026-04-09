@@ -31,6 +31,9 @@ _MAP_END: list[str] = [
 
 # key_points[chapter][stage] → 需要夜战的关键节点字母集合
 _KEY_POINTS: dict[int, list[str]] = {
+    1: ['', 'BDF', 'BFH', 'DHJ'],
+    2: ['', 'CFH', 'BFH', 'DHJ'],
+    3: ['', 'CFH', 'BFH', 'DHJ'],
     4: ['', 'CFH', 'BFH', 'DHJ'],
     5: ['', 'DFH', 'DGJ', 'CGJ'],
     6: ['', 'BGJ', 'CHJ', 'DGJ'],

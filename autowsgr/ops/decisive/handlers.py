@@ -145,6 +145,20 @@ class DecisivePhaseHandlers(DecisiveBase):
         screen = self._ctrl.screenshot()
         phase = self._map.detect_decisive_phase(screen)
 
+        # Ex-1 首次进入第 1 小节时，理论上应先经历一次战备舰队获取。
+        # 若此时尚未进入过 CHOOSE_FLEET，却稳定识别成 PREPARE_COMBAT，
+        # 则将其视为购买界面漏判并自动修正到 CHOOSE_FLEET。
+        # 注意：暂离后重进时 node='U'，此时舰标已在地图上，不应修正到 CHOOSE_FLEET
+        if (
+            phase == DecisivePhase.PREPARE_COMBAT
+            and self._state.stage == 1
+            and not self._has_chosen_fleet
+            and self._state.node != 'U'  # 排除暂离后重进的情况
+        ):
+            _log.warning('[决战] 首进第 1 小节将 PREPARE_COMBAT 修正为 CHOOSE_FLEET')
+            self._state.phase = DecisivePhase.CHOOSE_FLEET
+            return
+
         if phase is not None:
             self._state.phase = phase
 
@@ -230,6 +244,16 @@ class DecisivePhaseHandlers(DecisiveBase):
     def _handle_prepare_combat(self) -> None:
         """出征准备：编队 → 修理 → 出征。"""
         screen = self._ctrl.screenshot()
+
+        # 某些情况下地图页识别会先于 overlay 稳定，导致实际上仍停留在
+        # 「战备舰队获取 / 前进点选择」时就误入 PREPARE_COMBAT。
+        # 这里补一次即时探测，优先回到正确阶段，避免后续直接点“编队”超时。
+        overlay_phase = self._map.detect_decisive_phase(screen)
+        if overlay_phase in (DecisivePhase.CHOOSE_FLEET, DecisivePhase.ADVANCE_CHOICE):
+            _log.info('[决战] 出征准备前检测到 overlay，切回阶段: {}', overlay_phase.name)
+            self._state.phase = overlay_phase
+            return
+
         if self._state.node == 'U':
             if self._state.stage == 1 and self._has_chosen_fleet:
                 self._state.node = 'A'
@@ -256,7 +280,14 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # 先使用技能，再注册舰船，如果是未知节点，也判定一下技能是否使用
         current_node = self._state.node
-        if (current_node == 'A' or current_node == 'U') and not self._map.is_skill_used():
+        skill_used = self._map.is_skill_used()
+        _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
+        
+        # 强制使用技能条件：节点 A/U 且首次进入（尚未选择过舰队）
+        should_use_skill = (current_node == 'A' or current_node == 'U') and not self._has_chosen_fleet
+        
+        if should_use_skill or ((current_node == 'A' or current_node == 'U') and not skill_used):
+            _log.debug('[决战] 执行技能使用: 强制={}', should_use_skill)
             gained = self._map.use_skill()
             if gained:
                 if self._config.useful_skill and not self._logic.check_useful_skill(gained):
@@ -265,6 +296,8 @@ class DecisivePhaseHandlers(DecisiveBase):
                     return
                 _log.info('[决战] 使用技能获得: {}', gained)
                 self._state.ships.update(gained)
+        else:
+            _log.debug('[决战] 跳过技能使用: 节点={}, 技能已使用={}', current_node, skill_used)
 
         # ── 恢复模式: 扫描当前舰队与可用舰船 ─────────────────────────
         # 对齐 legacy: if fleet.empty() and not is_begin(): _check_fleet()
@@ -287,11 +320,11 @@ class DecisivePhaseHandlers(DecisiveBase):
             return
 
         self._map.enter_formation()
+        time.sleep(0.5)  # 等待编队页加载完成（对齐 check_fleet 的做法）
         page = DecisiveBattlePreparationPage(self._ctx, self._config, self._ocr)
 
         current_fleet = self._state.fleet[:]
         if current_fleet != best_fleet:
-            time.sleep(0.5)  # 等待进入出征准备页面
             page.change_fleet(None, best_fleet[1:])
             self._state.fleet = best_fleet
         else:
@@ -375,9 +408,15 @@ class DecisivePhaseHandlers(DecisiveBase):
             return
 
         # 非小关终止：推进节点计数
-        next_node = chr(ord(self._state.node) + 1)
-        self._state.node = next_node
-        _log.info('[决战] 推进至节点 {}', next_node)
+        # 使用逻辑递进：节点字母 +1（A→B→C...）
+        # 注意：战斗结束后可能出现 ADVANCE_CHOICE/CHOOSE_FLEET overlay，
+        # 此时不应调用 recognize_node()，因为舰标尚未出现。
+        # 恢复模式（暂离后再进）时，节点识别在 _handle_prepare_combat 中进行。
+        expected_node = chr(ord(self._state.node) + 1)
+        self._state.node = expected_node
+        _log.debug('[决战] 节点递进: {} -> {}', chr(ord(expected_node) - 1), expected_node)
+        
+        _log.info('[决战] 推进至节点 {}', self._state.node)
 
         # 轮询检测地图状态
         # TODO: 改进鲁棒性
