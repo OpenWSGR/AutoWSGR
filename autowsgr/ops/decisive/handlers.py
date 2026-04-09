@@ -286,10 +286,12 @@ class DecisivePhaseHandlers(DecisiveBase):
         current_node = self._state.node
         skill_used = self._map.is_skill_used()
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
-        
+
         # 强制使用技能条件：节点 A/U 且首次进入（尚未选择过舰队）
-        should_use_skill = (current_node == 'A' or current_node == 'U') and not self._has_chosen_fleet
-        
+        should_use_skill = (
+            current_node == 'A' or current_node == 'U'
+        ) and not self._has_chosen_fleet
+
         if should_use_skill or ((current_node == 'A' or current_node == 'U') and not skill_used):
             _log.debug('[决战] 执行技能使用: 强制={}', should_use_skill)
             gained = self._map.use_skill()
@@ -419,7 +421,7 @@ class DecisivePhaseHandlers(DecisiveBase):
         expected_node = chr(ord(self._state.node) + 1)
         self._state.node = expected_node
         _log.debug('[决战] 节点递进: {} -> {}', chr(ord(expected_node) - 1), expected_node)
-        
+
         _log.info('[决战] 推进至节点 {}', self._state.node)
 
         # 轮询检测地图状态

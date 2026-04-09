@@ -197,7 +197,7 @@ class DecisiveBattlePage:
     @staticmethod
     def recognize_stage(screen: np.ndarray, chapter: int) -> int:
         """识别当前决战章节的小关进度 (1-3)。
-    
+
         使用递进式判定逻辑：通过检测前 2 个小关的完成状态推断当前小关。
         所有章节使用统一的配置结构，只是参数不同。
         """
@@ -205,11 +205,11 @@ class DecisiveBattlePage:
         if config is None:
             _log.warning('[决战] 未知章节 {}', chapter)
             return 1
-    
+
         check_points = config['points']
         check_color = config['color']
         check_tolerance = config['tolerance']
-    
+
         for i, (rx, ry) in enumerate(check_points, start=1):
             matched = PixelChecker.check_pixel(screen, rx, ry, check_color, check_tolerance)
             actual_color = PixelChecker.get_pixel(screen, rx, ry)
@@ -224,15 +224,13 @@ class DecisiveBattlePage:
             if not matched:
                 _log.info('[决战] 识别决战地图参数, 第 {} 小节正在进行', i)
                 return i
-    
+
         _log.info('[决战] 识别决战地图参数, 第 3 小节正在进行')
         return 3
 
     def detect_stage(self, screen: np.ndarray, chapter: int) -> int:
         """识别小节号（统一调用 recognize_stage）。"""
         return self.recognize_stage(screen, chapter)
-
-
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 
