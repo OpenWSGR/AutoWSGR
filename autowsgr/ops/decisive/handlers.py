@@ -259,7 +259,11 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._state.node = 'A'
                 _log.info('[决战] 首次进入第 1 小节，跳过节点识别并默认使用节点 A')
             else:
-                self._state.node = self._map.recognize_node(screen)
+                self._state.node = self._map.recognize_node(
+                    screen,
+                    chapter=self._config.chapter,
+                    stage=self._state.stage,
+                )
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,

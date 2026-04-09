@@ -227,6 +227,8 @@ class DecisiveMapController:
         self,
         screen: np.ndarray | None = None,
         fallback: str = 'A',
+        chapter: int = 6,
+        stage: int = 1,
     ) -> str:
         """OCR 识别当前决战节点字母 (如 ``'A'``, ``'B'``)。
 
@@ -236,7 +238,23 @@ class DecisiveMapController:
            (地图上最大的橙黄色连通区域)。
         2. 以舰标 X 为参考裁剪竖列，使用 OCR 识别节点字母。
         3. OCR 失败时重试 (最多 3 次)，全部失败返回 fallback。
+        
+        Parameters
+        ----------
+        chapter:
+            当前章节 (1-6)，用于确定OCR字符集范围。
+        stage:
+            当前小关 (1-3)，用于确定OCR字符集范围。
         """
+        from autowsgr.ops.decisive.config import MapData
+        
+        # 根据章节小关确定可能的节点范围 (A到终点)
+        end_node = MapData.get_stage_end_node(chapter, stage)
+        end_ord = ord(end_node)
+        # 生成字符集 A到终点 (如A-F, A-H, A-J)
+        allowlist = ''.join(chr(i) for i in range(ord('A'), end_ord + 1))
+        _log.debug('[地图控制器] 章节{}小关{}节点范围: A-{}', chapter, stage, end_node)
+        
         _MAX_RETRY = 3
         _ICON_TIMEOUT = 10.0
         _ICON_GAP = 0.15
@@ -263,13 +281,45 @@ class DecisiveMapController:
             fresh_screen = self._ctrl.screenshot()
             h, w = fresh_screen.shape[:2]
             
-            # 裁剪范围：舰标上方区域，节点字母通常位于舰标上方
-            # 相对坐标：Y从0.25到0.55，X左右各0.04
-            y1 = int(0.25 * h)
+            # 裁剪范围：舰标上方区域（有颜色过滤，范围可以稍宽）
+            # 节点字母在舰标上方约0.08-0.20处
+            y1 = int(0.35 * h)
             y2 = int(0.55 * h)
-            x1 = max(0, int((icon_rel_x - 0.04) * w))
-            x2 = min(w, int((icon_rel_x + 0.04) * w))
+            x1 = max(0, int((icon_rel_x - 0.05) * w))
+            x2 = min(w, int((icon_rel_x + 0.05) * w))
             node_crop = fresh_screen[y1:y2, x1:x2]
+            
+            _log.debug('[地图控制器] 裁剪区域: Y={}-{}, X={}-{}, shape={}', y1, y2, x1, x2, node_crop.shape)
+            
+            # 图像增强：提升对比度和锐化，突出白色文字
+            # 节点字母颜色近似白色 (RGB 213-231)
+            gray = cv2.cvtColor(node_crop, cv2.COLOR_RGB2GRAY)
+            
+            # 自适应直方图均衡化（CLAHE）增强对比度
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            
+            # 锐化滤波
+            kernel_sharpen = np.array([[-1, -1, -1],
+                                       [-1,  9, -1],
+                                       [-1, -1, -1]])
+            sharpened = cv2.filter2D(enhanced, -1, kernel_sharpen)
+            
+            # 二值化（使用Otsu自动阈值）
+            _, binary = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # 检查是否有足够的白色像素
+            white_ratio = np.sum(binary > 0) / binary.size
+            _log.debug('[地图控制器] 白色像素比例: {:.2%}', white_ratio)
+            
+            if white_ratio < 0.005:  # 白色像素太少，可能没裁到字母
+                _log.warning('[地图控制器] 白色像素过少，可能未定位到节点字母')
+                if retry >= _MAX_RETRY:
+                    break
+                continue
+            
+            # 使用增强后的图像进行OCR
+            node_crop_processed = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2RGB)
             
             # 防御性检查
             if x1 >= x2 or node_crop.size == 0 or (x2 - x1) < 30:
@@ -288,14 +338,14 @@ class DecisiveMapController:
             # 3. OCR 识别节点字母
             try:
                 ocr = OCREngine.create('easyocr', gpu=False)
-                # 限制只识别大写字母，提高准确率
-                result = ocr.recognize_single(node_crop, allowlist='ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+                # 使用动态字符集（根据章节小关确定范围）
+                result = ocr.recognize_single(node_crop_processed, allowlist=allowlist)
                 text = result.text.strip().upper()
                 
                 _log.debug('[地图控制器] OCR原始结果: "{}" (置信度={:.2f})', text, result.confidence)
                 
-                # 提取单个字母（A-Z）
-                match = re.search(r'[A-Z]', text)
+                # 提取单个字母（在允许范围内）
+                match = re.search(rf'[{allowlist}]', text)
                 if match:
                     node_letter = match.group(0)
                     _log.info('[地图控制器] OCR识别节点: {}', node_letter)
