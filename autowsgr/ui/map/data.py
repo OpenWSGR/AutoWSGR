@@ -99,6 +99,8 @@ MAP_DATABASE: dict[tuple[int, int], str] = {
     (9, 3): '南入海口海域',
     (9, 4): '河口外海',
     (9, 5): '南大洋群岛',
+    # 第十章：极地海峡
+    (10, 1): '极地海峡',
 }
 """已知地图 (章节, 关卡号) → 名称。"""
 
@@ -109,7 +111,7 @@ for _ch, _mn in MAP_DATABASE:
     CHAPTER_MAP_COUNTS[_ch] = max(CHAPTER_MAP_COUNTS.get(_ch, 0), _mn)
 
 
-TOTAL_CHAPTERS: int = 9
+TOTAL_CHAPTERS: int = 10
 """总章节数。"""
 
 
@@ -226,8 +228,8 @@ def parse_map_title(text: str) -> MapIdentity | None:
     MapIdentity | None
         解析成功返回地图信息，失败返回 ``None``。
     """
-    # ── 第 1 步: 严格单位数匹配 ──
-    m = re.search(r'(\d)\s*[--—]\s*(\d)\s*[/]?\s*(.*)', text)
+    # ── 第 1 步: 单位数/双位数匹配 ──
+    m = re.search(r'(\d{1,2})\s*[--—]\s*(\d)\s*[/]?\s*(.*)', text)
     if m:
         chapter = int(m.group(1))
         map_num = int(m.group(2))
