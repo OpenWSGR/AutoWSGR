@@ -119,8 +119,8 @@ class ExpeditionPanelMixin(BaseMapPage):
                     break
             time.sleep(0.25)
 
-            # 3. 点击屏幕中央跳过动画
-            self.click_screen_center()
+            # 3. 点击屏幕右侧跳过动画
+            self.click_expedition_skip()
             time.sleep(1.0)
 
             # 4. 确认弹窗

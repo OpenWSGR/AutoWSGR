@@ -14,7 +14,7 @@ from autowsgr.types import PageName
 from autowsgr.ui.map.data import (
     CLICK_BACK,
     CLICK_PANEL,
-    CLICK_SCREEN_CENTER,
+    CLICK_EXPEDITION_SKIP,
     EXPEDITION_NOTIF_COLOR,
     EXPEDITION_NOTIF_PROBE,
     EXPEDITION_TOLERANCE,
@@ -236,6 +236,6 @@ class BaseMapPage:
         if self.get_active_panel(screen) != panel:
             self.switch_panel(panel)
 
-    def click_screen_center(self) -> None:
-        """点击屏幕中央 — 用于跳过动画/确认弹窗。"""
-        self._ctrl.click(*CLICK_SCREEN_CENTER)
+    def click_expedition_skip(self) -> None:
+        """点击屏幕右侧 — 用于跳过远征动画。"""
+        self._ctrl.click(*CLICK_EXPEDITION_SKIP)

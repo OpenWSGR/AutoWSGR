@@ -43,11 +43,12 @@ class Confirm:
     CONFIRM_2 = LazyTemplate('common/confirm_2_540p.png', 'confirm_2')
     CONFIRM_3 = LazyTemplate('common/confirm_3_540p.png', 'confirm_3')
     CONFIRM_4 = LazyTemplate('common/confirm_4_540p.png', 'confirm_4')
+    CONFIRM_5 = LazyTemplate('common/confirm_5_540p.png', 'confirm_5')
 
     @classmethod
     def all(cls) -> list[ImageTemplate]:
         """所有确认弹窗模板列表。"""
-        return [cls.CONFIRM_1, cls.CONFIRM_2, cls.CONFIRM_3, cls.CONFIRM_4]
+        return [cls.CONFIRM_1, cls.CONFIRM_2, cls.CONFIRM_3, cls.CONFIRM_4, cls.CONFIRM_5]
 
 
 class Build:

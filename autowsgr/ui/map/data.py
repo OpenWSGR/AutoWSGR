@@ -414,8 +414,8 @@ EXERCISE_SWIPE_DELAY: float = 0.8
 
 # ── 远征 ──
 
-CLICK_SCREEN_CENTER: tuple[float, float] = (0.5, 0.5)
-"""屏幕中央 — 用于闪过动画/确认弹窗。"""
+CLICK_EXPEDITION_SKIP: tuple[float, float] = (0.76, 0.5)
+"""屏幕右侧 — 用于跳过远征动画。"""
 
 # ── 战利品/舰船获取数量 OCR 裁切区域 ──
 
