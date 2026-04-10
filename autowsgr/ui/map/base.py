@@ -13,8 +13,8 @@ from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.map.data import (
     CLICK_BACK,
-    CLICK_PANEL,
     CLICK_EXPEDITION_SKIP,
+    CLICK_PANEL,
     EXPEDITION_NOTIF_COLOR,
     EXPEDITION_NOTIF_PROBE,
     EXPEDITION_TOLERANCE,
