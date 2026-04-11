@@ -626,7 +626,7 @@ class DecisiveMapController:
 
         # 掉落处理结束后，继续等待回到决战入口页，避免奖励弹窗残留导致后续状态识别超时
         settle_deadline = time.monotonic() + 12.0
-        reward_ack_pos = (0.5, 0.5)
+        reward_ack_pos = (0.953, 0.954)
         while time.monotonic() < settle_deadline:
             screen = self._ctrl.screenshot()
             if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
@@ -638,6 +638,7 @@ class DecisiveMapController:
                 _log.info("[地图控制器] 结算阶段仍有奖励弹窗: '{}'", reward_detail.template_name)
                 self._ctrl.click(*reward_ack_pos)
                 time.sleep(0.35)
+                confirm_operation(self._ctrl, timeout=0.8)
                 confirm_operation(self._ctrl, timeout=0.8)
                 continue
 
