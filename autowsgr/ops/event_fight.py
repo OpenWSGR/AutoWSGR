@@ -13,8 +13,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat

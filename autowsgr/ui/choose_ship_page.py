@@ -258,8 +258,8 @@ class ChooseShipPage:
                 level_hint = f' (等级限制: >= {min_level})'
             else:
                 level_hint = f' (等级限制: <= {max_level})'
-        _log.error("[UI] 未在选船列表中找到可用候选: {}{}", candidates, level_hint)
-        raise RuntimeError(f"未找到满足条件的目标舰船: {candidates}{level_hint}")
+        _log.error('[UI] 未在选船列表中找到可用候选: {}{}', candidates, level_hint)
+        raise RuntimeError(f'未找到满足条件的目标舰船: {candidates}{level_hint}')
 
     @staticmethod
     def _is_level_in_range(level: int | None, min_level: int | None, max_level: int | None) -> bool:

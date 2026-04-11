@@ -127,7 +127,9 @@ class FleetChangeMixin(FleetDetectMixin):
                     (
                         candidate
                         for candidate in candidates
-                        if isinstance(candidate, str) and candidate in current and candidate not in reused
+                        if isinstance(candidate, str)
+                        and candidate in current
+                        and candidate not in reused
                     ),
                     None,
                 )
@@ -161,7 +163,7 @@ class FleetChangeMixin(FleetDetectMixin):
                     slot_to_replace=slot,
                 )
                 if selected_name is None:
-                    _log.warning("[准备页] 槽位 {} 的候选均已在编队中, 跳过补员", i)
+                    _log.warning('[准备页] 槽位 {} 的候选均已在编队中, 跳过补员', i)
                     continue
                 occupied = current[slot] is not None
                 _log.info(
@@ -207,7 +209,7 @@ class FleetChangeMixin(FleetDetectMixin):
                         selectors[i],
                     )
                     if selected_name is None:
-                        _log.warning("[准备页] 槽位 {} 的候选均已在编队中, 无法补位", i)
+                        _log.warning('[准备页] 槽位 {} 的候选均已在编队中, 无法补位', i)
                         continue
                     _log.info(
                         "[准备页] 成员补位: 槽位 {} <- '{}' (原: '{}')",
@@ -318,9 +320,7 @@ class FleetChangeMixin(FleetDetectMixin):
 
         candidates = cls._slot_candidates(name, selector)
         occupied = {
-            ship
-            for idx, ship in enumerate(current)
-            if ship is not None and idx != slot_to_replace
+            ship for idx, ship in enumerate(current) if ship is not None and idx != slot_to_replace
         }
         available = [candidate for candidate in candidates if candidate not in occupied]
         if len(available) == 0:
