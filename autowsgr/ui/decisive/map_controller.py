@@ -13,15 +13,14 @@
 
 from __future__ import annotations
 
-import re
 import time
 from typing import TYPE_CHECKING
 
-from autowsgr.infra import save_image
 import cv2
 import numpy as np
 
 import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
+from autowsgr.infra import save_image
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
@@ -51,7 +50,6 @@ from autowsgr.vision import (
     PixelSignature,
     get_api_dll,
 )
-from autowsgr.vision.ocr import OCREngine
 
 from ..page import click_and_wait_for_page
 
@@ -225,13 +223,13 @@ class DecisiveMapController:
             return None
         return float(centroids[best][0]) / bgr.shape[1]
 
-    def dll_recognize(self,dll,screen,center)->str:
+    def dll_recognize(self, dll, screen, center) -> str:
         h, w = screen.shape[:2]
         x1 = max(0, int((center - 0.03) * w))
         x2 = min(w, int((center - 0.03 + 0.042) * w))
         col_crop = screen[0:h, x1:x2]
         result = dll.recognize_map(col_crop)
-        save_image(col_crop, result+'.png')
+        save_image(col_crop, result + '.png')
         return result
 
     def recognize_node(
@@ -268,33 +266,41 @@ class DecisiveMapController:
                 raise RuntimeError('决战节点识别失败: 舰船指示器超时未出现')
 
             _log.debug('[地图控制器] 舰船指示器位置: X={:.3f}', icon_rel_x)
-            time.sleep(0.5) # 等待截图稳定
+            time.sleep(0.5)  # 等待截图稳定
 
             # 2. 取新截图，按舰标 X 裁剪竖列
             fresh_screen = self._ctrl.screenshot()
 
             # 3. DLL 识别
             try:
-                result = self.dll_recognize(dll,fresh_screen,icon_rel_x)
+                result = self.dll_recognize(dll, fresh_screen, icon_rel_x)
                 if result != '0':
                     _log.info('[地图控制器] 识别决战节点: {}', result[0])
                     if result[0] == 'C':
                         right_x = icon_rel_x + 0.172
-                        right_result = self.dll_recognize(dll,fresh_screen, right_x)
+                        right_result = self.dll_recognize(dll, fresh_screen, right_x)
                         if right_result == 'D':
                             result = 'C'
                         elif right_result == 'C':
                             result = 'B'
-                        _log.info('[地图控制器] C右侧节点识别: {}, 修正后决战节点: {}', right_result, result)
+                        _log.info(
+                            '[地图控制器] C右侧节点识别: {}, 修正后决战节点: {}',
+                            right_result,
+                            result,
+                        )
 
                     if result[0] == 'J':
                         left_x = icon_rel_x - 0.172
-                        left_result = self.dll_recognize(dll,fresh_screen, left_x)
+                        left_result = self.dll_recognize(dll, fresh_screen, left_x)
                         if left_result == 'H':
                             result = 'I'
                         elif left_result == 'J':
                             result = 'J'
-                        _log.info('[地图控制器] J左侧节点识别: {}, 修正后决战节点: {}', left_result, result)
+                        _log.info(
+                            '[地图控制器] J左侧节点识别: {}, 修正后决战节点: {}',
+                            left_result,
+                            result,
+                        )
 
                     return result[0]
             except Exception:
