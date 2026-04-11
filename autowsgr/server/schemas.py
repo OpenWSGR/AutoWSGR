@@ -66,6 +66,17 @@ class NodeDecisionRequest(BaseModel):
     model_config = {'extra': 'forbid'}
 
 
+class FleetRuleRequest(BaseModel):
+    """编队槽位候选规则。"""
+
+    candidates: list[str] = Field(default_factory=list, description='候选舰船名（按优先级）')
+    search_name: str | None = Field(default=None, description='选船搜索关键词（用于同名舰船区分）')
+    min_level: int | None = Field(default=None, ge=1, description='等级下限（含）')
+    max_level: int | None = Field(default=None, ge=1, description='等级上限（含）')
+
+    model_config = {'extra': 'forbid'}
+
+
 class CombatPlanRequest(BaseModel):
     """作战计划请求体。"""
 
@@ -75,6 +86,10 @@ class CombatPlanRequest(BaseModel):
     map: int | str = Field(default=1, description='地图号')
     fleet_id: int = Field(default=1, ge=1, le=6, description='舰队编号')
     fleet: list[str] | None = Field(default=None, description='舰队成员')
+    fleet_rules: list[str | FleetRuleRequest] | None = Field(
+        default=None,
+        description='舰队槽位规则（字符串或候选规则）',
+    )
     repair_mode: list[int] = Field(
         default_factory=lambda: [2, 2, 2, 2, 2, 2],
         description='修理策略 (6个位置)',

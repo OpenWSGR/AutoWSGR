@@ -25,7 +25,7 @@ from autowsgr.vision import (
 )
 
 from .utils import wait_for_page, wait_leave_page
-from .utils.ship_list import locate_ship_rows
+from .utils.ship_list import locate_ship_rows, read_ship_levels
 
 
 if TYPE_CHECKING:
@@ -170,7 +170,8 @@ class ChooseShipPage:
         name: str | None,
         *,
         use_search: bool = True,
-    ) -> None:
+        selector: dict | None = None,
+    ) -> str | None:
         """更换/移除当前槽位的舰船。
 
         使用 DLL 行定位 + OCR 在选船列表中查找目标舰船并点击。
@@ -184,27 +185,101 @@ class ChooseShipPage:
             是否使用搜索框输入舰船名来过滤列表。
             常规出征为 ``True`` (默认), 决战为 ``False``
             (决战选船界面没有搜索框)。
+        selector:
+            可选规则，支持 ``candidates`` / ``min_level`` / ``max_level``。
+
+        Returns
+        -------
+        str | None
+            实际选中的舰船名；移除操作返回 ``None``。
         """
         if name is None:
             self.click_remove()
             self._wait_leave_current_page()
-            return
+            return None
 
         if self._ctx.ocr is None:
             _log.warning('[UI] 未提供 OCR 引擎, 无法识别选船列表')
-            return
-        if use_search:
+            return None
+
+        candidates = [name]
+        search_name: str | None = None
+        min_level: int | None = None
+        max_level: int | None = None
+
+        if isinstance(selector, dict):
+            raw_candidates = selector.get('candidates')
+            if isinstance(raw_candidates, list):
+                parsed = [str(v).strip() for v in raw_candidates if str(v).strip()]
+                if parsed:
+                    candidates = parsed
+            raw_min = selector.get('min_level')
+            raw_max = selector.get('max_level')
+            raw_search = selector.get('search_name')
+            if isinstance(raw_search, str) and raw_search.strip():
+                search_name = raw_search.strip()
+            if isinstance(raw_min, int) and raw_min > 0:
+                min_level = raw_min
+            if isinstance(raw_max, int) and raw_max > 0:
+                max_level = raw_max
+
+        if use_search and search_name:
             self.ensure_search_box()
-            self.input_ship_name(name)
+            self.input_ship_name(search_name)
             self.ensure_dismiss_keyboard()
-        found = self._click_ship_in_list(name)
-        if not found:
-            _log.error("[UI] 未在选船列表中找到 '{}'", name)
-            raise RuntimeError(f"未找到目标舰船 '{name}'")
+            matched = self._click_ship_in_list(
+                name,
+                min_level=min_level,
+                max_level=max_level,
+            )
+            if matched is not None:
+                self._wait_leave_current_page()
+                return matched
 
-        self._wait_leave_current_page()
+        for candidate in candidates:
+            if use_search:
+                self.ensure_search_box()
+                self.input_ship_name(candidate)
+                self.ensure_dismiss_keyboard()
+            matched = self._click_ship_in_list(
+                candidate,
+                min_level=min_level,
+                max_level=max_level,
+            )
+            if matched is not None:
+                self._wait_leave_current_page()
+                return matched
 
-    def _click_ship_in_list(self, name: str) -> bool:
+        level_hint = ''
+        if min_level is not None or max_level is not None:
+            if min_level is not None and max_level is not None:
+                level_hint = f' (等级限制: {min_level}-{max_level})'
+            elif min_level is not None:
+                level_hint = f' (等级限制: >= {min_level})'
+            else:
+                level_hint = f' (等级限制: <= {max_level})'
+        _log.error("[UI] 未在选船列表中找到可用候选: {}{}", candidates, level_hint)
+        raise RuntimeError(f"未找到满足条件的目标舰船: {candidates}{level_hint}")
+
+    @staticmethod
+    def _is_level_in_range(level: int | None, min_level: int | None, max_level: int | None) -> bool:
+        if min_level is None and max_level is None:
+            return True
+        if level is None:
+            return False
+        if min_level is not None and level < min_level:
+            return False
+        if max_level is not None and level > max_level:
+            return False
+        return True
+
+    def _click_ship_in_list(
+        self,
+        name: str,
+        *,
+        min_level: int | None = None,
+        max_level: int | None = None,
+    ) -> str | None:
         """在选船列表页使用 DLL 定位 + OCR 识别舰船名并点击目标。
 
         最多重试 ``_OCR_MAX_ATTEMPTS`` 次, 每次失败后向上滚动列表。
@@ -216,18 +291,33 @@ class ChooseShipPage:
 
         Returns
         -------
-        bool
-            ``True`` 表示已成功点击目标; ``False`` 表示全程未找到。
+        str | None
+            匹配并点击成功时返回舰船名；失败返回 ``None``。
         """
         assert self._ctx.ocr is not None
 
         for attempt in range(_OCR_MAX_ATTEMPTS):
             screen = self._ctrl.screenshot()
             hits = locate_ship_rows(self._ctx.ocr, screen)
+            level_map = {}
+            if min_level is not None or max_level is not None:
+                level_map = dict(read_ship_levels(self._ctx.ocr, screen))
 
             for matched, cx, cy in hits:
                 if matched != name:
                     continue
+
+                level = level_map.get(matched)
+                if not self._is_level_in_range(level, min_level, max_level):
+                    _log.warning(
+                        "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",
+                        matched,
+                        level if level is not None else '未知',
+                        min_level if min_level is not None else '-',
+                        max_level if max_level is not None else '-',
+                    )
+                    continue
+
                 _log.info(
                     "[UI] 选船 DLL+OCR -> '{}' (第 {}/{} 次), 点击 ({:.3f}, {:.3f})",
                     name,
@@ -238,7 +328,7 @@ class ChooseShipPage:
                 )
                 time.sleep(1.0)
                 self._ctrl.click(cx, cy)
-                return True
+                return matched
 
             _log.warning(
                 "[UI] 选船列表未匹配到 '{}' (第 {}/{} 次), 向上滚动",
@@ -250,4 +340,4 @@ class ChooseShipPage:
                 self._ctrl.swipe(0.4, _SCROLL_FROM_Y, 0.4, _SCROLL_TO_Y, duration=0.4)
                 time.sleep(0.5)
 
-        return False
+        return None

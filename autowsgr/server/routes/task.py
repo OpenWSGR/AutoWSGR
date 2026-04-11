@@ -111,6 +111,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
         request_plan = request.plan
         override_fleet_id = request_plan.fleet_id if request_plan is not None else None
         override_fleet = request_plan.fleet if request_plan is not None else None
+        override_fleet_rules = request_plan.fleet_rules if request_plan is not None else None
 
         for i in range(request.times):
             if task_manager.should_stop():
@@ -126,6 +127,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
                     times=1,
                     fleet_id=override_fleet_id,
                     fleet=override_fleet,
+                    fleet_rules=override_fleet_rules,
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
@@ -165,6 +167,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
 
         request_plan = request.plan
         override_fleet = request_plan.fleet if request_plan is not None else None
+        override_fleet_rules = request_plan.fleet_rules if request_plan is not None else None
         # 优先级: 顶层 fleet_id > plan 覆盖 fleet_id > YAML 内 fleet_id
         if request.fleet_id is not None:
             fleet_id = request.fleet_id
@@ -187,6 +190,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
                     times=1,
                     fleet_id=fleet_id,
                     fleet=override_fleet,
+                    fleet_rules=override_fleet_rules,
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
