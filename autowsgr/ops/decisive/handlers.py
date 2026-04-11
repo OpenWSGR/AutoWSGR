@@ -316,6 +316,14 @@ class DecisivePhaseHandlers(DecisiveBase):
         else:
             _log.debug('[决战] 跳过技能使用: 节点={}, 技能已使用={}', current_node, skill_used)
 
+        # 首次进入且尚未选择过舰队时，使用技能后可能出现战备舰队获取 overlay，
+        # 先切回 WAITING_FOR_MAP 等待 overlay 稳定，避免直接点击编队超时。
+        if not self._has_chosen_fleet:
+            _log.info('[决战] 首次进入，使用技能后等待 overlay 稳定')
+            self._wait_deadline = time.monotonic() + 10.0
+            self._state.phase = DecisivePhase.WAITING_FOR_MAP
+            return
+
         # ── 恢复模式: 扫描当前舰队与可用舰船 ─────────────────────────
         # 对齐 legacy: if fleet.empty() and not is_begin(): _check_fleet()
         if self._resume_mode:
