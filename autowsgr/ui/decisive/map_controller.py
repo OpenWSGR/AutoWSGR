@@ -20,7 +20,6 @@ import cv2
 import numpy as np
 
 import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
-from autowsgr.infra import save_image
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
@@ -229,7 +228,7 @@ class DecisiveMapController:
         x2 = min(w, int((center - 0.03 + 0.042) * w))
         col_crop = screen[0:h, x1:x2]
         result = dll.recognize_map(col_crop)
-        #save_image(col_crop, result + '.png')
+        # save_image(col_crop, result + '.png')
         return result
 
     def recognize_node(
