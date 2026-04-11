@@ -107,54 +107,25 @@ _CHAPTER_NAV_MAX_ATTEMPTS: int = 8
 """章节导航最大尝试次数。"""
 
 MAX_CHAPTER: int = 6
-MIN_CHAPTER: int = 1
+MIN_CHAPTER: int = 4
 
-# ── recognize_stage 检测参数 ──
+# ── recognize_stage 检测点 ──
 
-_STAGES_CHECK: dict[int, dict] = {
-    1: {
-        'points': [(0.4479, 0.3269), (0.6906, 0.3769)],  # 占位，待手动提取
-        'color': Color.of(249, 232, 94),  # 黄色 - 待确认
-        'tolerance': 40.0,  # 待调整
-    },
-    2: {
-        'points': [(0.4672, 0.3250), (0.6099, 0.6056)],  # 已完成 - 用户提取
-        'color': Color.of(249, 232, 94),  # 黄色 - 已确认
-        'tolerance': 40.0,  # 已调整
-    },
-    3: {
-        'points': [(0.4510, 0.6065), (0.6833, 0.3361)],  # 已完成 - 用户提取
-        'color': Color.of(249, 232, 94),  # 黄色 - 已确认
-        'tolerance': 40.0,  # 已调整
-    },
-    4: {
-        'points': [(0.4130, 0.3769), (0.6281, 0.5769)],  # 已完成 - 用户提取
-        'color': Color.of(249, 232, 94),  # 黄色 - 已确认
-        'tolerance': 40.0,  # 已调整
-    },
-    5: {
-        'points': [(0.4484, 0.3269), (0.5813, 0.6954)],  # 已完成 - 用户提取
-        'color': Color.of(249, 232, 94),  # 黄色 - 已确认
-        'tolerance': 40.0,  # 已调整
-    },
-    6: {
-        'points': [(0.6396, 0.3074), (0.5609, 0.6287)],  # 已完成 - 用户提取
-        'color': Color.of(249, 232, 94),  # 黄色 - 已确认
-        'tolerance': 40.0,  # 已调整
-    },
+_STAGE_CHECK_POINTS: dict[int, list[tuple[float, float]]] = {
+    4: [(0.381, 0.436), (0.596, 0.636), (0.778, 0.521)],
+    5: [(0.418, 0.378), (0.760, 0.477), (0.550, 0.750)],
+    6: [(0.606, 0.375), (0.532, 0.703), (0.862, 0.644)],
 }
-"""各章节小关检测配置。
+"""每章 3 个小关的像素检测点 (相对坐标)。
 
-每个章节的配置包含:
-- points: 前 2 个小关的完成标记检测点列表 (相对坐标)
-- color: 完成标记的颜色 (RGB)
-- tolerance: 颜色匹配容差
-
-通过检测前 2 个小关的完成状态推断当前是第几小关:
-- 第 1 个点未匹配 → 第 1 小关
-- 第 1 个点匹配但第 2 个点未匹配 → 第 2 小关
-- 两个点都匹配 → 第 3 小关
+若检测点颜色接近白色 (250, 244, 253) 表示该小关已通过。
 """
+
+_STAGE_CHECK_COLOR: Color = Color.of(250, 244, 253)
+"""小关已通过标记颜色 (近白色)。"""
+
+_STAGE_CHECK_TOLERANCE: float = 30.0
+"""颜色匹配容差。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -196,32 +167,24 @@ class DecisiveBattlePage:
 
     @staticmethod
     def recognize_stage(screen: np.ndarray, chapter: int) -> int:
-        """识别当前决战章节的小关进度 (1-3)。
+        """识别当前决战章节的小关进度 (0-3)。
 
-        使用递进式判定逻辑：通过检测前 2 个小关的完成状态推断当前小关。
-        所有章节使用统一的配置结构，只是参数不同。
+        检查每个小关位置像素颜色，白色 (250,244,253) 为已通过。
+        返回当前正在进行的小关编号; 3 表示全部通过。
         """
-        config = _STAGES_CHECK.get(chapter)
-        if config is None:
-            _log.warning('[决战] 未知章节 {}', chapter)
-            return 1
+        check_points = _STAGE_CHECK_POINTS.get(chapter)
+        if check_points is None:
+            _log.warning('[决战] 决战 recognize_stage: 未知章节 {}', chapter)
+            return 0
 
-        check_points = config['points']
-        check_color = config['color']
-        check_tolerance = config['tolerance']
-
-        for i, (rx, ry) in enumerate(check_points, start=1):
-            matched = PixelChecker.check_pixel(screen, rx, ry, check_color, check_tolerance)
-            actual_color = PixelChecker.get_pixel(screen, rx, ry)
-            _log.debug(
-                '[决战] 小关 {} 检测点 ({:.3f}, {:.3f}): 匹配={}, 实际颜色={}',
-                i,
+        for i, (rx, ry) in enumerate(check_points):
+            if not PixelChecker.check_pixel(
+                screen,
                 rx,
                 ry,
-                matched,
-                actual_color.as_rgb_tuple(),
-            )
-            if not matched:
+                _STAGE_CHECK_COLOR,
+                _STAGE_CHECK_TOLERANCE,
+            ):
                 _log.info('[决战] 识别决战地图参数, 第 {} 小节正在进行', i)
                 return i
 
@@ -303,7 +266,7 @@ class DecisiveBattlePage:
         Parameters
         ----------
         target:
-            目标章节编号 (1-6)。
+            目标章节编号 (MIN_CHAPTER - MAX_CHAPTER)。
 
         Raises
         ------

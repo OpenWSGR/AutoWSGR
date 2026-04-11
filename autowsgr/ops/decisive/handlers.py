@@ -259,11 +259,7 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._state.node = 'A'
                 _log.info('[决战] 首次进入第 1 小节，跳过节点识别并默认使用节点 A')
             else:
-                self._state.node = self._map.recognize_node(
-                    screen,
-                    chapter=self._config.chapter,
-                    stage=self._state.stage,
-                )
+                self._state.node = self._map.recognize_node()
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,
@@ -287,13 +283,14 @@ class DecisivePhaseHandlers(DecisiveBase):
         skill_used = self._map.is_skill_used()
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
 
-        # 强制使用技能条件：节点 A/U 且首次进入（尚未选择过舰队）
+        # 强制使用技能条件：节点 A/U 且首次进入（已经选择过舰队）
         should_use_skill = (
             current_node == 'A' or current_node == 'U'
-        ) and not self._has_chosen_fleet
+        ) and self._has_chosen_fleet
 
         if should_use_skill or ((current_node == 'A' or current_node == 'U') and not skill_used):
             _log.debug('[决战] 执行技能使用: 强制={}', should_use_skill)
+            time.sleep(0.5)
             gained = self._map.use_skill()
             if gained:
                 if self._config.useful_skill and not self._logic.check_useful_skill(gained):
