@@ -155,11 +155,18 @@ class DecisivePhaseHandlers(DecisiveBase):
             phase == DecisivePhase.PREPARE_COMBAT
             and self._state.stage == 1
             and not self._has_chosen_fleet
-            and self._state.node != 'U'  # 排除暂离后重进的情况
         ):
-            _log.warning('[决战] 首进第 1 小节将 PREPARE_COMBAT 修正为 CHOOSE_FLEET')
-            self._state.phase = DecisivePhase.CHOOSE_FLEET
-            return
+            if self._state.node != 'U':
+                _log.warning('[决战] 首进第 1 小节将 PREPARE_COMBAT 修正为 CHOOSE_FLEET')
+                self._state.phase = DecisivePhase.CHOOSE_FLEET
+                return
+            # node == 'U' 时，通过舰标检测区分暂离重进与 overlay 延迟加载
+            bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+            icon_x = self._map._locate_ship_icon(bgr)
+            if icon_x is None:
+                _log.warning('[决战] 首进第 1 小节未检测到舰标，将 PREPARE_COMBAT 修正为 CHOOSE_FLEET')
+                self._state.phase = DecisivePhase.CHOOSE_FLEET
+                return
 
         if phase is not None:
             self._state.phase = phase
