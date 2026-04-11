@@ -229,7 +229,7 @@ class DecisiveMapController:
         x2 = min(w, int((center - 0.03 + 0.042) * w))
         col_crop = screen[0:h, x1:x2]
         result = dll.recognize_map(col_crop)
-        save_image(col_crop, result + '.png')
+        #save_image(col_crop, result + '.png')
         return result
 
     def recognize_node(
