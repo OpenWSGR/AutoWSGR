@@ -17,6 +17,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+import cv2
+
 from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.infra.logger import get_logger
@@ -259,7 +261,14 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._state.node = 'A'
                 _log.info('[决战] 首次进入第 1 小节，跳过节点识别并默认使用节点 A')
             else:
-                self._state.node = self._map.recognize_node()
+                # 智能判定：检测舰标是否已在地图上，若存在则直接默认节点 A
+                bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
+                icon_x = self._map._locate_ship_icon(bgr)
+                if icon_x is not None:
+                    _log.info('[决战] 检测到舰标已在地图上，无 overlay，默认节点 A')
+                    self._state.node = 'A'
+                else:
+                    self._state.node = self._map.recognize_node()
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,
