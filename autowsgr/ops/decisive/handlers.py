@@ -295,26 +295,22 @@ class DecisivePhaseHandlers(DecisiveBase):
         skill_used = self._map.is_skill_used()
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
 
-        # 强制使用技能条件：节点 A/U 且首次进入（已经选择过舰队）
-        should_use_skill = (current_node == 'A' or current_node == 'U') and self._has_chosen_fleet
-
-        if should_use_skill or ((current_node == 'A' or current_node == 'U') and not skill_used):
-            _log.debug('[决战] 执行技能使用: 强制={}', should_use_skill)
+        if not skill_used:
             time.sleep(0.5)
             gained = self._map.use_skill()
+            _log.debug('[决战] 执行技能使用获得: {}', gained)
             if gained:
                 if self._config.useful_skill and not self._logic.check_useful_skill(gained):
                     _log.info('[决战] 技能获得: {}, 效果不佳，撤退重试', gained)
                     self._state.phase = DecisivePhase.RETREAT
                     return
-                _log.info('[决战] 使用技能获得: {}', gained)
                 self._state.ships.update(gained)
         else:
             _log.debug('[决战] 跳过技能使用: 节点={}, 技能已使用={}', current_node, skill_used)
 
         # 首次进入且尚未选择过舰队时，使用技能后可能出现战备舰队获取 overlay，
         # 先切回 WAITING_FOR_MAP 等待 overlay 稳定，避免直接点击编队超时。
-        if not skill_used not self._has_chosen_fleet:
+        if not skill_used and not self._has_chosen_fleet:
             _log.info('[决战] 首次进入，使用技能后等待 overlay 稳定')
             self._wait_deadline = time.monotonic() + 10.0
             self._state.phase = DecisivePhase.WAITING_FOR_MAP
