@@ -296,7 +296,11 @@ class ChooseShipPage:
 
         matched = str(entry[0]).strip()
         level = entry[1] if isinstance(entry[1], int) else None
-        row_key = round(float(entry[2]), 4) if len(entry) >= 3 and isinstance(entry[2], (int, float)) else -1.0
+        row_key = (
+            round(float(entry[2]), 4)
+            if len(entry) >= 3 and isinstance(entry[2], (int, float))
+            else -1.0
+        )
         return matched, level, row_key
 
     @staticmethod
