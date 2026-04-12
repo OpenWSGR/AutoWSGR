@@ -323,6 +323,8 @@ class NormalFightRunner:
         page.select_fleet(self._fleet_id)
         time.sleep(0.5)
 
+        resolved_ship_names: list[str | None] | None = None
+
         # 换船 (若提供了规则则优先按规则执行)
         if self._fleet_rules is not None:
             page.change_fleet(
@@ -330,6 +332,7 @@ class NormalFightRunner:
                 self._fleet_rules,
             )
             time.sleep(0.5)
+            resolved_ship_names = page.detect_fleet()
         elif self._fleet is not None:
             page.change_fleet(
                 self._fleet_id,
@@ -359,11 +362,13 @@ class NormalFightRunner:
         if ShipDamageState.SEVERE in ship_stats:
             _log.error('[OPS] 出征前检测到大破舰船，退出程序')
             raise ActionFailedError('出征前检测到大破舰船，退出程序')
-        ship_names = (
-            self._primary_names_from_rules(self._fleet_rules)
-            if self._fleet_rules is not None
-            else self._fleet
-        )
+        ship_names = resolved_ship_names
+        if ship_names is None:
+            ship_names = (
+                self._primary_names_from_rules(self._fleet_rules)
+                if self._fleet_rules is not None
+                else self._fleet
+            )
         self._fleet_ships = fleet_info.to_ships(ship_names)
 
         # 出征

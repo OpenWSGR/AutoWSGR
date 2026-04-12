@@ -248,6 +248,8 @@ class EventFightRunner:
         page.select_fleet(self._fleet_id)
         time.sleep(0.5)
 
+        resolved_ship_names: list[str | None] | None = None
+
         # 换船 (若提供了规则则优先按规则执行)
         if self._fleet_rules is not None:
             page.change_fleet(
@@ -255,6 +257,7 @@ class EventFightRunner:
                 self._fleet_rules,
             )
             time.sleep(0.5)
+            resolved_ship_names = page.detect_fleet()
         elif self._fleet is not None:
             page.change_fleet(
                 self._fleet_id,
@@ -281,11 +284,13 @@ class EventFightRunner:
         # 检测战前舰队信息 (血量 + 等级)
         fleet_info = page.detect_fleet_info()
         ship_stats = [fleet_info.ship_damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
-        ship_names = (
-            self._primary_names_from_rules(self._fleet_rules)
-            if self._fleet_rules is not None
-            else self._fleet
-        )
+        ship_names = resolved_ship_names
+        if ship_names is None:
+            ship_names = (
+                self._primary_names_from_rules(self._fleet_rules)
+                if self._fleet_rules is not None
+                else self._fleet
+            )
         self._fleet_ships = fleet_info.to_ships(ship_names)
 
         # 出征

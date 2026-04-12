@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -69,10 +69,18 @@ class NodeDecisionRequest(BaseModel):
 class FleetRuleRequest(BaseModel):
     """编队槽位候选规则。"""
 
-    candidates: list[str] = Field(default_factory=list, description='候选舰船名（按优先级）')
+    candidates: list[str] = Field(min_length=1, description='候选舰船名（按优先级）')
     search_name: str | None = Field(default=None, description='选船搜索关键词（用于同名舰船区分）')
     min_level: int | None = Field(default=None, ge=1, description='等级下限（含）')
     max_level: int | None = Field(default=None, ge=1, description='等级上限（含）')
+
+    @field_validator('candidates')
+    @classmethod
+    def _validate_candidates(cls, value: list[str]) -> list[str]:
+        normalized = [name.strip() for name in value if name and name.strip()]
+        if len(normalized) == 0:
+            raise ValueError('candidates 不能为空')
+        return normalized
 
     @model_validator(mode='after')
     def _validate_level_range(self) -> FleetRuleRequest:

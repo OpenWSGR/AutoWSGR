@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 import time
 from typing import TYPE_CHECKING, TypedDict
 
@@ -179,6 +180,7 @@ class FleetChangeMixin(FleetDetectMixin):
                     current,
                     name,
                     selectors[i],
+                    desired=names,
                     slot_to_replace=slot,
                 )
                 if selected_name is None:
@@ -226,6 +228,7 @@ class FleetChangeMixin(FleetDetectMixin):
                         current,
                         name,
                         selectors[i],
+                        desired=names,
                     )
                     if selected_name is None:
                         _log.warning('[准备页] 槽位 {} 的候选均已在编队中, 无法补位', i)
@@ -358,17 +361,36 @@ class FleetChangeMixin(FleetDetectMixin):
         name: str | None,
         selector: dict | None,
         *,
+        desired: list[str | None] | None = None,
         slot_to_replace: int | None = None,
     ) -> tuple[str | None, dict | None]:
-        """为槽位挑选一个“未被当前编队占用”的候选舰船。"""
+        """为槽位挑选候选舰船。
+
+        对同名舰船按“目标编队所需数量”控制占用：
+        允许同名重复编入（当目标中有多个同名槽位）,
+        但避免超过目标所需数量。
+        """
         if name is None:
             return None, None
 
         candidates = cls._slot_candidates(name, selector)
-        occupied = {
+        occupied_counts = Counter(
             ship for idx, ship in enumerate(current) if ship is not None and idx != slot_to_replace
-        }
-        available = [candidate for candidate in candidates if candidate not in occupied]
+        )
+
+        required_counts: Counter[str]
+        if desired is None:
+            required_counts = Counter()
+        else:
+            required_counts = Counter(ship for ship in desired if ship is not None)
+
+        available: list[str] = []
+        for candidate in candidates:
+            required = required_counts.get(candidate, 1)
+            occupied = occupied_counts.get(candidate, 0)
+            if occupied < required:
+                available.append(candidate)
+
         if len(available) == 0:
             return None, None
 
