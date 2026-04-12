@@ -12,8 +12,8 @@
 
 from __future__ import annotations
 
-from collections import Counter
 import time
+from collections import Counter
 from typing import TYPE_CHECKING, TypedDict
 
 from autowsgr.infra.logger import get_logger
