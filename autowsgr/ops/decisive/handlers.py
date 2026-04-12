@@ -291,7 +291,7 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # 先使用技能，再注册舰船，如果是未知节点，也判定一下技能是否使用
         current_node = self._state.node
-        time.sleep(0.5) # 等待动画稳定后截图判定
+        time.sleep(0.5)  # 等待动画稳定后截图判定
         skill_used = self._map.is_skill_used()
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
 
