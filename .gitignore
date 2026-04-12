@@ -131,7 +131,3 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
-
-# Debug screenshots and temporary debug scripts
-Screenshots/
-tools/debug_*.py
