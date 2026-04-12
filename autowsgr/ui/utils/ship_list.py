@@ -58,7 +58,10 @@ def to_legacy_format(screen: np.ndarray) -> tuple[np.ndarray, float, float]:
 def locate_ship_rows(
     ocr: OCREngine,
     screen: np.ndarray,
-) -> list[tuple[str, float, float]]:
+    *,
+    deduplicate_by_name: bool = True,
+    include_row_key: bool = False,
+) -> list[tuple[str, float, float] | tuple[str, float, float, float]]:
     """在选船列表页用 DLL 定位舰船名行，再逐行 OCR 识别。
 
     其他场景 (如 ``_click_ship_in_list``, ``recognize_ships_in_list``)
@@ -77,12 +80,19 @@ def locate_ship_rows(
         OCR 引擎实例。
     screen:
         选船列表页面的 V2 截图 (RGB, 任意分辨率)。
+    deduplicate_by_name:
+        是否按舰船名去重。默认 ``True`` 以保持兼容。
+        在同名多行场景下可设为 ``False`` 保留全部命中。
+    include_row_key:
+        是否在返回值中附带行标识 (row_key)。默认 ``False``。
 
     Returns
     -------
-    list[tuple[str, float, float]]
-        ``(ship_name, cx_rel, cy_rel)`` 列表 -- 舰船名及其行中心
-        相对于 **完整截图** 的归一化坐标。
+    list[tuple[str, float, float] | tuple[str, float, float, float]]
+        默认返回 ``(ship_name, cx_rel, cy_rel)``。
+        当 ``include_row_key=True`` 时返回
+        ``(ship_name, cx_rel, cy_rel, row_key)``。
+        ``row_key`` 用于与等级识别结果做行级关联。
     """
     from autowsgr.constants import SHIPNAMES
     from autowsgr.vision import get_api_dll
@@ -102,7 +112,7 @@ def locate_ship_rows(
     list_w_native = int(w * LEGACY_LIST_WIDTH / LEGACY_WIDTH)
     list_area_native = screen[:, :list_w_native]
 
-    found: list[tuple[str, float, float]] = []
+    found: list[tuple[str, float, float] | tuple[str, float, float, float]] = []
     seen: set[str] = set()
     for y_start_720, y_end_720 in rows:
         # 将 720p 坐标映射回原始分辨率
@@ -118,9 +128,12 @@ def locate_ship_rows(
             if not text:
                 continue
             name = _fuzzy_match(text, SHIPNAMES)
-            if name is None or name in seen:
+            if name is None:
                 continue
-            seen.add(name)
+            if deduplicate_by_name and name in seen:
+                continue
+            if deduplicate_by_name:
+                seen.add(name)
             # 从 bbox 计算精确位置 (bbox 相对于 row_img)
             if r.bbox is not None:
                 x1, y1, x2, y2 = r.bbox
@@ -129,11 +142,15 @@ def locate_ship_rows(
             else:
                 cx = list_w_native / 2 / w
                 cy = (y_start + y_end) / 2 / h
-            found.append((name, cx, cy))
+            row_key = round((y_start + y_end) / 2 / h, 4)
+            if include_row_key:
+                found.append((name, cx, cy, row_key))
+            else:
+                found.append((name, cx, cy))
 
     _log.debug(
         '[选船列表] 识别: {} (共 {} 行)',
-        sorted({n for n, _, _ in found}),
+        sorted({entry[0] for entry in found}),
         len(rows),
     )
     return found
@@ -147,7 +164,7 @@ def recognize_ships_in_list(
 
     基于 :func:`locate_ship_rows` 的薄封装。
     """
-    return {name for name, _, _ in locate_ship_rows(ocr, screen)}
+    return {entry[0] for entry in locate_ship_rows(ocr, screen)}
 
 
 def _parse_level(text: str) -> int | None:
@@ -164,7 +181,10 @@ def _parse_level(text: str) -> int | None:
 def read_ship_levels(
     ocr: OCREngine,
     screen: np.ndarray,
-) -> list[tuple[str, int | None]]:
+    *,
+    deduplicate_by_name: bool = True,
+    include_row_key: bool = False,
+) -> list[tuple[str, int | None] | tuple[str, int | None, float]]:
     """在选船列表页识别各舰船的名称及等级。
 
     使用与 :func:`locate_ship_rows` 相同的 DLL 行定位 + OCR 流程,
@@ -179,11 +199,18 @@ def read_ship_levels(
         OCR 引擎实例。
     screen:
         选船列表页面的 V2 截图 (RGB, 任意分辨率)。
+    deduplicate_by_name:
+        是否按舰船名去重。默认 ``True`` 以保持兼容。
+        在同名多行场景下可设为 ``False`` 保留全部命中。
+    include_row_key:
+        是否在返回值中附带行标识 (row_key)。默认 ``False``。
 
     Returns
     -------
-    list[tuple[str, int | None]]
-        ``(ship_name, level)`` 列表, 按行顺序排列。
+    list[tuple[str, int | None] | tuple[str, int | None, float]]
+        默认返回 ``(ship_name, level)`` 列表, 按行顺序排列。
+        当 ``include_row_key=True`` 时返回
+        ``(ship_name, level, row_key)``。
         ``level`` 为 ``None`` 表示未识别到等级。
     """
     h, w = screen.shape[:2]
@@ -198,7 +225,7 @@ def read_ship_levels(
     list_w_native = int(w * LEGACY_LIST_WIDTH / LEGACY_WIDTH)
     list_area_native = screen[:, :list_w_native]
 
-    found: list[tuple[str, int | None]] = []
+    found: list[tuple[str, int | None] | tuple[str, int | None, float]] = []
     seen: set[str] = set()
     for y_start_720, y_end_720 in rows:
         y_start = max(0, int((y_start_720 - 1) * scale_y))
@@ -228,8 +255,15 @@ def read_ship_levels(
                     row_name = name
 
         if row_name is not None:
-            seen.add(row_name)
-            found.append((row_name, row_level))
+            if deduplicate_by_name and row_name in seen:
+                continue
+            if deduplicate_by_name:
+                seen.add(row_name)
+            row_key = round((y_start + y_end) / 2 / h, 4)
+            if include_row_key:
+                found.append((row_name, row_level, row_key))
+            else:
+                found.append((row_name, row_level))
 
     _log.debug(
         '[选船列表] 等级识别: {}',

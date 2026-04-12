@@ -67,17 +67,28 @@ class NormalFightRunner:
     def _primary_names_from_rules(fleet_rules: list[Any] | None) -> list[str | None] | None:
         if not fleet_rules:
             return None
+
+        def _normalize_name(value: object) -> str | None:
+            if value is None:
+                return None
+            name = str(value).strip()
+            return name or None
+
         names: list[str | None] = []
         for slot in fleet_rules[:6]:
             if isinstance(slot, str):
-                names.append(slot)
+                names.append(_normalize_name(slot))
                 continue
+
+            candidates = None
             if isinstance(slot, dict):
                 candidates = slot.get('candidates')
-                if isinstance(candidates, list) and len(candidates) > 0:
-                    first = candidates[0]
-                    names.append(str(first) if first is not None else None)
-                    continue
+            else:
+                candidates = getattr(slot, 'candidates', None)
+
+            if isinstance(candidates, list) and len(candidates) > 0:
+                names.append(_normalize_name(candidates[0]))
+                continue
             names.append(None)
         return names
 

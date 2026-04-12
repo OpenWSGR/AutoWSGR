@@ -113,6 +113,35 @@ class EventFightRunner:
         self._results: list[CombatResult] = []
         self._fleet_ships = None
 
+    @staticmethod
+    def _primary_names_from_rules(fleet_rules: list[Any] | None) -> list[str | None] | None:
+        if not fleet_rules:
+            return None
+
+        def _normalize_name(value: object) -> str | None:
+            if value is None:
+                return None
+            name = str(value).strip()
+            return name or None
+
+        names: list[str | None] = []
+        for slot in fleet_rules[:6]:
+            if isinstance(slot, str):
+                names.append(_normalize_name(slot))
+                continue
+
+            candidates = None
+            if isinstance(slot, dict):
+                candidates = slot.get('candidates')
+            else:
+                candidates = getattr(slot, 'candidates', None)
+
+            if isinstance(candidates, list) and len(candidates) > 0:
+                names.append(_normalize_name(candidates[0]))
+                continue
+            names.append(None)
+        return names
+
     # ── 公共接口 ──
 
     def run(self) -> CombatResult:
@@ -252,7 +281,12 @@ class EventFightRunner:
         # 检测战前舰队信息 (血量 + 等级)
         fleet_info = page.detect_fleet_info()
         ship_stats = [fleet_info.ship_damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
-        self._fleet_ships = fleet_info.to_ships(self._fleet)
+        ship_names = (
+            self._primary_names_from_rules(self._fleet_rules)
+            if self._fleet_rules is not None
+            else self._fleet
+        )
+        self._fleet_ships = fleet_info.to_ships(ship_names)
 
         # 出征
         page.start_battle()

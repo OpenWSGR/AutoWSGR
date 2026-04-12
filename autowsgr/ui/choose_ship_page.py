@@ -186,7 +186,12 @@ class ChooseShipPage:
             常规出征为 ``True`` (默认), 决战为 ``False``
             (决战选船界面没有搜索框)。
         selector:
-            可选规则，支持 ``candidates`` / ``min_level`` / ``max_level``。
+            可选规则，支持 ``candidates`` / ``search_name`` /
+            ``min_level`` / ``max_level``。
+            其中 ``search_name`` 用于指定搜索框关键字（仅在
+            ``use_search=True`` 且界面存在搜索框时生效），
+            ``candidates`` 用于限定允许点击的舰船名集合，
+            ``min_level`` / ``max_level`` 用于按等级范围筛选。
 
         Returns
         -------
@@ -262,6 +267,39 @@ class ChooseShipPage:
         raise RuntimeError(f'未找到满足条件的目标舰船: {candidates}{level_hint}')
 
     @staticmethod
+    def _normalize_hit_entry(hit: object) -> tuple[str, float, float, float]:
+        """归一化 locate_ship_rows 的返回为 (name, cx, cy, row_key)。"""
+        if not isinstance(hit, (tuple, list)):
+            raise TypeError(f'unsupported hit entry: {hit!r}')
+
+        if len(hit) < 3:
+            raise ValueError(f'unsupported hit entry length: {hit!r}')
+
+        matched = str(hit[0]).strip()
+        cx = float(hit[1])
+        cy = float(hit[2])
+
+        if len(hit) >= 4 and isinstance(hit[3], (int, float)):
+            row_key = round(float(hit[3]), 4)
+        else:
+            row_key = round(cy, 4)
+        return matched, cx, cy, row_key
+
+    @staticmethod
+    def _normalize_level_entry(entry: object) -> tuple[str, int | None, float]:
+        """归一化 read_ship_levels 的返回为 (name, level, row_key)。"""
+        if not isinstance(entry, (tuple, list)):
+            raise TypeError(f'unsupported level entry: {entry!r}')
+
+        if len(entry) < 2:
+            raise ValueError(f'unsupported level entry length: {entry!r}')
+
+        matched = str(entry[0]).strip()
+        level = entry[1] if isinstance(entry[1], int) else None
+        row_key = round(float(entry[2]), 4) if len(entry) >= 3 and isinstance(entry[2], (int, float)) else -1.0
+        return matched, level, row_key
+
+    @staticmethod
     def _is_level_in_range(level: int | None, min_level: int | None, max_level: int | None) -> bool:
         if min_level is None and max_level is None:
             return True
@@ -298,16 +336,39 @@ class ChooseShipPage:
 
         for attempt in range(_OCR_MAX_ATTEMPTS):
             screen = self._ctrl.screenshot()
-            hits = locate_ship_rows(self._ctx.ocr, screen)
-            level_map = {}
-            if min_level is not None or max_level is not None:
-                level_map = dict(read_ship_levels(self._ctx.ocr, screen))
+            use_level_filter = min_level is not None or max_level is not None
+            if use_level_filter:
+                raw_hits = locate_ship_rows(
+                    self._ctx.ocr,
+                    screen,
+                    deduplicate_by_name=False,
+                    include_row_key=True,
+                )
+                raw_levels = read_ship_levels(
+                    self._ctx.ocr,
+                    screen,
+                    deduplicate_by_name=False,
+                    include_row_key=True,
+                )
+            else:
+                raw_hits = locate_ship_rows(self._ctx.ocr, screen)
+                raw_levels = []
 
-            for matched, cx, cy in hits:
+            hits = [self._normalize_hit_entry(hit) for hit in raw_hits]
+            level_map: dict[float, list[int | None]] = {}
+            for entry in raw_levels:
+                _, level, row_key = self._normalize_level_entry(entry)
+                level_map.setdefault(row_key, []).append(level)
+
+            for matched, cx, cy, row_key in hits:
                 if matched != name:
                     continue
 
-                level = level_map.get(matched)
+                level = None
+                if use_level_filter:
+                    row_levels = level_map.get(row_key)
+                    if row_levels:
+                        level = row_levels.pop(0)
                 if not self._is_level_in_range(level, min_level, max_level):
                     _log.warning(
                         "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",

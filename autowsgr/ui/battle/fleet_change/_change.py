@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.ui.battle.constants import CLICK_SHIP_SLOT
@@ -32,6 +32,18 @@ _MAX_SET_RETRIES: int = 2
 
 # 等待选船页面出现的超时 (秒)
 _CHOOSE_PAGE_TIMEOUT: float = 5.0
+
+
+class FleetSlotSelector(TypedDict, total=False):
+    """编队槽位规则。"""
+
+    candidates: list[str]
+    search_name: str
+    min_level: int
+    max_level: int
+
+
+FleetSlotInput = str | FleetSlotSelector | None
 
 
 class FleetChangeMixin(FleetDetectMixin):
@@ -58,7 +70,7 @@ class FleetChangeMixin(FleetDetectMixin):
     def change_fleet(
         self,
         fleet_id: int | None,
-        ship_names: Sequence[object | None],
+        ship_names: Sequence[FleetSlotInput],
     ) -> bool:
         """更换编队全部舰船 -- 扫描 -> 定点更换 -> 调整次序。
 
@@ -76,7 +88,14 @@ class FleetChangeMixin(FleetDetectMixin):
         fleet_id:
             舰队编号 (2-4); ``None`` 代表不指定舰队。1 队不支持更换。
         ship_names:
-            目标舰船名列表 (按槽位 0-5 顺序); ``None``/``""`` 表示留空。
+                        目标槽位列表 (按槽位 0-5 顺序); 每个元素可为:
+
+                        - ``str``: 目标舰船名
+                        - ``dict``: 规则对象 (``candidates`` / ``search_name`` /
+                            ``min_level`` / ``max_level``)
+                        - ``None``: 留空
+
+                        另外也兼容具备同名属性的 selector-like 对象。
 
         Returns
         -------
@@ -96,11 +115,11 @@ class FleetChangeMixin(FleetDetectMixin):
             selector = self._extract_selector(raw_slot)
             selectors.append(selector)
             if isinstance(raw_slot, str):
-                names.append(raw_slot or None)
+                names.append(self._normalize_ship_name(raw_slot))
             elif selector is not None:
                 candidates = selector.get('candidates', [])
                 if isinstance(candidates, list) and len(candidates) > 0:
-                    names.append(str(candidates[0]))
+                    names.append(self._normalize_ship_name(candidates[0]))
                 else:
                     names.append(None)
             else:
@@ -138,7 +157,7 @@ class FleetChangeMixin(FleetDetectMixin):
                     reused.add(chosen)
 
             # ── 前置短路: 已满足则无需任何操作 ────────────────────────
-            if self._validate_with_selector(current, names, selectors):
+            if self._can_short_circuit(current, names, selectors):
                 _log.info('[准备页] 舰队已满足目标, 跳过换船')
                 return True
 
@@ -258,6 +277,13 @@ class FleetChangeMixin(FleetDetectMixin):
         return False
 
     @staticmethod
+    def _normalize_ship_name(value: object) -> str | None:
+        if value is None:
+            return None
+        name = str(value).strip()
+        return name or None
+
+    @staticmethod
     def _extract_selector(slot: object | None) -> dict | None:
         if slot is None or isinstance(slot, str):
             return None
@@ -294,16 +320,36 @@ class FleetChangeMixin(FleetDetectMixin):
             selector['max_level'] = raw_max
         return selector
 
-    @staticmethod
-    def _slot_candidates(name: str | None, selector: dict | None) -> list[str]:
+    @classmethod
+    def _slot_candidates(cls, name: str | None, selector: dict | None) -> list[str]:
         out: list[str] = []
         if selector is not None:
             raw = selector.get('candidates')
             if isinstance(raw, list):
-                out.extend(str(v) for v in raw if v)
-        if name and name not in out:
-            out.append(name)
+                for value in raw:
+                    normalized = cls._normalize_ship_name(value)
+                    if normalized and normalized not in out:
+                        out.append(normalized)
+        normalized_name = cls._normalize_ship_name(name)
+        if normalized_name and normalized_name not in out:
+            out.append(normalized_name)
         return out
+
+    @classmethod
+    def _can_short_circuit(
+        cls,
+        current: list[str | None],
+        desired: list[str | None],
+        selectors: list[dict | None],
+    ) -> bool:
+        # 若指定了 search_name，不能在前置阶段仅凭同名/候选命中判定“已满足”。
+        for selector in selectors:
+            if not isinstance(selector, dict):
+                continue
+            raw_search_name = selector.get('search_name')
+            if isinstance(raw_search_name, str) and raw_search_name.strip():
+                return False
+        return cls._validate_with_selector(current, desired, selectors)
 
     @classmethod
     def _select_available_candidate(

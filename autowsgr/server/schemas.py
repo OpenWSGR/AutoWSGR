@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -73,6 +73,16 @@ class FleetRuleRequest(BaseModel):
     search_name: str | None = Field(default=None, description='选船搜索关键词（用于同名舰船区分）')
     min_level: int | None = Field(default=None, ge=1, description='等级下限（含）')
     max_level: int | None = Field(default=None, ge=1, description='等级上限（含）')
+
+    @model_validator(mode='after')
+    def _validate_level_range(self) -> FleetRuleRequest:
+        if (
+            self.min_level is not None
+            and self.max_level is not None
+            and self.max_level < self.min_level
+        ):
+            raise ValueError('max_level 必须大于或等于 min_level')
+        return self
 
     model_config = {'extra': 'forbid'}
 
