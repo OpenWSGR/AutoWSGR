@@ -23,7 +23,7 @@ class MacEmulatorManager(EmulatorProcessManager):
         if not self._process_name:
             return False
         try:
-            subprocess.check_output(f'pgrep -f {self._process_name}', shell=True)
+            subprocess.check_output(['pgrep', '-f', self._process_name])
         except subprocess.CalledProcessError:
             return False
 
@@ -39,7 +39,7 @@ class MacEmulatorManager(EmulatorProcessManager):
             raise EmulatorNotFoundError('未设置模拟器路径，无法启动')
 
         try:
-            subprocess.Popen(f'open -a {self._path}', shell=True)
+            subprocess.Popen(['open', '-a', self._path])
             if self._emulator_type == EmulatorType.mumu:
                 self._mumu_restart_instance()
             self.wait_until_online()
@@ -56,7 +56,7 @@ class MacEmulatorManager(EmulatorProcessManager):
         if not self._process_name:
             raise EmulatorError('未设置进程名，无法停止')
         try:
-            subprocess.Popen(f'pkill -9 -f {self._process_name}', shell=True)
+            subprocess.Popen(['pkill', '-9', '-f', self._process_name])
             _log.info('模拟器已停止')
         except Exception as exc:
             raise EmulatorError(f'停止模拟器失败: {exc}') from exc
@@ -74,10 +74,9 @@ class MacEmulatorManager(EmulatorProcessManager):
         if not tool or not os.path.isfile(tool):
             return {}
         proc = subprocess.Popen(
-            f'{tool} info all',
+            [tool, 'info', 'all'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            shell=True,
         )
         out, _ = proc.communicate()
         try:
@@ -93,9 +92,8 @@ class MacEmulatorManager(EmulatorProcessManager):
         for idx, v in enumerate(info.get('return', {}).get('results', [])):
             if port == v.get('adb_port'):
                 subprocess.Popen(
-                    f'{tool} restart {idx}',
+                    [tool, 'restart', str(idx)],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    shell=True,
                 )
                 break
