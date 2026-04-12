@@ -291,6 +291,7 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # 先使用技能，再注册舰船，如果是未知节点，也判定一下技能是否使用
         current_node = self._state.node
+        time.sleep(0.5) # 等待动画稳定后截图判定
         skill_used = self._map.is_skill_used()
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
 
@@ -313,7 +314,7 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # 首次进入且尚未选择过舰队时，使用技能后可能出现战备舰队获取 overlay，
         # 先切回 WAITING_FOR_MAP 等待 overlay 稳定，避免直接点击编队超时。
-        if not self._has_chosen_fleet:
+        if not skill_used not self._has_chosen_fleet:
             _log.info('[决战] 首次进入，使用技能后等待 overlay 稳定')
             self._wait_deadline = time.monotonic() + 10.0
             self._state.phase = DecisivePhase.WAITING_FOR_MAP
