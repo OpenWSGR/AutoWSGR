@@ -296,7 +296,6 @@ class DecisivePhaseHandlers(DecisiveBase):
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
 
         if not skill_used:
-            time.sleep(0.5)
             gained = self._map.use_skill()
             _log.debug('[决战] 执行技能使用获得: {}', gained)
             if gained:
