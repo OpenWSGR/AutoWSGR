@@ -266,11 +266,8 @@ class DecisivePhaseHandlers(DecisiveBase):
             return
 
         if self._state.node == 'U':
-            if self._state.stage == 1 and self._has_chosen_fleet:
-                self._state.node = 'A'
-                _log.info('[决战] 首次进入第 1 小节，跳过节点识别并默认使用节点 A')
-            else:
-                self._state.node = self._map.recognize_node()
+            # 初次进入都要进行节点识别
+            self._state.node = self._map.recognize_node()
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,
@@ -278,11 +275,9 @@ class DecisivePhaseHandlers(DecisiveBase):
         )
 
         # ── 恢复模式检测 ─────────────────────────────────────────────
-        # 统一在进图后根据节点判定：只要不是首次进入的 1A，均视为恢复模式。
-        if not self._resume_mode and (
-            not self._state.is_begin() or (self._state.is_begin() and not self._has_chosen_fleet)
-        ):
-            self._resume_mode = True
+        # 恢复模式逻辑修改，默认进入恢复模式，如果是首节点，则不进入恢复模式
+        if self._state.is_begin():
+            self._resume_mode = False
             _log.info(
                 '[决战] 检测到恢复模式 (节点={}, has_chosen_fleet={})',
                 self._state.node,
@@ -291,30 +286,25 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # 先使用技能，再注册舰船，如果是未知节点，也判定一下技能是否使用
         current_node = self._state.node
-        time.sleep(0.5) # 等待动画稳定后截图判定
+        time.sleep(0.5)  # 等待动画稳定后截图判定
         skill_used = self._map.is_skill_used()
         _log.debug('[决战] 节点: {}, 技能已使用检测: {}', current_node, skill_used)
 
-        # 强制使用技能条件：节点 A/U 且首次进入（已经选择过舰队）
-        should_use_skill = (current_node == 'A' or current_node == 'U') and self._has_chosen_fleet
-
-        if should_use_skill or ((current_node == 'A' or current_node == 'U') and not skill_used):
-            _log.debug('[决战] 执行技能使用: 强制={}', should_use_skill)
-            time.sleep(0.5)
+        if not skill_used:
             gained = self._map.use_skill()
+            _log.debug('[决战] 执行技能使用获得: {}', gained)
             if gained:
                 if self._config.useful_skill and not self._logic.check_useful_skill(gained):
                     _log.info('[决战] 技能获得: {}, 效果不佳，撤退重试', gained)
                     self._state.phase = DecisivePhase.RETREAT
                     return
-                _log.info('[决战] 使用技能获得: {}', gained)
                 self._state.ships.update(gained)
         else:
             _log.debug('[决战] 跳过技能使用: 节点={}, 技能已使用={}', current_node, skill_used)
 
         # 首次进入且尚未选择过舰队时，使用技能后可能出现战备舰队获取 overlay，
         # 先切回 WAITING_FOR_MAP 等待 overlay 稳定，避免直接点击编队超时。
-        if not skill_used not self._has_chosen_fleet:
+        if not skill_used and not self._has_chosen_fleet:
             _log.info('[决战] 首次进入，使用技能后等待 overlay 稳定')
             self._wait_deadline = time.monotonic() + 10.0
             self._state.phase = DecisivePhase.WAITING_FOR_MAP

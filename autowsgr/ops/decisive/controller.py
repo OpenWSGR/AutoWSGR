@@ -76,7 +76,8 @@ class DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps):
         """执行一轮完整决战（3 个小关）。"""
         _log.info('[决战] 开始第 {} 章决战', self._config.chapter)
         self._state.reset()
-        self._resume_mode = False
+        # 默认进入恢复模式，扫描舰船进度
+        self._resume_mode = True
         self._has_chosen_fleet = False
         self._prepare_entry_state()
         self._state.phase = DecisivePhase.ENTER_MAP
