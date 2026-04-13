@@ -93,6 +93,9 @@ class GameContext:
     quick_repair_used: int = 0
     """本次会话已消耗快修数。"""
 
+    active_fight_tasks: int = 0
+    """当前正在执行的战斗任务数。由 TaskScheduler 维护，用于判断是否可以安全执行浴室维修等会占用舰队的操作。"""
+
     stop_event: threading.Event = field(default_factory=threading.Event)
     """任务停止信号 (由 TaskManager 设置)。"""
 

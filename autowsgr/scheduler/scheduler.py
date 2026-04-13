@@ -201,47 +201,51 @@ class TaskScheduler:
         if not isinstance(runner, FightRunnerProtocol):
             runner = BatchRunnerAdapter(runner)
 
-        for j in range(task.times):
-            _log.info(
-                '[Scheduler] {} 第 {}/{} 次',
-                task.name,
-                j + 1,
-                task.times,
-            )
-
-            # 远征检查 (战斗前)
-            self._maybe_collect_expedition()
-
-            try:
-                result = runner.run()
-            except Exception as exc:
-                _log.opt(exception=True).error(
-                    '[Scheduler] {} 第 {} 次异常: {}',
+        self._ctx.active_fight_tasks += 1
+        try:
+            for j in range(task.times):
+                _log.info(
+                    '[Scheduler] {} 第 {}/{} 次',
                     task.name,
                     j + 1,
-                    exc,
+                    task.times,
                 )
-                result = CombatResult(flag=ConditionFlag.DOCK_FULL)
 
-            task.results.append(result)
-            task.completed += 1
+                # 远征检查 (战斗前)
+                self._maybe_collect_expedition()
 
-            _log.info(
-                '[Scheduler] {} [{}/{}] → {}',
-                task.name,
-                task.completed,
-                task.times,
-                result.flag.value if result.flag else 'N/A',
-            )
+                try:
+                    result = runner.run()
+                except Exception as exc:
+                    _log.opt(exception=True).error(
+                        '[Scheduler] {} 第 {} 次异常: {}',
+                        task.name,
+                        j + 1,
+                        exc,
+                    )
+                    result = CombatResult(flag=ConditionFlag.DOCK_FULL)
 
-            # 船坞满则停止当前任务
-            if result.flag == ConditionFlag.DOCK_FULL:
-                _log.warning(
-                    '[Scheduler] {} 船坞已满, 跳过剩余 {} 次',
+                task.results.append(result)
+                task.completed += 1
+
+                _log.info(
+                    '[Scheduler] {} [{}/{}] → {}',
                     task.name,
-                    task.times - task.completed,
+                    task.completed,
+                    task.times,
+                    result.flag.value if result.flag else 'N/A',
                 )
-                break
+
+                # 船坞满则停止当前任务
+                if result.flag == ConditionFlag.DOCK_FULL:
+                    _log.warning(
+                        '[Scheduler] {} 船坞已满, 跳过剩余 {} 次',
+                        task.name,
+                        task.times - task.completed,
+                    )
+                    break
+        finally:
+            self._ctx.active_fight_tasks -= 1
 
     # ── 远征检查 ──
 
