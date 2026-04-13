@@ -626,7 +626,7 @@ class DecisiveMapController:
 
         # 掉落处理结束后，继续等待回到决战入口页，避免奖励弹窗残留导致后续状态识别超时
         settle_deadline = time.monotonic() + 12.0
-        reward_ack_pos = (0.5, 0.5)
+        reward_ack_pos = (0.953, 0.954)
         while time.monotonic() < settle_deadline:
             screen = self._ctrl.screenshot()
             if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
@@ -639,6 +639,7 @@ class DecisiveMapController:
                 self._ctrl.click(*reward_ack_pos)
                 time.sleep(0.35)
                 confirm_operation(self._ctrl, timeout=0.8)
+                confirm_operation(self._ctrl, timeout=0.8)
                 continue
 
             if confirm_operation(self._ctrl, timeout=0.8):
@@ -647,6 +648,18 @@ class DecisiveMapController:
             time.sleep(0.3)
         else:
             _log.warning('[地图控制器] 小关通关后未能确认已回到决战入口页')
+
+        # settle 循环结束后，如果仍未回到入口页，尝试从地图页返回
+        for _ in range(5):
+            screen = self._ctrl.screenshot()
+            if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
+                _log.info('[地图控制器] 通过返回按钮回到决战入口页')
+                break
+            _log.debug('[地图控制器] 尝试点击返回按钮回到决战入口页')
+            self._ctrl.click(0.03, 0.06)
+            time.sleep(1.0)
+        else:
+            _log.warning('[地图控制器] 多次尝试后仍未能回到决战入口页')
 
         if collected:
             _log.info('[地图控制器] 小关通关共收集 {} 个掉落', len(collected))
