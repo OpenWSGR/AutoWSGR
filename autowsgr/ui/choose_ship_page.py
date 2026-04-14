@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from typing import TYPE_CHECKING
 
@@ -56,6 +57,7 @@ CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
 _SCROLL_FROM_Y: float = 0.55
 _SCROLL_TO_Y: float = 0.30
 _OCR_MAX_ATTEMPTS: int = 3
+_SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
 PAGE_SIGNATURE = PixelSignature(
     name='choose_ship_page',
@@ -337,6 +339,7 @@ class ChooseShipPage:
             匹配并点击成功时返回舰船名；失败返回 ``None``。
         """
         assert self._ctx.ocr is not None
+        normalized_target = self._normalize_ship_name(name)
 
         for attempt in range(_OCR_MAX_ATTEMPTS):
             screen = self._ctrl.screenshot()
@@ -365,7 +368,7 @@ class ChooseShipPage:
                 level_map.setdefault(row_key, []).append(level)
 
             for matched, cx, cy, row_key in hits:
-                if matched != name:
+                if self._normalize_ship_name(matched) != normalized_target:
                     continue
 
                 level = None
@@ -406,3 +409,11 @@ class ChooseShipPage:
                 time.sleep(0.5)
 
         return None
+
+    @staticmethod
+    def _normalize_ship_name(name: str) -> str:
+        normalized = name.strip()
+        if normalized.endswith('·改'):
+            normalized = normalized[:-2]
+        normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
+        return normalized.strip()
