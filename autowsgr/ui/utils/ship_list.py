@@ -217,6 +217,7 @@ def _coerce_level_digits(raw_digits: str) -> int | None:
             'I': '1',
             'i': '1',
             'l': '1',
+            'L': '1',
             'O': '0',
             'o': '0',
         }
