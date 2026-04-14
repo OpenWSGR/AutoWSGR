@@ -26,7 +26,7 @@ from autowsgr.vision import (
 )
 
 from .utils import wait_for_page, wait_leave_page
-from .utils.ship_list import locate_ship_rows, read_ship_levels
+from .utils.ship_list import LevelOCRRetryNeededError, locate_ship_rows, read_ship_levels
 
 
 if TYPE_CHECKING:
@@ -352,12 +352,23 @@ class ChooseShipPage:
                     deduplicate_by_name=False,
                     include_row_key=True,
                 )
-                raw_levels = read_ship_levels(
-                    self._ctx.ocr,
-                    screen,
-                    deduplicate_by_name=False,
-                    include_row_key=True,
-                )
+                try:
+                    raw_levels = read_ship_levels(
+                        self._ctx.ocr,
+                        screen,
+                        deduplicate_by_name=False,
+                        include_row_key=True,
+                    )
+                except LevelOCRRetryNeededError as exc:
+                    _log.warning(
+                        "[UI] 等级 OCR 噪声过高，触发重新识别 (第 {}/{} 次)",
+                        attempt + 1,
+                        _OCR_MAX_ATTEMPTS,
+                    )
+                    if attempt >= _OCR_MAX_ATTEMPTS - 1:
+                        raise RuntimeError('等级 OCR 噪声过高，重试后仍失败') from exc
+                    time.sleep(0.3)
+                    continue
             else:
                 raw_hits = locate_ship_rows(self._ctx.ocr, screen)
                 raw_levels = []

@@ -34,6 +34,12 @@ LEGACY_LIST_WIDTH: int = 1048
 _LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILilOo]{1,6})')
 _LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILilOo]{1,6})')
 _MAX_LEVEL_VALUE = 200
+_MAX_LEVEL_NOISE_CHARS = 1
+_MAX_NOISY_LEVEL_HITS_BEFORE_RETRY = 1
+
+
+class LevelOCRRetryNeededError(RuntimeError):
+    """等级 OCR 噪声过高，需要重新截图识别。"""
 
 
 def to_legacy_format(screen: np.ndarray) -> tuple[np.ndarray, float, float]:
@@ -171,21 +177,37 @@ def recognize_ships_in_list(
 
 def _parse_level(text: str) -> int | None:
     """从 OCR 文本中提取 ``Lv.XX`` 格式等级数字。"""
+    level, _need_retry = _parse_level_with_status(text)
+    return level
+
+
+def _parse_level_with_status(text: str) -> tuple[int | None, bool]:
+    """解析等级并返回是否应触发重识别。"""
     compact = text.strip().replace(' ', '')
 
     m = _LEVEL_PATTERN.search(compact)
     if m:
-        level = _coerce_level_digits(m.group(1))
+        raw_digits = m.group(1)
+        if _noise_char_count(raw_digits) > _MAX_LEVEL_NOISE_CHARS:
+            return None, True
+        level = _coerce_level_digits(raw_digits)
         if level is not None:
-            return level
+            return level, False
 
     m2 = _LEVEL_NOISY_PATTERN.search(compact)
     if m2:
-        level = _coerce_level_digits(m2.group(1))
+        raw_digits = m2.group(1)
+        if _noise_char_count(raw_digits) > _MAX_LEVEL_NOISE_CHARS:
+            return None, True
+        level = _coerce_level_digits(raw_digits)
         if level is not None:
-            return level
+            return level, False
 
-    return None
+    return None, False
+
+
+def _noise_char_count(raw_digits: str) -> int:
+    return sum(1 for ch in raw_digits if ch in 'ILilOo')
 
 
 def _coerce_level_digits(raw_digits: str) -> int | None:
@@ -261,14 +283,19 @@ def _probe_level_near_name(
         return None
 
     parsed_levels: list[int] = []
+    noisy_level_hits = 0
 
     def collect_levels(img: np.ndarray) -> None:
+        nonlocal noisy_level_hits
         results = ocr.recognize(img, allowlist='LlVvIiYy0Oo1.:-/0123456789')
         for r in results:
             text = r.text.strip()
             if not text:
                 continue
-            level = _parse_level(text)
+            level, need_retry = _parse_level_with_status(text)
+            if need_retry:
+                noisy_level_hits += 1
+                continue
             if level is not None:
                 parsed_levels.append(level)
 
@@ -280,6 +307,11 @@ def _probe_level_near_name(
     binary = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     binary_rgb = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
     collect_levels(binary_rgb)
+
+    if not parsed_levels and noisy_level_hits > _MAX_NOISY_LEVEL_HITS_BEFORE_RETRY:
+        raise LevelOCRRetryNeededError(
+            f'等级 OCR 噪声过高: {noisy_level_hits} 条异常等级文本 (阈值 {_MAX_NOISY_LEVEL_HITS_BEFORE_RETRY})',
+        )
 
     if not parsed_levels:
         return None
