@@ -31,8 +31,8 @@ LEGACY_HEIGHT: int = 720
 #: Legacy 选船列表左侧裁剪宽度 (px@1280)
 LEGACY_LIST_WIDTH: int = 1048
 
-_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9IlOo]{1,6})')
-_LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9IlOo]{1,6})')
+_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILlOo]{1,6})')
+_LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILlOo]{1,6})')
 _MAX_LEVEL_VALUE = 200
 
 
@@ -382,15 +382,16 @@ def read_ship_levels(
             if best_level is not None and best_dist <= max_pair_dist:
                 row_level = best_level
 
-            probe_level = _probe_level_near_name(
-                ocr,
-                screen,
-                y_start=y_start,
-                y_end=y_end,
-                name_x=name_x,
-            )
-            if probe_level is not None:
-                row_level = probe_level
+            if row_level is None:
+                probe_level = _probe_level_near_name(
+                    ocr,
+                    screen,
+                    y_start=y_start,
+                    y_end=y_end,
+                    name_x=name_x,
+                )
+                if probe_level is not None:
+                    row_level = probe_level
 
             if deduplicate_by_name and row_name in seen:
                 continue
