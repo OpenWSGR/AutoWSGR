@@ -31,7 +31,9 @@ LEGACY_HEIGHT: int = 720
 #: Legacy 选船列表左侧裁剪宽度 (px@1280)
 LEGACY_LIST_WIDTH: int = 1048
 
-_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*(\d+)')
+_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9IlOo]{1,6})')
+_LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9IlOo]{1,6})')
+_MAX_LEVEL_VALUE = 200
 
 
 def to_legacy_format(screen: np.ndarray) -> tuple[np.ndarray, float, float]:
@@ -169,13 +171,119 @@ def recognize_ships_in_list(
 
 def _parse_level(text: str) -> int | None:
     """从 OCR 文本中提取 ``Lv.XX`` 格式等级数字。"""
-    m = _LEVEL_PATTERN.search(text)
+    compact = text.strip().replace(' ', '')
+
+    m = _LEVEL_PATTERN.search(compact)
     if m:
-        try:
-            return int(m.group(1))
-        except ValueError:
-            return None
+        level = _coerce_level_digits(m.group(1))
+        if level is not None:
+            return level
+
+    m2 = _LEVEL_NOISY_PATTERN.search(compact)
+    if m2:
+        level = _coerce_level_digits(m2.group(1))
+        if level is not None:
+            return level
+
     return None
+
+
+def _coerce_level_digits(raw_digits: str) -> int | None:
+    """将 OCR 提取出的数字串映射为合法等级值。"""
+    trans = str.maketrans({
+        'I': '1',
+        'l': '1',
+        'L': '1',
+        'O': '0',
+        'o': '0',
+    })
+    normalized = raw_digits.translate(trans)
+    digits = ''.join(ch for ch in normalized if ch.isdigit())
+    if not digits:
+        return None
+
+    candidates: list[int] = []
+
+    # 先尝试前 3 位（常见误读: 1046 -> 104, 110544 -> 110）
+    if len(digits) >= 3:
+        candidates.append(int(digits[:3]))
+    if len(digits) >= 2:
+        candidates.append(int(digits[:2]))
+    candidates.append(int(digits[:1]))
+
+    # 兼容前导 0 的场景（如 051 -> 51）
+    if digits.startswith('0') and len(digits) >= 3:
+        candidates.insert(0, int(digits[1:3]))
+
+    seen_vals: set[int] = set()
+    for value in candidates:
+        if value in seen_vals:
+            continue
+        seen_vals.add(value)
+        if 1 <= value <= _MAX_LEVEL_VALUE:
+            return value
+
+    return None
+
+
+def _center_x(bbox: tuple[int, int, int, int] | None, width: int) -> float:
+    if bbox is None:
+        return width / 2
+    x1, _, x2, _ = bbox
+    return (x1 + x2) / 2
+
+
+def _probe_level_near_name(
+    ocr: OCREngine,
+    screen: np.ndarray,
+    *,
+    y_start: int,
+    y_end: int,
+    name_x: float,
+) -> int | None:
+    """在同一 y 行按舰名 x 位置裁剪区域，二次识别等级。"""
+    h, w = screen.shape[:2]
+    row_h = max(1, y_end - y_start)
+
+    x_pad = max(70, int(w * 0.045))
+    x0 = max(0, int(name_x - x_pad))
+    x1 = min(w, int(name_x + x_pad))
+
+    y0 = max(0, y_start - int(row_h * 1.6))
+    y1 = min(h, y_end + int(row_h * 0.4))
+
+    if x1 <= x0 or y1 <= y0:
+        return None
+
+    roi = screen[y0:y1, x0:x1]
+    if roi.size == 0:
+        return None
+
+    parsed_levels: list[int] = []
+
+    def collect_levels(img: np.ndarray) -> None:
+        results = ocr.recognize(img, allowlist='LlVvIiYy0O1.:-/0123456789')
+        for r in results:
+            text = r.text.strip()
+            if not text:
+                continue
+            level = _parse_level(text)
+            if level is not None:
+                parsed_levels.append(level)
+
+    collect_levels(roi)
+
+    gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
+    up = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+    norm = cv2.normalize(up, None, 0, 255, cv2.NORM_MINMAX)
+    binary = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    binary_rgb = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+    collect_levels(binary_rgb)
+
+    if not parsed_levels:
+        return None
+
+    return max(parsed_levels)
 
 
 def read_ship_levels(
@@ -230,36 +338,70 @@ def read_ship_levels(
     for y_start_720, y_end_720 in rows:
         y_start = max(0, int((y_start_720 - 1) * scale_y))
         y_end = min(h, int((y_end_720 + 1) * scale_y))
+        row_key = round((y_start + y_end) / 2 / h, 4)
 
         row_img = list_area_native[y_start:y_end]
         results = ocr.recognize(row_img)
 
-        row_name: str | None = None
-        row_level: int | None = None
+        name_hits: list[tuple[str, float]] = []
+        local_level_hits: list[tuple[int, float]] = []
 
         for r in results:
             text = r.text.strip()
             if not text:
                 continue
 
-            # 尝试匹配等级
-            if row_level is None:
-                level = _parse_level(text)
-                if level is not None:
-                    row_level = level
+            x_center = _center_x(r.bbox, row_img.shape[1])
 
-            # 尝试匹配舰船名
-            if row_name is None:
-                name = _fuzzy_match(text, SHIPNAMES)
-                if name is not None and name not in seen:
-                    row_name = name
+            level = _parse_level(text)
+            if level is not None:
+                local_level_hits.append((level, x_center))
 
-        if row_name is not None:
+            name = _fuzzy_match(text, SHIPNAMES)
+            if name is not None:
+                name_hits.append((name, x_center))
+
+        if not name_hits:
+            continue
+
+        name_hits.sort(key=lambda item: item[1])
+        local_level_hits.sort(key=lambda item: item[1])
+        max_pair_dist = max(80.0, row_img.shape[1] * 0.12)
+
+        for row_name, name_x in name_hits:
+            row_level: int | None = None
+
+            best_level: int | None = None
+            best_dist = float('inf')
+            for candidate_level, candidate_x in local_level_hits:
+                dist = abs(candidate_x - name_x)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_level = candidate_level
+
+            if best_level is not None and best_dist <= max_pair_dist:
+                row_level = best_level
+
+            probe_level = _probe_level_near_name(
+                ocr,
+                screen,
+                y_start=y_start,
+                y_end=y_end,
+                name_x=name_x,
+            )
+            if probe_level is not None:
+                row_level = probe_level
+
             if deduplicate_by_name and row_name in seen:
                 continue
             if deduplicate_by_name:
                 seen.add(row_name)
-            row_key = round((y_start + y_end) / 2 / h, 4)
+            _log.debug(
+                '[选船列表] 等级识别命中: name={} level={} row_key={}',
+                row_name,
+                row_level if row_level is not None else 'None',
+                row_key,
+            )
             if include_row_key:
                 found.append((row_name, row_level, row_key))
             else:
@@ -267,6 +409,6 @@ def read_ship_levels(
 
     _log.debug(
         '[选船列表] 等级识别: {}',
-        [(n, lv) for n, lv in found],
+        [(entry[0], entry[1]) for entry in found],
     )
     return found
