@@ -193,7 +193,6 @@ def _coerce_level_digits(raw_digits: str) -> int | None:
     trans = str.maketrans({
         'I': '1',
         'l': '1',
-        'L': '1',
         'O': '0',
         'o': '0',
     })
@@ -240,6 +239,7 @@ def _probe_level_near_name(
     y_start: int,
     y_end: int,
     name_x: float,
+    max_x: int,
 ) -> int | None:
     """在同一 y 行按舰名 x 位置裁剪区域，二次识别等级。"""
     h, w = screen.shape[:2]
@@ -247,7 +247,7 @@ def _probe_level_near_name(
 
     x_pad = max(70, int(w * 0.045))
     x0 = max(0, int(name_x - x_pad))
-    x1 = min(w, int(name_x + x_pad))
+    x1 = min(max_x, int(name_x + x_pad))
 
     y0 = max(0, y_start - int(row_h * 1.6))
     y1 = min(h, y_end + int(row_h * 0.4))
@@ -369,6 +369,9 @@ def read_ship_levels(
         max_pair_dist = max(80.0, row_img.shape[1] * 0.12)
 
         for row_name, name_x in name_hits:
+            if deduplicate_by_name and row_name in seen:
+                continue
+
             row_level: int | None = None
 
             best_level: int | None = None
@@ -389,12 +392,11 @@ def read_ship_levels(
                     y_start=y_start,
                     y_end=y_end,
                     name_x=name_x,
+                    max_x=list_w_native,
                 )
                 if probe_level is not None:
                     row_level = probe_level
 
-            if deduplicate_by_name and row_name in seen:
-                continue
             if deduplicate_by_name:
                 seen.add(row_name)
             _log.debug(
