@@ -37,13 +37,16 @@ from autowsgr.ui.bath_page.signatures import (
     CLICK_CHOOSE_REPAIR,
     CLICK_CLOSE_OVERLAY,
     CLICK_FIRST_REPAIR_SHIP,
+    CLICK_REPAIR_ALL,
+    CLOSE_OVERLAY_BUTTON_COLOR,
     PAGE_SIGNATURE,
+    REPAIR_ALL_BUTTON_COLOR,
     SWIPE_DELAY,
     SWIPE_DURATION,
     SWIPE_END,
     SWIPE_START,
 )
-from autowsgr.vision import PixelChecker
+from autowsgr.vision import Color, PixelChecker
 
 
 if TYPE_CHECKING:
@@ -194,7 +197,7 @@ class BathPage:
 
         _log.info('[UI] 关闭选择修理 overlay')
         self._ctrl.click(*CLICK_CLOSE_OVERLAY)
-        # 等待 overlay 消失，基础浴室签名恢复
+        # 等待 overlay 消失，基础浴室签名恢复（放宽条件，延长超时以兼容动画过渡）
         wait_for_page(
             self._ctrl,
             lambda s: (
@@ -203,6 +206,7 @@ class BathPage:
             ),
             source='选择修理 overlay',
             target='浴室',
+            timeout=10.0,
         )
 
     def click_first_repair_ship(self) -> None:
@@ -230,6 +234,56 @@ class BathPage:
 
         # 点击舰船后 overlay 自动关闭，等待回到浴室基础页面
         self._wait_overlay_auto_close()
+
+    def click_repair_all(self) -> None:
+        """在选择修理 overlay 中点击全部修理按钮。
+
+        点击后若 overlay 未自动关闭，则手动点击关闭按钮。
+
+        Raises
+        ------
+        NavigationError
+            overlay 未打开，或点击后未能关闭。
+        """
+        from autowsgr.ui.utils import NavigationError
+
+        screen = self._ctrl.screenshot()
+        if not BathPage.has_choose_repair_overlay(screen):
+            raise NavigationError('选择修理 overlay 未打开，无法点击全部修理', screen=screen)
+
+        # 可选：校验全部修理按钮颜色
+        btn_color, btn_tol = REPAIR_ALL_BUTTON_COLOR
+        px = PixelChecker.get_pixel(screen, *CLICK_REPAIR_ALL)
+        if not px.near(Color.from_rgb_tuple(btn_color), btn_tol):
+            _log.warning('[UI] 未检测到全部修理按钮，回退到点击第一个舰船')
+            self.click_first_repair_ship()
+            return
+
+        _log.info('[UI] 选择修理 → 点击全部修理')
+        self._ctrl.click(*CLICK_REPAIR_ALL)
+        time.sleep(1.0)
+
+        # 等待 overlay 自动关闭或手动关闭，最多 10s
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            if not BathPage.has_choose_repair_overlay(screen):
+                _log.debug('[UI] 全部修理后 overlay 已自动关闭')
+                return
+
+            # 若检测到关闭按钮颜色，说明 overlay 仍在，主动关闭
+            close_color, close_tol = CLOSE_OVERLAY_BUTTON_COLOR
+            close_px = PixelChecker.get_pixel(screen, *CLICK_CLOSE_OVERLAY)
+            if close_px.near(Color.from_rgb_tuple(close_color), close_tol):
+                _log.debug('[UI] 全部修理后 overlay 仍在，手动关闭')
+                self._ctrl.click(*CLICK_CLOSE_OVERLAY)
+                # 手动关闭后再给 2s 让动画完成
+                time.sleep(2.0)
+                return
+
+            time.sleep(0.5)
+
+        raise NavigationError('全部修理后 overlay 未关闭', screen=self._ctrl.screenshot())
 
     def repair_ship(self, ship_name: str) -> int:
         """在选择修理 overlay 中修理指定名称的舰船。

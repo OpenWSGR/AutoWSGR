@@ -37,6 +37,15 @@ CHOOSE_REPAIR_OVERLAY_SIGNATURE = PixelSignature(
 # 点击坐标 (相对坐标 0.0-1.0, 参考分辨率 960x540)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+CLICK_REPAIR_ALL: tuple[float, float] = (0.6802, 0.1704)
+"""全部修理按钮 (选择修理 overlay 右上角)。"""
+
+REPAIR_ALL_BUTTON_COLOR: tuple[tuple[int, int, int], float] = ((17, 119, 216), 30.0)
+"""全部修理按钮颜色 (蓝) 及容差。"""
+
+CLOSE_OVERLAY_BUTTON_COLOR: tuple[tuple[int, int, int], float] = ((197, 199, 194), 30.0)
+"""关闭按钮颜色 (灰) 及容差。"""
+
 CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """回退按钮 (◁)。"""
 

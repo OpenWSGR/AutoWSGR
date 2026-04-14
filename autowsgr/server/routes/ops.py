@@ -52,6 +52,68 @@ async def expedition_check():
         return ApiResponse(success=False, error=str(e))
 
 
+class ExpeditionAutoCheckRequest(BaseModel):
+    """自动远征检查请求。"""
+
+    allow_repair: bool = True
+    """是否允许执行浴室维修。前端在队列中还有后续战斗任务时可设为 False。"""
+
+
+@router.post('/api/expedition/auto_check', response_model=ApiResponse)
+async def expedition_auto_check(request: ExpeditionAutoCheckRequest):
+    """自动远征检查（挂机专用）。
+
+    不受 _require_idle 限制，顺带领取任务奖励并根据战斗任务状态智能执行浴室维修。
+    """
+    try:
+        ctx = get_context()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    from autowsgr.ops.expedition import collect_expedition
+    from autowsgr.ops.reward import collect_rewards
+    from autowsgr.ops.repair import repair_in_bath
+
+    results: dict[str, Any] = {}
+
+    # 1. 远征收取
+    try:
+        results['expedition'] = await asyncio.to_thread(collect_expedition, ctx)
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 自动远征检查: 远征收取失败: {}', e)
+        results['expedition_error'] = str(e)
+
+    # 2. 任务奖励
+    try:
+        results['rewards'] = await asyncio.to_thread(collect_rewards, ctx)
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 自动远征检查: 奖励领取失败: {}', e)
+        results['rewards_error'] = str(e)
+
+    # 3. 浴室维修
+    if task_manager.is_running:
+        _log.info('[API] 自动远征检查: 战斗任务进行中，跳过浴室维修')
+        results['repair_skipped'] = True
+        results['repair_reason'] = '战斗任务进行中'
+    elif not request.allow_repair:
+        _log.info('[API] 自动远征检查: 前端禁止维修（队列中还有后续任务），跳过浴室维修')
+        results['repair_skipped'] = True
+        results['repair_reason'] = '队列中有后续战斗任务'
+    else:
+        try:
+            await asyncio.to_thread(repair_in_bath, ctx)
+            results['repair'] = True
+        except Exception as e:
+            _log.opt(exception=True).warning('[API] 自动远征检查: 浴室维修失败: {}', e)
+            results['repair_error'] = str(e)
+
+    return ApiResponse(
+        success=True,
+        data=results,
+        message='自动远征检查完成',
+    )
+
+
 # ── 建造操作 ──
 
 
