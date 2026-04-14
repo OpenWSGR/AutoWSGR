@@ -190,12 +190,14 @@ def _parse_level(text: str) -> int | None:
 
 def _coerce_level_digits(raw_digits: str) -> int | None:
     """将 OCR 提取出的数字串映射为合法等级值。"""
-    trans = str.maketrans({
-        'I': '1',
-        'l': '1',
-        'O': '0',
-        'o': '0',
-    })
+    trans = str.maketrans(
+        {
+            'I': '1',
+            'l': '1',
+            'O': '0',
+            'o': '0',
+        }
+    )
     normalized = raw_digits.translate(trans)
     digits = ''.join(ch for ch in normalized if ch.isdigit())
     if not digits:
