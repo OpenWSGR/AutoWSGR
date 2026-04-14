@@ -361,7 +361,7 @@ class ChooseShipPage:
                     )
                 except LevelOCRRetryNeededError as exc:
                     _log.warning(
-                        "[UI] 等级 OCR 噪声过高，触发重新识别 (第 {}/{} 次)",
+                        '[UI] 等级 OCR 噪声过高，触发重新识别 (第 {}/{} 次)',
                         attempt + 1,
                         _OCR_MAX_ATTEMPTS,
                     )
@@ -430,7 +430,6 @@ class ChooseShipPage:
     @staticmethod
     def _normalize_ship_name(name: str) -> str:
         normalized = name.strip()
-        if normalized.endswith('·改'):
-            normalized = normalized[:-2]
+        normalized = normalized.removesuffix('·改')
         normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
         return normalized.strip()
