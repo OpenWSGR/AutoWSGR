@@ -262,7 +262,7 @@ def _probe_level_near_name(
     parsed_levels: list[int] = []
 
     def collect_levels(img: np.ndarray) -> None:
-        results = ocr.recognize(img, allowlist='LlVvIiYy0O1.:-/0123456789')
+        results = ocr.recognize(img, allowlist='LlVvIiYy0Oo1.:-/0123456789')
         for r in results:
             text = r.text.strip()
             if not text:

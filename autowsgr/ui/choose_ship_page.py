@@ -362,20 +362,25 @@ class ChooseShipPage:
                 raw_levels = []
 
             hits = [self._normalize_hit_entry(hit) for hit in raw_hits]
-            level_map: dict[float, list[int | None]] = {}
+            level_map: dict[float, dict[str, list[int | None]]] = {}
             for entry in raw_levels:
-                _, level, row_key = self._normalize_level_entry(entry)
-                level_map.setdefault(row_key, []).append(level)
+                level_name, level, row_key = self._normalize_level_entry(entry)
+                normalized_level_name = self._normalize_ship_name(level_name)
+                row_levels = level_map.setdefault(row_key, {})
+                row_levels.setdefault(normalized_level_name, []).append(level)
 
             for matched, cx, cy, row_key in hits:
-                if self._normalize_ship_name(matched) != normalized_target:
+                normalized_matched = self._normalize_ship_name(matched)
+                if normalized_matched != normalized_target:
                     continue
 
                 level = None
                 if use_level_filter:
                     row_levels = level_map.get(row_key)
                     if row_levels:
-                        level = row_levels.pop(0)
+                        name_levels = row_levels.get(normalized_matched)
+                        if name_levels:
+                            level = name_levels.pop(0)
                 if not self._is_level_in_range(level, min_level, max_level):
                     _log.warning(
                         "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",
