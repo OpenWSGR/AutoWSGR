@@ -210,10 +210,16 @@ class SortiePanelMixin(BaseMapPage):
             if not chapters:
                 return None, last_screen, False
 
-            candidate = max(set(chapters), key=chapters.count)
-            votes = chapters.count(candidate)
-            stable = votes >= 2
-            if not stable:
+            # 稳定策略：优先以“最后连续两次一致”为准，防止过渡态旧值占多数
+            if len(chapters) >= 2 and chapters[-1] == chapters[-2]:
+                candidate = chapters[-1]
+                stable = True
+            elif len(chapters) == samples and len(set(chapters)) == 1:
+                candidate = chapters[0]
+                stable = True
+            else:
+                candidate = max(set(chapters), key=chapters.count) if chapters else None
+                stable = False
                 _log.warning('[UI] 章节导航: OCR 抖动 {}，本轮不点击', chapters)
             return candidate, last_screen, stable
 
