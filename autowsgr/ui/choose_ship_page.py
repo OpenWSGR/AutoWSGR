@@ -419,7 +419,6 @@ class ChooseShipPage:
     @staticmethod
     def _normalize_ship_name(name: str) -> str:
         normalized = name.strip()
-        if normalized.endswith('·改'):
-            normalized = normalized[:-2]
+        normalized = normalized.removesuffix('·改')
         normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
         return normalized.strip()
