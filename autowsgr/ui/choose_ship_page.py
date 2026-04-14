@@ -331,7 +331,8 @@ class ChooseShipPage:
         Parameters
         ----------
         name:
-            目标舰船名 (精确名称)。
+            目标舰船名。
+            匹配时会先做舰名归一化（如去除“·改”与尾部括号别名）后再比较。
 
         Returns
         -------

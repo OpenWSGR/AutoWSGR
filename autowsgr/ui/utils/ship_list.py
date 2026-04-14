@@ -31,8 +31,8 @@ LEGACY_HEIGHT: int = 720
 #: Legacy 选船列表左侧裁剪宽度 (px@1280)
 LEGACY_LIST_WIDTH: int = 1048
 
-_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILlOo]{1,6})')
-_LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILlOo]{1,6})')
+_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILilOo]{1,6})')
+_LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILilOo]{1,6})')
 _MAX_LEVEL_VALUE = 200
 
 
@@ -192,6 +192,7 @@ def _coerce_level_digits(raw_digits: str) -> int | None:
     """将 OCR 提取出的数字串映射为合法等级值。"""
     trans = str.maketrans({
         'I': '1',
+        'i': '1',
         'l': '1',
         'O': '0',
         'o': '0',
