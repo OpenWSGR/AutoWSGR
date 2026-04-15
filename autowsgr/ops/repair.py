@@ -44,6 +44,7 @@ def repair_in_bath(ctx: GameContext) -> None:
 
     # 点击全部修理后 overlay 已关闭，先回到浴室页面，再返回主界面
     import time
+
     time.sleep(1.0)
     try:
         goto_page(ctx, PageName.MAIN)

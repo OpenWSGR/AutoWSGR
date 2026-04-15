@@ -71,8 +71,8 @@ async def expedition_auto_check(request: ExpeditionAutoCheckRequest):
         raise HTTPException(status_code=503, detail=str(e)) from e
 
     from autowsgr.ops.expedition import collect_expedition
-    from autowsgr.ops.reward import collect_rewards
     from autowsgr.ops.repair import repair_in_bath
+    from autowsgr.ops.reward import collect_rewards
 
     results: dict[str, Any] = {}
 
