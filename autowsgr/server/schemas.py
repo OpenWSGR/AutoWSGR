@@ -8,6 +8,31 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+_ALLOWED_SHIP_TYPE_CODES = {
+    'dd',
+    'cl',
+    'ca',
+    'cav',
+    'clt',
+    'bb',
+    'bc',
+    'bbv',
+    'cv',
+    'cvl',
+    'av',
+    'ss',
+    'ssg',
+    'cg',
+    'cgaa',
+    'ddg',
+    'ddgaa',
+    'bm',
+    'cbg',
+    'cf',
+    'ss_or_ssg',
+}
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举类型
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -81,6 +106,21 @@ class FleetRuleRequest(BaseModel):
         normalized = [name.strip() for name in value if name and name.strip()]
         if len(normalized) == 0:
             raise ValueError('candidates 不能为空')
+        return normalized
+
+    @field_validator('ship_type')
+    @classmethod
+    def _validate_ship_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+
+        if normalized not in _ALLOWED_SHIP_TYPE_CODES:
+            allowed = ', '.join(sorted(_ALLOWED_SHIP_TYPE_CODES))
+            raise ValueError(f'ship_type 不合法: {value!r}, 可选值: {allowed}')
         return normalized
 
     @model_validator(mode='after')

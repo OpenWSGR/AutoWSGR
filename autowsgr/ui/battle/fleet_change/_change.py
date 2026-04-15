@@ -94,14 +94,14 @@ class FleetChangeMixin(FleetDetectMixin):
         fleet_id:
             舰队编号 (2-4); ``None`` 代表不指定舰队。1 队不支持更换。
         ship_names:
-                        目标槽位列表 (按槽位 0-5 顺序); 每个元素可为:
+            目标槽位列表 (按槽位 0-5 顺序); 每个元素可为:
 
-                        - ``str``: 目标舰船名
-                        - ``dict``: 规则对象 (``candidates`` / ``search_name`` /
-                            ``min_level`` / ``max_level``)
-                        - ``None``: 留空
+            - ``str``: 目标舰船名
+            - ``dict``: 规则对象 (``candidates`` / ``search_name`` /
+              ``ship_type`` / ``min_level`` / ``max_level``)
+            - ``None``: 留空
 
-                        另外也兼容具备同名属性的 selector-like 对象。
+            另外也兼容具备同名属性的 selector-like 对象。
 
         Returns
         -------

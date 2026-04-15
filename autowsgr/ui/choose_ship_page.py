@@ -296,8 +296,20 @@ class ChooseShipPage:
                 level_hint = f' (等级限制: >= {min_level})'
             else:
                 level_hint = f' (等级限制: <= {max_level})'
-        _log.error('[UI] 未在选船列表中找到可用候选: {}{}', candidates, level_hint)
-        raise RuntimeError(f'未找到满足条件的目标舰船: {candidates}{level_hint}')
+
+        ship_type_hint = ''
+        if ship_type is not None:
+            ship_type_hint = f' (舰种限制: {ship_type})'
+
+        _log.error(
+            '[UI] 未在选船列表中找到可用候选: {}{}{}',
+            candidates,
+            level_hint,
+            ship_type_hint,
+        )
+        raise RuntimeError(
+            f'未找到满足条件的目标舰船: {candidates}{level_hint}{ship_type_hint}'
+        )
 
     @staticmethod
     def _normalize_hit_entry(hit: object) -> tuple[str, float, float, float]:
