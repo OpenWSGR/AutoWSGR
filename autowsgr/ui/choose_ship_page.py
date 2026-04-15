@@ -307,9 +307,7 @@ class ChooseShipPage:
             level_hint,
             ship_type_hint,
         )
-        raise RuntimeError(
-            f'未找到满足条件的目标舰船: {candidates}{level_hint}{ship_type_hint}'
-        )
+        raise RuntimeError(f'未找到满足条件的目标舰船: {candidates}{level_hint}{ship_type_hint}')
 
     @staticmethod
     def _normalize_hit_entry(hit: object) -> tuple[str, float, float, float]:
