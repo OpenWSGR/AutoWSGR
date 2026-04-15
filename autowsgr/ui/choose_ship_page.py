@@ -59,6 +59,29 @@ _SCROLL_TO_Y: float = 0.30
 _OCR_MAX_ATTEMPTS: int = 3
 _SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
+_SHIP_TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
+    'dd': ('驱逐',),
+    'cl': ('轻巡',),
+    'ca': ('重巡',),
+    'cav': ('航巡',),
+    'clt': ('雷巡',),
+    'bb': ('战列',),
+    'bc': ('战巡',),
+    'bbv': ('航战',),
+    'cv': ('航母',),
+    'cvl': ('轻母',),
+    'av': ('装母',),
+    'ss': ('潜艇',),
+    'ssg': ('导潜',),
+    'cg': ('导巡',),
+    'cgaa': ('防巡',),
+    'ddg': ('导驱',),
+    'ddgaa': ('防驱',),
+    'bm': ('重炮',),
+    'cbg': ('大巡',),
+    'cf': ('旗舰',),
+}
+
 PAGE_SIGNATURE = PixelSignature(
     name='choose_ship_page',
     strategy=MatchStrategy.ALL,
@@ -189,10 +212,11 @@ class ChooseShipPage:
             (决战选船界面没有搜索框)。
         selector:
             可选规则，支持 ``candidates`` / ``search_name`` /
-            ``min_level`` / ``max_level``。
+            ``ship_type`` / ``min_level`` / ``max_level``。
             其中 ``search_name`` 用于指定搜索框关键字（仅在
             ``use_search=True`` 且界面存在搜索框时生效），
             ``candidates`` 用于限定允许点击的舰船名集合，
+            ``ship_type`` 用于按舰种筛选同名舰船，
             ``min_level`` / ``max_level`` 用于按等级范围筛选。
 
         Returns
@@ -211,6 +235,7 @@ class ChooseShipPage:
 
         candidates = [name]
         search_name: str | None = None
+        ship_type: str | None = None
         min_level: int | None = None
         max_level: int | None = None
 
@@ -223,8 +248,11 @@ class ChooseShipPage:
             raw_min = selector.get('min_level')
             raw_max = selector.get('max_level')
             raw_search = selector.get('search_name')
+            raw_ship_type = selector.get('ship_type')
             if isinstance(raw_search, str) and raw_search.strip():
-                search_name = raw_search.strip()
+                search_name = self._normalize_search_keyword(raw_search)
+            if isinstance(raw_ship_type, str) and raw_ship_type.strip():
+                ship_type = raw_ship_type.strip().lower()
             if isinstance(raw_min, int) and raw_min > 0:
                 min_level = raw_min
             if isinstance(raw_max, int) and raw_max > 0:
@@ -236,6 +264,7 @@ class ChooseShipPage:
             self.ensure_dismiss_keyboard()
             matched = self._click_ship_in_list(
                 name,
+                ship_type=ship_type,
                 min_level=min_level,
                 max_level=max_level,
             )
@@ -244,12 +273,14 @@ class ChooseShipPage:
                 return matched
 
         for candidate in candidates:
+            search_candidate = self._normalize_search_keyword(candidate)
             if use_search:
                 self.ensure_search_box()
-                self.input_ship_name(candidate)
+                self.input_ship_name(search_candidate)
                 self.ensure_dismiss_keyboard()
             matched = self._click_ship_in_list(
                 candidate,
+                ship_type=ship_type,
                 min_level=min_level,
                 max_level=max_level,
             )
@@ -321,6 +352,7 @@ class ChooseShipPage:
         self,
         name: str,
         *,
+        ship_type: str | None = None,
         min_level: int | None = None,
         max_level: int | None = None,
     ) -> str | None:
@@ -403,6 +435,22 @@ class ChooseShipPage:
                     )
                     continue
 
+                if ship_type is not None:
+                    detected_ship_type = self._detect_ship_type_near_hit(
+                        screen,
+                        cx,
+                        cy,
+                        row_key,
+                    )
+                    if not self._is_ship_type_in_rule(detected_ship_type, ship_type):
+                        _log.warning(
+                            "[UI] 命中 '{}' 舰种 '{}' 不满足要求 '{}'",
+                            matched,
+                            detected_ship_type if detected_ship_type is not None else '未知',
+                            ship_type,
+                        )
+                        continue
+
                 _log.info(
                     "[UI] 选船 DLL+OCR -> '{}' (第 {}/{} 次), 点击 ({:.3f}, {:.3f})",
                     name,
@@ -426,6 +474,66 @@ class ChooseShipPage:
                 time.sleep(0.5)
 
         return None
+
+    def _detect_ship_type_near_hit(
+        self,
+        screen: np.ndarray,
+        cx: float,
+        cy: float,
+        row_key: float,
+    ) -> str | None:
+        """在命中卡片附近 OCR 识别舰种。"""
+        assert self._ctx.ocr is not None
+
+        h, w = screen.shape[:2]
+        x_px = int(max(0, min(w - 1, cx * w)))
+        y_px = int(max(0, min(h - 1, cy * h)))
+        row_y = int(max(0, min(h - 1, row_key * h))) if row_key >= 0 else y_px
+
+        probes: list[tuple[int, int, int, int]] = [
+            (max(0, x_px - 110), max(0, row_y - 120), min(w, x_px + 110), max(0, row_y - 12)),
+            (max(0, x_px - 130), max(0, y_px - 150), min(w, x_px + 130), max(0, y_px - 18)),
+            (max(0, x_px - 140), max(0, y_px - 170), min(w, x_px + 140), min(h, y_px + 20)),
+        ]
+
+        for x1, y1, x2, y2 in probes:
+            if x2 - x1 < 16 or y2 - y1 < 16:
+                continue
+            crop = screen[y1:y2, x1:x2]
+            results = self._ctx.ocr.recognize(crop)
+            for result in results:
+                text = str(getattr(result, 'text', '')).strip()
+                ship_type = self._extract_ship_type_from_text(text)
+                if ship_type is not None:
+                    return ship_type
+        return None
+
+    @staticmethod
+    def _extract_ship_type_from_text(text: str) -> str | None:
+        if not text:
+            return None
+        normalized = text.replace(' ', '')
+        for ship_type, keywords in _SHIP_TYPE_KEYWORDS.items():
+            if any(keyword in normalized for keyword in keywords):
+                return ship_type
+        return None
+
+    @staticmethod
+    def _is_ship_type_in_rule(detected: str | None, expected: str) -> bool:
+        if detected is None:
+            return False
+        rule = expected.strip().lower()
+        if rule == 'ss_or_ssg':
+            return detected in {'ss', 'ssg'}
+        return detected == rule
+
+    @staticmethod
+    def _normalize_search_keyword(name: str) -> str:
+        normalized = name.strip()
+        if normalized.endswith('·改'):
+            normalized = normalized.removesuffix('·改').strip()
+        normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
+        return normalized.strip()
 
     @staticmethod
     def _normalize_ship_name(name: str) -> str:

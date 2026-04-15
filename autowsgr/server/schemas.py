@@ -71,6 +71,7 @@ class FleetRuleRequest(BaseModel):
 
     candidates: list[str] = Field(min_length=1, description='候选舰船名（按优先级）')
     search_name: str | None = Field(default=None, description='选船搜索关键词（用于同名舰船区分）')
+    ship_type: str | None = Field(default=None, description='舰种约束（如 cl/cav/ss）')
     min_level: int | None = Field(default=None, ge=1, description='等级下限（含）')
     max_level: int | None = Field(default=None, ge=1, description='等级上限（含）')
 

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections import Counter
 from typing import TYPE_CHECKING, TypedDict
@@ -34,12 +35,16 @@ _MAX_SET_RETRIES: int = 2
 # 等待选船页面出现的超时 (秒)
 _CHOOSE_PAGE_TIMEOUT: float = 5.0
 
+# 舰名尾部别名后缀，如“(苍青幻影)”
+_SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
+
 
 class FleetSlotSelector(TypedDict, total=False):
     """编队槽位规则。"""
 
     candidates: list[str]
     search_name: str
+    ship_type: str
     min_level: int
     max_level: int
 
@@ -293,17 +298,20 @@ class FleetChangeMixin(FleetDetectMixin):
 
         raw_candidates = None
         raw_search_name = None
+        raw_ship_type = None
         raw_min = None
         raw_max = None
 
         if isinstance(slot, dict):
             raw_candidates = slot.get('candidates')
             raw_search_name = slot.get('search_name')
+            raw_ship_type = slot.get('ship_type')
             raw_min = slot.get('min_level')
             raw_max = slot.get('max_level')
         else:
             raw_candidates = getattr(slot, 'candidates', None)
             raw_search_name = getattr(slot, 'search_name', None)
+            raw_ship_type = getattr(slot, 'ship_type', None)
             raw_min = getattr(slot, 'min_level', None)
             raw_max = getattr(slot, 'max_level', None)
 
@@ -317,6 +325,8 @@ class FleetChangeMixin(FleetDetectMixin):
         selector: dict[str, object] = {'candidates': candidates}
         if isinstance(raw_search_name, str) and raw_search_name.strip():
             selector['search_name'] = raw_search_name.strip()
+        if isinstance(raw_ship_type, str) and raw_ship_type.strip():
+            selector['ship_type'] = raw_ship_type.strip().lower()
         if isinstance(raw_min, int) and raw_min > 0:
             selector['min_level'] = raw_min
         if isinstance(raw_max, int) and raw_max > 0:
@@ -337,6 +347,29 @@ class FleetChangeMixin(FleetDetectMixin):
         if normalized_name and normalized_name not in out:
             out.append(normalized_name)
         return out
+
+    @classmethod
+    def _normalize_search_name_for_compare(cls, value: str) -> str:
+        normalized = value.strip()
+        if normalized.endswith('·改'):
+            normalized = normalized.removesuffix('·改').strip()
+        normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
+        return normalized.strip()
+
+    @classmethod
+    def _matches_search_name(cls, current_name: str | None, raw_search_name: object) -> bool:
+        if current_name is None:
+            return False
+        if not isinstance(raw_search_name, str):
+            return True
+        if not raw_search_name.strip():
+            return True
+
+        search_name = raw_search_name.strip()
+        if current_name == search_name:
+            return True
+
+        return current_name == cls._normalize_search_name_for_compare(search_name)
 
     @classmethod
     def _can_short_circuit(
@@ -436,7 +469,7 @@ class FleetChangeMixin(FleetDetectMixin):
                     raw_search_name = selector.get('search_name')
                     if isinstance(raw_search_name, str) and raw_search_name.strip():
                         # 指定了搜索关键词时，不能仅凭同名判定已满足。
-                        if ship != raw_search_name.strip():
+                        if not cls._matches_search_name(ship, raw_search_name):
                             continue
                 ok[i] = True
                 matched_slots.add(i)
@@ -454,7 +487,7 @@ class FleetChangeMixin(FleetDetectMixin):
                     if isinstance(selector, dict):
                         raw_search_name = selector.get('search_name')
                         if isinstance(raw_search_name, str) and raw_search_name.strip():
-                            if ship != raw_search_name.strip():
+                            if not cls._matches_search_name(ship, raw_search_name):
                                 continue
                     ok[j] = True
                     matched_slots.add(i)
