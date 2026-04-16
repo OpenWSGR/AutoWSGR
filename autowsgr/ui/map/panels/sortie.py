@@ -197,7 +197,9 @@ class SortiePanelMixin(BaseMapPage):
         if self._ocr is None:
             raise RuntimeError('需要 OCR 引擎才能导航到指定章节')
 
-        def _read_chapter(samples: int = 3, delay: float = 0.15) -> tuple[int | None, np.ndarray | None, bool]:
+        def _read_chapter(
+            samples: int = 3, delay: float = 0.15
+        ) -> tuple[int | None, np.ndarray | None, bool]:
             chapters: list[int] = []
             last_screen: np.ndarray | None = None
 
@@ -293,7 +295,6 @@ class SortiePanelMixin(BaseMapPage):
             target,
         )
         return None
-
 
     def navigate_to_map(self, map_num: int | str) -> None:
         """通过 OCR 识别当前地图编号并左右翻页至目标。"""
