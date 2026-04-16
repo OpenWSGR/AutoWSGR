@@ -52,6 +52,8 @@ PAGE_SIGNATURE = PixelSignature(
         PixelRule.of(0.9695, 0.8500, (15, 31, 56), tolerance=30.0),
         PixelRule.of(0.7641, 0.8611, (22, 46, 84), tolerance=30.0),
         PixelRule.of(0.0453, 0.0667, (38, 39, 43), tolerance=30.0),
+        # 底部“重置关卡”按钮文字（白色）—— 与战役/出征地图区分的关键点
+        PixelRule.of(0.500, 0.925, (255, 255, 255), tolerance=30.0),
     ],
 )
 """决战页面像素签名。"""
