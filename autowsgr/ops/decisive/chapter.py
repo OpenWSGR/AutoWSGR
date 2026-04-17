@@ -39,7 +39,7 @@ class DecisiveChapterOps(DecisiveBase):
             self._ctrl.click(0.38, 0.565)
             destroy_ships(
                 self._ctx,
-                ship_types=self._config.destroy_ship_types or None,
+                ship_types=self._ctx.config.destroy_ship_types or None,
             )
             return
         raise DockFullError('决战中检测到船坞已满，且未开启 full_destroy')
