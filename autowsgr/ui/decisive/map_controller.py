@@ -582,8 +582,8 @@ class DecisiveMapController:
         from autowsgr.image_resources import Templates
         from autowsgr.ui.utils import confirm_operation
 
-        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0)
-        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0)
+        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0, delay=2.0)
+        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0, delay=2.0)
 
         ship_templates = [
             Templates.Symbol.GET_SHIP,
