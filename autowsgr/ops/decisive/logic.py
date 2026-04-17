@@ -114,6 +114,7 @@ class DecisiveLogic:
             candidates = self.config.level1 + [e for e in self._level2_full if not _is_ship(e)]
 
         lim = 6 if fleet_count < 6 else score
+        lim = score if fleet_count == 0 else lim
         result: list[str] = []
         for target in candidates:
             if target in selections:
