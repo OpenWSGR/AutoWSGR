@@ -454,6 +454,7 @@ class DecisivePhaseHandlers(DecisiveBase):
         _log.info('[决战] 小关 {} 通关!', self._state.stage)
         collected = self._map.confirm_stage_clear()
         self._state.node = 'A'
+        self._resume_mode = True
         if collected:
             _log.info('[决战] 获得 {} 个掉落: {}', len(collected), collected)
 
