@@ -13,7 +13,7 @@ import cv2
 
 from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
-from autowsgr.vision import get_api_dll
+from autowsgr.vision import apply_ship_patches, get_api_dll
 from autowsgr.vision.ocr import _fuzzy_match
 
 
@@ -135,7 +135,8 @@ def locate_ship_rows(
             text = r.text.strip()
             if not text:
                 continue
-            name = _fuzzy_match(text, SHIPNAMES)
+            correct_name = apply_ship_patches(text)
+            name = _fuzzy_match(correct_name, SHIPNAMES)
             if name is None:
                 continue
             if deduplicate_by_name and name in seen:
@@ -393,7 +394,8 @@ def read_ship_levels(
             if level is not None:
                 local_level_hits.append((level, x_center))
 
-            name = _fuzzy_match(text, SHIPNAMES)
+            correct_name = apply_ship_patches(text)
+            name = _fuzzy_match(correct_name, SHIPNAMES)
             if name is not None:
                 name_hits.append((name, x_center))
 
