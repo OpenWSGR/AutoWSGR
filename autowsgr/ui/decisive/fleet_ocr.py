@@ -71,9 +71,9 @@ def _prepare_name_roi(image: np.ndarray) -> np.ndarray:
 
     enlarged = cv2.resize(image, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
     lab = cv2.cvtColor(enlarged, cv2.COLOR_RGB2LAB)
-    l, a, b = cv2.split(lab)
-    l = cv2.equalizeHist(l)
-    enhanced = cv2.merge((l, a, b))
+    lightness_channel, a, b = cv2.split(lab)
+    lightness_channel = cv2.equalizeHist(lightness_channel)
+    enhanced = cv2.merge((lightness_channel, a, b))
     return cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
 
 

@@ -354,9 +354,7 @@ class ChooseShipPage:
             return False
         if min_level is not None and level < min_level:
             return False
-        if max_level is not None and level > max_level:
-            return False
-        return True
+        return not (max_level is not None and level > max_level)
 
     def _click_ship_in_list(
         self,

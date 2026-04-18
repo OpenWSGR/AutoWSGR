@@ -461,10 +461,13 @@ class FleetChangeMixin(FleetDetectMixin):
                 selector = selectors[i]
                 if isinstance(selector, dict):
                     raw_search_name = selector.get('search_name')
-                    if isinstance(raw_search_name, str) and raw_search_name.strip():
-                        # 指定了搜索关键词时，不能仅凭同名判定已满足。
-                        if not cls._matches_search_name(ship, raw_search_name):
-                            continue
+                    # 指定了搜索关键词时，不能仅凭同名判定已满足。
+                    if (
+                        isinstance(raw_search_name, str)
+                        and raw_search_name.strip()
+                        and not cls._matches_search_name(ship, raw_search_name)
+                    ):
+                        continue
                 ok[i] = True
                 matched_slots.add(i)
                 used_positions.add(i)
@@ -480,9 +483,12 @@ class FleetChangeMixin(FleetDetectMixin):
                     selector = selectors[i]
                     if isinstance(selector, dict):
                         raw_search_name = selector.get('search_name')
-                        if isinstance(raw_search_name, str) and raw_search_name.strip():
-                            if not cls._matches_search_name(ship, raw_search_name):
-                                continue
+                        if (
+                            isinstance(raw_search_name, str)
+                            and raw_search_name.strip()
+                            and not cls._matches_search_name(ship, raw_search_name)
+                        ):
+                            continue
                     ok[j] = True
                     matched_slots.add(i)
                     used_positions.add(j)
@@ -509,9 +515,12 @@ class FleetChangeMixin(FleetDetectMixin):
                 continue
 
             raw_search_name = selector.get('search_name')
-            if isinstance(raw_search_name, str) and raw_search_name.strip():
-                if not cls._matches_search_name(current_name, raw_search_name):
-                    return False
+            if (
+                isinstance(raw_search_name, str)
+                and raw_search_name.strip()
+                and not cls._matches_search_name(current_name, raw_search_name)
+            ):
+                return False
 
             candidates = selector.get('candidates')
             if not isinstance(candidates, list):
