@@ -226,6 +226,37 @@ def _euclidean_distance(
     return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 
+def _point_to_ray_distance(
+    px: float,
+    py: float,
+    ox: float,
+    oy: float,
+    dx: float,
+    dy: float,
+) -> float:
+    """计算点到射线的最小距离。
+
+    射线由起点 ``(ox, oy)`` 和方向向量 ``(dx, dy)`` 定义。
+    当点落在射线反向半平面时，最小距离退化为点到射线起点的距离。
+    """
+    # 向量 OP
+    vx = px - ox
+    vy = py - oy
+
+    # 点在射线后方：最短距离为到起点距离
+    dot = vx * dx + vy * dy
+    if dot <= 0:
+        return math.hypot(vx, vy)
+
+    # 射线方向单位向量的法向分量长度 = 到射线最短距离
+    # |v x d| / |d|, 其中二维叉积标量为 v_x * d_y - v_y * d_x
+    cross = abs(vx * dy - vy * dx)
+    norm_d = math.hypot(dx, dy)
+    if norm_d == 0:
+        return math.hypot(vx, vy)
+    return cross / norm_d
+
+
 class NodeTracker:
     """舰船位置追踪与节点判定器。
 
@@ -367,7 +398,8 @@ class NodeTracker:
         """根据当前舰船位置判定所在节点。
 
         当舰船位置发生变化（与上次不同）时，遍历所有候选节点，
-        使用欧几里得距离选择最近的节点作为当前节点。
+        优先按“到当前速度方向射线的最小距离”选择节点；
+        若射线距离相同，再按欧几里得距离打破平局。
 
         如果地图数据包含路由信息（新格式 YAML），则仅在当前节点的
         ``next_nodes`` 中搜索；否则搜索全部节点。
@@ -384,8 +416,27 @@ class NodeTracker:
         if self._ship_position == self._last_ship_position:
             return self._current_node
 
+        prev_position = self._last_ship_position
         self._last_ship_position = self._ship_position
         sx, sy = self._ship_position
+
+        # 速度方向（上一帧 -> 当前帧）；首帧或零位移时退化为欧氏距离模式
+        has_ray = False
+        vx = 0.0
+        vy = 0.0
+        if prev_position is not None:
+            vx = sx - prev_position[0]
+            vy = sy - prev_position[1]
+            has_ray = (vx * vx + vy * vy) > 1e-12
+
+        if not has_ray:
+            _log.debug(
+                '[NodeTracker] has_ray=False，保持当前节点: {}，位置: ({:.3f}, {:.3f})',
+                self._current_node,
+                sx,
+                sy,
+            )
+            return self._current_node
 
         current_data = self._map_data.get(self._current_node)
 
@@ -397,29 +448,59 @@ class NodeTracker:
                 self._current_node,
                 current_data.next_nodes,
             )
-            candidate_names = current_data.next_nodes
+            # 将当前节点也作为候选，避免在移动途中被强制前推
+            candidate_names = list(dict.fromkeys([self._current_node, *current_data.next_nodes]))
         else:
             # 旧格式：搜索全部节点（排除 "0"）
             candidate_names = self._map_data.node_names
 
         best_node = self._current_node
-        best_distance = float('inf')
+        best_ray_distance = float('inf')
+        best_euclidean_distance = float('inf')
+        candidate_metrics: list[str] = []
 
         for name in candidate_names:
             node = self._map_data.get(name)
             if node is None:
                 continue
-            dist = _euclidean_distance(sx, sy, node.x, node.y)
-            if dist < best_distance:
-                best_distance = dist
+
+            euclidean_dist = _euclidean_distance(sx, sy, node.x, node.y)
+            if has_ray:
+                ray_dist = _point_to_ray_distance(node.x, node.y, sx, sy, vx, vy)
+            else:
+                # 无法构建射线时，退化为纯欧氏距离比较
+                ray_dist = euclidean_dist
+
+            candidate_metrics.append(
+                f'{name}(ray={ray_dist:.4f}, euclid={euclidean_dist:.4f}, pos=({node.x:.3f},{node.y:.3f}))',
+            )
+
+            # 射线优先；同分时按欧氏距离打破平局
+            if (ray_dist < best_ray_distance) or (
+                math.isclose(ray_dist, best_ray_distance, rel_tol=1e-9, abs_tol=1e-12)
+                and euclidean_dist < best_euclidean_distance
+            ):
+                best_ray_distance = ray_dist
+                best_euclidean_distance = euclidean_dist
                 best_node = name
+
+        _log.debug(
+            '[NodeTracker] 候选点评估: {} | 船位=({:.3f},{:.3f}) | 速度=({:.4f},{:.4f}) | has_ray={}',
+            '; '.join(candidate_metrics),
+            sx,
+            sy,
+            vx,
+            vy,
+            has_ray,
+        )
 
         if best_node != self._current_node:
             _log.debug(
-                '[NodeTracker] 节点更新: {} → {} (距离 {:.4f}), 位置: ({:.3f}, {:.3f})',
+                '[NodeTracker] 节点更新: {} → {} (射线距 {:.4f}, 欧氏距 {:.4f}), 位置: ({:.3f}, {:.3f})',
                 self._current_node,
                 best_node,
-                best_distance,
+                best_ray_distance,
+                best_euclidean_distance,
                 sx,
                 sy,
             )
