@@ -131,3 +131,12 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# Agent temporary files
+.tmp/
+
+# MCP / Jupyter 测试产物
+test_*.ipynb
+*_test.ipynb
+.jupyter/
+.jupyter_ystore.db

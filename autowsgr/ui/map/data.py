@@ -197,7 +197,7 @@ CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 CHAPTER_NAV_DELAY: float = 0.5
 """章节切换后等待动画的延迟 (秒)。"""
 
-CHAPTER_NAV_MAX_ATTEMPTS: int = 12
+CHAPTER_NAV_MAX_ATTEMPTS: int = 20
 """章节导航最大尝试次数。"""
 
 

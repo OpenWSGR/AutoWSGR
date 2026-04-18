@@ -182,7 +182,10 @@ class SortiePanelMixin(BaseMapPage):
         return True
 
     def navigate_to_chapter(self, target: int) -> int | None:
-        """导航到指定章节 (通过 OCR 识别当前位置并逐步点击)。
+        """导航到指定章节 (通过 OCR 识别当前位置并批量点击)。
+
+        远距离章节切换时采用批量点击 + 充分等待的策略，
+        避免单步验证导致动画过渡期的 OCR 抖动浪费尝试次数。
 
         Parameters
         ----------
@@ -194,7 +197,9 @@ class SortiePanelMixin(BaseMapPage):
         if self._ocr is None:
             raise RuntimeError('需要 OCR 引擎才能导航到指定章节')
 
-        def _read_chapter_stable(samples: int = 3) -> tuple[int | None, np.ndarray | None, bool]:
+        def _read_chapter(
+            samples: int = 3, delay: float = 0.15
+        ) -> tuple[int | None, np.ndarray | None, bool]:
             chapters: list[int] = []
             last_screen: np.ndarray | None = None
 
@@ -205,12 +210,12 @@ class SortiePanelMixin(BaseMapPage):
                 if info is not None:
                     chapters.append(info.chapter)
                 if i < samples - 1:
-                    time.sleep(0.15)
+                    time.sleep(delay)
 
             if not chapters:
                 return None, last_screen, False
 
-            # 稳定策略：优先以“最后连续两次一致”为准，防止过渡态旧值占多数
+            # 稳定策略：优先以"最后连续两次一致"为准，防止过渡态旧值占多数
             if len(chapters) >= 2 and chapters[-1] == chapters[-2]:
                 candidate = chapters[-1]
                 stable = True
@@ -226,7 +231,7 @@ class SortiePanelMixin(BaseMapPage):
         confirm_hits = 0
 
         for attempt in range(CHAPTER_NAV_MAX_ATTEMPTS):
-            current, screen, stable = _read_chapter_stable()
+            current, screen, stable = _read_chapter()
             if current is None:
                 _log.warning('[UI] 章节导航: OCR 识别失败 (第 {} 次尝试)', attempt + 1)
                 return None
@@ -255,16 +260,34 @@ class SortiePanelMixin(BaseMapPage):
                 time.sleep(CHAPTER_NAV_DELAY)
                 continue
 
-            if current > target:
-                ok = self.click_prev_chapter(screen)
+            delta = target - current
+            direction = -1 if delta < 0 else 1
+            steps = abs(delta)
+
+            # 远距离批量点击，近距离逐步点击
+            if steps > 2:
+                batch = min(steps, 4)
+                _log.info('[UI] 章节导航: 批量点击 {} 章', batch)
+                for _ in range(batch):
+                    if direction < 0:
+                        ok = self.click_prev_chapter()
+                    else:
+                        ok = self.click_next_chapter()
+                    if not ok:
+                        _log.warning('[UI] 章节导航: 点击失败，终止')
+                        return None
+                    time.sleep(0.3)
+                # 批量点击后充分等待动画完全结束，避免 OCR 抖动
+                time.sleep(1.0)
             else:
-                ok = self.click_next_chapter(screen)
-
-            if not ok:
-                _log.warning('[UI] 章节导航: 点击失败，终止')
-                return None
-
-            time.sleep(CHAPTER_NAV_DELAY)
+                if direction < 0:
+                    ok = self.click_prev_chapter(screen)
+                else:
+                    ok = self.click_next_chapter(screen)
+                if not ok:
+                    _log.warning('[UI] 章节导航: 点击失败，终止')
+                    return None
+                time.sleep(CHAPTER_NAV_DELAY)
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',

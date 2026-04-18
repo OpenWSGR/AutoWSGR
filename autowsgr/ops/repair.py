@@ -40,9 +40,16 @@ def repair_in_bath(ctx: GameContext) -> None:
 
     page = BathPage(ctx)
     page.go_to_choose_repair()
-    page.click_first_repair_ship()
+    page.click_repair_all()
 
-    # 点击舰船后 overlay 自动关闭，已回到浴室页面
+    # 点击全部修理后 overlay 已关闭，先回到浴室页面，再返回主界面
+    import time
+
+    time.sleep(1.0)
+    try:
+        goto_page(ctx, PageName.MAIN)
+    except Exception:
+        _log.warning('[OPS] 浴室修理后返回主界面失败，可能仍在过渡动画中')
     _log.info('[OPS] 浴室修理操作完成')
 
 
