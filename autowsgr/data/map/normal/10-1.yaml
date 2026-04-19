@@ -1,48 +1,98 @@
 "0":
-  position: [900, 427]
-  next: [A, B]
+  position:
+  - 0.938
+  - 0.793
+  next:
+  - A
+  - B
 A:
-  position: [832, 172]
-  next: [C, I]
+  position:
+  - 0.868
+  - 0.321
+  next:
+  - C
+  - I
 B:
-  position: [787, 300]
-  next: [D, F]
+  position:
+  - 0.82
+  - 0.554
+  next:
+  - D
+  - F
 C:
-  position: [682, 60]
+  position:
+  - 0.711
+  - 0.11
   next: []
 D:
-  position: [683, 442]
-  next: [E, G]
+  position:
+  - 0.712
+  - 0.819
+  next:
+  - E
+  - G
 E:
-  position: [487, 495]
+  position:
+  - 0.508
+  - 0.917
   next: []
 F:
-  position: [630, 247]
-  next: [H]
+  position:
+  - 0.656
+  - 0.457
+  next:
+  - H
 G:
-  position: [503, 397]
-  next: [L]
+  position:
+  - 0.523
+  - 0.735
+  next:
+  - L
 H:
-  position: [449, 278]
-  next: [L]
+  position:
+  - 0.469
+  - 0.513
+  next:
+  - L
 I:
-  position: [548, 180]
-  next: [J, K]
+  position:
+  - 0.57
+  - 0.334
+  next:
+  - J
+  - K
 J:
-  position: [435, 75]
+  position:
+  - 0.452
+  - 0.137
   next: []
 K:
-  position: [345, 240]
-  next: [N, O]
+  position:
+  - 0.36
+  - 0.445
+  next:
+  - "N"
+  - O
 L:
-  position: [316, 405]
-  next: [M]
+  position:
+  - 0.329
+  - 0.751
+  next:
+  - M
 M:
-  position: [128, 367]
-  next: [O]
-N:
-  position: [240, 143]
-  next: [O]
+  position:
+  - 0.133
+  - 0.682
+  next:
+  - O
+"N":
+  position:
+  - 0.25
+  - 0.264
+  next:
+  - O
 O:
-  position: [60, 203]
+  position:
+  - 0.064
+  - 0.375
   next: []

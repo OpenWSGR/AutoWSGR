@@ -1,24 +1,57 @@
+"0":
+  position:
+  - 0.891
+  - 0.779
+  next:
+  - A
+  - B
 A:
-- 682
-- 390
+  position:
+  - 0.711
+  - 0.722
+  next:
+  - C
+  - D
 B:
-- 768
-- 202
+  position:
+  - 0.802
+  - 0.375
+  next:
+  - D
 C:
-- 495
-- 465
+  position:
+  - 0.516
+  - 0.861
+  next:
+  - E
+  - F
 D:
-- 517
-- 247
+  position:
+  - 0.54
+  - 0.46
+  next:
+  - F
+  - G
 E:
-- 116
-- 367
+  position:
+  - 0.121
+  - 0.679
+  next:
+  - H
 F:
-- 255
-- 292
+  position:
+  - 0.265
+  - 0.542
+  next:
+  - G
+  - H
 G:
-- 345
-- 112
+  position:
+  - 0.358
+  - 0.209
+  next: []
 H:
-- 135
-- 97
+  position:
+  - 0.141
+  - 0.178
+  next: []

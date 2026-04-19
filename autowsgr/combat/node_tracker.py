@@ -37,10 +37,6 @@ from autowsgr.vision import (
 # 常量
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 地图节点坐标 YAML 文件的基准分辨率
-_SOURCE_WIDTH = 960
-_SOURCE_HEIGHT = 540
-
 # 地图数据根目录
 _MAP_DATA_ROOT = Path(__file__).resolve().parent.parent / 'data' / 'map' / 'normal'
 
@@ -80,13 +76,13 @@ class MapNodeData:
 
     从 YAML 文件加载并转换为相对坐标。
 
-    **标准格式** (含路由信息)::
+        **标准格式** (归一化坐标 + 路由信息)::
 
         "0":
-          position: [200, 350]
+                    position: [0.208, 0.648]
           next: ["A"]
         A:
-          position: [283, 282]
+                    position: [0.295, 0.522]
           next: ["B", "C"]
     """
 
@@ -180,22 +176,17 @@ class MapNodeData:
             name = str(key)
 
             if isinstance(value, dict):
-                # 新格式: {"position": [x, y], "next": ["B", "C"]}
+                # 格式: {"position": [x, y], "next": ["B", "C"]}
                 pos = value.get('position', [0, 0])
                 next_nodes = value.get('next', [])
-                rel_x = pos[0] / _SOURCE_WIDTH
-                rel_y = pos[1] / _SOURCE_HEIGHT
+                rel_x = pos[0]
+                rel_y = pos[1]
                 nodes[name] = NodePosition(
                     name=name,
                     x=rel_x,
                     y=rel_y,
                     next_nodes=list(next_nodes),
                 )
-            elif isinstance(value, (list, tuple)):
-                # 旧格式: [x, y] 或 !!python/tuple
-                rel_x = value[0] / _SOURCE_WIDTH
-                rel_y = value[1] / _SOURCE_HEIGHT
-                nodes[name] = NodePosition(name=name, x=rel_x, y=rel_y)
             else:
                 _log.warning(
                     "[NodeTracker] 忽略无法解析的节点 '{}': {}",

@@ -1,42 +1,92 @@
+"0":
+  position:
+  - 0.837
+  - 0.556
+  next:
+  - B
+  - C
 A:
-- 645
-- 435
+  position:
+  - 0.673
+  - 0.806
+  next:
+  - D
 B:
-- 660
-- 307
+  position:
+  - 0.689
+  - 0.57
+  next:
+  - A
+  - E
 C:
-- 753
-- 176
+  position:
+  - 0.786
+  - 0.328
+  next:
+  - F
+  - G
 D:
-- 476
-- 476
+  position:
+  - 0.495
+  - 0.881
+  next:
+  - H
 E:
-- 543
-- 375
+  position:
+  - 0.565
+  - 0.695
+  next:
+  - D
+  - I
 F:
-- 562
-- 255
+  position:
+  - 0.586
+  - 0.473
+  next:
+  - I
 G:
-- 615
-- 116
+  position:
+  - 0.64
+  - 0.217
+  next:
+  - J
+  - K
 H:
-- 322
-- 427
+  position:
+  - 0.335
+  - 0.79
+  next: []
 I:
-- 363
-- 360
+  position:
+  - 0.379
+  - 0.667
+  next:
+  - L
 J:
-- 427
-- 210
+  position:
+  - 0.445
+  - 0.389
+  next:
+  - L
 K:
-- 491
-- 105
+  position:
+  - 0.512
+  - 0.196
+  next:
+  - M
 L:
-- 210
-- 285
+  position:
+  - 0.219
+  - 0.528
+  next:
+  - "N"
 M:
-- 315
-- 142
-N:
-- 120
-- 172
+  position:
+  - 0.328
+  - 0.265
+  next: []
+"N":
+  position:
+  - 0.125
+  - 0.322
+  next: []
