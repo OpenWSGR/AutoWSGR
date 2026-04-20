@@ -32,15 +32,18 @@ _log = get_logger('vision.ocr')
 
 # ── 结果数据类 ──
 
-REPLACE_RULE: dict[str, str] = {'鲍鱼': '鲃鱼'}
+REPLACE_RULE: dict[str, str] = {'鲍鱼': '鲃鱼','296':'M-296','维内托':'维托里奥·维内托'}
 
 
 # ── 舰船名文本补丁管线 ──
 
 
 def _patch_replace_rule(text: str) -> str:
-    """精确替换已知 OCR 误识别。"""
-    return REPLACE_RULE.get(text, text)
+    """替换已知 OCR 误识别（包含匹配）。"""
+    for old, new in REPLACE_RULE.items():
+        if old in text:
+            return new
+    return text
 
 
 def _patch_submarine_prefix(text: str) -> str:
