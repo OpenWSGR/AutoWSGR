@@ -62,7 +62,6 @@ class NodePosition:
         节点 y 坐标（相对值 0.0-1.0）。
     next_nodes:
         从该节点可以到达的下一个节点名列表。
-        仅在新格式 YAML 中提供；旧格式为空列表。
     """
 
     name: str
@@ -74,15 +73,16 @@ class NodePosition:
 class MapNodeData:
     """单个地图的节点位置数据。
 
-    从 YAML 文件加载并转换为相对坐标。
+    从 YAML 文件加载节点坐标和路由信息。
+    节点坐标必须为归一化形式（0.0 ~ 1.0）。
 
-        **标准格式** (归一化坐标 + 路由信息)::
+    地图格式示例::
 
         "0":
-                    position: [0.208, 0.648]
+          position: [0.208, 0.648]
           next: ["A"]
         A:
-                    position: [0.295, 0.522]
+          position: [0.295, 0.522]
           next: ["B", "C"]
     """
 
@@ -388,12 +388,11 @@ class NodeTracker:
     def update_node(self) -> str:
         """根据当前舰船位置判定所在节点。
 
-        当舰船位置发生变化（与上次不同）时，遍历所有候选节点，
-        优先按“到当前速度方向射线的最小距离”选择节点；
+        当舰船位置发生变化（与上次不同）时，遍历候选节点（当前节点 + next_nodes），
+        优先按"到当前速度方向射线的最小距离"选择节点；
         若射线距离相同，再按欧几里得距离打破平局。
 
-        如果地图数据包含路由信息（新格式 YAML），则仅在当前节点的
-        ``next_nodes`` 中搜索；否则搜索全部节点。
+        地图必须包含路由信息 (next_nodes)，否则无法判定。
 
         Returns
         -------
@@ -431,19 +430,21 @@ class NodeTracker:
 
         current_data = self._map_data.get(self._current_node)
 
-        # 确定候选节点列表
-        if current_data is not None and current_data.next_nodes:
-            # 新格式：仅在 next_nodes 中搜索
-            _log.debug(
-                "[NodeTracker] 当前节点 '{}', 下一节点候选列表: {}",
+        # 要求地图必须包含路由信息
+        if current_data is None or not current_data.next_nodes:
+            _log.warning(
+                "[NodeTracker] 节点 '{}' 缺少路由信息 (next_nodes)，无法判定下一节点",
                 self._current_node,
-                current_data.next_nodes,
             )
-            # 将当前节点也作为候选，避免在移动途中被强制前推
-            candidate_names = list(dict.fromkeys([self._current_node, *current_data.next_nodes]))
-        else:
-            # 旧格式：搜索全部节点（排除 "0"）
-            candidate_names = self._map_data.node_names
+            return self._current_node
+
+        _log.debug(
+            "[NodeTracker] 当前节点 '{}', 下一节点候选列表: {}",
+            self._current_node,
+            current_data.next_nodes,
+        )
+        # 将当前节点也作为候选，避免在移动途中被强制前推
+        candidate_names = list(dict.fromkeys([self._current_node, *current_data.next_nodes]))
 
         best_node = self._current_node
         best_ray_distance = float('inf')
