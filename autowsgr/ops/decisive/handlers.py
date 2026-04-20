@@ -245,7 +245,7 @@ class DecisivePhaseHandlers(DecisiveBase):
             _, first_value = next(iter(selections.items()))
             self._map.buy_fleet_option(first_value.click_position)
             if not self._map.close_fleet_overlay():
-              raise RuntimeError('关闭决战选船界面失败')
+                raise RuntimeError('关闭决战选船界面失败')
         self._state.phase = DecisivePhase.PREPARE_COMBAT
 
     def _handle_advance_choice(self) -> None:
