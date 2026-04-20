@@ -32,7 +32,7 @@ _log = get_logger('vision.ocr')
 
 # ── 结果数据类 ──
 
-REPLACE_RULE: dict[str, str] = {'鲍鱼': '鲃鱼','296':'M-296','维内托':'维托里奥·维内托'}
+REPLACE_RULE: dict[str, str] = {'鲍鱼': '鲃鱼', '296': 'M-296', '维内托': '维托里奥·维内托'}
 
 
 # ── 舰船名文本补丁管线 ──
