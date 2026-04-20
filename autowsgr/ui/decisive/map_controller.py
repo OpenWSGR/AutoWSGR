@@ -16,7 +16,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from autowsgr.infra import save_image
 import cv2
 import numpy as np
 
@@ -232,24 +231,24 @@ class DecisiveMapController:
         # save_image(col_crop, result + '.png')
         return result
 
-    def get_ship_icon_pos(self)->float | None:
-      detect_screen = self._ctrl.screenshot()
-      # _locate_ship_icon 需要 BGR；screenshot() 返回 RGB
-      bgr = cv2.cvtColor(detect_screen, cv2.COLOR_RGB2BGR)
-      icon_rel_x = self._locate_ship_icon(bgr)
-      return icon_rel_x
+    def get_ship_icon_pos(self) -> float | None:
+        detect_screen = self._ctrl.screenshot()
+        # _locate_ship_icon 需要 BGR；screenshot() 返回 RGB
+        bgr = cv2.cvtColor(detect_screen, cv2.COLOR_RGB2BGR)
+        icon_rel_x = self._locate_ship_icon(bgr)
+        return icon_rel_x
 
-    def get_ship_icon_pos_with_retry(self)->float | None:
-      _ICON_TIMEOUT = 10.0
-      _ICON_GAP = 0.15
-      deadline = time.monotonic() + _ICON_TIMEOUT
-      icon_rel_x: float | None = None
-      while time.monotonic() < deadline:
-          icon_rel_x = self.get_ship_icon_pos()
-          if icon_rel_x is not None:
-              break
-          time.sleep(_ICON_GAP)
-      return icon_rel_x
+    def get_ship_icon_pos_with_retry(self) -> float | None:
+        _ICON_TIMEOUT = 10.0
+        _ICON_GAP = 0.15
+        deadline = time.monotonic() + _ICON_TIMEOUT
+        icon_rel_x: float | None = None
+        while time.monotonic() < deadline:
+            icon_rel_x = self.get_ship_icon_pos()
+            if icon_rel_x is not None:
+                break
+            time.sleep(_ICON_GAP)
+        return icon_rel_x
 
     def recognize_node(
         self,
@@ -269,13 +268,18 @@ class DecisiveMapController:
         for retry in range(_MAX_RETRY + 1):
             icon_rel_x: float | None = self.get_ship_icon_pos_with_retry()
             for retry_icon in range(_MAX_RETRY + 1):
-              time.sleep(0.5)
-              icon_rel_x_now = self.get_ship_icon_pos_with_retry()
-              if icon_rel_x_now == icon_rel_x:
-                _log.debug('[地图控制器] 舰船指示器位置: X={:.5f}', icon_rel_x)
-                break
-              _log.debug('[地图控制器] 舰船指示器位置偏移, 重试{:d}: X1={:.5f}, X2={:.5f}',retry_icon, icon_rel_x,icon_rel_x_now)
-              icon_rel_x = icon_rel_x_now
+                time.sleep(0.5)
+                icon_rel_x_now = self.get_ship_icon_pos_with_retry()
+                if icon_rel_x_now == icon_rel_x:
+                    _log.debug('[地图控制器] 舰船指示器位置: X={:.5f}', icon_rel_x)
+                    break
+                _log.debug(
+                    '[地图控制器] 舰船指示器位置偏移, 重试{:d}: X1={:.5f}, X2={:.5f}',
+                    retry_icon,
+                    icon_rel_x,
+                    icon_rel_x_now,
+                )
+                icon_rel_x = icon_rel_x_now
 
             if icon_rel_x is None:
                 raise RuntimeError('决战节点识别失败: 舰船指示器超时未出现')
