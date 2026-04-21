@@ -269,11 +269,7 @@ class SortiePanelMixin(BaseMapPage):
                 batch = min(steps, 4)
                 _log.info('[UI] 章节导航: 批量点击 {} 章', batch)
                 for _ in range(batch):
-                    ok = (
-                        self.click_prev_chapter()
-                        if direction < 0
-                        else self.click_next_chapter()
-                    )
+                    ok = self.click_prev_chapter() if direction < 0 else self.click_next_chapter()
                     if not ok:
                         _log.warning('[UI] 章节导航: 点击失败，终止')
                         return None
