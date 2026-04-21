@@ -446,10 +446,12 @@ class NodeTracker:
         # 将当前节点也作为候选，避免在移动途中被强制前推
         candidate_names = list(dict.fromkeys([self._current_node, *current_data.next_nodes]))
 
+        ray_hit_threshold = 0.01
         best_node = self._current_node
         best_ray_distance = float('inf')
         best_euclidean_distance = float('inf')
         candidate_metrics: list[str] = []
+        candidate_distances: list[tuple[str, float, float]] = []
 
         for name in candidate_names:
             node = self._map_data.get(name)
@@ -466,15 +468,23 @@ class NodeTracker:
             candidate_metrics.append(
                 f'{name}(ray={ray_dist:.4f}, euclid={euclidean_dist:.4f}, pos=({node.x:.3f},{node.y:.3f}))',
             )
+            candidate_distances.append((name, ray_dist, euclidean_dist))
 
-            # 射线优先；同分时按欧氏距离打破平局
-            if (ray_dist < best_ray_distance) or (
-                math.isclose(ray_dist, best_ray_distance, rel_tol=1e-9, abs_tol=1e-12)
-                and euclidean_dist < best_euclidean_distance
-            ):
-                best_ray_distance = ray_dist
-                best_euclidean_distance = euclidean_dist
-                best_node = name
+        ray_hits = [item for item in candidate_distances if item[1] < ray_hit_threshold]
+        if ray_hits:
+            best_node, best_ray_distance, best_euclidean_distance = min(
+                ray_hits,
+                key=lambda item: (item[2], item[1]),
+            )
+        elif candidate_distances:
+            _log.warning(
+                '[NodeTracker] 射线距离未命中阈值 (<{:.4f})，回退到最小射线距离选择',
+                ray_hit_threshold,
+            )
+            best_node, best_ray_distance, best_euclidean_distance = min(
+                candidate_distances,
+                key=lambda item: (item[1], item[2]),
+            )
 
         _log.debug(
             '[NodeTracker] 候选点评估: {} | 船位=({:.3f},{:.3f}) | 速度=({:.4f},{:.4f}) | has_ray={}',
