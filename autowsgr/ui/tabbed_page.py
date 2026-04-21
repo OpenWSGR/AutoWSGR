@@ -277,7 +277,7 @@ def _match_page_type(screen: np.ndarray) -> TabbedPageType | None:
     best_score = -1.0
     for page_type, tmpl in templates.items():
         score = _coverage(test_bin, tmpl)
-        if score > best_score:
+        if score > 0.6 and score > best_score:
             best_score = score
             best_type = page_type
     return best_type
