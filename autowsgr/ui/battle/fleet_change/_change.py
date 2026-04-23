@@ -633,6 +633,8 @@ class FleetChangeMixin(FleetDetectMixin):
             self._ctrl,
             ChooseShipPage.is_current_page,
             timeout=_CHOOSE_PAGE_TIMEOUT,
+            source='编队',
+            target='编队选船',
         )
         choose_page = ChooseShipPage(self._ctx)
         return choose_page.change_single_ship(

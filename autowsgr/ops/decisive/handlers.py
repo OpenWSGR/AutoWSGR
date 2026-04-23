@@ -245,6 +245,7 @@ class DecisivePhaseHandlers(DecisiveBase):
                 if name not in {'长跑训练', '肌肉记忆', '黑科技'}:
                     self._state.ships.add(name)
 
+        self._state.phase = DecisivePhase.PREPARE_COMBAT
         if not self._map.close_fleet_overlay():
             _log.info('[决战] 关闭决战选船界面失败, 选择第一艘后撤退')
             self._state.phase = DecisivePhase.RETREAT
@@ -252,7 +253,6 @@ class DecisivePhaseHandlers(DecisiveBase):
             self._map.buy_fleet_option(first_value.click_position)
             if not self._map.close_fleet_overlay():
                 raise RuntimeError('关闭决战选船界面失败')
-        self._state.phase = DecisivePhase.PREPARE_COMBAT
 
     def _handle_advance_choice(self) -> None:
         """选择前进点。"""

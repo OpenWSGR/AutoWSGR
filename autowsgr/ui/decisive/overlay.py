@@ -132,7 +132,7 @@ CLICK_RETREAT_BUTTON: tuple[float, float] = (36 / 960, 33 / 540)
 CLICK_SORTIE: tuple[float, float] = (900 / 960, 500 / 540)
 """右下角「出征」按钮 — 进入出征准备页。"""
 
-CLICK_FLEET_EDIT: tuple[float, float] = (700 / 960, 500 / 540)
+CLICK_FORMATION: tuple[float, float] = (700 / 960, 500 / 540)
 """右下角「编队」按钮 — 进入编队页面。"""
 
 CLICK_BUY_EXP: tuple[float, float] = (75 / 960, 500 / 540)
@@ -141,7 +141,6 @@ CLICK_BUY_EXP: tuple[float, float] = (75 / 960, 500 / 540)
 CLICK_SKILL: tuple[float, float] = (0.2143, 0.894)
 """副官技能按钮。"""
 
-CLICK_FORMATION: tuple[float, float] = (0.75, 0.925)
 
 # ── 战备舰队获取 overlay ──
 

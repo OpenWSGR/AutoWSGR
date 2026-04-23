@@ -134,6 +134,8 @@ def recognize_fleet_options(
             continue
         costs.append(cost)
     _log.debug('[舰队OCR] 识别到 {} 项费用: {}', len(costs), costs)
+    if any(c < 4 for c in costs):
+        _log.warning('[舰队OCR] 识别到小于4的费用, 建议检查配队是否有误')
 
     # 3. 恢复原版行为：仅对可购买项识别舰名
     selections: dict[str, FleetSelection] = {}

@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.constants import DECISIVE_SKILL_NAMES, update_shipnames
-from autowsgr.infra import DecisiveConfig
+from autowsgr.infra import DecisiveConfig, get_logger
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
@@ -19,6 +19,7 @@ from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
+_log = get_logger('ops.decisive')
 
 class DecisiveBase:
     """决战控制器基类。
@@ -65,6 +66,9 @@ class DecisiveBase:
         }
         merged_config = DecisiveConfig(**merged_config_dict)
         self._config = merged_config
+        _log.info('[决战] 当前运行配置: {}',merged_config)
+        if(len(merged_config.level1)<6):
+          _log.warning('[决战] 一级舰队小于6艘, 请检查配置是否有误')
 
         # 将决战配置中的舰船名 + 技能名合并到全局 SHIPNAMES，
         # 后续 OCR 识别无需再临时拼接候选列表。
