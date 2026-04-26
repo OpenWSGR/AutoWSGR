@@ -353,13 +353,11 @@ class DecisivePhaseHandlers(DecisiveBase):
             self._state.fleet = best_fleet
 
         strategy = (
-            RepairStrategy.NEVER
-            if not self._config.use_quick_repair
-            else RepairStrategy.MODERATE
+            RepairStrategy.MODERATE
             if self._config.repair_level <= 1
             else RepairStrategy.SEVERE
         )
-        page.apply_repair(strategy)
+        page.apply_repair(strategy, repair_manually=self._config.use_quick_repair)
 
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)
