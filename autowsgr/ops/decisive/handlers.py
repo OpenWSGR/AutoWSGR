@@ -122,7 +122,11 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         if entry_status == DecisiveEntryStatus.REFRESH:
             _log.info('[决战] 检测到「重置关卡」状态，执行章节重置')
-            self._battle_page.reset_chapter()
+            reset_success = self._battle_page.reset_chapter()
+            if not reset_success:
+              # 重置不成功是因为需要解装
+              self._state.phase = DecisivePhase.DOCK_FULL
+              return
             # 重置后重新检测入口状态
             entry_status = self._battle_page.detect_entry_status()
 

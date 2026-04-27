@@ -18,8 +18,9 @@ import re
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import DecisiveEntryStatus, PageName
+from autowsgr.types import DecisiveEntryStatus, DecisivePhase, PageName
 from autowsgr.ui.utils import click_and_wait_for_page, confirm_operation
 from autowsgr.vision import (
     Color,
@@ -409,7 +410,7 @@ class DecisiveBattlePage:
 
     # ── 章节重置 ─────────────────────────────────────────────────────────
 
-    def reset_chapter(self) -> None:
+    def reset_chapter(self) -> bool:
         """使用磁盘重置当前章节。
 
         在决战总览页点击"重置关卡"按钮并确认操作。
@@ -423,6 +424,15 @@ class DecisiveBattlePage:
         _log.info('[决战] 决战页面 → 重置关卡')
         self._ctrl.click(*CLICK_RESET_CHAPTER)
         time.sleep(1.0)
+        screen = self._ctrl.screenshot()
+        if ImageChecker.template_exists(
+            screen,
+            Templates.Build.SHIP_FULL_DEPOT,
+            confidence=0.8,
+        ):
+            _log.warning('[决战] 重置关卡时检测到船坞已满')
+            return False
         confirm_operation(self._ctrl, must_confirm=True, timeout=5.0)
         time.sleep(1.0)  # 防止后续 stage 识别出问题
         _log.info('[决战] 决战关卡重置完成')
+        return True
