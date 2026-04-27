@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import DecisiveEntryStatus, DecisivePhase, PageName
+from autowsgr.types import DecisiveEntryStatus, PageName
 from autowsgr.ui.utils import click_and_wait_for_page, confirm_operation
 from autowsgr.vision import (
     Color,
