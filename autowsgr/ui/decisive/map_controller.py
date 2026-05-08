@@ -16,12 +16,11 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from autowsgr.combat import recognize_ship_drop
-from autowsgr.infra import save_image
 import cv2
 import numpy as np
 
 import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
+from autowsgr.combat import recognize_ship_drop
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
@@ -646,7 +645,7 @@ class DecisiveMapController:
                     break
 
             ship_drop = recognize_ship_drop(screen, ocr=self._ocr)
-            _log.info(f"[地图控制器] 检测到掉落: {ship_drop.ship_name}({ship_drop.ship_type})")
+            _log.info(f'[地图控制器] 检测到掉落: {ship_drop.ship_name}({ship_drop.ship_type})')
             collected.append(ship_drop.ship_name)
             self._ctrl.click(0.953, 0.954)
             time.sleep(0.5)
