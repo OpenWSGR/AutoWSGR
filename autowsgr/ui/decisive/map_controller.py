@@ -299,32 +299,6 @@ class DecisiveMapController:
                 result = self.dll_recognize_map(dll, fresh_screen, icon_rel_x)
                 if result != '0':
                     _log.info('[地图控制器] 识别决战节点: {}', result[0])
-                    if result[0] == 'C':
-                        right_x = icon_rel_x + 0.172
-                        right_result = self.dll_recognize_map(dll, fresh_screen, right_x)
-                        if right_result == 'D':
-                            result = 'C'
-                        elif right_result == 'C':
-                            result = 'B'
-                        _log.info(
-                            '[地图控制器] C右侧节点识别: {}, 修正后决战节点: {}',
-                            right_result,
-                            result,
-                        )
-
-                    if result[0] == 'J':
-                        left_x = icon_rel_x - 0.172
-                        left_result = self.dll_recognize_map(dll, fresh_screen, left_x)
-                        if left_result == 'H':
-                            result = 'I'
-                        elif left_result == 'J':
-                            result = 'J'
-                        _log.info(
-                            '[地图控制器] J左侧节点识别: {}, 修正后决战节点: {}',
-                            left_result,
-                            result,
-                        )
-
                     return result[0]
             except Exception:
                 _log.warning('[地图控制器] DLL 节点识别异常', exc_info=True)
