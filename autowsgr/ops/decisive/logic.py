@@ -123,7 +123,8 @@ class DecisiveLogic:
                     score -= sel.cost
                     result.append(target)
 
-        if first_node and result:
+        # 第一节点没选上Lv1，也购买Lv2舰船
+        if first_node:
             for target in set(self._level2_full) - self._level1_set:
                 if target in selections:
                     sel = selections[target]

@@ -282,7 +282,12 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         if self._state.node == 'U':
             # 初次进入都要进行节点识别
-            self._state.node = self._map.recognize_node()
+            recognized_node = self._map.recognize_node()
+            if recognized_node == 'CHOOSE_FLEET':
+              _log.info('[决战] 检测到战备舰队获取页面')
+              self._state.phase = DecisivePhase.CHOOSE_FLEET
+              return
+            self._state.node = recognized_node
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,

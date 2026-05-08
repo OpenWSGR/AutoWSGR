@@ -16,6 +16,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.combat import recognize_ship_drop
+from autowsgr.infra import save_image
 import cv2
 import numpy as np
 
@@ -233,6 +235,10 @@ class DecisiveMapController:
 
     def get_ship_icon_pos(self) -> float | None:
         detect_screen = self._ctrl.screenshot()
+        # 针对Ex5特调，A节点不选择分支，直接进入战备舰队获取
+        screen_is_fleet_acquisition = is_fleet_acquisition(detect_screen)
+        if screen_is_fleet_acquisition:
+            return -1
         # _locate_ship_icon 需要 BGR；screenshot() 返回 RGB
         bgr = cv2.cvtColor(detect_screen, cv2.COLOR_RGB2BGR)
         icon_rel_x = self._locate_ship_icon(bgr)
@@ -270,6 +276,8 @@ class DecisiveMapController:
             for retry_icon in range(_MAX_RETRY + 1):
                 time.sleep(0.5)
                 icon_rel_x_now = self.get_ship_icon_pos_with_retry()
+                if icon_rel_x_now == -1:
+                    return 'CHOOSE_FLEET'
                 if icon_rel_x_now == icon_rel_x:
                     _log.debug('[地图控制器] 舰船指示器位置: X={:.5f}', icon_rel_x)
                     break
@@ -637,8 +645,9 @@ class DecisiveMapController:
                 if detail is None:
                     break
 
-            _log.info("[地图控制器] 检测到掉落: '{}'", detail.template_name)
-            collected.append(detail.template_name)
+            ship_drop = recognize_ship_drop(screen, ocr=self._ocr)
+            _log.info(f"[地图控制器] 检测到掉落: {ship_drop.ship_name}({ship_drop.ship_type})")
+            collected.append(ship_drop.ship_name)
             self._ctrl.click(0.953, 0.954)
             time.sleep(0.5)
             confirm_operation(self._ctrl, timeout=1.0)
