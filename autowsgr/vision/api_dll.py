@@ -1,8 +1,10 @@
-import cv2
 import autowsgr_native
+import cv2
 import numpy as np
 
+
 _TARGET_H = 720
+
 
 class ApiDll:
     def locate(self, image: np.ndarray):
@@ -24,6 +26,7 @@ class ApiDll:
 
 
 _dll_instance: ApiDll | None = None
+
 
 def get_api_dll() -> ApiDll:
     """获取 ApiDll 单例。首次调用时加载 DLL。"""
