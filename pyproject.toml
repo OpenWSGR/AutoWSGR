@@ -36,6 +36,7 @@ dev = [
     "pytest-cov",
     "pytest-xdist",
     "requests>=2.32.5",
+    "httpx>=0.28.0",
     "beautifulsoup4",
 ]
 
@@ -50,7 +51,7 @@ path = "autowsgr/__init__.py"
 ignore-words = "docs/spelling_wordlist.txt"
 
 [tool.pytest.ini_options]
-testpaths = ["testing"]
+testpaths = ["tests/unit"]
 addopts = ["--import-mode=importlib"]
 
 [tool.ruff]
@@ -171,7 +172,7 @@ extend-safe-fixes = [
 "__init__.py" = [
     "F401",    # unused-import
 ]
-"testing/**" = [
+"tests/**" = [
     "T201",    # print
 ]
 "tools/**" = [
