@@ -361,7 +361,7 @@ class TestMultiResolutionScaling:
 
         # 模板采集自 1080p: 60x80 像素 → 在 540p 下应缩放为 30x40
         rng = np.random.RandomState(81)
-        big_img = rng.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        big_img = rng.randint(0, 256, (60, 80, 3), dtype=np.uint8).astype(np.uint8)
         from autowsgr.vision import ImageTemplate
 
         tmpl_1080 = ImageTemplate(
@@ -392,7 +392,7 @@ class TestMultiResolutionScaling:
 
         # 模板采集自 540p: 30x40 像素 → 在 1080p 下应缩放为 60x80
         rng = np.random.RandomState(82)
-        small_img = rng.randint(0, 256, (30, 40, 3), dtype=np.uint8)
+        small_img = rng.randint(0, 256, (30, 40, 3), dtype=np.uint8).astype(np.uint8)
         from autowsgr.vision import ImageTemplate
 
         tmpl_540 = ImageTemplate(
@@ -423,7 +423,7 @@ class TestMultiResolutionScaling:
 
         # 模板 A: 采集自 960x540 (30x40) → 在 720p 下缩放为 40x53
         rng_a = np.random.RandomState(83)
-        img_a = rng_a.randint(0, 256, (30, 40, 3), dtype=np.uint8)
+        img_a = rng_a.randint(0, 256, (30, 40, 3), dtype=np.uint8).astype(np.uint8)
         tmpl_a = ImageTemplate(
             name='tmpl_a',
             image=img_a,
@@ -441,7 +441,7 @@ class TestMultiResolutionScaling:
 
         # 模板 B: 采集自 1920x1080 (60x80) → 在 720p 下缩放为 40x53
         rng_b = np.random.RandomState(84)
-        img_b = rng_b.randint(0, 256, (60, 80, 3), dtype=np.uint8)
+        img_b = rng_b.randint(0, 256, (60, 80, 3), dtype=np.uint8).astype(np.uint8)
         tmpl_b = ImageTemplate(
             name='tmpl_b',
             image=img_b,

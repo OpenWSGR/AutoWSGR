@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:  # noqa: S110
     pass
 from loguru import logger
@@ -56,7 +56,7 @@ def main() -> None:
 
         from autowsgr.ops.repair import repair_in_bath
 
-        repair_in_bath(ctrl)
+        repair_in_bath(ctx)
         logger.info('repair_in_bath() 已执行')
         print('  [OK] repair_in_bath() 已执行')
     except Exception as exc:

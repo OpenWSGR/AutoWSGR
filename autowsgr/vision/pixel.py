@@ -138,7 +138,7 @@ class PixelRule:
         """
         color = d['color']
         if isinstance(color, (list, tuple)):
-            c = Color.from_rgb_tuple(tuple(color))  # type: ignore[arg-type]
+            c = Color.from_rgb_tuple(tuple(color))
         elif isinstance(color, dict):
             c = Color(r=color['r'], g=color['g'], b=color['b'])
         else:

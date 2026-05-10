@@ -15,4 +15,6 @@ runner = NormalFightRunner(
     plan,
     fleet_id=2,
 )
-runner.run_for_times_condition(1, last_point[i])
+point = last_point[i]
+assert point is not None
+runner.run_for_times_condition(1, point)

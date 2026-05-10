@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -46,7 +47,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
     from autowsgr.ui.map.data import MapPanel
     from autowsgr.ui.map.page import MapPage
 
-    map_page = MapPage(runner.ctrl)
+    map_page = MapPage(runner.ctx)
 
     # ───── Step 0: 验证初始状态 ──────────────────────────────────────
     runner.verify_current('初始验证: 地图页面', '地图页面', MapPage.is_current_page)
@@ -120,7 +121,7 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
         return
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        MainPage(ctrl).navigate_to(MainPage.Target.SORTIE)
+        MainPage(_make_test_ctx(ctrl)).navigate_to(MainPage.Target.SORTIE)
         time.sleep(pause)
 
 

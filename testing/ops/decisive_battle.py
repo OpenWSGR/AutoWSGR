@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # ── UTF-8 输出兼容 (Windows 终端) ──────────────────────────────────────────
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:  # noqa: S110
     pass
 from loguru import logger
@@ -148,7 +148,6 @@ def main() -> None:
     try:
         ctx = launch_for_test(args.serial, log_dir=log_dir, with_ocr=True)
         ctrl = ctx.ctrl
-        ocr = ctx.ocr
         logger.info('已连接: {}', ctrl.serial)
         print(f'  [OK] 已连接: {ctrl.serial}')
         print('  [OK] OCR 引擎已就绪')
@@ -165,7 +164,7 @@ def main() -> None:
         flagship_priority=args.flagship,
         repair_level=args.repair_level,
     )
-    controller = DecisiveController(ctx, config, ocr=ocr)
+    controller = DecisiveController(ctx, config)
     logger.info('DecisiveController 构建完成 (章节 {})', args.chapter)
     print(f'  [OK] 控制器就绪 (章节 {args.chapter})')
     print()

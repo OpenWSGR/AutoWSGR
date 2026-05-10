@@ -27,6 +27,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
@@ -39,8 +40,10 @@ sys.path.insert(0, str(_ROOT))
 # ── UTF-8 输出兼容 (Windows 终端) ────────────────────────────────────────────
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        _stdout: Any = sys.stdout
+        _stdout.reconfigure(encoding='utf-8', errors='replace')
+        _stderr: Any = sys.stderr
+        _stderr.reconfigure(encoding='utf-8', errors='replace')
 except Exception:  # noqa: S110
     pass
 # ────────────────────────────────────────────────────────────────────────────

@@ -49,6 +49,8 @@ _W, _H = 960, 540
 
 
 def _make_ctx(ctrl: AndroidController, ocr: OCREngine | None = None) -> GameContext:
+    if ocr is None:
+        ocr = MagicMock()
     """构造 GameContext，用于 BattlePreparationPage 初始化。"""
     return GameContext(ctrl=ctrl, config=MagicMock(), ocr=ocr)
 

@@ -56,36 +56,36 @@ class TestScrcpyControllerCoordinates:
 
     def test_click_center(self, ctrl: ScrcpyController):
         ctrl.click(0.5, 0.5)
-        ctrl._device.shell.assert_called_once_with('input tap 480 270')
+        ctrl._device.shell.assert_called_once_with('input tap 480 270')  # type: ignore  # noqa: PGH003
 
     def test_click_top_left(self, ctrl: ScrcpyController):
         ctrl.click(0.0, 0.0)
-        ctrl._device.shell.assert_called_once_with('input tap 0 0')
+        ctrl._device.shell.assert_called_once_with('input tap 0 0')  # type: ignore  # noqa: PGH003
 
     def test_click_bottom_right(self, ctrl: ScrcpyController):
         ctrl.click(1.0, 1.0)
-        ctrl._device.shell.assert_called_once_with('input tap 960 540')
+        ctrl._device.shell.assert_called_once_with('input tap 960 540')  # type: ignore  # noqa: PGH003
 
     def test_click_quarter(self, ctrl: ScrcpyController):
         ctrl.click(0.25, 0.75)
-        ctrl._device.shell.assert_called_once_with('input tap 240 405')
+        ctrl._device.shell.assert_called_once_with('input tap 240 405')  # type: ignore  # noqa: PGH003
 
     def test_swipe_default_duration(self, ctrl: ScrcpyController):
         ctrl.swipe(0.1, 0.2, 0.9, 0.8)
-        ctrl._device.shell.assert_called_once_with('input swipe 96 108 864 432 500')
+        ctrl._device.shell.assert_called_once_with('input swipe 96 108 864 432 500')  # type: ignore  # noqa: PGH003
 
     def test_swipe_custom_duration(self, ctrl: ScrcpyController):
         ctrl.swipe(0.0, 0.0, 1.0, 1.0, duration=1.0)
-        ctrl._device.shell.assert_called_once_with('input swipe 0 0 960 540 1000')
+        ctrl._device.shell.assert_called_once_with('input swipe 0 0 960 540 1000')  # type: ignore  # noqa: PGH003
 
     def test_swipe_short_duration(self, ctrl: ScrcpyController):
         ctrl.swipe(0.5, 0.5, 0.6, 0.6, duration=0.2)
-        ctrl._device.shell.assert_called_once_with('input swipe 480 270 576 324 200')
+        ctrl._device.shell.assert_called_once_with('input swipe 480 270 576 324 200')  # type: ignore  # noqa: PGH003
 
     def test_long_tap_delegates_to_swipe(self, ctrl: ScrcpyController):
         """long_tap 通过 swipe(x, y, x, y, duration) 实现。"""
         ctrl.long_tap(0.5, 0.5, duration=2.0)
-        ctrl._device.shell.assert_called_once_with('input swipe 480 270 480 270 2000')
+        ctrl._device.shell.assert_called_once_with('input swipe 480 270 480 270 2000')  # type: ignore  # noqa: PGH003
 
     def test_high_resolution(self):
         """1920x1080 分辨率下的转换。"""
@@ -112,7 +112,7 @@ class TestScrcpyControllerScreenshot:
         ctrl._resolution = (4, 3)
 
         # mock 视频流，避免启动真实 scrcpy 连接
-        ctrl._ensure_stream_alive = MagicMock()
+        ctrl._ensure_stream_alive = MagicMock()  # type: ignore  # noqa: PGH003
         ctrl._alive = True
 
         img = np.zeros((3, 4, 3), dtype=np.uint8)
@@ -128,7 +128,7 @@ class TestScrcpyControllerScreenshot:
         ctrl._resolution = (4, 3)
 
         # mock 视频流，避免启动真实 scrcpy 连接
-        ctrl._ensure_stream_alive = MagicMock()
+        ctrl._ensure_stream_alive = MagicMock()  # type: ignore  # noqa: PGH003
         ctrl._alive = True
         ctrl._last_frame = None  # 始终无帧
 
@@ -141,7 +141,7 @@ class TestScrcpyControllerScreenshot:
         ctrl._resolution = (2, 2)
 
         # mock 视频流，避免启动真实 scrcpy 连接
-        ctrl._ensure_stream_alive = MagicMock()
+        ctrl._ensure_stream_alive = MagicMock()  # type: ignore  # noqa: PGH003
         ctrl._alive = True
 
         img = np.zeros((2, 2, 3), dtype=np.uint8)

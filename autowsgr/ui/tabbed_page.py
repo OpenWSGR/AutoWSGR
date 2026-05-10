@@ -179,6 +179,8 @@ def _load_templates() -> dict[TabbedPageType, np.ndarray]:
         path = _TEMPLATE_DIR / filename
         buf = np.frombuffer(path.read_bytes(), np.uint8)
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise RuntimeError(f'无法加载模板: {path}')
         result[page_type] = img > 0
     return result
 

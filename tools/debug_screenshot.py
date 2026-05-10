@@ -113,12 +113,6 @@ def check_page_signatures(screen: np.ndarray, page_name: str | None = None) -> N
         known_pages['decisive_battle'] = DECISIVE_SIG
     except ImportError:
         pass
-    try:
-        from autowsgr.ui.main_page import PAGE_SIGNATURE as MAIN_SIG
-
-        known_pages['main'] = MAIN_SIG
-    except ImportError:
-        pass
 
     print('\n=== 页面签名检测 ===')
     for name, sig in known_pages.items():
@@ -228,7 +222,12 @@ def main() -> None:
         if len(parts) != 4:
             print('错误: --roi 需要 4 个逗号分隔的浮点数')
             sys.exit(1)
-        run_ocr_on_roi(screen, tuple(parts), allowlist=args.allowlist, out_dir=out_dir)
+        run_ocr_on_roi(
+            screen,
+            (parts[0], parts[1], parts[2], parts[3]),
+            allowlist=args.allowlist,
+            out_dir=out_dir,
+        )
 
     if not args.roi and args.check_page is None and not args.pixel:
         print('\n提示: 使用 --roi / --check-page / --pixel 执行进一步分析')
