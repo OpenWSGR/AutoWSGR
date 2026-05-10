@@ -234,7 +234,7 @@ class EventFightRunner:
 
         # 委托 UI 层完成: 难度 / 节点 / 出击
         event_page = BaseEventPage(self._ctx)
-        entrance: Literal['alpha', 'beta'] | None = self._entrance  # type: ignore[assignment]
+        entrance: Literal['alpha', 'beta'] | None = self._entrance
         event_page.start_fight(self._map_code, entrance, self._skip_check)
 
     # ── 出征准备 ──

@@ -47,8 +47,8 @@ if TYPE_CHECKING:
 
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:
     try:
         if isinstance(sys.stdout, io.TextIOWrapper):
@@ -67,7 +67,7 @@ if TYPE_CHECKING:
 
     import numpy as np
 
-    from autowsgr.emulator import ADBController
+    from autowsgr.emulator import AndroidController, ScrcpyController
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -212,7 +212,7 @@ class UIControllerTestRunner:
     Parameters
     ----------
     ctrl:
-        已连接的 ADBController 实例。
+        已连接的 ScrcpyController 实例。
     controller_name:
         被测控制器名称 (用于报告)。
     log_dir:
@@ -225,7 +225,7 @@ class UIControllerTestRunner:
 
     def __init__(
         self,
-        ctrl: ADBController,
+        ctrl: ScrcpyController,
         controller_name: str = '',
         log_dir: Path | None = None,
         *,
@@ -272,7 +272,7 @@ class UIControllerTestRunner:
         action: str,
         expected_page: str,
         checker: Callable[[np.ndarray], bool],
-        do_action: Callable[[], None],
+        do_action: Callable[[], object],
         *,
         screenshot_tag: str = '',
     ) -> StepRecord | None:
@@ -478,7 +478,25 @@ class UIControllerTestRunner:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def reset_to_main_page(ctrl: ADBController, pause: float = 1.5) -> bool:  # noqa: PLR0912
+def _make_test_ctx(ctrl: AndroidController) -> GameContext:
+    """创建一个带有 Mock OCR 的 GameContext，供端到端测试使用。"""
+    from autowsgr.context import GameContext
+    from autowsgr.infra import UserConfig
+    from autowsgr.vision import OCREngine, OCRResult
+
+    class _MockOCR(OCREngine):
+        def recognize(
+            self,
+            image: np.ndarray,
+            allowlist: str = '',
+        ) -> list[OCRResult]:
+            _ = image, allowlist
+            return []
+
+    return GameContext(ctrl=ctrl, config=UserConfig(), ocr=_MockOCR())
+
+
+def reset_to_main_page(ctrl: AndroidController, pause: float = 1.5) -> bool:  # noqa: PLR0912
     """从任意已知页面导航回主页面。
 
     按"叶页面 → 中间页面 → 主页面"顺序尝试每一级的返回操作，最多循环 5 次。
@@ -545,7 +563,7 @@ def reset_to_main_page(ctrl: ADBController, pause: float = 1.5) -> bool:  # noqa
 
 
 def ensure_page(
-    ctrl: ADBController,
+    ctrl: ScrcpyController,
     checker: Callable[[np.ndarray], bool],
     navigate_fn: Callable[[], None] | None,
     page_name: str,
@@ -688,11 +706,11 @@ def parse_e2e_args(
     )
 
 
-def connect_device(serial: str | None, *, timeout: float = 15.0) -> ADBController:
+def connect_device(serial: str | None, *, timeout: float = 15.0) -> ScrcpyController:
     """创建并连接 ADB 控制器，失败时退出进程。"""
-    from autowsgr.emulator import ADBController
+    from autowsgr.emulator import ScrcpyController
 
-    ctrl = ADBController(serial=serial, screenshot_timeout=timeout)
+    ctrl = ScrcpyController(serial=serial, screenshot_timeout=timeout)
     try:
         dev_info = ctrl.connect()
         ok(f'已连接: {dev_info.serial}  分辨率: {dev_info.resolution[0]}x{dev_info.resolution[1]}')
@@ -708,7 +726,7 @@ def connect_via_launcher(
     log_level: str,
     *,
     timeout: float = 15.0,
-) -> ADBController:
+) -> ScrcpyController:
     """通过 Launcher 加载配置并连接设备。
 
     自动从 ``usersettings.yaml``（当前工作目录）加载用户配置，
@@ -729,10 +747,10 @@ def connect_via_launcher(
 
     Returns
     -------
-    ADBController
+    ScrcpyController
         已建立连接的设备控制器。
     """
-    from autowsgr.emulator import ADBController
+    from autowsgr.emulator import ScrcpyController
     from autowsgr.infra import ConfigManager
     from autowsgr.infra.logger import setup_logger
 
@@ -749,7 +767,7 @@ def connect_via_launcher(
     setup_logger(log_dir=log_dir, level=log_level, save_images=True, channels=channels)
 
     # 连接设备
-    ctrl = ADBController(serial=cfg.emulator.serial, screenshot_timeout=timeout)
+    ctrl = ScrcpyController(serial=cfg.emulator.serial, screenshot_timeout=timeout)
     try:
         dev_info = ctrl.connect()
         ok(f'已连接: {dev_info.serial}  分辨率: {dev_info.resolution[0]}x{dev_info.resolution[1]}')

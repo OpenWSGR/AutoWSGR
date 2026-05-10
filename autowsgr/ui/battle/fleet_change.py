@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
-
-from ..utils import wait_for_page
-from .base import BaseBattlePreparation
+from autowsgr.ui.battle.base import BaseBattlePreparation
+from autowsgr.ui.battle.detection import DetectionMixin
+from autowsgr.ui.utils import wait_for_page
 
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 _log = get_logger('ui.preparation')
 
 
-class FleetChangeMixin(BaseBattlePreparation):
+class FleetChangeMixin(DetectionMixin, BaseBattlePreparation):
     """舰队编成更换 Mixin。
 
     依赖 :class:`~autowsgr.ui.battle.base.BaseBattlePreparation` 提供的
@@ -100,7 +100,7 @@ class FleetChangeMixin(BaseBattlePreparation):
         slot_occupied: bool = True,
     ) -> None:
         """更换/移除指定位置的单艘舰船。"""
-        from ..choose_ship_page import ChooseShipPage
+        from autowsgr.ui.choose_ship_page import ChooseShipPage
 
         if name is None and not slot_occupied:
             return

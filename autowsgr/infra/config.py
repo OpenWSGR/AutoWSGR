@@ -486,7 +486,7 @@ class ConfigManager:
                     return UserConfig()
                 except ValidationError:
                     # WSL/Linux 下默认配置缺少 serial/path 无法通过验证，提供占位值
-                    return UserConfig(emulator={'serial': '', 'path': ''})
+                    return UserConfig(emulator=EmulatorConfig(serial='', path=''))
             config = UserConfig.from_yaml(path)
             _log.info('已加载配置: {}', path)
             return config

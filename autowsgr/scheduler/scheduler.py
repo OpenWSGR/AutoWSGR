@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from autowsgr.combat import CombatResult
 from autowsgr.infra.logger import get_logger
@@ -64,13 +64,13 @@ class BatchRunnerAdapter:
     每次 ``.run()`` 返回最后一场结果；若列表为空，返回默认成功。
     """
 
-    def __init__(self, inner: object) -> None:
+    def __init__(self, inner: Any) -> None:
         if not hasattr(inner, 'run'):
             raise TypeError(f'{type(inner).__name__} 没有 run() 方法')
         self._inner = inner
 
     def run(self) -> CombatResult:
-        results = self._inner.run()  # type: ignore[union-attr]
+        results = self._inner.run()
         if isinstance(results, list):
             return (
                 results[-1]
@@ -79,7 +79,7 @@ class BatchRunnerAdapter:
                     flag=ConditionFlag.OPERATION_SUCCESS,
                 )
             )
-        return results  # type: ignore[return-value]
+        return results
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

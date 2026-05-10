@@ -66,7 +66,7 @@ class GameContext:
 
     # ── 基础设施引用 (可选) ──
 
-    ocr: OCREngine
+    ocr: OCREngine | None = None
     """OCR 引擎实例 (章节/阵型识别等)。"""
 
     # ── 游戏运行时状态 ──

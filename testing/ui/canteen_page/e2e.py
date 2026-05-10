@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -40,7 +41,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
     from autowsgr.ui.backyard_page import BackyardPage
     from autowsgr.ui.canteen_page import CanteenPage
 
-    canteen_page = CanteenPage(runner.ctrl)
+    canteen_page = CanteenPage(runner.ctx)
 
     runner.verify_current('初始验证: 食堂页面', '食堂页面', CanteenPage.is_current_page)
     if runner.aborted:
@@ -63,13 +64,14 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
 
     if not reset_to_main_page(ctrl, pause):
         return
+    ctx = _make_test_ctx(ctrl)
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        MainPage(ctrl).navigate_to(MainPage.Target.HOME)
+        MainPage(ctx).navigate_to(MainPage.Target.HOME)
         time.sleep(pause)
         screen = ctrl.screenshot()
     if BackyardPage.is_current_page(screen):
-        BackyardPage(ctrl).go_to_canteen()
+        BackyardPage(ctx).go_to_canteen()
         time.sleep(pause)
 
 

@@ -74,11 +74,11 @@ def run_test(runner: UIControllerTestRunner) -> None:  # noqa: PLR0911, C901, PL
     from autowsgr.ui.mission_page import MissionPage
     from autowsgr.ui.sidebar_page import SidebarPage
 
-    main_page = MainPage(runner.ctrl)
-    map_page = MapPage(runner.ctrl)
-    mission_page = MissionPage(runner.ctrl)
-    sidebar_page = SidebarPage(runner.ctrl)
-    backyard_page = BackyardPage(runner.ctrl)
+    main_page = MainPage(runner.ctx)
+    map_page = MapPage(runner.ctx)
+    mission_page = MissionPage(runner.ctx)
+    sidebar_page = SidebarPage(runner.ctx)
+    backyard_page = BackyardPage(runner.ctx)
 
     # ═══════════════════════════════════════════════════════════════════════
     # A. 页面识别与状态
@@ -228,7 +228,7 @@ def run_test(runner: UIControllerTestRunner) -> None:  # noqa: PLR0911, C901, PL
         from autowsgr.ui.event.event_page import BaseEventPage
 
         if BaseEventPage.is_current_page(screen):
-            event_page = BaseEventPage(runner.ctrl)
+            event_page = BaseEventPage(runner.ctx)
             runner.execute_step(
                 '活动地图 → ◁ 主页面',
                 '主页面',

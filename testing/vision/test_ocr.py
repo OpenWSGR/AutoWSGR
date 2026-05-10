@@ -26,9 +26,10 @@ class MockOCREngine(OCREngine):
 
     def recognize(
         self,
-        _image: np.ndarray,
-        _allowlist: str = '',
+        image: np.ndarray,
+        allowlist: str = '',
     ) -> list[OCRResult]:
+        _ = image, allowlist
         return self._results
 
 
@@ -45,7 +46,7 @@ class TestOCRResult:
     def test_immutable(self):
         r = OCRResult(text='x', confidence=0.5)
         with pytest.raises((AttributeError, TypeError)):
-            r.text = 'y'  # type: ignore[misc]
+            r.text = 'y'  # type: ignore  # noqa: PGH003
 
 
 # ─────────────────────────────────────────────

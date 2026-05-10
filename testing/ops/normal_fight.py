@@ -32,8 +32,8 @@ from pathlib import Path
 # ── UTF-8 输出兼容 (Windows 终端) ──
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:
     try:
         if isinstance(sys.stdout, io.TextIOWrapper):
@@ -74,7 +74,7 @@ def _build_7_4_6ss_plan() -> CombatPlan:
         formation=Formation.double_column,
         night=False,
         proceed=True,
-        proceed_stop=[2, 2, 2, 2, 2, 2],
+        proceed_stop=[RepairMode.severe_damage] * 6,
         enemy_rules=default_rules,
     )
 
@@ -87,7 +87,7 @@ def _build_7_4_6ss_plan() -> CombatPlan:
         formation=Formation.single_column,
         night=False,
         proceed=True,
-        proceed_stop=[2, 2, 2, 2, 2, 2],
+        proceed_stop=[RepairMode.severe_damage] * 6,
         enemy_rules=b_rules,
     )
 
@@ -102,7 +102,7 @@ def _build_7_4_6ss_plan() -> CombatPlan:
         formation=Formation.single_column,
         night=True,
         proceed=True,
-        proceed_stop=[2, 2, 2, 2, 2, 2],
+        proceed_stop=[RepairMode.severe_damage] * 6,
         enemy_rules=m_rules,
     )
 
