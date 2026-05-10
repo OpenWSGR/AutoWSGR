@@ -4,7 +4,7 @@
 
 ## 项目简介
 
-![Repo Size](https://img.shields.io/github/repo-size/OpenWSGR/AutoWSGR) ![Pypi Version](https://img.shields.io/pypi/v/autowsgr) ![Pypi Downloads](https://img.shields.io/pypi/dm/autowsgr) ![Github Issues](https://img.shields.io/github/issues/OpenWSGR/AutoWSGR) ![Github Last Commit](https://img.shields.io/github/last-commit/OpenWSGR/AutoWSGR) [![License](https://img.shields.io/badge/license-OpenWSGR%20Strict%20NC-red.svg)](LICENSE)
+![Repo Size](https://img.shields.io/github/repo-size/OpenWSGR/AutoWSGR) ![Pypi Version](https://img.shields.io/pypi/v/autowsgr) ![Pypi Downloads](https://img.shields.io/pypi/dm/autowsgr) ![Github Issues](https://img.shields.io/github/issues/OpenWSGR/AutoWSGR) ![Github Last Commit](https://img.shields.io/github/last-commit/OpenWSGR/AutoWSGR) [![Codecov](https://codecov.io/gh/OpenWSGR/AutoWSGR/graph/badge.svg)](https://codecov.io/gh/OpenWSGR/AutoWSGR) [![License](https://img.shields.io/badge/license-OpenWSGR%20Strict%20NC-red.svg)](LICENSE)
 
 用 Python 与 C++ 实现的 战舰少女R 的自动化流水线 & 数据统计一体化脚本, 提供 `WSGR` 游戏级别接口以及部分图像和原子操作接口。
 
