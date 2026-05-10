@@ -1,31 +1,46 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "automerge": true,
+  "rangeStrategy": "replace",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "automerge": false,
   "automergeType": "pr",
   "platformAutomerge": true,
+  "rebaseWhen": "behind-base-branch",
   "internalChecksFilter": "strict",
   "git-submodules": {
     "enabled": true
   },
   "packageRules": [
     {
-      "matchManagers": [
-        "python-version",
-        "pep621",
-        "uv",
-        "pip_requirements",
-        "pip_setup",
-        "setup-cfg"
-      ],
-      "matchPackageNames": ["python", "python3", "cpython","requires-python"],
-      "enabled": false
+      "description": "Automerge dev dependency minor and patch updates",
+      "matchDepTypes": ["dev", "dependency-groups.dev"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
     },
     {
-      "description": "Group patch and minor updates together",
+      "description": "Automerge lock file maintenance",
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "automerge": true
+    },
+    {
+      "description": "Group minor and patch production dependencies",
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "dependencies (minor and patch)",
       "groupSlug": "dependencies-minor-patch"
+    },
+    {
+      "description": "Do not automerge 0.x versions (can have breaking changes)",
+      "matchCurrentVersion": "/^0\\./",
+      "automerge": false
+    },
+    {
+      "description": "Disable Python runtime version updates",
+      "matchPackageNames": ["python", "python3", "cpython", "requires-python"],
+      "enabled": false
     }
   ]
 }
