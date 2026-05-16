@@ -315,6 +315,9 @@ CAMPAIGN_POSITIONS: dict[int, tuple[float, float]] = {
 CLICK_DIFFICULTY: tuple[float, float] = (0.800, 0.130)
 """切换难度。"""
 
+CAMPAIGN_REMAIN_CROP: tuple[float, float, float, float] = (0.08, 0.82, 0.25, 0.92)
+"""战役剩余次数 OCR 裁剪区域 (第一列战役的底部文本区)。"""
+
 
 # ── 出征地图节点切换 ──
 

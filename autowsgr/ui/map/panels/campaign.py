@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -11,6 +12,7 @@ from autowsgr.types import PageName
 from autowsgr.ui.map.base import BaseMapPage
 from autowsgr.ui.map.data import (
     CAMPAIGN_POSITIONS,
+    CAMPAIGN_REMAIN_CROP,
     CLICK_DIFFICULTY,
     DIFFICULTY_EASY_COLOR,
     DIFFICULTY_HARD_COLOR,
@@ -37,6 +39,36 @@ class CampaignPanelMixin(BaseMapPage):
     """Mixin: 战役面板操作 — 难度识别 / 切换 / 进入战役。"""
 
     # ── 查询 ─────────────────────────────────────────────────────────────
+
+    def get_campaign_remains(self) -> tuple[int, int] | None:
+        """获取战役剩余次数。
+
+        Returns
+        -------
+        tuple[int, int] | None
+            返回 (剩余次数, 总次数)，如 (0, 8)。如果识别失败返回 None。
+        """
+        self.ensure_panel(MapPanel.BATTLE)
+        time.sleep(0.5)
+        screen = self._ctrl.screenshot()
+        img = PixelChecker.crop(screen, *CAMPAIGN_REMAIN_CROP)
+
+        ocr = self._ocr
+        if ocr is None:
+            _log.warning('[UI] 无法获取战役次数: 未提供 OCR 引擎')
+            return None
+
+        results = ocr.recognize(img)
+        text = ''.join([r.text for r in results]).replace(' ', '')
+        m = re.search(r'(\d+)[/|](\d+)', text)
+        if m:
+            remains = int(m.group(1))
+            total = int(m.group(2))
+            _log.info(f'[UI] 战役次数识别成功: {remains}/{total}')
+            return remains, total
+
+        _log.warning(f'[UI] 战役次数识别失败: OCR 结果未匹配 ({text})')
+        return None
 
     def recognize_difficulty(self) -> str | None:
         """通过检测难度按钮颜色识别当前难度。
