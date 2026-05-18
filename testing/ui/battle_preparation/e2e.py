@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -42,7 +43,7 @@ if TYPE_CHECKING:
 def run_test(runner: UIControllerTestRunner) -> None:
     from autowsgr.ui.battle.preparation import BattlePreparationPage, Panel
 
-    bp_page = BattlePreparationPage(runner.ctrl)
+    bp_page = BattlePreparationPage(runner.ctx)
 
     runner.verify_current(
         '初始验证: 出征准备页面', '出征准备页面', BattlePreparationPage.is_current_page
@@ -94,7 +95,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
 
     runner.execute_step(
         '出征准备页面 → ◁ 返回',
-        None,  # 返回目标页面因地图层级不同而变化，跳过严格验证
+        '未知页面',  # 返回目标页面因地图层级不同而变化，跳过严格验证
         lambda _: True,
         bp_page.go_back,
     )
@@ -133,11 +134,13 @@ def _navigate_to(
     if not reset_to_main_page(ctrl, pause):
         return
 
+    ctx = _make_test_ctx(ctrl)
+
     # 主页面 → 地图
     screen = ctrl.screenshot()
     if not MainPage.is_current_page(screen):
         return
-    MainPage(ctrl).navigate_to(MainPage.Target.SORTIE)
+    MainPage(ctx).navigate_to(MainPage.Target.SORTIE)
     time.sleep(pause)
 
     # 确认在地图并切换到出征面板
@@ -145,11 +148,11 @@ def _navigate_to(
     if not MapPage.is_current_page(screen):
         return
     if MapPage.get_active_panel(screen) != MapPanel.SORTIE:
-        MapPage(ctrl).switch_panel(MapPanel.SORTIE)
+        MapPage(ctx).switch_panel(MapPanel.SORTIE)
         time.sleep(pause)
 
     # 章节导航 (无 OCR)。先向前滑到第 1 章，再向后到目标章
-    map_page = MapPage(ctrl)
+    map_page = MapPage(ctx)
     for _ in range(TOTAL_CHAPTERS):
         if not map_page.click_prev_chapter():
             break

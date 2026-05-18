@@ -307,7 +307,7 @@ def _probe_level_near_name(
 
     gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
     up = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-    norm = cv2.normalize(up, None, 0, 255, cv2.NORM_MINMAX)
+    norm = cv2.normalize(up, up, 0, 255, cv2.NORM_MINMAX)
     binary = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     binary_rgb = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
     collect_levels(binary_rgb)

@@ -34,7 +34,7 @@ TaskRequestUnion = Annotated[
 
 
 @router.post('/start', response_model=ApiResponse)
-async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[arg-type]
+async def task_start(request: TaskRequestUnion) -> ApiResponse:
     """启动任务 (异步执行，立即返回)。"""
     if task_manager.is_running:
         raise HTTPException(status_code=409, detail='已有任务正在运行')

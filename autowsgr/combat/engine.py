@@ -62,7 +62,7 @@ class CombatEngine(PhaseHandlersMixin):
 
         # 运行时状态 (由 fight() 重置)
         self._plan: CombatPlan = CombatPlan(name='', mode=CombatMode.BATTLE)
-        self._recognizer: CombatRecognizer = None  # type: ignore[assignment]  # set in fight()
+        self._recognizer: CombatRecognizer | None = None  # set in fight()
         self._phase = CombatPhase.PROCEED
         self._last_action = 'yes'
         self._node = '0'
@@ -83,7 +83,7 @@ class CombatEngine(PhaseHandlersMixin):
     def fight(  # noqa: PLR0912
         self,
         plan: CombatPlan,
-        initial_ship_stats: list[ShipDamageState],
+        initial_ship_stats: list[ShipDamageState] | None,
     ) -> CombatResult:
         """执行一次完整的战斗循环。
 
