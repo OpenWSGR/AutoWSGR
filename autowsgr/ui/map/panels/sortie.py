@@ -250,8 +250,7 @@ class SortiePanelMixin(BaseMapPage):
                 self.click_chapter(step)
                 remaining -= abs(step)
                 _log.info(f'[UI] 章节导航: 跳转{step}章, 剩余{remaining}章')
-                if remaining > 0:
-                    time.sleep(CHAPTER_NAV_DELAY * step)
+                time.sleep(CHAPTER_NAV_DELAY * abs(step))
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
