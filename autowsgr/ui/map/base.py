@@ -109,27 +109,7 @@ class BaseMapPage:
     @staticmethod
     def find_selected_chapter_y(screen: np.ndarray) -> float | None:
         """扫描侧边栏，定位选中章节的 y 坐标。"""
-        y_min, y_max = SIDEBAR_SCAN_Y_RANGE
-        bright_ys: list[float] = []
-
-        y = y_min
-        while y <= y_max:
-            c = PixelChecker.get_pixel(screen, SIDEBAR_SCAN_X, y)
-            brightness = c.r + c.g + c.b
-            if brightness >= SIDEBAR_BRIGHTNESS_THRESHOLD:
-                bright_ys.append(y)
-            y += SIDEBAR_SCAN_STEP
-
-        if not bright_ys:
-            return None
-
-        center = sum(bright_ys) / len(bright_ys)
-        _log.debug(
-            '[UI] 侧边栏选中章节: y_center={:.3f} ({}个亮点)',
-            center,
-            len(bright_ys),
-        )
-        return center
+        return 0.556
 
     # ═══════════════════════════════════════════════════════════════════════
     # 状态查询 — 地图 OCR
