@@ -221,7 +221,9 @@ NAV_GRAPH: list[NavEdge] = [
     NavEdge(PageName.MAP, PageName.DECISIVE_BATTLE, _map_to_decisive, '地图 → 决战'),
     # ── 出征准备 ↔ 选船 ──
     NavEdge(PageName.BATTLE_PREP, PageName.MAP, _battle_prep_to_map, '出征准备 → 地图'),
-    NavEdge(PageName.CHOOSE_SHIP, PageName.BATTLE_PREP, _choose_ship_to_battle_prep, '选船 → 出征准备'),
+    NavEdge(
+        PageName.CHOOSE_SHIP, PageName.BATTLE_PREP, _choose_ship_to_battle_prep, '选船 → 出征准备'
+    ),
     # ── 后院 ↔ 子页面 ──
     NavEdge(PageName.BACKYARD, PageName.BATH, _backyard_to_bath, '后院 → 浴室'),
     NavEdge(PageName.BACKYARD, PageName.CANTEEN, _backyard_to_canteen, '后院 → 食堂'),
