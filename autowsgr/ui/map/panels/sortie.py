@@ -20,7 +20,6 @@ from autowsgr.ui.map.data import (
     LOOT_COUNT_CROP,
     SHIP_COUNT_CROP,
     SIDEBAR_CLICK_X,
-    SIDEBAR_SCAN_Y_RANGE,
     TOTAL_CHAPTERS,
     MapPanel,
 )
@@ -164,7 +163,7 @@ class SortiePanelMixin(BaseMapPage):
         self._ctrl.click(SIDEBAR_CLICK_X, target_y)
         return True
 
-    def navigate_to_chapter(self, target: int) -> int | None:  # noqa: C901, PLR0912, PLR0915
+    def navigate_to_chapter(self, target: int) -> int | None:
         """导航到指定章节 (通过 OCR 识别当前位置并批量点击)。
 
         远距离章节切换时采用批量点击 + 充分等待的策略，
@@ -252,7 +251,7 @@ class SortiePanelMixin(BaseMapPage):
                 remaining -= abs(step)
                 _log.info(f'[UI] 章节导航: 跳转{step}章, 剩余{remaining}章')
                 if remaining > 0:
-                    time.sleep(CHAPTER_NAV_DELAY)
+                    time.sleep(CHAPTER_NAV_DELAY * step)
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
