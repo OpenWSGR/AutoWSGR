@@ -107,7 +107,7 @@ class BaseMapPage:
     # ═══════════════════════════════════════════════════════════════════════
 
     @staticmethod
-    def find_selected_chapter_y(screen: np.ndarray) -> float | None:
+    def find_selected_chapter_y() -> float | None:
         """扫描侧边栏，定位选中章节的 y 坐标。"""
         return 0.556
 

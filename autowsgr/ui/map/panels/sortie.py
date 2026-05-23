@@ -149,35 +149,18 @@ class SortiePanelMixin(BaseMapPage):
     # 章节 / 地图导航
     # ═══════════════════════════════════════════════════════════════════════
 
-    def click_prev_chapter(self, screen: np.ndarray | None = None) -> bool:
-        """点击侧边栏上方章节 (前一章)。"""
-        if screen is None:
-            screen = self._ctrl.screenshot()
-        sel_y = self.find_selected_chapter_y(screen)
-        if sel_y is None:
-            _log.warning('[UI] 侧边栏未找到选中章节，无法切换')
-            return False
-        target_y = sel_y - CHAPTER_SPACING
-        if target_y < SIDEBAR_SCAN_Y_RANGE[0]:
-            _log.warning('[UI] 已在最前章节，无法继续向前')
-            return False
-        _log.info('[UI] 地图页面 -> 上一章 (y={:.3f})', target_y)
-        self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-        return True
+    def click_chapter(self, num: int) -> bool:
+        """点击侧边栏章节
 
-    def click_next_chapter(self, screen: np.ndarray | None = None) -> bool:
-        """点击侧边栏下方章节 (后一章)。"""
-        if screen is None:
-            screen = self._ctrl.screenshot()
-        sel_y = self.find_selected_chapter_y(screen)
-        if sel_y is None:
-            _log.warning('[UI] 侧边栏未找到选中章节，无法切换')
-            return False
-        target_y = sel_y + CHAPTER_SPACING
-        if target_y > SIDEBAR_SCAN_Y_RANGE[1]:
-            _log.warning('[UI] 已在最后章节，无法继续向后')
-            return False
-        _log.info('[UI] 地图页面 -> 下一章 (y={:.3f})', target_y)
+        Parameters
+        ----------
+        num:
+            跳转数量, 正数为向下跳转, 负数为向上跳转
+            允许输入[-3, 3]
+        """
+        sel_y = self.find_selected_chapter_y()
+        target_y = sel_y + num * CHAPTER_SPACING
+        _log.info('[UI] 地图页面 -> 跳转章节 {} (y={:.3f})', num, target_y)
         self._ctrl.click(SIDEBAR_CLICK_X, target_y)
         return True
 
@@ -261,30 +244,15 @@ class SortiePanelMixin(BaseMapPage):
                 continue
 
             delta = target - current
-            direction = -1 if delta < 0 else 1
-            steps = abs(delta)
-
-            # 远距离批量点击，近距离逐步点击
-            if steps > 2:
-                batch = min(steps, 4)
-                _log.info('[UI] 章节导航: 批量点击 {} 章', batch)
-                for _ in range(batch):
-                    ok = self.click_prev_chapter() if direction < 0 else self.click_next_chapter()
-                    if not ok:
-                        _log.warning('[UI] 章节导航: 点击失败，终止')
-                        return None
-                    time.sleep(0.3)
-                # 批量点击后充分等待动画完全结束，避免 OCR 抖动
-                time.sleep(1.0)
-            else:
-                if direction < 0:
-                    ok = self.click_prev_chapter(screen)
-                else:
-                    ok = self.click_next_chapter(screen)
-                if not ok:
-                    _log.warning('[UI] 章节导航: 点击失败，终止')
-                    return None
-                time.sleep(CHAPTER_NAV_DELAY)
+            direction = 1 if delta > 0 else -1
+            remaining = abs(delta)
+            while remaining > 0:
+                step = min(remaining, 3) * direction
+                self.click_chapter(step)
+                remaining -= abs(step)
+                _log.info(f'[UI] 章节导航: 跳转{step}章, 剩余{remaining}章')
+                if remaining > 0:
+                    time.sleep(CHAPTER_NAV_DELAY)
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
