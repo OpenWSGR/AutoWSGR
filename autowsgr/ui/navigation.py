@@ -120,6 +120,11 @@ def _battle_prep_to_map(ctx: GameContext) -> None:
     BattlePreparationPage(ctx).go_back()
 
 
+def _choose_ship_to_battle_prep(ctx: GameContext) -> None:
+    # 选船页面的返回按钮和出征准备页面位置一致
+    ctx.ctrl.click(0.022, 0.058)
+
+
 def _backyard_to_bath(ctx: GameContext) -> None:
     from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
 
@@ -214,8 +219,9 @@ NAV_GRAPH: list[NavEdge] = [
     NavEdge(PageName.SIDEBAR, PageName.MAIN, _sidebar_to_main, '侧边栏 → 主页面'),
     # ── 地图 → 子页面 ──
     NavEdge(PageName.MAP, PageName.DECISIVE_BATTLE, _map_to_decisive, '地图 → 决战'),
-    # ── 出征准备 → 地图 ──
+    # ── 出征准备 ↔ 选船 ──
     NavEdge(PageName.BATTLE_PREP, PageName.MAP, _battle_prep_to_map, '出征准备 → 地图'),
+    NavEdge(PageName.CHOOSE_SHIP, PageName.BATTLE_PREP, _choose_ship_to_battle_prep, '选船 → 出征准备'),
     # ── 后院 ↔ 子页面 ──
     NavEdge(PageName.BACKYARD, PageName.BATH, _backyard_to_bath, '后院 → 浴室'),
     NavEdge(PageName.BACKYARD, PageName.CANTEEN, _backyard_to_canteen, '后院 → 食堂'),

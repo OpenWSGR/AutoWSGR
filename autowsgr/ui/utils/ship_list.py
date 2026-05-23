@@ -35,7 +35,7 @@ _LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILilOo]{1,6})')
 _LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILilOo]{1,6})')
 _MAX_LEVEL_VALUE = 200
 _MAX_LEVEL_NOISE_CHARS = 1
-_MAX_NOISY_LEVEL_HITS_BEFORE_RETRY = 1
+_MAX_NOISY_LEVEL_HITS_BEFORE_RETRY = 5
 
 
 class LevelOCRRetryNeededError(RuntimeError):
