@@ -125,6 +125,7 @@ register_page(PageName.BUILD, BuildPage.is_current_page)
 register_page(PageName.INTENSIFY, IntensifyPage.is_current_page)
 register_page(PageName.FRIEND, FriendPage.is_current_page)
 register_page(PageName.DECISIVE_BATTLE, DecisiveBattlePage.is_current_page)
+register_page(PageName.CHOOSE_SHIP, ChooseShipPage.is_current_page)
 register_page(PageName.EVENT_MAP, BaseEventPage.is_current_page)
 
 __all__ = [

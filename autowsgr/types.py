@@ -424,6 +424,8 @@ class PageName(StrEnum):
     """好友页面"""
     DECISIVE_BATTLE = '决战页面'
     """决战页面"""
+    CHOOSE_SHIP = '选择舰船页面'
+    """选择舰船页面"""
 
     EVENT_MAP = '活动页面'
     """活动地图页面"""
