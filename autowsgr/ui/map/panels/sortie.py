@@ -148,7 +148,7 @@ class SortiePanelMixin(BaseMapPage):
     # 章节 / 地图导航
     # ═══════════════════════════════════════════════════════════════════════
 
-    def click_chapter(self, num: int) -> bool:
+    def click_chapter(self, num: int):
         """点击侧边栏章节
 
         Parameters
@@ -157,11 +157,15 @@ class SortiePanelMixin(BaseMapPage):
             跳转数量, 正数为向下跳转, 负数为向上跳转
             允许输入[-3, 3]
         """
+        if not -3 <= num <= 3:
+            raise ValueError(f'跳转数量必须为 -3 到 3, 收到: {num}')
+        if num == 0:
+            return
         sel_y = self.find_selected_chapter_y()
         target_y = sel_y + num * CHAPTER_SPACING
         _log.info('[UI] 地图页面 -> 跳转章节 {} (y={:.3f})', num, target_y)
         self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-        return True
+        return
 
     def navigate_to_chapter(self, target: int) -> int | None:
         """导航到指定章节 (通过 OCR 识别当前位置并批量点击)。
