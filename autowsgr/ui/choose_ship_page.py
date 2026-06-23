@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
@@ -320,9 +320,10 @@ class ChooseShipPage:
         if len(hit) < 3:
             raise ValueError(f'unsupported hit entry length: {hit!r}')
 
-        matched = str(hit[0]).strip()
-        cx = float(hit[1])
-        cy = float(hit[2])
+        hit_seq: tuple[Any, ...] | list[Any] = hit
+        matched = str(hit_seq[0]).strip()
+        cx = float(hit_seq[1])
+        cy = float(hit_seq[2])
 
         if len(hit) >= 4 and isinstance(hit[3], (int, float)):
             row_key = round(float(hit[3]), 4)

@@ -93,6 +93,7 @@ class WindowsEmulatorManager(EmulatorProcessManager):
                     _log.info('云手机无需关闭')
                     return
                 case _:
+                    assert self._process_name is not None
                     subprocess.run(  # noqa: S603
                         ['taskkill', '-f', '-im', self._process_name],  # noqa: S607
                         check=True,

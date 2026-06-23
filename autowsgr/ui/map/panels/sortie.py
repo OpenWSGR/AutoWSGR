@@ -30,7 +30,7 @@ from autowsgr.vision import PixelChecker
 if TYPE_CHECKING:
     import numpy as np
 
-    from autowsgr.vision import EasyOCREngine
+    from autowsgr.vision import OCREngine
 
 
 _log = get_logger('ui')
@@ -73,7 +73,7 @@ _OCR_ALLOWLIST = '0123456789/|'
 """OCR 字符白名单。包含 ``/`` 和 ``|`` 使 OCR 正确识别斜线而非误读为 ``1``。"""
 
 
-def _parse_numerator(text: str, max_val: int) -> int:
+def _parse_numerator(text: str, max_val: int) -> int | None:
     """从 ``"X/Y"`` 格式的 OCR 文本中提取分子 (``/`` 前的数字)。
 
     - 优先按 ``/`` 或 ``|`` 分割取第一段。
@@ -103,7 +103,7 @@ def _parse_numerator(text: str, max_val: int) -> int:
     return None
 
 
-def recognize_loot_count(screen: np.ndarray, ocr: EasyOCREngine) -> int | None:
+def recognize_loot_count(screen: np.ndarray, ocr: OCREngine) -> int | None:
     """识别出征面板战利品 (胖次) 已获取数量。
 
     OCR ``X/50`` 区域并提取 ``/`` 前的数字, 上限固定为 50。
@@ -114,16 +114,16 @@ def recognize_loot_count(screen: np.ndarray, ocr: EasyOCREngine) -> int | None:
         _log.warning('[UI] 战利品数量 OCR 无结果')
         return None
     count = _parse_numerator(text, LOOT_MAX)
+    if count is None:
+        _log.warning("[UI] 战利品数量 OCR 解析失败: '{}'", text)
+        return None
     if count > 50 and str(count).endswith('1'):
         count = int(str(count)[:-1])  # 可能 OCR 把 "/50" 识别成 "150"
-    if count is not None:
-        _log.info('[UI] 战利品数量: {}/{}', count, LOOT_MAX)
-    else:
-        _log.warning("[UI] 战利品数量 OCR 解析失败: '{}'", text)
+    _log.info('[UI] 战利品数量: {}/{}', count, LOOT_MAX)
     return count
 
 
-def recognize_ship_count(screen: np.ndarray, ocr: EasyOCREngine) -> int | None:
+def recognize_ship_count(screen: np.ndarray, ocr: OCREngine) -> int | None:
     """识别出征面板舰船已获取数量。
 
     OCR ``X/500`` 区域并提取 ``/`` 前的数字, 上限固定为 500。
@@ -182,6 +182,7 @@ class SortiePanelMixin(BaseMapPage):
             raise ValueError(f'章节编号必须为 1-{TOTAL_CHAPTERS}，收到: {target}')
         if self._ocr is None:
             raise RuntimeError('需要 OCR 引擎才能导航到指定章节')
+        _ocr = self._ocr
 
         def _read_chapter(
             samples: int = 3, delay: float = 0.15
@@ -192,7 +193,7 @@ class SortiePanelMixin(BaseMapPage):
             for i in range(samples):
                 screen = self._ctrl.screenshot()
                 last_screen = screen
-                info = self.recognize_map(screen, self._ocr)
+                info = self.recognize_map(screen, _ocr)
                 if info is not None:
                     chapters.append(info.chapter)
                 if i < samples - 1:
@@ -265,6 +266,8 @@ class SortiePanelMixin(BaseMapPage):
 
     def navigate_to_map(self, map_num: int | str) -> None:
         """通过 OCR 识别当前地图编号并左右翻页至目标。"""
+        if self._ocr is None:
+            raise RuntimeError('需要 OCR 引擎才能导航到指定地图')
         map_num = int(map_num)
         screen = self._ctrl.screenshot()
         info = self.recognize_map(screen, self._ocr)

@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -151,16 +152,13 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
     """从任意已知页面导航到侧边栏。"""
     import time
 
-    from autowsgr.context import GameContext
-    from autowsgr.infra import UserConfig
     from autowsgr.ui.main_page import MainPage
 
     if not reset_to_main_page(ctrl, pause):
         return
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        ctx = GameContext(ctrl=ctrl, config=UserConfig())
-        MainPage(ctx).navigate_to(MainPage.Target.SIDEBAR)
+        MainPage(_make_test_ctx(ctrl)).navigate_to(MainPage.Target.SIDEBAR)
         time.sleep(pause)
 
 

@@ -54,5 +54,8 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
         ocr: OCREngine | None = None,
     ) -> None:
         super().__init__(ctx, ocr)
-        self._ocr: OCREngine = ocr or ctx.ocr  # type: ignore[assignment]
+        _ocr = ocr if ocr is not None else ctx.ocr
+        if _ocr is None:
+            raise ValueError('DecisivePreparation requires an OCR engine')
+        self._ocr: OCREngine = _ocr
         self._config = config
