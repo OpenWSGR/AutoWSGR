@@ -16,12 +16,14 @@ ADB 命令实现触控/按键等操作。
 
 from __future__ import annotations
 
+import random
 import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
+from autowsgr.infra.config import OPERATION_DELAY_MIN, OPERATION_DELAY_MAX
 from autowsgr.infra.logger import caller_info, get_logger
 
 from ..detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
@@ -411,8 +413,8 @@ class ScrcpyController(AndroidController):
             time.sleep(0.01)
 
     # ── 触控 ──
-
-    def click(self, x: float, y: float) -> None:
+    # 引入一个开关，当参数为：click(x, y, delay=False) 时关闭延迟，该方法默认打开全局延迟，全局延迟可以在 config.py 内设置
+    def click(self, x: float, y: float, *, delay: bool = True) -> None:
         dev = self._require_device()
         w, h = self._resolution
         px, py = int(x * w), int(y * h)
@@ -427,6 +429,11 @@ class ScrcpyController(AndroidController):
             caller_info(),
         )
         dev.shell(f'input tap {px} {py}')
+        if delay:  # True 才走延迟
+            time.sleep(random.uniform(
+                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            ))
 
     def swipe(
         self,
@@ -435,6 +442,8 @@ class ScrcpyController(AndroidController):
         x2: float,
         y2: float,
         duration: float = 0.5,
+        *,
+        delay: bool = True
     ) -> None:
         dev = self._require_device()
         w, h = self._resolution
@@ -456,32 +465,66 @@ class ScrcpyController(AndroidController):
         )
         dev.shell(f'input swipe {px1} {py1} {px2} {py2} {ms}')
 
+        # 增加延迟，改动同 click_delay
+        if delay:  # True 才走延迟
+            time.sleep(random.uniform(
+                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            ))
+
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
         self.swipe(x, y, x, y, duration=duration)
 
     # ── 按键 ──
-
-    def key_event(self, key_code: int) -> None:
+    def key_event(self, key_code: int, *, delay: bool = True) -> None:
         dev = self._require_device()
         _log.debug('[Emulator] key_event({})  {}', key_code, caller_info())
         dev.keyevent(key_code)
 
-    def text(self, content: str) -> None:
+        # 增加延迟，改动同 click_delay
+        if delay:  # True 才走延迟
+            time.sleep(random.uniform(
+                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            ))
+
+    def text(self, content: str, *, delay: bool = True) -> None:
         dev = self._require_device()
         _log.debug("[Emulator] text('{}')  {}", content, caller_info())
         dev.send_keys(content)
 
+        # 增加延迟，改动同 click_delay
+        if delay:  # True 才走延迟
+            time.sleep(random.uniform(
+                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            ))
+
     # ── 应用管理 ──
 
-    def start_app(self, package: str) -> None:
+    def start_app(self, package: str, *, delay: bool = True) -> None:
         dev = self._require_device()
         _log.info('[Emulator] 启动应用: {}  {}', package, caller_info())
         dev.app_start(package)
 
-    def stop_app(self, package: str) -> None:
+        # 增加延迟，改动同 click_delay
+        if delay:  # True 才走延迟
+            time.sleep(random.uniform(
+                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            ))
+
+    def stop_app(self, package: str, *, delay: bool = True) -> None:
         dev = self._require_device()
         _log.info('[Emulator] 停止应用: {}  {}', package, caller_info())
         dev.app_stop(package)
+
+        # 增加延迟，改动同 click_delay
+        if delay:  # True 才走延迟
+            time.sleep(random.uniform(
+                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            ))
 
     def is_app_running(self, package: str) -> bool:
         try:

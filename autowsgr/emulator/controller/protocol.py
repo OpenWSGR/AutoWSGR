@@ -83,13 +83,15 @@ class AndroidController(ABC):
     # ── 触控 ──
 
     @abstractmethod
-    def click(self, x: float, y: float) -> None:
+    def click(self, x: float, y: float, *, delay: bool = True) -> None:
         """点击屏幕。
 
         Parameters
         ----------
         x, y:
             相对坐标 (0.0-1.0)。
+        delay:
+            是否在点击后等待操作延迟（默认 True）。
         """
         ...
 

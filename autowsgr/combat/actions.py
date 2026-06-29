@@ -133,7 +133,9 @@ def click_fight_condition(device: AndroidController, condition: FightCondition) 
         目标战况。
     """
     x, y = condition.relative_click_position
-    device.click(x, y)
+
+    # 选择战况后，舰队会在地图上移动，不能添加延迟，否则会出现识别不到下一个点的问题
+    device.click(x, y, delay=False)
 
 
 def click_night_battle(device: AndroidController, pursue: bool) -> None:
@@ -186,14 +188,18 @@ def click_speed_up(device: AndroidController, *, battle_mode: bool = False) -> N
         ``True`` 使用战役加速坐标，``False`` 使用常规战坐标。
     """
     coords = Coords.SPEED_UP_BATTLE if battle_mode else Coords.SPEED_UP_NORMAL
-    device.click(*coords)
+
+    # 由于这个点击之后，马上就会进行画面识别，为了保证画面被正确识别，这里不加延迟
+    device.click(*coords,delay=False)
 
 
 def click_skip_missile_animation(device: AndroidController) -> None:
     """跳过导弹支援动画。"""
-    device.click(*Coords.SPEED_UP_BATTLE)
-    time.sleep(0.2)
-    device.click(*Coords.SPEED_UP_BATTLE)
+
+    # 快速点击不需要增加操作后的 delay
+    device.click(*Coords.SPEED_UP_BATTLE, delay=False)
+    time.sleep(1)
+    device.click(*Coords.SPEED_UP_BATTLE, delay=False)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -420,7 +426,9 @@ def dismiss_resource_confirm(device: AndroidController, screen: ndarray) -> None
     )
     if detail is not None:
         time.sleep(0.25)
-        device.click(*detail.center)
+
+        # 由于在地图移动的过程中，点击后必须立刻获取当前画面，因此不能加延迟
+        device.click(*detail.center, delay=False)
         _log.info(
             "[Combat] 点掉资源确认弹窗: '{}' ({:.4f}, {:.4f})",
             detail.template_name,

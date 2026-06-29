@@ -29,6 +29,11 @@ from .file_utils import load_yaml
 
 _log = get_logger('infra')
 
+# ── 全局操作延迟 ──
+# 这里引入了两个变量会自动判断谁大谁小，意思呢就是说可以通过这个来控制UI操作之后的延迟时间，默认不开启这个延迟如果有需要可以自己调
+# 影响 scrcpy 设备交互操作（click/swipe/key_event/text/start_app/stop_app）
+OPERATION_DELAY_MIN: float = 0.0
+OPERATION_DELAY_MAX: float = 0.0
 
 # ── 子配置模型 ──
 
