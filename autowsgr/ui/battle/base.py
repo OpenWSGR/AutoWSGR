@@ -176,7 +176,7 @@ class BaseBattlePreparation:
     def start_battle(self) -> None:
         """点击「开始出征」按钮。"""
         _log.info('[UI] 出征准备 → 开始出征')
-        self._ctrl.click(*CLICK_START_BATTLE)
+        self._ctrl.click_delay(*CLICK_START_BATTLE)
 
     # ── 动作 — 舰队 / 面板选择 ───────────────────────────────────────────
 
@@ -185,12 +185,12 @@ class BaseBattlePreparation:
         if fleet not in CLICK_FLEET:
             raise ValueError(f'舰队编号必须为 1-4，收到: {fleet}')
         _log.debug('[UI] 出征准备 → 选择 {}队', fleet)
-        self._ctrl.click(*CLICK_FLEET[fleet])
+        self._ctrl.click_delay(*CLICK_FLEET[fleet])
 
     def select_panel(self, panel: Panel) -> None:
         """切换底部面板标签。"""
         _log.debug('[UI] 出征准备 → {}', panel.value)
-        self._ctrl.click(*CLICK_PANEL[panel])
+        self._ctrl.click_delay(*CLICK_PANEL[panel])
 
     def quick_supply(self) -> None:
         """点击「快速补给」标签。"""
@@ -207,11 +207,11 @@ class BaseBattlePreparation:
         if slot not in CLICK_SHIP_SLOT:
             raise ValueError(f'舰船槽位必须为 0-5，收到: {slot}')
         _log.debug('[UI] 出征准备 → 点击舰船位 {}', slot)
-        self._ctrl.click(*CLICK_SHIP_SLOT[slot])
+        self._ctrl.click_delay(*CLICK_SHIP_SLOT[slot])
 
     # ── 动作 — 开关 ──────────────────────────────────────────────────────
 
     def toggle_auto_supply(self) -> None:
         """切换自动补给开关。"""
         _log.debug('[UI] 出征准备 → 切换自动补给')
-        self._ctrl.click(*CLICK_AUTO_SUPPLY)
+        self._ctrl.click_delay(*CLICK_AUTO_SUPPLY)

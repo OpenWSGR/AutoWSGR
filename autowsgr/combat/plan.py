@@ -235,9 +235,9 @@ class CombatPlan:
     map_id: int | str = 1
     fleet_id: int = 1
     fleet: list[str] | None = None
+    fleet_rules: list[dict] | None = None
     repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
     fight_condition: FightCondition = FightCondition.aim
-    selected_nodes: list[str] = field(default_factory=list)
     nodes: dict[str, NodeDecision] = field(default_factory=dict)
     default_node: NodeDecision = field(default_factory=NodeDecision)
     event_name: str | None = None
@@ -269,6 +269,47 @@ class CombatPlan:
             return True  # 未配置白名单 = 全部允许
         return node in self.selected_nodes
 
+    @staticmethod
+    def _parse_preset(preset: dict) -> tuple[list[str | None], list[dict]]:
+        """将 YAML fleet_presets 条目转换为 fleet + fleet_rules 格式。"""
+        ships = preset.get('ships', [])
+        fleet: list[str | None] = []
+        rules: list[dict] = []
+        for ship in ships:
+            if isinstance(ship, str):
+                fleet.append(ship)
+                rules.append({'candidates': [ship], 'search_name': ship})
+            elif isinstance(ship, dict):
+                name = ship.get('name')
+                priority = ship.get('priority')
+                ship_type = ship.get('ship_type')
+                min_level = ship.get('min_level')
+                max_level = ship.get('max_level')
+                rule: dict[str, object] = {}
+                if name:
+                    fleet.append(name)
+                    rule['candidates'] = [name]
+                    rule['search_name'] = name
+                elif isinstance(priority, list) and priority:
+                    fleet.append(priority[0])
+                    rule['candidates'] = list(priority)
+                else:
+                    fleet.append(None)
+                if ship_type:
+                    rule['ship_type'] = ship_type
+                if min_level is not None:
+                    rule['min_level'] = min_level
+                if max_level is not None:
+                    rule['max_level'] = max_level
+                rules.append(rule)
+            else:
+                fleet.append(None)
+                rules.append({})
+        while len(fleet) < 6:
+            fleet.append(None)
+            rules.append({})
+        return fleet[:6], rules[:6]
+
     @classmethod
     def from_yaml(cls, path: str | Path) -> CombatPlan:
         data = load_yaml(path)
@@ -282,6 +323,16 @@ class CombatPlan:
         map_id = data.get('map', 1)
         fleet_id = data.get('fleet_id', 1)
         fleet = data.get('fleet')
+        fleet_rules = data.get('fleet_rules')
+
+        # 如果 GUI 未传 fleet/fleet_rules，从 YAML fleet_presets 自动提取第一个预设
+        fleet_presets = data.get('fleet_presets')
+        if isinstance(fleet_presets, list) and fleet_presets:
+            preset_count = len(fleet_presets[0].get('ships', []))
+            if (fleet is None and fleet_rules is None) or (isinstance(fleet, list) and len(fleet) < preset_count):
+                _log.warning('[Combat] GUI仅传{}艘，YAML预设{}艘，补全', len(fleet) if fleet else 0, preset_count)
+                fleet, fleet_rules = cls._parse_preset(fleet_presets[0])
+
         fight_condition = FightCondition(data.get('fight_condition', 4))
         selected_nodes = data.get('selected_nodes', [])
 
@@ -321,6 +372,7 @@ class CombatPlan:
             map_id=map_id,
             fleet_id=fleet_id,
             fleet=fleet,
+            fleet_rules=fleet_rules,
             repair_mode=repair_mode,
             fight_condition=fight_condition,
             selected_nodes=selected_nodes,

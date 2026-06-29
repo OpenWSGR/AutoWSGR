@@ -113,6 +113,15 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
         override_fleet = request_plan.fleet if request_plan is not None else None
         override_fleet_rules = request_plan.fleet_rules if request_plan is not None else None
 
+        # 如果 YAML 预设的舰队比 GUI 覆盖的更完整，优先用预设
+        if override_fleet and plan.fleet:
+            override_count = sum(1 for n in override_fleet if n)
+            plan_count = sum(1 for n in plan.fleet if n)
+            if override_count < plan_count:
+                _log.warning('[Task] GUI 仅覆盖 {} 艘船，YAML 预设 {} 艘，用预设补全', override_count, plan_count)
+                override_fleet = plan.fleet
+                override_fleet_rules = plan.fleet_rules
+
         for i in range(request.times):
             if task_manager.should_stop():
                 break

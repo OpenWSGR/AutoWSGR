@@ -44,7 +44,7 @@ class NormalFightRunner:
         self._plan = plan
         self._fleet_id = fleet_id if fleet_id is not None else plan.fleet_id
         self._fleet = fleet if fleet is not None else plan.fleet
-        self._fleet_rules = fleet_rules
+        self._fleet_rules = fleet_rules if fleet_rules else plan.fleet_rules
 
         # 从 config 读取拆船配置
         self._dock_full_destroy = ctx.config.dock_full_destroy

@@ -102,5 +102,5 @@ class StartScreenPage:
         :data:`_CLICK_SETTLE` 秒让画面稳定，之后可开始检测登录浮层。
         """
         _log.info('[UI] 点击「点击进入」按钮 {}', CLICK_ENTER)
-        self._ctrl.click(*CLICK_ENTER)
+        self._ctrl.click_delay(*CLICK_ENTER)
         time.sleep(_CLICK_SETTLE)

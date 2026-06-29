@@ -179,7 +179,7 @@ class BaseEventPage:
     def _close_overlay(self) -> None:
         """点击浮层中的关闭按钮，返回地图基础页面。"""
         _log.info('[UI] 活动地图: 关闭进入页浮层')
-        self._ctrl.click(*CLICK_CLOSE_OVERLAY)
+        self._ctrl.click_delay(*CLICK_CLOSE_OVERLAY)
         wait_for_page(self._ctrl, self.is_current_page, timeout=5.0)
         time.sleep(0.25)  # 等待页面稳定
 
@@ -198,7 +198,7 @@ class BaseEventPage:
         """
         x, y = NODE_POSITIONS[node_id]
         _log.debug('[UI] 活动地图: 选择节点 {}', node_id)
-        self._ctrl.click(x, y)
+        self._ctrl.click_delay(x, y)
         for _ in range(10):
             # 检测到节点浮层即成功
             if self._detect_overlay(self._ctrl.screenshot()):
@@ -274,7 +274,7 @@ class BaseEventPage:
             return
 
         _log.info('[UI] 活动地图: 切换难度 {} -> {}', current, target)
-        self._ctrl.click(*CLICK_DIFFICULTY)
+        self._ctrl.click_delay(*CLICK_DIFFICULTY)
         time.sleep(1.0)
 
         # 验证切换成功
@@ -285,7 +285,7 @@ class BaseEventPage:
                 target,
                 new_diff,
             )
-            self._ctrl.click(*CLICK_DIFFICULTY)
+            self._ctrl.click_delay(*CLICK_DIFFICULTY)
             time.sleep(1.0)
 
     # ── 入口选择 (alpha/beta) ─────────────────────────────────────────────

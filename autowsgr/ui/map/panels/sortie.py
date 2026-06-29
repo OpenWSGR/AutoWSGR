@@ -164,7 +164,7 @@ class SortiePanelMixin(BaseMapPage):
         sel_y = self.find_selected_chapter_y()
         target_y = sel_y + num * CHAPTER_SPACING
         _log.info('[UI] 地图页面 -> 跳转章节 {} (y={:.3f})', num, target_y)
-        self._ctrl.click(SIDEBAR_CLICK_X, target_y)
+        self._ctrl.click_delay(SIDEBAR_CLICK_X, target_y)
         return
 
     def navigate_to_chapter(self, target: int) -> int | None:
@@ -274,11 +274,11 @@ class SortiePanelMixin(BaseMapPage):
                 delta = map_num - current_map
                 if delta > 0:
                     for _ in range(delta):
-                        self._ctrl.click(*CLICK_MAP_NEXT)
+                        self._ctrl.click_delay(*CLICK_MAP_NEXT)
                         time.sleep(0.3)
                 else:
                     for _ in range(-delta):
-                        self._ctrl.click(*CLICK_MAP_PREV)
+                        self._ctrl.click_delay(*CLICK_MAP_PREV)
                         time.sleep(0.3)
                 time.sleep(0.5)
 

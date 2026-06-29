@@ -177,7 +177,7 @@ class BathPage:
 
         _log.info('[UI] 浴室 → 打开选择修理 overlay')
         if not self.has_choose_repair_overlay(self._ctrl.screenshot()):
-            self._ctrl.click(*CLICK_CHOOSE_REPAIR)
+            self._ctrl.click_delay(*CLICK_CHOOSE_REPAIR)
         wait_for_page(
             self._ctrl,
             BathPage.has_choose_repair_overlay,
@@ -196,7 +196,7 @@ class BathPage:
         from autowsgr.ui.utils import wait_for_page
 
         _log.info('[UI] 关闭选择修理 overlay')
-        self._ctrl.click(*CLICK_CLOSE_OVERLAY)
+        self._ctrl.click_delay(*CLICK_CLOSE_OVERLAY)
         # 等待 overlay 消失，基础浴室签名恢复（放宽条件，延长超时以兼容动画过渡）
         wait_for_page(
             self._ctrl,
@@ -230,7 +230,7 @@ class BathPage:
         if not BathPage.has_choose_repair_overlay(screen):
             raise NavigationError('选择修理 overlay 未打开，无法点击舰船', screen=screen)
 
-        self._ctrl.click(*CLICK_FIRST_REPAIR_SHIP)
+        self._ctrl.click_delay(*CLICK_FIRST_REPAIR_SHIP)
 
         # 点击舰船后 overlay 自动关闭，等待回到浴室基础页面
         self._wait_overlay_auto_close()
@@ -260,7 +260,7 @@ class BathPage:
             return
 
         _log.info('[UI] 选择修理 → 点击全部修理')
-        self._ctrl.click(*CLICK_REPAIR_ALL)
+        self._ctrl.click_delay(*CLICK_REPAIR_ALL)
         time.sleep(1.0)
 
         # 等待 overlay 自动关闭或手动关闭，最多 10s
@@ -276,7 +276,7 @@ class BathPage:
             close_px = PixelChecker.get_pixel(screen, *CLICK_CLOSE_OVERLAY)
             if close_px.near(Color.from_rgb_tuple(close_color), close_tol):
                 _log.debug('[UI] 全部修理后 overlay 仍在，手动关闭')
-                self._ctrl.click(*CLICK_CLOSE_OVERLAY)
+                self._ctrl.click_delay(*CLICK_CLOSE_OVERLAY)
                 # 手动关闭后再给 2s 让动画完成
                 time.sleep(2.0)
                 return
@@ -318,7 +318,7 @@ class BathPage:
                 if ship.name == ship_name:
                     _log.info('[UI] 选择修理: 找到 {} (耗时 {})，点击', ship_name, ship.repair_time)
                     repair_secs = ship.repair_seconds
-                    self._ctrl.click(*ship.position)
+                    self._ctrl.click_delay(*ship.position)
 
                     # 检测浴场是否已满: overlay 未关闭说明浴场满
                     if self._try_wait_overlay_close():
@@ -423,7 +423,7 @@ class BathPage:
             return
 
         _log.info('[UI] 浴室 → 返回')
-        self._ctrl.click(*CLICK_BACK)
+        self._ctrl.click_delay(*CLICK_BACK)
         wait_leave_page(
             self._ctrl,
             BathPage.is_current_page,

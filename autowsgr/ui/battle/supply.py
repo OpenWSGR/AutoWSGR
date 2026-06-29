@@ -54,7 +54,7 @@ class SupplyMixin(BaseBattlePreparation):
     def toggle_battle_support(self) -> None:
         """切换战役支援开关。"""
         _log.debug('[UI] 出征准备 → 切换战役支援')
-        self._ctrl.click(*CLICK_SUPPORT)
+        self._ctrl.click_delay(*CLICK_SUPPORT)
 
     # ── 动作 — 补给 ──────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ class SupplyMixin(BaseBattlePreparation):
             if sid not in CLICK_SHIP_SLOT:
                 _log.warning('[UI] 无效槽位: {}', sid)
                 continue
-            self._ctrl.click(*CLICK_SHIP_SLOT[sid])
+            self._ctrl.click_delay(*CLICK_SHIP_SLOT[sid])
             time.sleep(0.3)
         _log.debug('[UI] 出征准备 → 补给 {}', ship_ids)
 

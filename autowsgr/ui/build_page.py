@@ -264,7 +264,7 @@ class BuildPage:
         if not 1 <= slot <= 4:
             raise ValueError(f'建造槽位必须为 1-4，收到: {slot}')
         _log.info('[UI] 建造页面 → 点击槽位 {}', slot)
-        self._ctrl.click(*BUILD_SLOT_POSITIONS[slot - 1])
+        self._ctrl.click_delay(*BUILD_SLOT_POSITIONS[slot - 1])
         time.sleep(0.5)
 
     def collect_slot(self, slot: int) -> None:
@@ -306,54 +306,54 @@ class BuildPage:
             此方法仅执行确认点击。
         """
         _log.info('[UI] 建造页面 → 确认建造')
-        self._ctrl.click(*CLICK_CONFIRM_BUILD)
+        self._ctrl.click_delay(*CLICK_CONFIRM_BUILD)
         time.sleep(1.0)
 
     def dismiss_animation(self) -> None:
         """点击跳过建造获取动画。"""
-        self._ctrl.click(*CLICK_DISMISS_ANIMATION)
+        self._ctrl.click_delay(*CLICK_DISMISS_ANIMATION)
 
     # ── 解体操作 ──────────────────────────────────────────────────────────
 
     def destroy_click_add(self) -> None:
         """解体标签 → 点击「添加」按钮。"""
         _log.info('[UI] 建造页面 (解体) → 添加')
-        self._ctrl.click(*CLICK_DESTROY_ADD)
+        self._ctrl.click_delay(*CLICK_DESTROY_ADD)
 
     def destroy_quick_select(self) -> None:
         """解体标签 → 点击「快速选择」按钮。"""
         _log.info('[UI] 建造页面 (解体) → 快速选择')
-        self._ctrl.click(*CLICK_DESTROY_QUICK_SELECT)
+        self._ctrl.click_delay(*CLICK_DESTROY_QUICK_SELECT)
 
     def destroy_confirm_select(self) -> None:
         """解体标签 → 点击「确认选择」。"""
         _log.info('[UI] 建造页面 (解体) → 确认选择')
-        self._ctrl.click(*CLICK_DESTROY_CONFIRM_SELECT)
+        self._ctrl.click_delay(*CLICK_DESTROY_CONFIRM_SELECT)
 
     def destroy_toggle_remove_equip(self) -> None:
         """解体标签 → 点击「卸下装备」复选框。"""
         _log.info('[UI] 建造页面 (解体) → 卸下装备')
-        self._ctrl.click(*CLICK_DESTROY_REMOVE_EQUIP)
+        self._ctrl.click_delay(*CLICK_DESTROY_REMOVE_EQUIP)
 
     def destroy_confirm(self) -> None:
         """解体标签 → 点击「解装确认」。"""
         _log.info('[UI] 建造页面 (解体) → 解装确认')
-        self._ctrl.click(*CLICK_DESTROY_CONFIRM)
+        self._ctrl.click_delay(*CLICK_DESTROY_CONFIRM)
 
     def destroy_four_star_confirm(self) -> None:
         """解体标签 → 四星确认弹窗点击确认。"""
         _log.info('[UI] 建造页面 (解体) → 四星确认')
-        self._ctrl.click(*CLICK_DESTROY_FOUR_STAR_CONFIRM)
+        self._ctrl.click_delay(*CLICK_DESTROY_FOUR_STAR_CONFIRM)
 
     def destroy_open_type_filter(self) -> None:
         """解体标签 → 打开舰船类型过滤器。"""
         _log.info('[UI] 建造页面 (解体) → 打开类型过滤')
-        self._ctrl.click(*CLICK_DESTROY_TYPE_FILTER)
+        self._ctrl.click_delay(*CLICK_DESTROY_TYPE_FILTER)
 
     def destroy_confirm_filter(self) -> None:
         """解体标签 → 确认舰船类型过滤。"""
         _log.info('[UI] 建造页面 (解体) → 确认过滤')
-        self._ctrl.click(*CLICK_DESTROY_CONFIRM_FILTER)
+        self._ctrl.click_delay(*CLICK_DESTROY_CONFIRM_FILTER)
 
     # ── 组合动作 — 建造收取 ──
 
@@ -369,7 +369,7 @@ class BuildPage:
             screen = self._ctrl.screenshot()
             detail = ImageChecker.find_any(screen, Templates.Confirm.all())
             if detail is not None:
-                self._ctrl.click(*detail.center)
+                self._ctrl.click_delay(*detail.center)
                 time.sleep(0.5)
 
     def collect_all(
@@ -403,12 +403,12 @@ class BuildPage:
                 detail = ImageChecker.find_template(screen, fast_tmpl)
                 if detail is None:
                     break
-                self._ctrl.click(*detail.center)
+                self._ctrl.click_delay(*detail.center)
                 time.sleep(0.3)
                 screen = self._ctrl.screenshot()
                 confirm = ImageChecker.find_any(screen, Templates.Confirm.all())
                 if confirm is not None:
-                    self._ctrl.click(*confirm.center)
+                    self._ctrl.click_delay(*confirm.center)
                     time.sleep(1.0)
 
         complete_tmpl = (
@@ -429,7 +429,7 @@ class BuildPage:
                 break
             if ImageChecker.template_exists(screen, full_depot_tmpl):
                 raise RuntimeError(f'{build_type} 仓库已满')
-            self._ctrl.click(*detail.center)
+            self._ctrl.click_delay(*detail.center)
             time.sleep(1.0)
             self.dismiss_build_result()
             collected += 1
@@ -453,7 +453,7 @@ class BuildPage:
         if detail is None:
             raise RuntimeError(f'{build_type} 建造队列已满')
 
-        self._ctrl.click(*detail.center)
+        self._ctrl.click_delay(*detail.center)
         time.sleep(1.0)
 
         resource_tmpl = Templates.Build.RESOURCE
@@ -466,7 +466,7 @@ class BuildPage:
         else:
             raise RuntimeError('资源选择页面未出现')
 
-        self._ctrl.click(*CLICK_CONFIRM_BUILD)
+        self._ctrl.click_delay(*CLICK_CONFIRM_BUILD)
         time.sleep(1.0)
         _log.info('[UI] 建造已启动 ({})', build_type)
 
@@ -498,7 +498,7 @@ class BuildPage:
             time.sleep(_step_delay)
             for ship_type in ship_types:
                 _log.debug('[UI] 解体 → 点击舰种: {}', ship_type.value)
-                self._ctrl.click(*ship_type.relative_position_in_destroy)
+                self._ctrl.click_delay(*ship_type.relative_position_in_destroy)
                 time.sleep(0.8)
             self.destroy_confirm_filter()
             time.sleep(_step_delay)

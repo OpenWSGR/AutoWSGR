@@ -171,22 +171,22 @@ class CanteenPage:
         if position not in CLICK_RECIPE:
             raise ValueError(f'菜谱编号必须为 1-3，收到: {position}')
         _log.info('[UI] 食堂 → 选择菜谱 {}', position)
-        self._ctrl.click(*CLICK_RECIPE[position])
+        self._ctrl.click_delay(*CLICK_RECIPE[position])
 
     def confirm_force_cook(self) -> None:
         """「效果正在生效」弹窗 → 点击继续做菜。"""
         _log.info('[UI] 食堂 → 确认继续做菜 (覆盖生效中的菜)')
-        self._ctrl.click(*CLICK_FORCE_COOK)
+        self._ctrl.click_delay(*CLICK_FORCE_COOK)
 
     def cancel_force_cook(self) -> None:
         """「效果正在生效」弹窗 → 取消做菜。"""
         _log.info('[UI] 食堂 → 取消做菜 (保留生效中的菜)')
-        self._ctrl.click(*CLICK_CANCEL_COOK)
+        self._ctrl.click_delay(*CLICK_CANCEL_COOK)
 
     def dismiss_popup(self) -> None:
         """关闭弹窗 (通用关闭按钮)。"""
         _log.info('[UI] 食堂 → 关闭弹窗')
-        self._ctrl.click(*CLICK_DISMISS_POPUP)
+        self._ctrl.click_delay(*CLICK_DISMISS_POPUP)
 
     def click_to_skip_animation(self) -> None:
         """点击屏幕任意位置跳过动画。
@@ -194,7 +194,7 @@ class CanteenPage:
         目前仅在做菜过程中使用，点击坐标为屏幕右下角。
         """
         _log.info('[UI] 食堂 → 点击跳过动画')
-        self._ctrl.click(0.9, 0.9)
+        self._ctrl.click_delay(0.9, 0.9)
 
     # ── 组合动作 — 做菜 ──
 
@@ -225,7 +225,7 @@ class CanteenPage:
             screen = self._ctrl.screenshot()
             detail = ImageChecker.find_template(screen, Templates.Cook.COOK_BUTTON)
             if detail is not None:
-                self._ctrl.click(*detail.center)
+                self._ctrl.click_delay(*detail.center)
                 break
             time.sleep(0.3)
         else:

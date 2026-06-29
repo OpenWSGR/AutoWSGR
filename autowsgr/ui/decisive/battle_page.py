@@ -217,7 +217,7 @@ class DecisiveBattlePage:
     def click_enter_map(self) -> None:
         """从决战总览页进入当前章节的决战地图页。"""
         _log.info('[决战] 决战总览 → 进入地图')
-        self._ctrl.click(*CLICK_ENTER_MAP)
+        self._ctrl.click_delay(*CLICK_ENTER_MAP)
 
     # ── 章节 OCR ──────────────────────────────────────────────────────────
 
@@ -253,13 +253,13 @@ class DecisiveBattlePage:
     def go_prev_chapter(self) -> None:
         """点击 ◁ 切换到前一章节。"""
         _log.info('[决战] 决战页面 → 前一章节 ◁')
-        self._ctrl.click(*CLICK_PREV_CHAPTER)
+        self._ctrl.click_delay(*CLICK_PREV_CHAPTER)
         time.sleep(_CHAPTER_SWITCH_DELAY)
 
     def go_next_chapter(self) -> None:
         """点击 ▷ 切换到后一章节。"""
         _log.info('[决战] 决战页面 → 后一章节 ▷')
-        self._ctrl.click(*CLICK_NEXT_CHAPTER)
+        self._ctrl.click_delay(*CLICK_NEXT_CHAPTER)
         time.sleep(_CHAPTER_SWITCH_DELAY)
 
     def navigate_to_chapter(self, target: int) -> None:
@@ -337,15 +337,15 @@ class DecisiveBattlePage:
             raise ValueError(f'资源类型必须为 oil/ammo/steel/aluminum，收到: {use}')
 
         _log.info('[决战] 决战页面 → 购买磁盘 (资源: {}, 次数: {})', use, times)
-        self._ctrl.click(*CLICK_BUY_TICKET_OPEN)
+        self._ctrl.click_delay(*CLICK_BUY_TICKET_OPEN)
         time.sleep(1.5)
 
         resource_pos = CLICK_BUY_RESOURCE[use]
         for _ in range(times):
-            self._ctrl.click(*resource_pos)
+            self._ctrl.click_delay(*resource_pos)
             time.sleep(1.0)
 
-        self._ctrl.click(*CLICK_BUY_CONFIRM)
+        self._ctrl.click_delay(*CLICK_BUY_CONFIRM)
         time.sleep(1.0)
         _log.info('[决战] 决战磁盘购买完成')
 
@@ -422,7 +422,7 @@ class DecisiveBattlePage:
             船坞已满处理由调用方负责。
         """
         _log.info('[决战] 决战页面 → 重置关卡')
-        self._ctrl.click(*CLICK_RESET_CHAPTER)
+        self._ctrl.click_delay(*CLICK_RESET_CHAPTER)
         time.sleep(1.0)
         screen = self._ctrl.screenshot()
         if ImageChecker.template_exists(

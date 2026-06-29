@@ -112,7 +112,7 @@ class ExpeditionPanelMixin(BaseMapPage):
             )
 
             # 1. 点击就绪槽位
-            self._ctrl.click(*slot_pos)
+            self._ctrl.click_delay(*slot_pos)
             time.sleep(1.0)
 
             # 2. 等待远征结果画面

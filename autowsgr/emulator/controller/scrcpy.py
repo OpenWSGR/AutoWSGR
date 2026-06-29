@@ -16,12 +16,14 @@ ADB 命令实现触控/按键等操作。
 
 from __future__ import annotations
 
+import random
 import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
+from autowsgr.infra.config import OPERATION_DELAY_MIN, OPERATION_DELAY_MAX
 from autowsgr.infra.logger import caller_info, get_logger
 
 from ..detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
@@ -428,6 +430,29 @@ class ScrcpyController(AndroidController):
         )
         dev.shell(f'input tap {px} {py}')
 
+    # 引入一个新的 click 方法，解决的主要问题：低帧率机器下因为操作导致的画面变慢从而无法操作成功的问题
+    # 全局变量在 config 文件里使用 参数：OPERATION_DELAY 控制
+    def click_delay(self, x: float, y: float) -> None:
+        """点击（带操作延迟）。"""
+        dev = self._require_device()
+        w, h = self._resolution
+        px, py = int(x * w), int(y * h)
+        _log.debug(
+            '[Emulator] click_delay({:.3f}, {:.3f}) → pixel({}, {})  res={}x{}  {}',
+            x,
+            y,
+            px,
+            py,
+            w,
+            h,
+            caller_info(),
+        )
+        dev.shell(f'input tap {px} {py}')
+        time.sleep(random.uniform(
+            min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX)
+        ))
+
     def swipe(
         self,
         x1: float,
@@ -456,20 +481,37 @@ class ScrcpyController(AndroidController):
         )
         dev.shell(f'input swipe {px1} {py1} {px2} {py2} {ms}')
 
+        # 增加延迟，改动同 click_delay
+        time.sleep(random.uniform(
+            min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX)
+        ))
+
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
         self.swipe(x, y, x, y, duration=duration)
 
     # ── 按键 ──
-
     def key_event(self, key_code: int) -> None:
         dev = self._require_device()
         _log.debug('[Emulator] key_event({})  {}', key_code, caller_info())
         dev.keyevent(key_code)
 
+        # 增加延迟，改动同 click_delay
+        time.sleep(random.uniform(
+            min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX)
+        ))
+
     def text(self, content: str) -> None:
         dev = self._require_device()
         _log.debug("[Emulator] text('{}')  {}", content, caller_info())
         dev.send_keys(content)
+
+        # 增加延迟，改动同 click_delay
+        time.sleep(random.uniform(
+            min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX)
+        ))
 
     # ── 应用管理 ──
 
@@ -478,10 +520,22 @@ class ScrcpyController(AndroidController):
         _log.info('[Emulator] 启动应用: {}  {}', package, caller_info())
         dev.app_start(package)
 
+        # 增加延迟，改动同 click_delay
+        time.sleep(random.uniform(
+            min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX)
+        ))
+
     def stop_app(self, package: str) -> None:
         dev = self._require_device()
         _log.info('[Emulator] 停止应用: {}  {}', package, caller_info())
         dev.app_stop(package)
+
+        # 增加延迟，改动同 click_delay
+        time.sleep(random.uniform(
+            min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+            max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX)
+        ))
 
     def is_app_running(self, package: str) -> bool:
         try:

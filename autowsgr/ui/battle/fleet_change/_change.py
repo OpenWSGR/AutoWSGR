@@ -35,6 +35,9 @@ _MAX_SET_RETRIES: int = 2
 # 等待选船页面出现的超时 (秒)
 _CHOOSE_PAGE_TIMEOUT: float = 5.0
 
+# 清空编队的最大尝试次数 (防止无限循环)
+_MAX_CLEAR_ATTEMPTS: int = 12
+
 # 舰名尾部别名后缀，如“(苍青幻影)”
 _SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
@@ -135,153 +138,61 @@ class FleetChangeMixin(FleetDetectMixin):
         selectors += [None] * (6 - len(selectors))
         _log.info('[准备页] 目标编成: {}', names)
 
-        for attempt in range(_MAX_SET_RETRIES + 1):
-            # ── 1. 扫描当前舰队 ──────────────────────────────────────
+        # ── 1. # ── 解析目标 ─────────────────────────────────────────────
+        target_count = sum(1 for n in names if n is not None)
+        _log.info('[准备页] 目标编成: {} (需 {} 艘船)', names, target_count)
+
+        # ── 循环扫描→修复→重扫 ───────────────────────────
+        max_rounds = target_count * 3
+        for _round in range(max_rounds):
             current = self.detect_fleet()
 
-            # 对规则槽位，优先复用当前舰队中已存在的候选舰船。
-            reused: set[str] = set()
-            for i in range(6):
-                selector = selectors[i]
-                if selector is None:
-                    continue
-                candidates = selector.get('candidates')
-                if not isinstance(candidates, list):
-                    continue
-                chosen = next(
-                    (
-                        candidate
-                        for candidate in candidates
-                        if isinstance(candidate, str)
-                        and candidate in current
-                        and candidate not in reused
-                    ),
-                    None,
-                )
-                if chosen is not None:
-                    names[i] = chosen
-                    reused.add(chosen)
+            # 扫描所有槽位，收集错误
+            errors: list[tuple[str, int]] = []
+            used: set[str] = set()
+            for i in range(target_count):
+                ship = current[i]
+                if ship is not None and self._ship_matches_slot(ship, names[i], selectors[i]) and ship not in used:
+                    used.add(ship)
+                else:
+                    errors.append(("wrong", i))
+            for i in range(target_count, 6):
+                if current[i] is not None:
+                    errors.append(("extra", i))
 
-            # ── 前置短路: 已满足则无需任何操作 ────────────────────────
-            if self._can_short_circuit(current, names, selectors):
-                _log.info('[准备页] 舰队已满足目标, 跳过换船')
-                return True
-
-            # ── 2. 成员对齐: 确保目标船都在队中 ──────────────────────
-            # 先做“一对一”成员匹配：每个目标槽位最多占用一艘当前舰船，
-            # 避免宽候选槽位(如潜艇池)把整队都视为已匹配。
-            ok, matched_slots = self._match_existing_members(current, names, selectors)
-
-            for i, name in enumerate(names):
-                if name is None:
-                    continue
-                if i in matched_slots:
-                    continue
-                slot = next((i for i in range(6) if not ok[i]), None)
-                if slot is None:
-                    _log.warning("[准备页] 无可用槽位放 '{}', 跳过", name)
-                    continue
-                selected_name, selected_selector = self._select_available_candidate(
-                    current,
-                    name,
-                    selectors[i],
-                    desired=names,
-                    slot_to_replace=slot,
-                )
-                if selected_name is None:
-                    _log.warning('[准备页] 槽位 {} 的候选均已在编队中, 跳过补员', i)
-                    continue
-                occupied = current[slot] is not None
-                _log.info(
-                    "[准备页] 成员对齐: 槽位 {} <- '{}' (原: '{}')",
-                    slot,
-                    selected_name,
-                    current[slot],
-                )
-                selected = self._change_single_ship(
-                    slot,
-                    selected_name,
-                    selector=selected_selector,
-                    slot_occupied=occupied,
-                )
-                current[slot] = selected if selected is not None else selected_name
-                names[i] = current[slot]
-                ok[slot] = True
-                matched_slots.add(i)
-                time.sleep(0.3)
-
-            # 从后往前移除剩余不需要的舰船
-            for i in range(5, -1, -1):
-                if not ok[i] and current[i] is not None:
-                    _log.info("[准备页] 移除槽位 {} 的 '{}'", i, current[i])
-                    self._change_single_ship(i, None, slot_occupied=True)
-                    current[i] = None
-                    time.sleep(0.3)
-
-            # 宽候选规则下，移除后可能出现“目标需要 6 船但当前仅 5 船”的情况。
-            # 这里按目标槽位进行补位，确保不会因成员压缩导致缺员。
-            current = self.detect_fleet()
-            target_count = sum(1 for v in names if v is not None)
-            current_count = sum(1 for v in current if v is not None)
-            if current_count < target_count:
-                for i, name in enumerate(names):
-                    if name is None:
-                        continue
-                    if current[i] is not None:
-                        continue
-                    selected_name, selected_selector = self._select_available_candidate(
-                        current,
-                        name,
-                        selectors[i],
-                        desired=names,
-                    )
-                    if selected_name is None:
-                        _log.warning('[准备页] 槽位 {} 的候选均已在编队中, 无法补位', i)
-                        continue
-                    _log.info(
-                        "[准备页] 成员补位: 槽位 {} <- '{}' (原: '{}')",
-                        i,
-                        selected_name,
-                        current[i],
-                    )
-                    selected = self._change_single_ship(
-                        i,
-                        selected_name,
-                        selector=selected_selector,
-                        slot_occupied=False,
-                    )
-                    current[i] = selected if selected is not None else selected_name
-                    names[i] = current[i]
-                    time.sleep(0.3)
-
-                    current_count = sum(1 for v in current if v is not None)
-                    if current_count >= target_count:
-                        break
-
-            # ── 3. 位置对齐: 滑动拖拽到正确槽位 ─────────────────────
-            current = self.detect_fleet()
-            self._reorder(current, names)
-
-            # ── 4. 验证结果 ──────────────────────────────────────────
-            current = self.detect_fleet()
-            if self._validate_with_selector(current, names, selectors):
+            if not errors:
                 _log.info('[准备页] 编成更换完成: {}', current)
                 return True
 
-            if attempt < _MAX_SET_RETRIES:
-                _log.warning(
-                    '[准备页] 第 {}/{} 次验证失败, 重试...',
-                    attempt + 1,
-                    _MAX_SET_RETRIES + 1,
-                )
-                time.sleep(0.5)
-            else:
-                _log.error(
-                    '[准备页] 舰队设置在 {} 次尝试后仍然失败, 当前: {}',
-                    _MAX_SET_RETRIES + 1,
-                    current,
-                )
+            kind, slot = errors[0]
+            _log.info('[准备页] 扫描发现 {} 个错误, 修复: {} 槽位 {}', len(errors), kind, slot)
 
+            if kind == 'extra':
+                self._change_single_ship(slot, None, slot_occupied=True)
+                continue
+
+            # wrong: 先尝试与后面槽位互换
+            tgt = names[slot]
+            sel = selectors[slot]
+            sw = None
+            for j in range(slot + 1, 6):
+                if current[j] is not None and self._ship_matches_slot(current[j], tgt, sel) and not any(current[j] == current[k] for k in range(slot)):
+                    sw = j; break
+
+            if sw is not None:
+                _log.info('[准备页] 互换: 槽位 {} ↔ {}', slot, sw)
+                self._ctrl.swipe(*CLICK_SHIP_SLOT[sw], *CLICK_SHIP_SLOT[slot], duration=0.5)
+            else:
+                # 踢掉已被前面槽位占用的候选，避免重复选同一艘
+                usable = list(sel.get('candidates', [tgt])) if sel else [tgt]
+                skip = set(current[k] for k in range(slot) if current[k] is not None)
+                pick = next((c for c in usable if c not in skip), tgt)
+                _log.info('[准备页] 更换: 槽位 {} → {} (跳过: {})', slot, pick, skip or '无')
+                pick_sel = dict(sel) if sel else {}
+                pick_sel['search_name'] = pick
+                self._change_single_ship(slot, pick, selector=pick_sel, slot_occupied=current[slot] is not None)
+
+        _log.error('[准备页] 舰队设置超过最大循环次数')
         return False
 
     @staticmethod
@@ -497,6 +408,17 @@ class FleetChangeMixin(FleetDetectMixin):
         return ok, matched_slots
 
     @classmethod
+    def _ship_matches_slot(cls, ship_name, target_name, selector):
+        if ship_name is None:
+            return False
+        if selector is None:
+            return ship_name == target_name
+        candidates = selector.get('candidates')
+        if isinstance(candidates, list):
+            return ship_name in candidates
+        return ship_name == target_name
+
+    @classmethod
     def _validate_with_selector(
         cls,
         current: list[str | None],
@@ -603,6 +525,73 @@ class FleetChangeMixin(FleetDetectMixin):
         ship = current.pop(src)
         current.insert(dst, ship)
         time.sleep(0.5)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 清空编队
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _clear_fleet(self) -> None:
+        """清空当前编队的所有舰船。
+
+        反复找第一个有船的槽位 → 移除。利用游戏中舰船左对齐 + 移除后
+        自动左移的特性，每次移除后下一艘船自动占据更小的槽位号，
+        直到全部清空。
+
+        注意：必须 OCR 确认槽位有船才点击，否则选船页面第一项是船名
+        而非「移除」，会导致错误选船。
+        """
+        from autowsgr.ui.choose_ship_page import (
+            ChooseShipPage,
+            CLICK_REMOVE_SHIP,
+        )
+        from autowsgr.ui.utils import wait_for_page
+
+        for _attempt in range(_MAX_CLEAR_ATTEMPTS):
+            current = self.detect_fleet()
+            if all(ship is None for ship in current):
+                _log.info('[准备页] 编队已清空')
+                return
+
+            # 找到第一个有船的槽位（游戏中舰船左对齐，通常就是 0）
+            target_slot = next(
+                (i for i in range(6) if current[i] is not None),
+                None,
+            )
+            if target_slot is None:
+                return  # 前置 all() 已判定非全空，这里不应触发
+
+            _log.info(
+                '[准备页] 清空编队: 当前 {} 艘, 移除槽位 {} 的 {}',
+                sum(1 for s in current if s is not None),
+                target_slot,
+                current[target_slot],
+            )
+
+            self.click_ship_slot(target_slot)
+            wait_for_page(
+                self._ctrl,
+                ChooseShipPage.is_current_page,
+                timeout=_CHOOSE_PAGE_TIMEOUT,
+                source='编队',
+                target='编队选船',
+            )
+            # 槽位有船 → 点击「移除」按钮
+            self._ctrl.click_delay(*CLICK_REMOVE_SHIP)
+            # 等待返回准备页
+            wait_for_page(
+                self._ctrl,
+                lambda screen: not ChooseShipPage.is_current_page(screen),
+                timeout=_CHOOSE_PAGE_TIMEOUT,
+                source='编队选船',
+                target='编队',
+            )
+
+        remaining = sum(1 for s in self.detect_fleet() if s is not None)
+        if remaining > 0:
+            _log.warning(
+                '[准备页] 清空编队未完全完成: 仍有 {} 艘船',
+                remaining,
+            )
 
     # ══════════════════════════════════════════════════════════════════════
     # 单船更换

@@ -143,14 +143,14 @@ class CampaignPanelMixin(BaseMapPage):
 
         # 2. 选择难度
         if self.recognize_difficulty() != difficulty:
-            self._ctrl.click(*CLICK_DIFFICULTY)
+            self._ctrl.click_delay(*CLICK_DIFFICULTY)
         while self.recognize_difficulty() != difficulty:
             _log.debug('[UI] 等待难度切换到 {}…', difficulty)
             time.sleep(0.25)
         time.sleep(0.75)
 
         # 3. 选择战役
-        self._ctrl.click(*CAMPAIGN_POSITIONS[map_index])
+        self._ctrl.click_delay(*CAMPAIGN_POSITIONS[map_index])
         time.sleep(0.5)
 
         # 等待到达出征准备

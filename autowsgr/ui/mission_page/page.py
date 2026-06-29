@@ -78,7 +78,7 @@ class MissionPage:
             目标面板。
         """
         _log.info('[UI] 任务页面: 切换到 {}', panel.value)
-        self._ctrl.click(*CLICK_PANEL[panel])
+        self._ctrl.click_delay(*CLICK_PANEL[panel])
         time.sleep(PANEL_SWITCH_DELAY)
 
     # ── 回退 ──────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ class MissionPage:
     def dismiss_reward_popup(self) -> None:
         """点击屏幕中央, 关闭领取奖励后的弹窗。"""
         _log.info('[UI] 任务页面 -> 关闭奖励弹窗')
-        self._ctrl.click(*CLICK_CONFIRM_CENTER)
+        self._ctrl.click_delay(*CLICK_CONFIRM_CENTER)
 
     def _try_confirm(self, *, timeout: float = 5.0) -> bool:
         """等待并点击确认弹窗。"""
@@ -116,7 +116,7 @@ class MissionPage:
             screen = self._ctrl.screenshot()
             detail = ImageChecker.find_any(screen, Templates.Confirm.all())
             if detail is not None:
-                self._ctrl.click(*detail.center)
+                self._ctrl.click_delay(*detail.center)
                 time.sleep(0.5)
                 return True
             time.sleep(0.3)
@@ -136,7 +136,7 @@ class MissionPage:
         screen = self._ctrl.screenshot()
         detail = ImageChecker.find_template(screen, Templates.GameUI.REWARD_COLLECT_ALL)
         if detail is not None:
-            self._ctrl.click(*detail.center)
+            self._ctrl.click_delay(*detail.center)
             time.sleep(0.5)
             self.dismiss_reward_popup()
             time.sleep(0.3)
@@ -147,7 +147,7 @@ class MissionPage:
         screen = self._ctrl.screenshot()
         detail = ImageChecker.find_template(screen, Templates.GameUI.REWARD_COLLECT)
         if detail is not None:
-            self._ctrl.click(*detail.center)
+            self._ctrl.click_delay(*detail.center)
             time.sleep(0.5)
             self._try_confirm(timeout=5.0)
             return True

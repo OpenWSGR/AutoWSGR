@@ -38,7 +38,7 @@ class RepairMixin(BaseBattlePreparation):
             if pos not in BLOOD_BAR_PROBE:
                 _log.warning('[UI] 无效修理位置: {}', pos)
                 continue
-            self._ctrl.click(*BLOOD_BAR_PROBE[pos])
+            self._ctrl.click_delay(*BLOOD_BAR_PROBE[pos])
             time.sleep(1.5)
             _log.info('[UI] 出征准备 → 修理位置 {}', pos)
 

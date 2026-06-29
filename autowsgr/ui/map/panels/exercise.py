@@ -217,7 +217,7 @@ class ExercisePanelMixin(BaseMapPage):
 
             slot = rival_index - 1  # 可见位置 0-3
             x, y = EXERCISE_CHALLENGE_PROBES[slot]
-            self._ctrl.click(x, y)
+            self._ctrl.click_delay(x, y)
         else:
             # 对手 5: 确保在底部
             screen = self._ctrl.screenshot()
@@ -225,7 +225,7 @@ class ExercisePanelMixin(BaseMapPage):
                 self._exercise_swipe_to_bottom()
 
             x, y = EXERCISE_CHALLENGE_PROBES[3]  # 第 4 个可见位置
-            self._ctrl.click(x, y)
+            self._ctrl.click_delay(x, y)
 
         time.sleep(0.5)
 
@@ -264,7 +264,7 @@ class ExercisePanelMixin(BaseMapPage):
         参考 legacy: ``timer.click(665, 400, delay=0.75)``。
         """
         _log.info('[UI] 演习 → 刷新对手阵容 (对手信息页)')
-        self._ctrl.click(*EXERCISE_CLICK_RIVAL_INFO)
+        self._ctrl.click_delay(*EXERCISE_CLICK_RIVAL_INFO)
         time.sleep(0.75)
 
     # ═══════════════════════════════════════════════════════════════════════

@@ -240,11 +240,11 @@ class SidebarPage:
                 time.sleep(config.retry_delay)
 
             # Step 1: 点击侧边栏菜单项
-            self._ctrl.click(*CLICK_NAV[target])
+            self._ctrl.click_delay(*CLICK_NAV[target])
             # Step 2: 等待二级弹出菜单出现
             time.sleep(SUBMENU_DELAY)
             # Step 3: 点击子选项
-            self._ctrl.click(*CLICK_SUBMENU[target])
+            self._ctrl.click_delay(*CLICK_SUBMENU[target])
 
             try:
                 wait_for_page(

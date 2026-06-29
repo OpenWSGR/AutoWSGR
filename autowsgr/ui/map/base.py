@@ -215,4 +215,4 @@ class BaseMapPage:
 
     def click_expedition_skip(self) -> None:
         """点击屏幕右侧 — 用于跳过远征动画。"""
-        self._ctrl.click(*CLICK_EXPEDITION_SKIP)
+        self._ctrl.click_delay(*CLICK_EXPEDITION_SKIP)

@@ -363,17 +363,17 @@ class DecisiveMapController:
 
     def buy_fleet_option(self, click_position: tuple[float, float]) -> None:
         """点击购买一个舰船/技能卡。"""
-        self._ctrl.click(*click_position)
+        self._ctrl.click_delay(*click_position)
         time.sleep(0.3)
 
     def refresh_fleet(self) -> None:
         """点击「刷新」按钮，刷新备选舰船。"""
-        self._ctrl.click(*CLICK_FLEET_REFRESH)
+        self._ctrl.click_delay(*CLICK_FLEET_REFRESH)
         time.sleep(1.5)
 
     def close_fleet_overlay(self) -> bool:
         """关闭战备舰队获取 overlay，并确认已离开该弹窗。"""
-        self._ctrl.click(*CLICK_FLEET_CLOSE)
+        self._ctrl.click_delay(*CLICK_FLEET_CLOSE)
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
@@ -415,10 +415,10 @@ class DecisiveMapController:
             confidence=0.8,
         )
         if match is not None:
-            self._ctrl.click(*match.center)
+            self._ctrl.click_delay(*match.center)
             time.sleep(0.5)
 
-        self._ctrl.click(*click_confirm_pos)
+        self._ctrl.click_delay(*click_confirm_pos)
         time.sleep(1.0)
 
     def use_skill(self) -> list[str]:
@@ -486,7 +486,7 @@ class DecisiveMapController:
                 all_ships.add(name)
 
         # 返回准备页
-        self._ctrl.click(0.05, 0.05)
+        self._ctrl.click_delay(0.05, 0.05)
         time.sleep(1.0)
 
         # 返回地图页
@@ -507,9 +507,9 @@ class DecisiveMapController:
     def select_advance_card(self, index: int) -> None:
         """选择前进点卡片并确认。"""
         if index < len(ADVANCE_CARD_POSITIONS):
-            self._ctrl.click(*ADVANCE_CARD_POSITIONS[index])
+            self._ctrl.click_delay(*ADVANCE_CARD_POSITIONS[index])
             time.sleep(0.5)
-        self._ctrl.click(*CLICK_ADVANCE_CONFIRM)
+        self._ctrl.click_delay(*CLICK_ADVANCE_CONFIRM)
         time.sleep(1.5)
 
     # ══════════════════════════════════════════════════════════════════════
@@ -548,7 +548,7 @@ class DecisiveMapController:
 
     def click_sortie(self) -> None:
         """点击右下角「出征」按钮。"""
-        self._ctrl.click(*CLICK_SORTIE)
+        self._ctrl.click_delay(*CLICK_SORTIE)
         time.sleep(2.0)
 
     def go_to_map_page(self) -> None:
@@ -556,7 +556,7 @@ class DecisiveMapController:
         screen = self._ctrl.screenshot()
         if is_decisive_map_page(screen):
             return
-        self._ctrl.click(0.03, 0.06)
+        self._ctrl.click_delay(0.03, 0.06)
         time.sleep(1.0)
         if not is_decisive_map_page(self._ctrl.screenshot()):
             _log.warning('[地图控制器] 无法确认已回到地图页')
@@ -564,18 +564,18 @@ class DecisiveMapController:
     def open_retreat_dialog(self) -> None:
         """点击左上角撤退按钮，打开确认退出 overlay。"""
         self.go_to_map_page()
-        self._ctrl.click(*CLICK_RETREAT_BUTTON)
+        self._ctrl.click_delay(*CLICK_RETREAT_BUTTON)
         time.sleep(1.0)
         self.wait_for_overlay(DecisiveOverlay.CONFIRM_EXIT, timeout=5.0)
 
     def confirm_retreat(self) -> None:
         """在确认退出 overlay 中点击「撤退」。"""
-        self._ctrl.click(*CLICK_RETREAT_CONFIRM)
+        self._ctrl.click_delay(*CLICK_RETREAT_CONFIRM)
         time.sleep(2.0)
 
     def confirm_leave(self) -> None:
         """在确认退出 overlay 中点击「暂离」。"""
-        self._ctrl.click(*CLICK_LEAVE)
+        self._ctrl.click_delay(*CLICK_LEAVE)
         time.sleep(2.0)
 
     def confirm_stage_clear(self) -> list[str]:  # noqa: PLR0912
@@ -623,7 +623,7 @@ class DecisiveMapController:
             ship_drop = recognize_ship_drop(screen, ocr=self._ocr)
             _log.info(f'[地图控制器] 检测到掉落: {ship_drop.ship_name}({ship_drop.ship_type})')
             collected.append(ship_drop.ship_name)
-            self._ctrl.click(0.953, 0.954)
+            self._ctrl.click_delay(0.953, 0.954)
             time.sleep(0.5)
             confirm_operation(self._ctrl, timeout=1.0)
 
@@ -639,7 +639,7 @@ class DecisiveMapController:
             reward_detail = ImageChecker.find_any(screen, ship_templates, confidence=0.8)
             if reward_detail is not None:
                 _log.info("[地图控制器] 结算阶段仍有奖励弹窗: '{}'", reward_detail.template_name)
-                self._ctrl.click(*reward_ack_pos)
+                self._ctrl.click_delay(*reward_ack_pos)
                 time.sleep(0.35)
                 confirm_operation(self._ctrl, timeout=0.8)
                 confirm_operation(self._ctrl, timeout=0.8)
@@ -659,7 +659,7 @@ class DecisiveMapController:
                 _log.info('[地图控制器] 通过返回按钮回到决战入口页')
                 break
             _log.debug('[地图控制器] 尝试点击返回按钮回到决战入口页')
-            self._ctrl.click(0.03, 0.06)
+            self._ctrl.click_delay(0.03, 0.06)
             time.sleep(1.0)
         else:
             _log.warning('[地图控制器] 多次尝试后仍未能回到决战入口页')
@@ -676,7 +676,7 @@ class DecisiveMapController:
         """进入出征准备页 → 执行快速修理 → 返回地图页。"""
         _log.info('[地图控制器] 节点间修理 (等级: {})', repair_level)
 
-        self._ctrl.click(*CLICK_SORTIE)
+        self._ctrl.click_delay(*CLICK_SORTIE)
         time.sleep(2.0)
 
         page = BattlePreparationPage(self._ctx)
