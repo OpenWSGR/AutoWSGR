@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
-from autowsgr.infra.config import OPERATION_DELAY_MIN, OPERATION_DELAY_MAX
+from autowsgr.infra.config import OPERATION_DELAY_MAX, OPERATION_DELAY_MIN
 from autowsgr.infra.logger import caller_info, get_logger
 
 from ..detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
@@ -430,10 +430,12 @@ class ScrcpyController(AndroidController):
         )
         dev.shell(f'input tap {px} {py}')
         if delay:  # True 才走延迟
-            time.sleep(random.uniform(
-                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-            ))
+            time.sleep(
+                random.uniform(
+                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                )
+            )
 
     def swipe(
         self,
@@ -443,7 +445,7 @@ class ScrcpyController(AndroidController):
         y2: float,
         duration: float = 0.5,
         *,
-        delay: bool = True
+        delay: bool = True,
     ) -> None:
         dev = self._require_device()
         w, h = self._resolution
@@ -467,10 +469,12 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(random.uniform(
-                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-            ))
+            time.sleep(
+                random.uniform(
+                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                )
+            )
 
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
         self.swipe(x, y, x, y, duration=duration)
@@ -483,10 +487,12 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(random.uniform(
-                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-            ))
+            time.sleep(
+                random.uniform(
+                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                )
+            )
 
     def text(self, content: str, *, delay: bool = True) -> None:
         dev = self._require_device()
@@ -495,10 +501,12 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(random.uniform(
-                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-            ))
+            time.sleep(
+                random.uniform(
+                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                )
+            )
 
     # ── 应用管理 ──
 
@@ -509,10 +517,12 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(random.uniform(
-                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-            ))
+            time.sleep(
+                random.uniform(
+                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                )
+            )
 
     def stop_app(self, package: str, *, delay: bool = True) -> None:
         dev = self._require_device()
@@ -521,10 +531,12 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(random.uniform(
-                min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-            ))
+            time.sleep(
+                random.uniform(
+                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+                )
+            )
 
     def is_app_running(self, package: str) -> bool:
         try:
