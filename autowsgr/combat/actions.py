@@ -190,7 +190,7 @@ def click_speed_up(device: AndroidController, *, battle_mode: bool = False) -> N
     coords = Coords.SPEED_UP_BATTLE if battle_mode else Coords.SPEED_UP_NORMAL
 
     # 由于这个点击之后，马上就会进行画面识别，为了保证画面被正确识别，这里不加延迟
-    device.click(*coords,delay=False)
+    device.click(*coords, delay=False)
 
 
 def click_skip_missile_animation(device: AndroidController) -> None:
