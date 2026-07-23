@@ -128,7 +128,7 @@ decisive_battle:
     - U-1405
     - M-296
     - 伊-25
-    - 351
+    - "351"
   flagship_priority:               # 旗舰优先级队列
     - U-1405
     - U-47
