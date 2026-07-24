@@ -416,7 +416,7 @@ class PhaseHandlersMixin:
 
     def _handle_get_ship(self) -> ConditionFlag:
         """处理获取舰船。"""
-        ship_name = get_ship_drop(self._device)
+        ship_name = get_ship_drop(self._device, self._ocr)
         if ship_name:
             _log.info('[Combat] 获得舰船: {}', ship_name)
 

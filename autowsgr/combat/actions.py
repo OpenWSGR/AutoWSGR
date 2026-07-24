@@ -304,7 +304,7 @@ def click_image(device: AndroidController, template_key: TemplateKey, timeout: f
     return False
 
 
-def get_ship_drop(device: AndroidController) -> str | None:
+def get_ship_drop(device: AndroidController, ocr: OCREngine) -> str | None:
     """获取掉落舰船名称。
 
     Parameters
@@ -317,10 +317,8 @@ def get_ship_drop(device: AndroidController) -> str | None:
     str | None
         掉落的舰船名称，或 ``None`` 如果未获取到。
     """
-    from autowsgr.vision import EasyOCREngine
 
     screen = device.screenshot()
-    ocr = EasyOCREngine.create(gpu=False)
     result = recognize_ship_drop(screen, ocr)
     if result.ship_name:
         _log.info('[Combat] 掉落识别: {} ({})', result.ship_name, result.ship_type or '未知')

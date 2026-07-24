@@ -30,7 +30,7 @@ from autowsgr.vision import PixelChecker
 if TYPE_CHECKING:
     import numpy as np
 
-    from autowsgr.vision import EasyOCREngine
+    from autowsgr.vision import OCREngine
 
 
 _log = get_logger('ui')
@@ -103,7 +103,7 @@ def _parse_numerator(text: str, max_val: int) -> int:
     return None
 
 
-def recognize_loot_count(screen: np.ndarray, ocr: EasyOCREngine) -> int | None:
+def recognize_loot_count(screen: np.ndarray, ocr: OCREngine) -> int | None:
     """识别出征面板战利品 (胖次) 已获取数量。
 
     OCR ``X/50`` 区域并提取 ``/`` 前的数字, 上限固定为 50。
@@ -123,7 +123,7 @@ def recognize_loot_count(screen: np.ndarray, ocr: EasyOCREngine) -> int | None:
     return count
 
 
-def recognize_ship_count(screen: np.ndarray, ocr: EasyOCREngine) -> int | None:
+def recognize_ship_count(screen: np.ndarray, ocr: OCREngine) -> int | None:
     """识别出征面板舰船已获取数量。
 
     OCR ``X/500`` 区域并提取 ``/`` 前的数字, 上限固定为 500。
