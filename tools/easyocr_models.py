@@ -36,7 +36,7 @@ MIRROR_OPTIONS: dict[str, dict[str, Any]] = {
     },
     '1': {
         'name': 'EdgeOne',
-        'base_url': 'http://easyocr.v.ekuai.tech/',
+        'base_url': 'https://easyocr.v.ekuai.tech/',
         'type': 'direct',
     },
     '2': {
@@ -273,6 +273,19 @@ def download_models(
     print_step('4. 下载模型文件')
     for fname in MODEL_FILES:
         print(f'\n--- 处理: {fname} ---')
+        dst = os.path.join(model_dir, fname)
+
+        # 检查目标目录是否已存在模型文件
+        if os.path.exists(dst):
+            print(f'目标目录已存在: {dst}')
+            print(f'校验已有文件 {fname} ...')
+            real_md5 = md5(dst)
+            if real_md5 == EXPECTED_MD5[fname]:
+                print(f'已有文件校验通过 ({real_md5})，跳过下载。')
+                continue
+            else:
+                print(f'已有文件 MD5 不匹配 (期望: {EXPECTED_MD5[fname]} 实际: {real_md5})，将重新下载。')
+
         tmp = os.path.join(os.getcwd(), fname)
         _download_one(fname, choice, mirror, tmp)
         _verify_md5(fname, tmp)
