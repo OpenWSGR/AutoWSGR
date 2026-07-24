@@ -153,10 +153,11 @@ class ScrcpyController(AndroidController):
             self._serial or 'auto',
             *self._resolution,
         )
-        # 在首次交互前切换到 Yosemite IME，确保游戏打开键盘时
-        # InputConnection 直接绑定到 Yosemite（与 airtest 一致）
+        # 输入法管理：根据配置决定使用 Yosemite 或非 Yosemite 输入法
         if self._config is not None and self._config.ime and self._config.ime.lower() == 'yosemite':
             self._ensure_yosemite_ime_ready()
+        else:
+            self._ensure_non_yosemite_ime()
         return DeviceInfo(
             serial=self._serial or 'auto',
             resolution=self._resolution,
@@ -538,7 +539,7 @@ class ScrcpyController(AndroidController):
             if not _yosemite_apk.exists():
                 raise EmulatorConnectionError(
                     f'Yosemite.apk 未找到: {_yosemite_apk}\n'
-                    '请确保 airtest 包安装正确：pip install airtest'
+                    '请确保 airtest 包安装正确: pip install airtest-openwsgr'
                 )
             _log.info('[Emulator] 安装 Yosemite IME（来自 airtest 包）...')
             dev.push(str(_yosemite_apk), _YOSEMITE_DEVICE_PATH)
@@ -563,6 +564,34 @@ class ScrcpyController(AndroidController):
         dev = self._require_device()
         dev.shell(f'ime set {prev}')
         _log.debug('[Emulator] IME 已恢复为 {}', prev)
+
+    def _ensure_non_yosemite_ime(self) -> None:
+        """确保当前输入法不是 Yosemite。
+
+        检测已启用的输入法列表，若当前为 Yosemite 则切换到第一个非 Yosemite 的输入法。
+        切换后不会恢复，因为用户明确选择不使用 Yosemite。
+        """
+        dev = self._require_device()
+        current_ime = dev.shell('settings get secure default_input_method').strip()
+
+        # 当前输入法已经不是 Yosemite，无需切换
+        if _YOSEMITE_IME not in current_ime:
+            _log.debug('[Emulator] 当前输入法非 Yosemite: {}', current_ime)
+            return
+
+        # 获取已启用的输入法列表，选择第一个非 Yosemite 的
+        ime_list = dev.shell('ime list -s').strip().splitlines()
+        target_ime = next(
+            (ime.strip() for ime in ime_list if ime.strip() and _YOSEMITE_IME not in ime),
+            None,
+        )
+
+        if target_ime is None:
+            _log.warning('[Emulator] 未找到可用的非 Yosemite 输入法，跳过切换')
+            return
+
+        dev.shell(f'ime set {target_ime}')
+        _log.info('[Emulator] 已从 Yosemite 切换到 {}', target_ime)
 
     def text(self, content: str, *, delay: bool = True) -> None:
         """向设备输入文本。
