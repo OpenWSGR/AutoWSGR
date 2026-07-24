@@ -284,7 +284,9 @@ def download_models(
                 print(f'已有文件校验通过 ({real_md5})，跳过下载。')
                 continue
             else:
-                print(f'已有文件 MD5 不匹配 (期望: {EXPECTED_MD5[fname]} 实际: {real_md5})，将重新下载。')
+                print(
+                    f'已有文件 MD5 不匹配 (期望: {EXPECTED_MD5[fname]} 实际: {real_md5})，将重新下载。'
+                )
 
         tmp = os.path.join(os.getcwd(), fname)
         _download_one(fname, choice, mirror, tmp)
