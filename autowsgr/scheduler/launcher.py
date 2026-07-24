@@ -137,7 +137,7 @@ class Launcher:
         cfg = self.config
         _log.info('[Launcher] 创建 OCR 引擎 (backend={})', cfg.ocr.backend.value)
         # 目前仅支持 EasyOCR，后续可按 cfg.ocr.backend 分发
-        self._ocr = EasyOCREngine.create(gpu=cfg.ocr.gpu)
+        self._ocr = EasyOCREngine.create(gpu=cfg.ocr.gpu, mirror=cfg.ocr.mirror)
         return self._ocr
 
     # ── 构造 GameContext ──

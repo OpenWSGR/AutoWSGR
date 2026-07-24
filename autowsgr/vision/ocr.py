@@ -6,7 +6,7 @@
 
     from autowsgr.vision import OCREngine
 
-    engine = OCREngine.create("easyocr", gpu=False)
+    engine = OCREngine.create("easyocr", gpu=False, mirror="tencent")
     results = engine.recognize(cropped_image)
     number = engine.recognize_number(resource_area)
 """
@@ -379,7 +379,9 @@ class OCREngine(ABC):
     """已创建的引擎单例缓存，key 为 ``"<engine>:<gpu>"``。"""
 
     @classmethod
-    def create(cls, engine: str = 'easyocr', gpu: bool = False) -> OCREngine:
+    def create(
+        cls, engine: str = 'easyocr', gpu: bool = False, mirror: str = 'tencent'
+    ) -> OCREngine:
         """创建或获取 OCR 引擎实例（单例）。
 
         首次调用时创建引擎实例并缓存，后续相同参数的调用直接返回缓存实例。
@@ -390,6 +392,8 @@ class OCREngine(ABC):
             引擎名称: ``"easyocr"`` 或 ``"paddleocr"``。
         gpu:
             是否使用 GPU 加速。
+        mirror:
+            模型下载镜像源: ``"origin"`` / ``"github"`` / ``"tencent"`` / ``"modelscope"``。
 
         Returns
         -------
@@ -401,8 +405,8 @@ class OCREngine(ABC):
             return cls._instances[cache_key]
 
         if engine == 'easyocr':
-            _log.info('[OCR] 初始化 EasyOCR（gpu={}）', gpu)
-            instance = EasyOCREngine(gpu=gpu)
+            _log.info('[OCR] 初始化 EasyOCR（gpu={}, mirror={}）', gpu, mirror)
+            instance = EasyOCREngine(gpu=gpu, mirror=mirror)
             cls._instances[cache_key] = instance
             return instance
         raise ValueError(f'不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr')
@@ -414,7 +418,10 @@ class OCREngine(ABC):
 class EasyOCREngine(OCREngine):
     """基于 EasyOCR 的识别引擎。"""
 
-    def __init__(self, gpu: bool = False) -> None:
+    def __init__(self, gpu: bool = False, mirror: str = 'tencent') -> None:
+        from autowsgr.vision.easyocr_models_checker import ensure_models
+
+        ensure_models(mirror)
         self._reader = easyocr.Reader(['ch_sim', 'en'], gpu=gpu)
 
     def recognize(

@@ -184,6 +184,19 @@ class OcrBackend(StrEnum):
     paddleocr = 'paddleocr'
 
 
+class OcrMirror(StrEnum):
+    """EasyOCR 模型下载镜像源。"""
+
+    origin = 'origin'
+    """EasyOCR 原生下载"""
+    github = 'github'
+    """GitHub releases"""
+    tencent = 'tencent'
+    """EdgeOne CDN (腾讯云)"""
+    modelscope = 'modelscope'
+    """ModelScope 镜像"""
+
+
 # ── 游戏概念 ──
 
 

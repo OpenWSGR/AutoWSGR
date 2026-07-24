@@ -19,6 +19,7 @@ from autowsgr.types import (
     GameAPP,
     MapEntrance,
     OcrBackend,
+    OcrMirror,
     OSType,
     RepairMode,
     ShipType,
@@ -80,6 +81,8 @@ class OCRConfig(BaseModel):
     """OCR 后端"""
     gpu: bool = False
     """是否使用 GPU 加速"""
+    mirror: OcrMirror = OcrMirror.tencent
+    """EasyOCR 模型下载镜像源"""
 
 
 class LogConfig(BaseModel):
