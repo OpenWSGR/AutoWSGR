@@ -470,12 +470,18 @@ class ScrcpyController(AndroidController):
                 self._ensure_stream_alive()
                 sock = self._require_control_socket()
                 sock.sendall(data)
+            time.sleep(0.05)  # 避免连续发送过快导致游戏处理不及
 
     @staticmethod
     def _float_to_u16fp(value: float) -> int:
         """将 [0.0, 1.0] 压力值编码为 scrcpy u16 定点数。"""
         clamped = max(0.0, min(1.0, value))
         return round(clamped * 0xFFFF)
+
+    def _to_absolute(self, x: float, y: float) -> tuple[int, int]:
+        """将相对坐标 [0.0, 1.0] 转换为设备像素坐标。"""
+        w, h = self._resolution
+        return int(x * w), int(y * h)
 
     def _inject_touch(
         self,
@@ -491,7 +497,7 @@ class ScrcpyController(AndroidController):
               | width(2) | height(2) | pressure(2) | action_button(4) | buttons(4)
         """
         w, h = self._resolution
-        px, py = int(x * w), int(y * h)
+        px, py = self._to_absolute(x, y)
         u16_pressure = self._float_to_u16fp(pressure)
         data = struct.pack(
             '>BBqIIHHHII',
@@ -595,7 +601,7 @@ class ScrcpyController(AndroidController):
     # 引入一个开关，当参数为：click(x, y, delay=False) 时关闭延迟，该方法默认打开全局延迟，全局延迟可以在 config.py 内设置
     def click(self, x: float, y: float, *, delay: bool = True) -> None:
         w, h = self._resolution
-        px, py = int(x * w), int(y * h)
+        px, py = self._to_absolute(x, y)
         _log.debug(
             '[Emulator] click({:.3f}, {:.3f}) → pixel({}, {})  res={}x{}  {}',
             x,
@@ -627,9 +633,8 @@ class ScrcpyController(AndroidController):
         *,
         delay: bool = True,
     ) -> None:
-        w, h = self._resolution
-        px1, py1 = int(x1 * w), int(y1 * h)
-        px2, py2 = int(x2 * w), int(y2 * h)
+        px1, py1 = self._to_absolute(x1, y1)
+        px2, py2 = self._to_absolute(x2, y2)
         ms = int(duration * 1000)
         _log.debug(
             '[Emulator] swipe({:.3f},{:.3f}→{:.3f},{:.3f}) → pixel({},{}→{},{}) {}ms  {}',
@@ -668,8 +673,7 @@ class ScrcpyController(AndroidController):
             )
 
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
-        w, h = self._resolution
-        px, py = int(x * w), int(y * h)
+        px, py = self._to_absolute(x, y)
         ms = int(duration * 1000)
         _log.debug(
             '[Emulator] long_tap({:.3f}, {:.3f}) → pixel({},{}) {}ms  {}',
