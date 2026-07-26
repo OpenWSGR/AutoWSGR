@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import random
 from pathlib import Path
 from typing import Any, Literal
 
@@ -36,6 +37,21 @@ _log = get_logger('infra')
 OPERATION_DELAY_MIN: float = 0.0
 OPERATION_DELAY_MAX: float = 0.0
 
+
+def operation_delay() -> float:
+    """本次 UI 操作后的随机延迟秒数。
+
+    受 :data:`OPERATION_DELAY_MIN` / :data:`OPERATION_DELAY_MAX` 控制。
+    兼容层把 classic 的 ``delay`` 单值映射为 ``MIN = MAX = delay``;
+    本函数读取模块全局, 故运行期修改 :data:`OPERATION_DELAY_MIN/MAX` 即时生效
+    (``scrcpy.py`` 通过调用本函数而非 ``from import`` 绑定值)。
+    """
+    return random.uniform(
+        min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+        max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
+    )
+
+
 # ── 子配置模型 ──
 
 
@@ -60,11 +76,7 @@ class AccountConfig(BaseModel):
     model_config = {'frozen': True}
 
     game_app: GameAPP = GameAPP.official
-    """游戏渠道"""
-    account: str | None = None
-    """游戏账号"""
-    password: str | None = None
-    """游戏密码"""
+    """游戏渠道(决定 Android 包名)"""
 
     @property
     def package_name(self) -> str:
@@ -97,15 +109,10 @@ class LogConfig(BaseModel):
     dir: Path | None = None
     """日志保存路径。自动按日期生成"""
 
-    # 细粒度显示开关
-    show_map_node: bool = False
-    show_android_input: bool = True
-    show_enemy_rules: bool = True
-    show_fight_stage: bool = True
-    show_chapter_info: bool = True
-    show_match_fight_stage: bool = True
+    # 细粒度显示开关 (仅保留有效开关; classic 遗留的 show_map_node /
+    # show_android_input / show_enemy_rules / show_fight_stage /
+    # show_chapter_info / show_match_fight_stage / show_ocr_info 已移除)
     show_decisive_battle_info: bool = True
-    show_ocr_info: bool = True
     show_emulator_debug: bool = True
     """是否输出 emulator 通道的 DEBUG 日志（click/swipe 等操作）。"""
     show_ui_debug: bool = True
@@ -165,6 +172,24 @@ class LogConfig(BaseModel):
         return merged
 
 
+class NormalFightTaskConfig(BaseModel):
+    """单个常规战任务配置。
+
+    兼容 classic 的 ``[plan_name, fleet_id, target_times]`` 列表写法
+    (经 :func:`_parse_normal_fight_tasks` 解析), 也支持纯字符串 (仅 plan 名)
+    或完整字典。
+    """
+
+    model_config = {'frozen': True}
+
+    name: str
+    """常规战计划名 (如 ``8-5AI-only1DD``), 解析为 ``autowsgr/data/plan/normal_fight/`` 下的文件。"""
+    fleet_id: int | None = None
+    """出征舰队编号; 留空则用 plan 内配置。"""
+    times: int | None = None
+    """目标出击次数; ``None`` 表示无限 (空闲填充, 仅受全局上限约束)。"""
+
+
 class DailyAutomationConfig(BaseModel):
     """日常自动化设置。"""
 
@@ -179,6 +204,8 @@ class DailyAutomationConfig(BaseModel):
     """空闲时自动澡堂修理"""
     auto_set_support: bool = False
     """自动开启战役支援"""
+    bath_repair_blacklist: list[str] = Field(default_factory=list)
+    """浴室修理黑名单:这些舰船名(中文全名)不会被自动浴室修理。"""
 
     # 战役
     auto_battle: bool = True
@@ -206,14 +233,50 @@ class DailyAutomationConfig(BaseModel):
     # 常规战
     auto_normal_fight: bool = True
     """按自定义任务进行常规战"""
-    normal_fight_tasks: list[str] = Field(default_factory=list)
-    """常规战任务列表"""
+    normal_fight_tasks: list[NormalFightTaskConfig] = Field(default_factory=list)
+    """常规战任务列表; 兼容 classic ``[name, fleet, times]`` 写法 (见下方校验器)。"""
     quick_repair_limit: int | None = None
     """快修消耗上限"""
     stop_max_ship: bool = False
     """获取当天上限 500 船后终止"""
     stop_max_loot: bool = False
     """获取当天上限 50 胖次后终止"""
+
+    @field_validator('normal_fight_tasks', mode='before')
+    @classmethod
+    def _parse_normal_fight_tasks(cls, v: object) -> list[dict[str, Any]]:
+        """把 classic ``[name, fleet, times]`` 列表 / 纯字符串 / dict 统一成 dict。
+
+        classic 的 user_settings.yaml 里写法是::
+
+            normal_fight_tasks:
+              - [8-5AI-only1DD, 4, 900]   # [plan, fleet_id, target_times]
+
+        Pydantic 默认无法把嵌套 list 塞进结构化模型, 这里在校验前转换。
+        """
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise TypeError(f'normal_fight_tasks 应为列表, 得到 {type(v).__name__}')
+        result: list[dict[str, Any]] = []
+        for item in v:
+            if isinstance(item, str):
+                result.append({'name': item})
+            elif isinstance(item, dict):
+                result.append(item)
+            elif isinstance(item, (list, tuple)):
+                # [name, fleet_id, target_times]
+                if len(item) < 1:
+                    raise ValueError(f'常规战任务条目不能为空: {item!r}')
+                entry: dict[str, Any] = {'name': str(item[0])}
+                if len(item) >= 2 and item[1] is not None:
+                    entry['fleet_id'] = int(item[1])  # type: ignore[arg-type]
+                if len(item) >= 3 and item[2] is not None:
+                    entry['times'] = int(item[2])  # type: ignore[arg-type]
+                result.append(entry)
+            else:
+                raise TypeError(f'无法识别的常规战任务条目: {item!r}')
+        return result
 
 
 class DecisiveConfig(BaseModel):
@@ -275,18 +338,16 @@ class UserConfig(BaseModel):
     """操作系统类型，自动检测"""
 
     # 脚本行为
-    delay: float = 1.5
-    """延迟时间基本单位 (秒)"""
-    check_page: bool = True
-    """启动时是否检查游戏页面"""
+    # delay / check_page 已移除:delay 由兼容层映射为 OPERATION_DELAY_MIN/MAX
+    # (见 config_compat);check_page 功能已由 launcher.ensure_ready 覆盖。
     dock_full_destroy: bool = True
     """船坞满时自动清空"""
     repair_manually: bool = False
     """是否手动修理"""
     bathroom_feature_count: int = 1
-    """浴室装饰数 (1-3)"""
+    """浴室装饰数 (1-3)。预留:智能浴场空位调度用。"""
     bathroom_count: int = 2
-    """修理位置总数 (≤12)"""
+    """修理位置总数 (≤12)。预留:智能浴场空位调度用。"""
 
     # 解装设置
     destroy_ship_work_mode: DestroyShipWorkMode = DestroyShipWorkMode.disable
@@ -320,8 +381,7 @@ class UserConfig(BaseModel):
     # 数据路径
     plan_root: Path | None = None
     """自定义计划文件目录"""
-    ship_name_file: Path | None = None
-    """自定义舰船名文件"""
+    # ship_name_file 已移除 (新版无需自定义舰船名文件; 兼容层会提示用户删除)
 
     @model_validator(mode='after')
     def _resolve_emulator_defaults(self) -> UserConfig:
@@ -359,8 +419,16 @@ class UserConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> UserConfig:
-        """从 YAML 文件加载配置。"""
+        """从 YAML 文件加载配置。
+
+        raw dict 先经 :func:`migrate_raw_config` 做向下兼容处理
+        (废弃字段提示 / delay 迁移); 若检测到迁移改动, 会把结果**写回原文件**
+        (仅含用户已定义字段, 不写入默认值), 使迁移一次性生效。最后交 Pydantic 校验。
+        """
+        from autowsgr.infra.config_compat import migrate_raw_config
+
         data = load_yaml(path)
+        data = migrate_raw_config(data, source_path=path)
         return cls.model_validate(data)
 
 

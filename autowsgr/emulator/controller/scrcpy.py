@@ -18,7 +18,6 @@ INJECT_TEXT）实现，延迟远低于 ``adb shell input``。仅应用启停、�
 
 from __future__ import annotations
 
-import random
 import socket
 import struct
 import threading
@@ -27,7 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
-from autowsgr.infra.config import OPERATION_DELAY_MAX, OPERATION_DELAY_MIN
+from autowsgr.infra.config import operation_delay
 from autowsgr.infra.logger import caller_info, get_logger
 
 from ..detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
@@ -616,12 +615,7 @@ class ScrcpyController(AndroidController):
         self._inject_touch(_ACTION_UP, x, y, pressure=0.0)
 
         if delay:  # True 才走延迟
-            time.sleep(
-                random.uniform(
-                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                )
-            )
+            time.sleep(operation_delay())
 
     def swipe(
         self,
@@ -665,12 +659,7 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(
-                random.uniform(
-                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                )
-            )
+            time.sleep(operation_delay())
 
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
         px, py = self._to_absolute(x, y)
@@ -698,12 +687,7 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(
-                random.uniform(
-                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                )
-            )
+            time.sleep(operation_delay())
 
     def text(self, content: str, *, delay: bool = True) -> None:
         _log.debug("[Emulator] text('{}')  {}", content, caller_info())
@@ -716,12 +700,7 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(
-                random.uniform(
-                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                )
-            )
+            time.sleep(operation_delay())
 
     # ── 应用管理 ──
 
@@ -732,12 +711,7 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(
-                random.uniform(
-                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                )
-            )
+            time.sleep(operation_delay())
 
     def stop_app(self, package: str, *, delay: bool = True) -> None:
         dev = self._require_device()
@@ -746,12 +720,7 @@ class ScrcpyController(AndroidController):
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
-            time.sleep(
-                random.uniform(
-                    min(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                    max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
-                )
-            )
+            time.sleep(operation_delay())
 
     def is_app_running(self, package: str) -> bool:
         try:
