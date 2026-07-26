@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from autowsgr.infra import load_yaml, merge_dicts, save_yaml
+from autowsgr.infra.file_utils import resolve_plan_path
 
 
 class TestLoadYaml:
@@ -95,3 +96,64 @@ class TestMergeDicts:
         merge_dicts(base, override)
         assert base == {'a': {'x': 1}}
         assert override == {'a': {'y': 2}}
+
+
+class TestResolvePlanPath:
+    """测试 resolve_plan_path —— 含 plan_root 优先 / 回退语义。
+
+    对齐 classic ``plan_root``: 用户自定义目录同名文件优先于包内默认,
+    未命中则回退到 ``autowsgr/data/plan/{category}/``。
+    """
+
+    def test_plan_root_overrides_package_default(self, tmp_path: Path):
+        """plan_root 同名文件优先于包内默认。"""
+        root = tmp_path / 'my_plans'
+        (root / 'normal_fight').mkdir(parents=True)
+        user_plan = root / 'normal_fight' / '1-1.yaml'
+        user_plan.write_text('# user override\n', encoding='utf-8')
+
+        resolved = resolve_plan_path('1-1', plan_root=root)
+        assert resolved == user_plan.resolve()
+
+    def test_plan_root_without_yaml_suffix(self, tmp_path: Path):
+        """plan_root 查找支持省略 .yaml 后缀。"""
+        root = tmp_path / 'my_plans'
+        (root / 'normal_fight').mkdir(parents=True)
+        (root / 'normal_fight' / 'custom.yaml').write_text('k: v\n', encoding='utf-8')
+
+        resolved = resolve_plan_path('custom', plan_root=root)
+        assert resolved.name == 'custom.yaml'
+        assert resolved.parent == (root / 'normal_fight').resolve()
+
+    def test_fallback_to_package_default(self, tmp_path: Path):
+        """plan_root 未命中时回退到包内默认目录。"""
+        from autowsgr.infra.file_utils import _get_package_data_dir
+
+        root = tmp_path / 'empty_plans'
+        (root / 'normal_fight').mkdir(parents=True)
+
+        resolved = resolve_plan_path('1-1', plan_root=root)
+        expected_dir = (_get_package_data_dir() / 'plan' / 'normal_fight').resolve()
+        assert resolved.parent == expected_dir
+        assert resolved.name == '1-1.yaml'
+
+    def test_no_plan_root_falls_back_to_package(self):
+        """plan_root=None 时仅查包内默认 (旧行为不变)。"""
+        from autowsgr.infra.file_utils import _get_package_data_dir
+
+        resolved = resolve_plan_path('1-1')
+        expected_dir = (_get_package_data_dir() / 'plan' / 'normal_fight').resolve()
+        assert resolved.parent == expected_dir
+
+    def test_not_found_lists_searched_paths(self, tmp_path: Path):
+        """都不存在时抛 FileNotFoundError 并列出所有搜索过的路径。"""
+        root = tmp_path / 'my_plans'
+        (root / 'normal_fight').mkdir(parents=True)
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            resolve_plan_path('绝对不存在的策略', plan_root=root)
+
+        msg = str(exc_info.value)
+        assert '绝对不存在的策略' in msg
+        # 错误信息应同时包含 plan_root 候选与包数据目录候选
+        assert str(root / 'normal_fight') in msg

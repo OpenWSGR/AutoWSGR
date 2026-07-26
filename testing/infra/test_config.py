@@ -12,6 +12,7 @@ from autowsgr.infra import (
     EmulatorConfig,
     FightConfig,
     UserConfig,
+    load_yaml,
 )
 from autowsgr.types import (
     DestroyShipWorkMode,
@@ -25,6 +26,18 @@ from autowsgr.types import (
 def _mock_wsl(monkeypatch: pytest.MonkeyPatch):
     """在非 WSL Linux CI runner 上伪装成 WSL，使 OSType.auto() 不抛异常。"""
     monkeypatch.setattr(OSType, '_is_wsl', staticmethod(lambda: True))
+
+
+@pytest.fixture(autouse=True)
+def _reset_operation_delay():
+    """每个用例前后复位 OPERATION_DELAY 全局, 避免 delay 迁移污染其他用例。"""
+    from autowsgr.infra import config
+
+    config.OPERATION_DELAY_MIN = 0.0
+    config.OPERATION_DELAY_MAX = 0.0
+    yield
+    config.OPERATION_DELAY_MIN = 0.0
+    config.OPERATION_DELAY_MAX = 0.0
 
 
 # ── EmulatorConfig ──
@@ -65,8 +78,8 @@ dock_full_destroy: false
         cfg = UserConfig.from_yaml(path)
         assert cfg.emulator.type == EmulatorType.bluestacks
         assert cfg.emulator.serial == '127.0.0.1:5555'
-        assert cfg.delay == 2.0
         assert cfg.dock_full_destroy is False
+        assert not hasattr(cfg, 'delay')
 
     def test_with_daily_automation(self, tmp_yaml: Callable[[str, str], Path]):
         content = """\
@@ -157,12 +170,164 @@ delay: 2.5
         path = tmp_yaml('settings.yaml', content)
         cfg = ConfigManager.load(path)
         assert cfg.emulator.type == EmulatorType.mumu
-        assert cfg.delay == 2.5
+        assert not hasattr(cfg, 'delay')
 
     def test_load_nonexistent_returns_default(self, tmp_path: Path):
         cfg = ConfigManager.load(tmp_path / 'no_such_file.yaml')
         assert isinstance(cfg, UserConfig)
-        assert cfg.delay == 1.5
+        assert not hasattr(cfg, 'delay')
+
+
+# ── ConfigCompat (向下兼容迁移) ──
+
+
+class TestConfigCompat:
+    """向下兼容迁移: migrate_raw_config + operation_delay。"""
+
+    def test_ship_name_file_removed(self):
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config({'ship_name_file': '/tmp/x.json'})
+        assert 'ship_name_file' not in out
+
+    def test_account_credentials_removed(self):
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config(
+            {'account': {'game_app': '官服', 'account': 'a', 'password': 'b'}},
+        )
+        assert out['account'] == {'game_app': '官服'}
+
+    def test_delay_mapped_to_operation_delay(self):
+        from autowsgr.infra import config
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config({'delay': 1.5})
+        assert 'delay' not in out
+        assert config.OPERATION_DELAY_MIN == 1.5
+        assert config.OPERATION_DELAY_MAX == 1.5
+
+    def test_operation_delay_reads_global(self):
+        from autowsgr.infra import config
+
+        config.OPERATION_DELAY_MIN = 2.0
+        config.OPERATION_DELAY_MAX = 2.0
+        assert config.operation_delay() == 2.0
+
+    def test_non_dict_passthrough(self):
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        assert migrate_raw_config(None) is None  # type: ignore[arg-type]
+
+    def test_legacy_emulator_fields_migrated(self, tmp_yaml: Callable[[str, str], Path]):
+        """classic 平铺 emulator_type/start_cmd/name → 嵌套 emulator 块, 值透传。"""
+        content = """\
+emulator_type: "MuMu"
+emulator_start_cmd: "C:/fake/MuMuPlayer.exe"
+emulator_name: "127.0.0.1:16384"
+"""
+        path = tmp_yaml('emu_legacy.yaml', content)
+        cfg = UserConfig.from_yaml(path)
+        assert cfg.emulator.type == EmulatorType.mumu
+        assert cfg.emulator.path == 'C:/fake/MuMuPlayer.exe'
+        assert cfg.emulator.serial == '127.0.0.1:16384'
+
+    def test_nested_emulator_takes_precedence(self):
+        """同时存在平铺与嵌套时, 以嵌套 emulator 块为准。"""
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config(
+            {
+                'emulator_type': 'MuMu',
+                'emulator': {'type': '蓝叠', 'serial': '127.0.0.1:5555'},
+            },
+        )
+        assert out['emulator'] == {'type': '蓝叠', 'serial': '127.0.0.1:5555'}
+        assert 'emulator_type' not in out
+
+    def test_legacy_null_emulator_fields_skipped(self):
+        """None 值的平铺模拟器字段不写入嵌套 (让 dev 自动检测)。"""
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config(
+            {'emulator_type': 'MuMu', 'emulator_start_cmd': None, 'emulator_name': None},
+        )
+        assert out['emulator'] == {'type': 'MuMu'}
+
+    def test_legacy_toplevel_fields_dropped(self):
+        """check_update / 顶层 show_map_node 等 classic 废弃字段被清理。"""
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config({'check_update': False, 'show_map_node': True})
+        assert 'check_update' not in out
+        assert 'show_map_node' not in out
+
+    # ── 写回 (source_path 持久化) ──
+
+    def test_legacy_emulator_fields_written_back(
+        self,
+        tmp_yaml: Callable[[str, str], Path],
+    ):
+        """from_yaml 应把迁移结果写回原文件: 平铺→嵌套, 且不灌入默认字段。"""
+        content = """\
+emulator_type: "MuMu"
+emulator_start_cmd: "C:/fake/MuMuPlayer.exe"
+emulator_name: "127.0.0.1:16384"
+"""
+        path = tmp_yaml('emu_writeback.yaml', content)
+        UserConfig.from_yaml(path)
+
+        rewritten = load_yaml(path)
+        # 平铺字段已消失, 值搬进嵌套 emulator 块
+        assert 'emulator_type' not in rewritten
+        assert 'emulator_start_cmd' not in rewritten
+        assert 'emulator_name' not in rewritten
+        assert rewritten['emulator'] == {
+            'type': 'MuMu',
+            'path': 'C:/fake/MuMuPlayer.exe',
+            'serial': '127.0.0.1:16384',
+        }
+        # 关键: 不得写入用户从未定义的 Pydantic 默认字段
+        assert 'dock_full_destroy' not in rewritten
+        assert 'os_type' not in rewritten
+        assert 'repair_manually' not in rewritten
+
+    def test_writeback_idempotent(self, tmp_yaml: Callable[[str, str], Path]):
+        """迁移写回后, 再次加载不应再改动文件 (一次性生效)。"""
+        content = """\
+emulator_type: "MuMu"
+emulator_start_cmd: "C:/fake/MuMuPlayer.exe"
+emulator_name: "127.0.0.1:16384"
+"""
+        path = tmp_yaml('emu_idempotent.yaml', content)
+        UserConfig.from_yaml(path)
+        first = load_yaml(path)
+        # 第二次加载: 平铺字段已不在, 无迁移发生, 文件应原样不动
+        UserConfig.from_yaml(path)
+        assert load_yaml(path) == first
+
+    def test_clean_config_not_rewritten(self, tmp_yaml: Callable[[str, str], Path]):
+        """无需迁移的干净配置, 文件字节应原样保留 (不触发写回)。"""
+        content = """\
+emulator:
+  type: "MuMu"
+  path: "C:/fake/MuMuPlayer.exe"
+  serial: "127.0.0.1:16384"
+dock_full_destroy: false
+"""
+        path = tmp_yaml('clean.yaml', content)
+        before = path.read_text(encoding='utf-8')
+        UserConfig.from_yaml(path)
+        assert path.read_text(encoding='utf-8') == before
+
+    def test_migrate_without_source_path_does_not_persist(self):
+        """不传 source_path 时, 迁移只在内存生效 (向后兼容旧调用)。"""
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config({'emulator_type': 'MuMu'})
+        # 内存里照常迁移
+        assert out['emulator'] == {'type': 'MuMu'}
+        assert 'emulator_type' not in out
 
 
 # ── LogConfig (setup_logger) ──
