@@ -38,7 +38,7 @@ class DecisiveChapterOps(DecisiveBase):
             _log.warning('[决战] 船坞已满，执行自动解装')
             self._ctrl.click(0.38, 0.565)
             if not destroy_ships_auto(self._ctx):
-                # 解装模式为「不启用」, 船坞仍满
-                raise DockFullError('决战中船坞已满，且解装模式为「不启用」')
+                # 白名单覆盖全部舰种, 无可解装对象, 船坞仍满
+                raise DockFullError('决战中船坞已满，且无可解装舰种')
             return
         raise DockFullError('决战中检测到船坞已满，且未开启 full_destroy')

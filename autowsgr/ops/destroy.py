@@ -54,10 +54,12 @@ def destroy_ships(
 def destroy_ships_auto(ctx: GameContext) -> bool:
     """按 ``ctx.config`` 的解装设置自动解装。
 
-    供 normal_fight / event_fight / decisive 船坞满时调用, 统一读取配置:
+    供 normal_fight / event_fight / decisive 船坞满时调用, 统一读取配置。
+    是否调用本函数由调用方的 ``dock_full_destroy`` / ``full_destroy`` 开关决定;
+    此处只关心「怎么拆」::
 
-    - ``destroy_ship_work_mode == disable``: 不解装, 返回 ``False``
-      (调用方据此停止战斗, 视为船坞满)。
+    - ``destroy_ship_work_mode == disable``: 不启用舰种分类, 走快速拆解路线
+      (``ship_types=None`` → 不打开过滤器, 快速全选解装全部)。
     - ``include`` (黑名单): 解装 ``destroy_ship_types`` 指定舰种。
     - ``exclude`` (白名单): 解装除 ``destroy_ship_types`` 外的所有舰种。
 
@@ -66,16 +68,16 @@ def destroy_ships_auto(ctx: GameContext) -> bool:
     Returns
     -------
     bool
-        ``True`` 已执行解装; ``False`` 配置为「不启用」。
+        ``True`` 已执行解装; ``False`` 仅在白名单覆盖全部舰种、无可解装对象时返回
+        (此时船坞仍满, 调用方据此保持 DOCK_FULL)。
     """
     cfg = ctx.config
     mode = cfg.destroy_ship_work_mode
 
     if mode == DestroyShipWorkMode.disable:
-        _log.info('[OPS] 解装模式为「不启用」, 跳过自动解装')
-        return False
-
-    if mode == DestroyShipWorkMode.include:
+        # 不启用舰种分类: 不过滤, 直接走快速全选拆解路线
+        ship_types = None
+    elif mode == DestroyShipWorkMode.include:
         ship_types = cfg.destroy_ship_types or None
     else:  # exclude (白名单): 解装除指定舰种外的所有
         protected = set(cfg.destroy_ship_types)

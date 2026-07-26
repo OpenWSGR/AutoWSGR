@@ -413,7 +413,7 @@ class NormalFightRunner:
             if destroy_ships_auto(self._ctx):
                 # 解装成功 (调用方可根据需要重试出征)
                 result.flag = ConditionFlag.OPERATION_SUCCESS
-            # 否则 work_mode=disable, 保持 DOCK_FULL
+            # 否则无可解装对象 (白名单覆盖全部舰种), 保持 DOCK_FULL
             return
 
         _log.warning('[OPS] 船坞已满, 未开启自动解装')

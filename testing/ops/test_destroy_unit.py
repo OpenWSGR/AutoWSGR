@@ -48,12 +48,13 @@ def recorded(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     return calls
 
 
-def test_disable_skips_and_returns_false(recorded: list[dict]):
+def test_disable_uses_quick_route_no_filter(recorded: list[dict]):
+    """disable (不启用舰种分类): 不过滤, 走快速拆解路线, 解装全部。"""
     from autowsgr.ops.destroy import destroy_ships_auto
 
     ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.disable))
-    assert destroy_ships_auto(ctx) is False
-    assert recorded == []
+    assert destroy_ships_auto(ctx) is True
+    assert recorded == [{'ship_types': None, 'remove_equipment': True}]
 
 
 def test_include_passes_listed_types(recorded: list[dict]):
