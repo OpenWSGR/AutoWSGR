@@ -44,6 +44,31 @@ CAMPAIGN_NAMES: dict[int, str] = {
 }
 """战役编号 → 中文名称。"""
 
+
+def ensure_battle_support(ctx: GameContext, *, enabled: bool = True) -> None:
+    """确保战役支援开关处于目标状态 (在出征准备页面调用)。
+
+    读取当前支援状态, 不符则切换。对应 classic ``set_support``:
+    受 ``daily_automation.auto_set_support`` 控制, 由
+    :meth:`CampaignRunner._prepare_for_battle` 在出征前一次性调用。
+
+    Parameters
+    ----------
+    ctx:
+        游戏上下文 (需已在出征准备页面)。
+    enabled:
+        目标状态, 默认 ``True`` (开启)。
+    """
+    page = BattlePreparationPage(ctx)
+    screen = ctx.ctrl.screenshot()
+    if page.is_support_enabled(screen) == enabled:
+        _log.debug('[OPS] 战役支援已为目标状态 {}', enabled)
+        return
+    _log.info('[OPS] 战役支援状态不符, 切换 → {}', enabled)
+    page.toggle_battle_support()
+    time.sleep(0.5)
+
+
 # 用户友好的战役名称 → (map_index, difficulty)
 # 支持 "困难航母"、"简单驱逐" 等名称直接映射
 CAMPAIGN_NAME_MAP: dict[str, tuple[int, str]] = {}
@@ -217,6 +242,11 @@ class CampaignRunner:
         """
         time.sleep(0.25)  # 等待页面稳定
         page = BattlePreparationPage(self._ctx)
+
+        # 战役支援 (auto_set_support): 出征前一次性开启
+        da = self._ctx.config.daily_automation
+        if da is not None and da.auto_set_support:
+            ensure_battle_support(self._ctx, enabled=True)
 
         # 修理策略
         if self._repair_mode == RepairMode.moderate_damage:

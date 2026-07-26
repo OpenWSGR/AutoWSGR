@@ -21,6 +21,8 @@ from autowsgr.ui.utils import NavigationError
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from autowsgr.context import GameContext
     from autowsgr.context.ship import Ship
 
@@ -403,17 +405,15 @@ class NormalFightRunner:
     def _handle_dock_full(self, result: CombatResult) -> None:
         """船坞已满: 按配置自动解装并重试，或保持 DOCK_FULL 标志。"""
         if self._dock_full_destroy:
-            from autowsgr.ops.destroy import destroy_ships
+            from autowsgr.ops.destroy import destroy_ships_auto
 
             _log.warning('[OPS] 船坞已满，执行自动解装')
             # 点击弹窗确认按钮 (legacy 坐标)
             self._ctrl.click(0.38, 0.565)
-            destroy_ships(
-                self._ctx,
-                ship_types=self._destroy_ship_types,
-            )
-            # 解装后标记为成功 (调用方可根据需要重试出征)
-            result.flag = ConditionFlag.OPERATION_SUCCESS
+            if destroy_ships_auto(self._ctx):
+                # 解装成功 (调用方可根据需要重试出征)
+                result.flag = ConditionFlag.OPERATION_SUCCESS
+            # 否则 work_mode=disable, 保持 DOCK_FULL
             return
 
         _log.warning('[OPS] 船坞已满, 未开启自动解装')
@@ -425,11 +425,22 @@ class NormalFightRunner:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def get_normal_fight_plan(yaml_path: str) -> CombatPlan:
-    """从 YAML 文件加载常规战计划。"""
+def get_normal_fight_plan(
+    yaml_path: str,
+    plan_root: str | Path | None = None,
+) -> CombatPlan:
+    """从 YAML 文件加载常规战计划。
+
+    *plan_root* 透传给 :func:`resolve_plan_path`: 用户自定义目录优先于包内默认,
+    未命中则回退到 ``autowsgr/data/plan/normal_fight/``。
+    """
     from autowsgr.infra.file_utils import resolve_plan_path
 
-    resolved = resolve_plan_path(yaml_path, category='normal_fight')
+    resolved = resolve_plan_path(
+        yaml_path,
+        category='normal_fight',
+        plan_root=plan_root,
+    )
     return CombatPlan.from_yaml(resolved)
 
 
@@ -462,16 +473,18 @@ def run_normal_fight_from_yaml(
     fleet_id: int | None = None,
     fleet: list[str] | None = None,
     fleet_rules: list[Any] | None = None,
+    plan_root: str | Path | None = None,
 ) -> list[CombatResult]:
     """从 YAML 文件加载计划并执行常规战。
 
     *yaml_path* 支持以下格式:
 
     - 绝对路径 / 相对路径: 直接加载。
-    - 策略名称 (如 ``"7-4千伪"``): 自动在 ``autowsgr/data/plan/normal_fight/``
-      包数据目录中查找，可省略 ``.yaml`` 后缀。
+    - 策略名称 (如 ``"7-4千伪"``): 按 :func:`resolve_plan_path` 的优先级查找 ——
+      若指定 *plan_root* 先在其中查找 (``{plan_root}/normal_fight/``), 未命中再
+      回退到 ``autowsgr/data/plan/normal_fight/`` 包数据目录; 可省略 ``.yaml`` 后缀。
     """
-    plan = get_normal_fight_plan(yaml_path)
+    plan = get_normal_fight_plan(yaml_path, plan_root=plan_root)
     return run_normal_fight(
         ctx,
         plan,

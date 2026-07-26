@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 
+from .bathroom import BathRoom
 from .build import BuildQueue
 from .expedition import ExpeditionQueue
 from .fleet import Fleet
@@ -79,6 +80,8 @@ class GameContext:
     """远征队列。"""
     build_queue: BuildQueue = field(default_factory=BuildQueue)
     """建造队列。"""
+    bathroom: BathRoom = field(default_factory=BathRoom)
+    """浴室修理槽位状态 (空位调度用)。"""
     ship_registry: dict[str, Ship] = field(default_factory=dict)
     """舰船注册表, 以名称为键。"""
     current_page: PageName | None = None

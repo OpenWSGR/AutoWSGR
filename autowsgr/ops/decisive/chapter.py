@@ -33,13 +33,12 @@ class DecisiveChapterOps(DecisiveBase):
     def _do_dock_full_destroy(self) -> None:
         """船坞满处理：按配置自动解装或抛错。"""
         if self._config.full_destroy:
-            from autowsgr.ops.destroy import destroy_ships
+            from autowsgr.ops.destroy import destroy_ships_auto
 
             _log.warning('[决战] 船坞已满，执行自动解装')
             self._ctrl.click(0.38, 0.565)
-            destroy_ships(
-                self._ctx,
-                ship_types=self._ctx.config.destroy_ship_types or None,
-            )
+            if not destroy_ships_auto(self._ctx):
+                # 解装模式为「不启用」, 船坞仍满
+                raise DockFullError('决战中船坞已满，且解装模式为「不启用」')
             return
         raise DockFullError('决战中检测到船坞已满，且未开启 full_destroy')

@@ -320,15 +320,12 @@ class EventFightRunner:
     def _handle_dock_full(self, result: CombatResult) -> None:
         """船坞已满处理。"""
         if self._dock_full_destroy:
-            from autowsgr.ops.destroy import destroy_ships
+            from autowsgr.ops.destroy import destroy_ships_auto
 
             _log.warning('[OPS] 船坞已满，执行自动解装')
             self._ctrl.click(0.38, 0.565)
-            destroy_ships(
-                self._ctx,
-                ship_types=self._destroy_ship_types,
-            )
-            result.flag = ConditionFlag.OPERATION_SUCCESS
+            if destroy_ships_auto(self._ctx):
+                result.flag = ConditionFlag.OPERATION_SUCCESS
             return
 
         _log.warning('[OPS] 船坞已满, 未开启自动解装')

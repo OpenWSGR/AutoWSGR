@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import date
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from autowsgr.combat import CombatResult
@@ -32,7 +33,10 @@ from autowsgr.types import ConditionFlag
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from autowsgr.context import GameContext
+    from autowsgr.scheduler.triggers import Trigger
 
 _log = get_logger('scheduler')
 
@@ -101,11 +105,18 @@ class FightTask:
         执行次数。``CampaignRunner`` 自带 times 时此处设 1 即可。
     name:
         任务名称（用于日志），留空则自动推导。
+    priority:
+        优先级（数值越小越先执行），用于 ``run_daily`` 触发器队列排序。默认 50。
+    on_done:
+        每场战斗结束后的回调（接收 ``CombatResult``）。触发器用它更新
+        ``_idle`` / ``_exhausted`` 等内部状态。
     """
 
     runner: object
     times: int = 1
     name: str = ''
+    priority: int = 50
+    on_done: Callable[[CombatResult], None] | None = None
 
     # 运行时状态
     completed: int = field(default=0, init=False, repr=False)
@@ -138,11 +149,17 @@ class TaskScheduler:
         ctx: GameContext,
         *,
         expedition_interval: float = 900.0,
+        idle_sleep: float = 5.0,
     ) -> None:
         self._ctx = ctx
         self._expedition_interval = expedition_interval
+        self._idle_sleep = idle_sleep
         self._tasks: list[FightTask] = []
         self._last_expedition_time: float = 0.0
+        # 触发器调度 (auto_daily 长期挂机)
+        self._triggers: list[Trigger] = []
+        self._queue: list[FightTask] = []
+        self._last_date: date = date.today()  # noqa: DTZ011  # 跨日按本地墙上时钟 (游戏 0 点刷新)
 
     # ── 任务管理 ──
 
@@ -196,14 +213,21 @@ class TaskScheduler:
 
     def _run_task(self, task: FightTask) -> None:
         """执行单个任务的全部轮次。"""
-        # 适配返回 list 的 runner
-        runner = task.runner
-        if not isinstance(runner, FightRunnerProtocol):
-            runner = BatchRunnerAdapter(runner)
+        # 统一用 BatchRunnerAdapter 包装: 对 run()→list[CombatResult] 取最后一场,
+        # 对 run()→单个 CombatResult 直接 passthrough, 兼容两类 runner
+        # (CampaignRunner / ExerciseRunner 返回 list, 其余返回单个)。
+        # 不能靠 isinstance(FightRunnerProtocol) 判断: @runtime_checkable 不检查
+        # 返回类型, CampaignRunner 有 run() 方法即被误判满足协议而跳过适配
+        # (曾致战役 on_done 回调 'list' object has no attribute 'flag' 崩溃)。
+        runner = BatchRunnerAdapter(task.runner)
 
         self._ctx.active_fight_tasks += 1
         try:
             for j in range(task.times):
+                if self._ctx.stop_event.is_set():
+                    _log.info('[Scheduler] {} 检测到停止信号, 中断', task.name)
+                    break
+
                 _log.info(
                     '[Scheduler] {} 第 {}/{} 次',
                     task.name,
@@ -211,22 +235,36 @@ class TaskScheduler:
                     task.times,
                 )
 
-                # 远征检查 (战斗前)
+                # 远征检查 (战斗前) — 仅旧 run() 路径有效;run_daily() 下由触发器接管
                 self._maybe_collect_expedition()
 
                 try:
                     result = runner.run()
                 except Exception as exc:
+                    # 子任务异常: 结束本子任务, 不崩溃主循环。ACTION_FAILED 不属
+                    # 于任何触发器的成功/耗尽标志, 故 on_done 不会计入战斗次数、
+                    # 不会误判耗尽 —— 远征出错等下次定时重试, 战斗出错不扣次数。
                     _log.opt(exception=True).error(
-                        '[Scheduler] {} 第 {} 次异常: {}',
+                        '[Scheduler] {} 第 {} 次异常, 结束本子任务: {}',
                         task.name,
                         j + 1,
                         exc,
                     )
-                    result = CombatResult(flag=ConditionFlag.DOCK_FULL)
+                    result = CombatResult(flag=ConditionFlag.ACTION_FAILED)
 
                 task.results.append(result)
                 task.completed += 1
+
+                # 通知触发器更新状态 (auto_daily 触发器调度用)
+                if task.on_done is not None:
+                    try:
+                        task.on_done(result)
+                    except Exception as exc:
+                        _log.opt(exception=True).warning(
+                            '[Scheduler] {} on_done 回调异常: {}',
+                            task.name,
+                            exc,
+                        )
 
                 _log.info(
                     '[Scheduler] {} [{}/{}] → {}',
@@ -246,6 +284,134 @@ class TaskScheduler:
                     break
         finally:
             self._ctx.active_fight_tasks -= 1
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # 触发器调度 (auto_daily 长期挂机)
+    # ═══════════════════════════════════════════════════════════════════════════════
+
+    def register_trigger(self, trigger: Trigger) -> TaskScheduler:
+        """注册一个触发器。支持链式调用。"""
+        self._triggers.append(trigger)
+        _log.info(
+            '[Scheduler] 注册触发器: {} (prio={})',
+            trigger.name,
+            trigger.priority,
+        )
+        return self
+
+    def run_daily(self) -> None:
+        """触发器驱动的长期挂机主循环 (auto_daily)。
+
+        循环逻辑::
+
+            while not stop_event:
+                1. 检测跨日 → reset 所有触发器 (战役 _exhausted / 常规战计数清零)
+                2. 询问每个触发器 should_fire → 命中的任务按 priority 入队
+                3. 队首有任务 → 执行;队列空 → idle_sleep 后继续 (挂机等待)
+
+        与 :meth:`run` 的区别:后者顺序执行预提交任务后退出;
+        本方法由触发器持续产出任务,适合全天 / 跨日挂机。
+        """
+        _log.info(
+            '[Scheduler] 开始触发器调度: {} 个触发器',
+            len(self._triggers),
+        )
+        self._last_date = date.today()  # noqa: DTZ011  # 本地墙上时钟
+
+        while not self._ctx.stop_event.is_set():
+            self._check_daily_reset()
+
+            # 收集触发器产出的新任务
+            for trigger in self._triggers:
+                try:
+                    task = trigger.should_fire(self._ctx)
+                except Exception as exc:
+                    _log.opt(exception=True).warning(
+                        '[Scheduler] 触发器 {} 异常: {}',
+                        trigger.name,
+                        exc,
+                    )
+                    continue
+                if task is not None:
+                    self._enqueue(task)
+
+            # 取队首执行
+            task = self._dequeue()
+            if task is not None:
+                try:
+                    self._run_task(task)
+                except Exception as exc:
+                    # _run_task 自身异常 (非 runner.run, 极少见) 兜底: 复位触发器
+                    # _idle 避免该触发器卡死不再产出, 继续主循环, 不崩溃脚本。
+                    _log.opt(exception=True).error(
+                        '[Scheduler] 子任务 {} 执行崩溃, 已跳过: {}',
+                        task.name,
+                        exc,
+                    )
+                    if task.on_done is not None:
+                        try:
+                            task.on_done(
+                                CombatResult(flag=ConditionFlag.ACTION_FAILED),
+                            )
+                        except Exception:  # noqa: S110  # on_done 回调异常不应影响主循环
+                            pass
+            else:
+                # 队列空:所有触发器暂无任务 (常规战打满 / 只等远征定时) → 挂机等待
+                time.sleep(self._idle_sleep)
+
+        _log.info('[Scheduler] 收到停止信号, 调度结束')
+        self._print_summary()
+
+    def _enqueue(self, task: FightTask) -> None:
+        """按 priority 插入队列 (数值小先出;同 priority FIFO)。"""
+        idx = len(self._queue)
+        for i, existing in enumerate(self._queue):
+            if existing.priority > task.priority:
+                idx = i
+                break
+        self._queue.insert(idx, task)
+        _log.debug(
+            '[Scheduler] 入队: {} (prio={}, 队列长度={})',
+            task.name,
+            task.priority,
+            len(self._queue),
+        )
+
+    def _dequeue(self) -> FightTask | None:
+        """取出队首任务 (priority 最小者)。"""
+        if not self._queue:
+            return None
+        return self._queue.pop(0)
+
+    def _check_daily_reset(self) -> None:
+        """检测跨日 (0 点) → 通知所有触发器 reset。
+
+        游戏每日 0 点刷新战役次数、演习时段、掉落上限。
+        大部分由游戏自身重置 (脚本每次读画面值);脚本只需 reset 自身状态
+        (战役 _exhausted、常规战完成计数、ctx 每日计数器)。
+        """
+        today = date.today()  # noqa: DTZ011  # 本地墙上时钟 (跨日检测)
+        if today == self._last_date:
+            return
+        _log.info(
+            '[Scheduler] 检测到跨日 ({} → {}), 重置触发器',
+            self._last_date,
+            today,
+        )
+        for trigger in self._triggers:
+            try:
+                trigger.reset()
+            except Exception as exc:
+                _log.opt(exception=True).warning(
+                    '[Scheduler] 触发器 {} reset 异常: {}',
+                    trigger.name,
+                    exc,
+                )
+        # 清零 ctx 每日计数器 (掉落 / 快修累计)
+        self._ctx.dropped_ship_count = 0
+        self._ctx.dropped_loot_count = 0
+        self._ctx.quick_repair_used = 0
+        self._last_date = today
 
     # ── 远征检查 ──
 

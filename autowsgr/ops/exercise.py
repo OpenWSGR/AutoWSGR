@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult, NodeDecision, run_combat
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import Formation, PageName, ShipDamageState
+from autowsgr.types import ConditionFlag, Formation, PageName, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel
 
 
@@ -127,6 +127,33 @@ class ExerciseRunner:
         )
         _log.debug('[OPS] 演习战斗结束')
         return result
+
+
+class ExerciseOnceRunner(ExerciseRunner):
+    """单次演习执行器 (auto_daily 触发器用)。
+
+    与 :class:`ExerciseRunner` 不同: 每次 :meth:`run` 只挑战**一个**可用的对手,
+    无可用对手时返回 ``SKIP_FIGHT`` —— 供 :class:`~autowsgr.scheduler.triggers.ExerciseTrigger`
+    判定本时段已打满 (跨时段再 reset)。
+
+    这样把「打完 5 场」从 runner 内部循环上移到触发器层, 场与场之间允许
+    远征等高优先级任务插队。
+    """
+
+    def run(self) -> CombatResult:  # type: ignore[override]
+        """挑战下一个可用对手; 无对手返回 ``SKIP_FIGHT``。"""
+        self._enter_exercise_page()
+        rivals_status = MapPage(self._ctx).get_exercise_rival_status()
+        rivals = rivals_status.rivals
+        _log.info('[OPS] 单次演习, 当前可挑战对手: {}', rivals)
+
+        for index, available in enumerate(rivals, start=1):
+            if available:
+                _log.info('[OPS] 单次演习: 挑战对手 {}', index)
+                return self._challenge_rival(index)
+
+        _log.info('[OPS] 无可挑战对手, 本时段演习已打满')
+        return CombatResult(flag=ConditionFlag.SKIP_FIGHT)
 
 
 def run_exercise(

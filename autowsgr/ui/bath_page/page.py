@@ -335,6 +335,49 @@ class BathPage:
             screen=self._ctrl.screenshot(),
         )
 
+    def repair_longest(self, blacklist: set[str] | None = None) -> int:
+        """在选择修理 overlay 中修理修理时间最长的非黑名单舰船。
+
+        逐页扫描 (最多 10 页), 在第一个含非黑名单候选的页内选最长者点击。
+        游戏默认按修理时间降序列出, 故首页最长 ≈ 全局最长。
+
+        Parameters
+        ----------
+        blacklist:
+            不修理的舰船名集合 (中文全名)。命中则跳过。
+
+        Returns
+        -------
+        int
+            修理秒数 (``>0`` 成功); ``-1`` 无可修候选 (空或全被排除);
+            ``-2`` 浴场已满 (点击后 overlay 未关闭)。
+        """
+        blocked = blacklist or set()
+        target: RepairShipInfo | None = None
+        for _ in range(10):
+            candidates = [
+                s for s in self.recognize_repair_ships() if s.name and s.name not in blocked
+            ]
+            if candidates:
+                target = max(candidates, key=lambda s: s.repair_seconds)
+                break
+            self._swipe_left()
+
+        if target is None:
+            _log.info('[UI] 选择修理: 无可修理舰船 (或均被黑名单排除)')
+            return -1
+
+        _log.info(
+            '[UI] 选择修理 → 修理最长: {} ({})',
+            target.name,
+            target.repair_time,
+        )
+        self._ctrl.click(*target.position)
+        if self._try_wait_overlay_close():
+            return target.repair_seconds
+        _log.warning('[UI] 浴场已满, 修理 {} 失败', target.name)
+        return -2
+
     def recognize_repair_ships(self) -> list[RepairShipInfo]:
         """识别选择修理 overlay 中当前可见的待修理舰船。
 
