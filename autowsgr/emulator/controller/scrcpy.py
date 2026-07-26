@@ -1,7 +1,9 @@
 """scrcpy 设备控制器 — 基于 adbutils + scrcpy-server 的实现。
 
-通过 scrcpy 协议获取 H264 视频流并解码为截图，使用 adbutils 执行
-ADB 命令实现触控/按键等操作。
+通过 scrcpy 协议获取 H264 视频流并解码为截图；触控（click/swipe/long_tap）、
+按键和文本输入通过 scrcpy 控制流（INJECT_TOUCH_EVENT / INJECT_KEYCODE /
+INJECT_TEXT）实现，延迟远低于 ``adb shell input``。仅应用启停、运行检测等
+非实时操作仍走 ADB。
 
 使用方式::
 
@@ -17,6 +19,8 @@ ADB 命令实现触控/按键等操作。
 from __future__ import annotations
 
 import random
+import socket
+import struct
 import threading
 import time
 from pathlib import Path
@@ -31,8 +35,6 @@ from .protocol import AndroidController, DeviceInfo
 
 
 if TYPE_CHECKING:
-    import socket
-
     import numpy as np
     from adbutils import AdbConnection, AdbDevice
 
@@ -43,12 +45,40 @@ _SCRCPY_SERVER_JAR = Path(__file__).resolve().parents[2] / 'data' / 'bin' / 'scr
 _SCRCPY_SERVER_VERSION = '2.7'
 _DEVICE_JAR_PATH = '/data/local/tmp/scrcpy-server.jar'
 
+# ── scrcpy 2.7 控制流协议常量 ──
+# 参考：scrcpy app/src/control_msg.h / control_msg.c (v2.7)
+
+# 控制消息类型
+_TYPE_INJECT_KEYCODE = 0
+_TYPE_INJECT_TEXT = 1
+_TYPE_INJECT_TOUCH_EVENT = 2
+_TYPE_INJECT_SCROLL_EVENT = 3
+_TYPE_SET_CLIPBOARD = 9
+
+# SET_CLIPBOARD 文本上限（SC_CONTROL_MSG_CLIPBOARD_TEXT_MAX_LENGTH = 1<<18 - 14）
+_CLIPBOARD_TEXT_MAX_LENGTH = (1 << 18) - 14
+
+# Android MotionEvent 动作码
+_ACTION_DOWN = 0
+_ACTION_UP = 1
+_ACTION_MOVE = 2
+
+# Android KeyEvent 动作码
+_KEY_ACTION_DOWN = 0
+_KEY_ACTION_UP = 1
+
+# Pointer id（触摸用）
+# scrcpy 中 SC_POINTER_ID_GENERIC_FINGER = UINT64_C(-2)，
+# 作为有符号 int64 写入 q 格式即 -2，对应无符号 0xFFFFFFFFFFFFFFFE
+_POINTER_ID_FINGER = -2
+
 
 class ScrcpyController(AndroidController):
     """基于 scrcpy 协议的 Android 设备控制器。
 
-    截图通过 scrcpy-server 提供的 H264 视频流解码获得（30+ fps），
-    触控/按键等操作通过 adbutils 的 ``adb shell input`` 实现。
+    截图通过 scrcpy-server 提供的 H264 视频流解码获得（30+ fps）；
+    触控（click/swipe/long_tap）、按键与文本输入通过 scrcpy 控制流实现，
+    相比 ``adb shell input`` 显著降低延迟。仅应用管理类操作仍走 ADB。
 
     Parameters
     ----------
@@ -91,10 +121,12 @@ class ScrcpyController(AndroidController):
         self._alive = False
         self._server_stream: AdbConnection | None = None
         self._video_socket: socket.socket | None = None
+        self._control_socket: socket.socket | None = None
         self._decode_thread: threading.Thread | None = None
         self._frame_ready = threading.Event()  # 首帧就绪信号
         self._frame_lock = threading.Lock()
         self._reconnect_lock = threading.Lock()
+        self._control_lock = threading.Lock()  # 控制流写串行化
 
     # ── 连接 ──
 
@@ -131,6 +163,7 @@ class ScrcpyController(AndroidController):
         self._deploy_server()
         self._start_server()
         self._connect_video_socket()
+        self._connect_control_socket()
         self._start_decode_thread()
 
         # ── 等待首帧 ──
@@ -220,7 +253,7 @@ class ScrcpyController(AndroidController):
             'tunnel_forward=true',
             'video=true',
             'audio=false',
-            'control=false',
+            'control=true',
             f'max_size={self._max_size}',
             f'video_bit_rate={self._bitrate}',
             f'max_fps={self._max_fps}',
@@ -258,6 +291,34 @@ class ScrcpyController(AndroidController):
         if not dummy:
             raise EmulatorConnectionError('未收到 scrcpy dummy byte，连接可能已断开')
         _log.debug('[Emulator] scrcpy 视频通道已连接')
+
+    def _connect_control_socket(self) -> None:
+        """连接 scrcpy 控制通道（video 之后建立的第二个 socket）。
+
+        scrcpy 2.7 中 ``send_dummy_byte=true`` 时 dummy byte 仅由第一个 socket
+        （video）发送，控制 socket 无需读取 dummy byte。
+        """
+        import adbutils
+
+        dev = self._require_device()
+        for _attempt in range(30):
+            try:
+                self._control_socket = dev.create_connection(
+                    adbutils.Network.LOCAL_ABSTRACT,
+                    'scrcpy',
+                )
+                break
+            except Exception:
+                time.sleep(0.1)
+        else:
+            raise EmulatorConnectionError('无法连接 scrcpy-server 控制通道（3s 超时）')
+
+        # 禁用 Nagle，降低控制指令延迟
+        try:
+            self._control_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except OSError:
+            pass
+        _log.debug('[Emulator] scrcpy 控制通道已连接')
 
     def _start_decode_thread(self) -> None:
         """启动后台 H264 解码线程。"""
@@ -331,6 +392,13 @@ class ScrcpyController(AndroidController):
         return self._device
 
     def _close_video_channel(self) -> None:
+        if self._control_socket is not None:
+            try:
+                self._control_socket.close()
+            except Exception as exc:
+                _log.debug('[Scrcpy] 关闭 control socket 失败: {}', exc)
+            self._control_socket = None
+
         if self._video_socket is not None:
             try:
                 self._video_socket.close()
@@ -353,12 +421,13 @@ class ScrcpyController(AndroidController):
         self._frame_ready.clear()
 
     def _reopen_stream(self) -> None:
-        """在保持 ADB 设备连接的前提下重建 scrcpy 视频流。"""
+        """在保持 ADB 设备连接的前提下重建 scrcpy 视频流与控制流。"""
         self._close_video_channel()
         self._last_frame = None
         self._deploy_server()
         self._start_server()
         self._connect_video_socket()
+        self._connect_control_socket()
         self._start_decode_thread()
 
         if not self._frame_ready.wait(timeout=self._screenshot_timeout):
@@ -379,6 +448,116 @@ class ScrcpyController(AndroidController):
 
             _log.warning('[Emulator] 检测到视频流未运行，尝试自动重连')
             self._reopen_stream()
+
+    # ── 控制流消息发送 ──
+
+    def _require_control_socket(self) -> socket.socket:
+        """返回控制 socket；视频流未就绪时先尝试恢复。"""
+        self._ensure_stream_alive()
+        if self._control_socket is None:
+            raise EmulatorConnectionError('scrcpy 控制通道未连接')
+        return self._control_socket
+
+    def _send_control(self, data: bytes) -> None:
+        """向控制 socket 串行写入一帧消息（线程安全）。"""
+        sock = self._require_control_socket()
+        with self._control_lock:
+            try:
+                sock.sendall(data)
+            except (ConnectionError, OSError) as exc:
+                _log.warning('[Emulator] 控制流发送失败，触发重连: {}', exc)
+                self._alive = False
+                self._ensure_stream_alive()
+                sock = self._require_control_socket()
+                sock.sendall(data)
+
+    @staticmethod
+    def _float_to_u16fp(value: float) -> int:
+        """将 [0.0, 1.0] 压力值编码为 scrcpy u16 定点数。"""
+        clamped = max(0.0, min(1.0, value))
+        return round(clamped * 0xFFFF)
+
+    def _inject_touch(
+        self,
+        action: int,
+        x: float,
+        y: float,
+        pressure: float = 1.0,
+        pointer_id: int = _POINTER_ID_FINGER,
+    ) -> None:
+        """发送 INJECT_TOUCH_EVENT 控制消息（scrcpy 2.7，32 字节）。
+
+        布局：type(1) | action(1) | pointer_id(8) | x(4) | y(4)
+              | width(2) | height(2) | pressure(2) | action_button(4) | buttons(4)
+        """
+        w, h = self._resolution
+        px, py = int(x * w), int(y * h)
+        u16_pressure = self._float_to_u16fp(pressure)
+        data = struct.pack(
+            '>BBqIIHHHII',
+            _TYPE_INJECT_TOUCH_EVENT,
+            action,
+            pointer_id,
+            px,
+            py,
+            w,
+            h,
+            u16_pressure,
+            0,  # action_button（触摸事件为 0）
+            0,  # buttons（触摸事件为 0）
+        )
+        # struct '>BBqIIHHHII' = 1+1+8+4+4+2+2+2+4+4 = 32 字节
+        self._send_control(data)
+
+    def _inject_keycode(self, key_code: int, action: int = _KEY_ACTION_UP) -> None:
+        """发送 INJECT_KEYCODE 控制消息（scrcpy 2.7，14 字节）。
+
+        布局：type(1) | action(1) | keycode(4) | repeat(4) | metastate(4)
+        """
+        data = struct.pack(
+            '>BBIII',
+            _TYPE_INJECT_KEYCODE,
+            action,
+            key_code,
+            0,  # repeat
+            0,  # metastate
+        )
+        self._send_control(data)
+
+    def _inject_text(self, content: str) -> None:
+        """发送 INJECT_TEXT 控制消息（scrcpy 2.7）。
+
+        布局：type(1) | length(4) | utf8_bytes
+        最大长度 300 字节。
+
+        注意：INJECT_TEXT 通过 InputConnection.commitText 注入，
+        仅对 ASCII/拉丁字符可靠；中文等多字节字符请使用 :meth:`_set_clipboard`。
+        """
+        raw = content.encode('utf-8')[:300]
+        data = struct.pack('>BI', _TYPE_INJECT_TEXT, len(raw)) + raw
+        self._send_control(data)
+
+    def _set_clipboard(self, content: str, paste: bool = True) -> None:
+        """发送 SET_CLIPBOARD 控制消息（scrcpy 2.7）。
+
+        布局：type(1) | sequence(8) | paste(1) | length(4) | utf8_bytes
+
+        ``paste=True`` 时，server 在设置剪贴板后会自动注入
+        ``KEYCODE_PASTE``（Android ≥ 7），实现立即粘贴。
+        该路径通过系统剪贴板 + 粘贴键工作，可正确输入中文等
+        INJECT_TEXT 无法处理的字符。
+
+        Parameters
+        ----------
+        content:
+            要输入的文本（UTF-8，最长 262130 字节）。
+        paste:
+            是否在设置剪贴板后立即粘贴。
+        """
+        raw = content.encode('utf-8')[:_CLIPBOARD_TEXT_MAX_LENGTH]
+        # sequence=0 表示 SEQUENCE_INVALID，不请求 ack
+        data = struct.pack('>BQBI', _TYPE_SET_CLIPBOARD, 0, 1 if paste else 0, len(raw)) + raw
+        self._send_control(data)
 
     # ── 截图 ──
 
@@ -415,7 +594,6 @@ class ScrcpyController(AndroidController):
     # ── 触控 ──
     # 引入一个开关，当参数为：click(x, y, delay=False) 时关闭延迟，该方法默认打开全局延迟，全局延迟可以在 config.py 内设置
     def click(self, x: float, y: float, *, delay: bool = True) -> None:
-        dev = self._require_device()
         w, h = self._resolution
         px, py = int(x * w), int(y * h)
         _log.debug(
@@ -428,7 +606,9 @@ class ScrcpyController(AndroidController):
             h,
             caller_info(),
         )
-        dev.shell(f'input tap {px} {py}')
+        self._inject_touch(_ACTION_DOWN, x, y, pressure=1.0)
+        self._inject_touch(_ACTION_UP, x, y, pressure=0.0)
+
         if delay:  # True 才走延迟
             time.sleep(
                 random.uniform(
@@ -447,7 +627,6 @@ class ScrcpyController(AndroidController):
         *,
         delay: bool = True,
     ) -> None:
-        dev = self._require_device()
         w, h = self._resolution
         px1, py1 = int(x1 * w), int(y1 * h)
         px2, py2 = int(x2 * w), int(y2 * h)
@@ -465,7 +644,19 @@ class ScrcpyController(AndroidController):
             ms,
             caller_info(),
         )
-        dev.shell(f'input swipe {px1} {py1} {px2} {py2} {ms}')
+        # 按下
+        self._inject_touch(_ACTION_DOWN, x1, y1, pressure=1.0)
+        # 在 duration 内插值若干 MOVE 事件，保证流畅滑动
+        steps = max(1, ms // 16)  # ~60fps，每步约 16ms
+        step_ms = ms / steps
+        for i in range(1, steps + 1):
+            t = i / steps
+            cx = x1 + (x2 - x1) * t
+            cy = y1 + (y2 - y1) * t
+            self._inject_touch(_ACTION_MOVE, cx, cy, pressure=1.0)
+            time.sleep(step_ms / 1000.0)
+        # 抬起
+        self._inject_touch(_ACTION_UP, x2, y2, pressure=0.0)
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
@@ -477,13 +668,29 @@ class ScrcpyController(AndroidController):
             )
 
     def long_tap(self, x: float, y: float, duration: float = 1.0) -> None:
-        self.swipe(x, y, x, y, duration=duration)
+        w, h = self._resolution
+        px, py = int(x * w), int(y * h)
+        ms = int(duration * 1000)
+        _log.debug(
+            '[Emulator] long_tap({:.3f}, {:.3f}) → pixel({},{}) {}ms  {}',
+            x,
+            y,
+            px,
+            py,
+            ms,
+            caller_info(),
+        )
+        # 按下后保持不动，再抬起（与 input swipe 同点等价）
+        self._inject_touch(_ACTION_DOWN, x, y, pressure=1.0)
+        time.sleep(duration)
+        self._inject_touch(_ACTION_UP, x, y, pressure=0.0)
 
     # ── 按键 ──
     def key_event(self, key_code: int, *, delay: bool = True) -> None:
-        dev = self._require_device()
         _log.debug('[Emulator] key_event({})  {}', key_code, caller_info())
-        dev.keyevent(key_code)
+        # 发送 DOWN + UP 完成一次按键
+        self._inject_keycode(key_code, action=_KEY_ACTION_DOWN)
+        self._inject_keycode(key_code, action=_KEY_ACTION_UP)
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
@@ -495,9 +702,13 @@ class ScrcpyController(AndroidController):
             )
 
     def text(self, content: str, *, delay: bool = True) -> None:
-        dev = self._require_device()
         _log.debug("[Emulator] text('{}')  {}", content, caller_info())
-        dev.send_keys(content)
+        if content.isascii():
+            # 纯 ASCII/拉丁字符走 INJECT_TEXT（延迟更低）
+            self._inject_text(content)
+        else:
+            # 含中文等多字节字符 → SET_CLIPBOARD + paste（Android ≥ 7）
+            self._set_clipboard(content, paste=True)
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟
