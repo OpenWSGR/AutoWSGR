@@ -71,6 +71,9 @@ _KEY_ACTION_UP = 1
 # 作为有符号 int64 写入 q 格式即 -2，对应无符号 0xFFFFFFFFFFFFFFFE
 _POINTER_ID_FINGER = -2
 
+# 同一手势内相邻控制消息（如 DOWN→UP、按键 DOWN→UP）之间的最小间隔。
+_MIN_GESTURE_INTERVAL = 0.01  # 10ms
+
 
 class ScrcpyController(AndroidController):
     """基于 scrcpy 协议的 Android 设备控制器。
@@ -469,7 +472,6 @@ class ScrcpyController(AndroidController):
                 self._ensure_stream_alive()
                 sock = self._require_control_socket()
                 sock.sendall(data)
-            time.sleep(0.05)  # 避免连续发送过快导致游戏处理不及
 
     @staticmethod
     def _float_to_u16fp(value: float) -> int:
@@ -612,6 +614,7 @@ class ScrcpyController(AndroidController):
             caller_info(),
         )
         self._inject_touch(_ACTION_DOWN, x, y, pressure=1.0)
+        time.sleep(_MIN_GESTURE_INTERVAL)  # DOWN/UP 间留出最小间隔，防止游戏来不及处理
         self._inject_touch(_ACTION_UP, x, y, pressure=0.0)
 
         if delay:  # True 才走延迟
@@ -645,6 +648,7 @@ class ScrcpyController(AndroidController):
         )
         # 按下
         self._inject_touch(_ACTION_DOWN, x1, y1, pressure=1.0)
+        time.sleep(_MIN_GESTURE_INTERVAL)  # DOWN 后留出最小间隔，再开始 MOVE 插值
         # 在 duration 内插值若干 MOVE 事件，保证流畅滑动
         steps = max(1, ms // 16)  # ~60fps，每步约 16ms
         step_ms = ms / steps
@@ -653,7 +657,9 @@ class ScrcpyController(AndroidController):
             cx = x1 + (x2 - x1) * t
             cy = y1 + (y2 - y1) * t
             self._inject_touch(_ACTION_MOVE, cx, cy, pressure=1.0)
-            time.sleep(step_ms / 1000.0)
+            # 每步之间的间隔就是 swipe 本身的节奏（约 16ms/步），
+            # 已经足够避免连续发送过快；max() 仅在极短 duration 下兜底。
+            time.sleep(max(step_ms / 1000.0, _MIN_GESTURE_INTERVAL))
         # 抬起
         self._inject_touch(_ACTION_UP, x2, y2, pressure=0.0)
 
@@ -683,6 +689,7 @@ class ScrcpyController(AndroidController):
         _log.debug('[Emulator] key_event({})  {}', key_code, caller_info())
         # 发送 DOWN + UP 完成一次按键
         self._inject_keycode(key_code, action=_KEY_ACTION_DOWN)
+        time.sleep(_MIN_GESTURE_INTERVAL)  # DOWN/UP 间留出最小间隔
         self._inject_keycode(key_code, action=_KEY_ACTION_UP)
 
         # 增加延迟，改动同 click_delay

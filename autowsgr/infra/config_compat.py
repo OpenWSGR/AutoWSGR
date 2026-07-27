@@ -182,8 +182,9 @@ def _migrate_delay(data: dict[str, Any]) -> None:
             raw,
         )
         return
-    data['operation_delay_min'] = delay
-    data['operation_delay_max'] = delay
+    # 仅在用户未显式设置 operation_delay_min/max 时回填, 避免覆盖已部分迁移的显式值
+    data.setdefault('operation_delay_min', delay)
+    data.setdefault('operation_delay_max', delay)
     _log.info('[compat] delay={} 已迁移为 operation_delay_min/max。', delay)
 
 

@@ -57,6 +57,14 @@ if TYPE_CHECKING:
 
 _log = get_logger('ui')
 
+_MAX_VISIBLE_CARDS = 5
+"""选择修理 overlay 单屏最多完整可见的舰船卡片数 (约 5~6 张, 视分辨率而定)。
+
+游戏按修理耗时降序排列舰船, 列表不循环。若某页识别到的卡片数少于此值,
+说明该页未被填满, 即已到列表末尾 (含被黑名单排除的卡片), 无需再滑动
+翻页查找更多舰船——继续滑动只会重复看到同一批末尾卡片。
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class RepairShipInfo:
@@ -327,6 +335,14 @@ class BathPage:
 
                     _log.warning('[UI] 浴场已满, 无法修理 {}', ship_name)
                     return -1
+            if len(ships) < _MAX_VISIBLE_CARDS:
+                # 本页未填满一屏，说明已到修理列表末尾，再滑动也不会有新舰船
+                _log.debug(
+                    '[UI] 选择修理: 本页仅 {} 张卡片 (<{}), 已到列表末尾，停止翻页',
+                    len(ships),
+                    _MAX_VISIBLE_CARDS,
+                )
+                break
             # 未找到，滑动翻页
             self._swipe_left()
 
@@ -355,11 +371,18 @@ class BathPage:
         blocked = blacklist or set()
         target: RepairShipInfo | None = None
         for _ in range(10):
-            candidates = [
-                s for s in self.recognize_repair_ships() if s.name and s.name not in blocked
-            ]
+            ships = self.recognize_repair_ships()
+            candidates = [s for s in ships if s.name and s.name not in blocked]
             if candidates:
                 target = max(candidates, key=lambda s: s.repair_seconds)
+                break
+            if len(ships) < _MAX_VISIBLE_CARDS:
+                # 本页未填满一屏 (含被黑名单排除的), 说明已到修理列表末尾
+                _log.debug(
+                    '[UI] 选择修理: 本页仅 {} 张卡片 (<{}), 已到列表末尾，停止翻页',
+                    len(ships),
+                    _MAX_VISIBLE_CARDS,
+                )
                 break
             self._swipe_left()
 
