@@ -3,33 +3,26 @@
 由于 ScrcpyController 依赖物理设备/模拟器，测试策略：
 1. DeviceInfo — 不可变数据类
 2. ScrcpyController — ABC 接口约束
-3. ScrcpyController — 控制流消息序列化与坐标转换（mock control socket）
+3. ScrcpyController — 坐标转换（纯函数 _to_pixels，独立验证）
+4. ScrcpyController — 控制流编排（在 _inject_* 边界断言动作序列与路由）
+
+控制流的二进制线缆格式（struct 布局、TYPE_* 常量）属于 scrcpy 外部协议，在
+scrcpy.py 中定义。这里不重复声明该格式来校验实现自身——那样只能保证“打包与解包
+用了同一份格式”，无法发现“对真实 scrcpy 协议的误解”。改为只验证控制器自身的逻辑：
+相对坐标→像素映射、动作序列（DOWN/UP/MOVE）、文本路由。动作码取自 Android 官方
+定义（MotionEvent / KeyEvent），以字面量形式独立断言，不导入实现侧常量。
 """
 
 from __future__ import annotations
 
-import struct
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import numpy as np
 import pytest
 
-from autowsgr.emulator import (
-    ScrcpyController,
-)
+from autowsgr.emulator import ScrcpyController
 from autowsgr.infra import EmulatorConnectionError
-
-
-# ── 控制流协议常量（与 scrcpy.py 保持一致）──
-_TYPE_INJECT_TOUCH_EVENT = 2
-_TYPE_INJECT_KEYCODE = 0
-_TYPE_INJECT_TEXT = 1
-_TYPE_SET_CLIPBOARD = 9
-_ACTION_DOWN = 0
-_ACTION_UP = 1
-_ACTION_MOVE = 2
-_POINTER_ID_FINGER = -2
 
 
 # ═══════════════════════════════════════════════
@@ -50,146 +43,120 @@ class TestScrcpyControllerInit:
 
 
 # ═══════════════════════════════════════════════
-# ScrcpyController — 控制流消息序列化与坐标转换
+# ScrcpyController — 坐标转换
+# ═══════════════════════════════════════════════
+
+
+class TestScrcpyControllerCoordinates:
+    """测试相对坐标 [0, 1] → 像素坐标的转换（纯函数 _to_pixels）。
+
+    预期像素值由 int(x * w) / int(y * h) 手工计算，不依赖任何线缆格式。
+    """
+
+    @pytest.fixture
+    def ctrl(self) -> ScrcpyController:
+        c = ScrcpyController(serial='test')
+        c._resolution = (960, 540)
+        return c
+
+    def test_center(self, ctrl: ScrcpyController):
+        assert ctrl._to_absolute(0.5, 0.5) == (480, 270)
+
+    def test_top_left(self, ctrl: ScrcpyController):
+        assert ctrl._to_absolute(0.0, 0.0) == (0, 0)
+
+    def test_bottom_right(self, ctrl: ScrcpyController):
+        assert ctrl._to_absolute(1.0, 1.0) == (960, 540)
+
+    def test_quarter(self, ctrl: ScrcpyController):
+        assert ctrl._to_absolute(0.25, 0.75) == (240, 405)
+
+    def test_high_resolution(self):
+        """1920x1080 分辨率下转换正确。"""
+        c = ScrcpyController(serial='test')
+        c._resolution = (1920, 1080)
+        assert c._to_absolute(0.5, 0.5) == (960, 540)
+
+
+# ═══════════════════════════════════════════════
+# ScrcpyController — 控制流编排
 # ═══════════════════════════════════════════════
 
 
 class TestScrcpyControllerControlFlow:
-    """测试 click/swipe/key_event/text 通过控制流发送正确的二进制消息。"""
+    """测试 click/swipe/long_tap/key_event/text 的控制流编排。
+
+    在 _inject_touch / _inject_keycode / _inject_text / _set_clipboard 边界上
+    断言控制器发出了语义正确的动作序列、坐标与文本路由，而不关心底层字节如何打包。
+
+    动作码取自 Android 官方定义（不导入实现侧常量，从而能捕获实现侧常量写错的 bug）：
+    - MotionEvent: ACTION_DOWN=0, ACTION_UP=1, ACTION_MOVE=2
+    - KeyEvent:    ACTION_DOWN=0, ACTION_UP=1
+    """
 
     @pytest.fixture
     def ctrl(self) -> ScrcpyController:
-        """创建一个 mock 设备 + mock 控制通道的 ScrcpyController。"""
         c = ScrcpyController(serial='test')
         c._resolution = (960, 540)
         c._device = MagicMock()
-        c._alive = True
-        c._control_socket = MagicMock()
         return c
 
-    @staticmethod
-    def _parse_touch(data: bytes) -> tuple:
-        """解析 INJECT_TOUCH_EVENT 消息，返回各字段元组。
-
-        布局：type(1) | action(1) | pointer_id(8) | x(4) | y(4)
-              | width(2) | height(2) | pressure(2) | action_button(4) | buttons(4)
-
-        返回索引：[0]type [1]action [2]pointer_id [3]x [4]y
-                  [5]width [6]height [7]pressure [8]action_button [9]buttons
-        """
-        return struct.unpack('>BBqIIHHHII', data)
-
-    def test_click_center(self, ctrl: ScrcpyController):
-        """click(0.5, 0.5) 在 960x540 上 → DOWN+UP at (480, 270)。"""
-        sock = ctrl._control_socket
+    def test_click_down_then_up(self, ctrl: ScrcpyController):
+        """click = 同一点先 DOWN(pressure=1) 后 UP(pressure=0)。"""
+        ctrl._inject_touch = MagicMock()
         ctrl.click(0.5, 0.5, delay=False)
-        assert sock.sendall.call_count == 2
-        down = self._parse_touch(sock.sendall.call_args_list[0].args[0])
-        up = self._parse_touch(sock.sendall.call_args_list[1].args[0])
-        assert down[0] == _TYPE_INJECT_TOUCH_EVENT
-        assert down[1] == _ACTION_DOWN
-        assert down[3] == 480 and down[4] == 270
-        assert up[1] == _ACTION_UP
-        assert down[5] == 960 and down[6] == 540  # width, height
+        assert ctrl._inject_touch.call_args_list == [
+            call(0, 0.5, 0.5, pressure=1.0),  # ACTION_DOWN
+            call(1, 0.5, 0.5, pressure=0.0),  # ACTION_UP
+        ]
 
-    def test_click_top_left(self, ctrl: ScrcpyController):
-        ctrl.click(0.0, 0.0, delay=False)
-        down = self._parse_touch(ctrl._control_socket.sendall.call_args_list[0].args[0])
-        assert down[3] == 0 and down[4] == 0
-
-    def test_click_bottom_right(self, ctrl: ScrcpyController):
-        ctrl.click(1.0, 1.0, delay=False)
-        down = self._parse_touch(ctrl._control_socket.sendall.call_args_list[0].args[0])
-        assert down[3] == 960 and down[4] == 540
-
-    def test_click_quarter(self, ctrl: ScrcpyController):
-        ctrl.click(0.25, 0.75, delay=False)
-        down = self._parse_touch(ctrl._control_socket.sendall.call_args_list[0].args[0])
-        assert down[3] == 240 and down[4] == 405
-
-    def test_swipe_down_move_up(self, ctrl: ScrcpyController):
-        """swipe 发送 DOWN、中间多个 MOVE、最后 UP。"""
-        sock = ctrl._control_socket
+    def test_swipe_down_moves_up(self, ctrl: ScrcpyController):
+        """swipe = DOWN → 若干 MOVE → UP，首末坐标落在两端点。"""
+        ctrl._inject_touch = MagicMock()
         ctrl.swipe(0.1, 0.2, 0.9, 0.8, duration=0.1, delay=False)
-        frames = [c.args[0] for c in sock.sendall.call_args_list]
-        first = self._parse_touch(frames[0])
-        last = self._parse_touch(frames[-1])
-        assert first[0] == _TYPE_INJECT_TOUCH_EVENT
-        assert first[1] == _ACTION_DOWN
-        assert first[3] == 96 and first[4] == 108
-        assert last[1] == _ACTION_UP
-        assert last[3] == 864 and last[4] == 432
-        # 中间应有 MOVE
-        middle_actions = {self._parse_touch(f)[1] for f in frames[1:-1]}
-        assert _ACTION_MOVE in middle_actions
+        calls = ctrl._inject_touch.call_args_list
+        actions = [c.args[0] for c in calls]
+        assert actions[0] == 0  # DOWN
+        assert actions[-1] == 1  # UP
+        assert 2 in actions[1:-1]  # 中间至少一个 MOVE
+        assert calls[0].args[1:3] == (0.1, 0.2)  # 起点
+        assert calls[-1].args[1:3] == (0.9, 0.8)  # 终点
 
-    def test_long_tap_down_then_up(self, ctrl: ScrcpyController):
-        """long_tap 发送 DOWN、等待、UP，坐标相同。"""
-        sock = ctrl._control_socket
-        ctrl.long_tap(0.5, 0.5, duration=0.05)
-        assert sock.sendall.call_count == 2
-        down = self._parse_touch(sock.sendall.call_args_list[0].args[0])
-        up = self._parse_touch(sock.sendall.call_args_list[1].args[0])
-        assert down[3] == up[3] == 480
-        assert down[4] == up[4] == 270
+    def test_long_tap_down_then_up_same_point(self, ctrl: ScrcpyController):
+        """long_tap = 同一点 DOWN → 保持 → UP。"""
+        ctrl._inject_touch = MagicMock()
+        ctrl.long_tap(0.5, 0.5, duration=0.01)
+        calls = ctrl._inject_touch.call_args_list
+        assert len(calls) == 2
+        assert calls[0].args[1:3] == calls[1].args[1:3] == (0.5, 0.5)
 
-    def test_key_event_sends_keycode_down_up(self, ctrl: ScrcpyController):
-        """key_event 通过 INJECT_KEYCODE 发送 DOWN+UP。"""
-        sock = ctrl._control_socket
-        ctrl.key_event(4, delay=False)  # BACK
-        assert sock.sendall.call_count == 2
-        # 每条 14 字节：type(1) action(1) keycode(4) repeat(4) meta(4)
-        d0 = sock.sendall.call_args_list[0].args[0]
-        d1 = sock.sendall.call_args_list[1].args[0]
-        assert len(d0) == 14 and len(d1) == 14
-        t0, a0, k0, _, _ = struct.unpack('>BBIII', d0)
-        t1, a1, k1, _, _ = struct.unpack('>BBIII', d1)
-        assert t0 == _TYPE_INJECT_KEYCODE and t1 == _TYPE_INJECT_KEYCODE
-        assert k0 == 4 and k1 == 4
-        assert a0 == 0  # DOWN
-        assert a1 == 1  # UP
+    def test_key_event_down_then_up(self, ctrl: ScrcpyController):
+        """key_event = 同一 keycode 先 DOWN 后 UP。"""
+        ctrl._inject_keycode = MagicMock()
+        ctrl.key_event(4, delay=False)  # KEYCODE_BACK
+        assert ctrl._inject_keycode.call_args_list == [
+            call(4, action=0),  # ACTION_DOWN
+            call(4, action=1),  # ACTION_UP
+        ]
 
-    def test_text_sends_inject_text(self, ctrl: ScrcpyController):
-        """text 通过 INJECT_TEXT 发送 UTF-8 文本。"""
-        sock = ctrl._control_socket
+    def test_text_ascii_uses_inject_text(self, ctrl: ScrcpyController):
+        """纯 ASCII 文本走 INJECT_TEXT 低延迟路径。"""
+        ctrl._inject_text = MagicMock()
+        ctrl._set_clipboard = MagicMock()
         ctrl.text('hello', delay=False)
-        assert sock.sendall.call_count == 1
-        data = sock.sendall.call_args_list[0].args[0]
-        msg_type = data[0]
-        length = struct.unpack('>I', data[1:5])[0]
-        payload = data[5:]
-        assert msg_type == _TYPE_INJECT_TEXT
-        assert length == 5
-        assert payload == b'hello'
+        ctrl._inject_text.assert_called_once_with('hello')
+        ctrl._set_clipboard.assert_not_called()
 
-    def test_text_chinese_uses_set_clipboard(self, ctrl: ScrcpyController):
-        """中文文本走 SET_CLIPBOARD+paste 路径。"""
-        sock = ctrl._control_socket
+    def test_text_non_ascii_uses_clipboard(self, ctrl: ScrcpyController):
+        """含中文等多字节字符走 SET_CLIPBOARD + paste。"""
+        ctrl._inject_text = MagicMock()
+        ctrl._set_clipboard = MagicMock()
         ctrl.text('你好', delay=False)
-        assert sock.sendall.call_count == 1
-        data = sock.sendall.call_args_list[0].args[0]
-        # type(1) | sequence(8) | paste(1) | length(4) | utf8
-        assert data[0] == _TYPE_SET_CLIPBOARD
-        assert data[9] == 1  # paste=True
-        length = struct.unpack('>I', data[10:14])[0]
-        assert length == 6  # 你好 = 6 bytes UTF-8
-        assert data[14:] == '你好'.encode('utf-8')
+        ctrl._set_clipboard.assert_called_once_with('你好', paste=True)
+        ctrl._inject_text.assert_not_called()
 
-    def test_high_resolution(self):
-        """1920x1080 分辨率下坐标转换正确。"""
-        c = ScrcpyController(serial='test')
-        c._resolution = (1920, 1080)
-        c._device = MagicMock()
-        c._alive = True
-        c._control_socket = MagicMock()
-        c.click(0.5, 0.5, delay=False)
-        down = TestScrcpyControllerControlFlow._parse_touch(
-            c._control_socket.sendall.call_args_list[0].args[0]
-        )
-        assert down[3] == 960 and down[4] == 540
-
-    def test_control_socket_none_raises(self, ctrl: ScrcpyController):
-        """控制通道未连接时调用触控应抛异常。"""
+    def test_send_control_raises_when_disconnected(self, ctrl: ScrcpyController):
+        """控制通道未连接时 _send_control 抛异常。"""
         ctrl._control_socket = None
         ctrl._alive = False
         ctrl._ensure_stream_alive = MagicMock(side_effect=EmulatorConnectionError('mock'))
