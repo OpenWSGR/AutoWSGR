@@ -49,7 +49,7 @@ class FleetInfo:
     ship_damage: dict[int, ShipDamageState] = field(default_factory=dict)
     """槽位号 (0-5) → 血量状态。"""
 
-    def to_ships(self, names: list[str | None] | None = None) -> list[Ship]:
+    def to_ships(self, names: list[str | None] | list[str] | None = None) -> list[Ship]:
         """将舰队信息转换为 Ship 列表。
 
         Parameters
@@ -72,7 +72,7 @@ class FleetInfo:
                 continue
             name = ''
             if names and i < len(names) and names[i] is not None:
-                name = names[i]
+                name = names[i] or ''
             ships.append(
                 Ship(
                     name=name,
