@@ -171,6 +171,8 @@ class ChooseShipPage:
         """
         _log.debug("[UI] 选船 → 输入舰船名 '{}'", name)
         self._ctrl.text(name)
+        # 等待输入同步
+        time.sleep(0.1)
 
     def ensure_dismiss_keyboard(self) -> None:
         """点击空白区域关闭软键盘。"""
@@ -181,6 +183,8 @@ class ChooseShipPage:
             lambda screen: PixelChecker.check_signature(screen, INPUT_SIGNATURE).matched,
             timeout=5.0,
         )
+        # 等待键盘关闭
+        time.sleep(0.2)
 
     def click_first_result(self) -> None:
         """点击搜索结果中的第一个舰船。"""
