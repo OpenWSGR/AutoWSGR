@@ -317,6 +317,8 @@ class TaskScheduler:
             len(self._triggers),
         )
         self._last_date = date.today()  # noqa: DTZ011  # 本地墙上时钟
+        # 启动时校准每日掉落计数器 (避免首次常规战误触发, 见 _sync_initial_counts)
+        self._sync_initial_counts()
 
         while not self._ctx.stop_event.is_set():
             self._check_daily_reset()
@@ -412,6 +414,45 @@ class TaskScheduler:
         self._ctx.dropped_loot_count = 0
         self._ctx.quick_repair_used = 0
         self._last_date = today
+
+    # ── 启动校准 ──
+
+    def _sync_initial_counts(self) -> None:
+        """启动时校准每日掉落计数器, 避免常规战误触发。
+
+        仅当启用了 ``stop_max_ship`` / ``stop_max_loot`` (二者依赖 ``ctx`` 每日
+        计数器判断是否达上限) 时执行; 否则跳过 (常规战无限打, 计数器无需校准)。
+
+        ``ctx.dropped_ship_count`` / ``dropped_loot_count`` 初始为 0; 若不同步,
+        首次 :meth:`NormalFightTrigger.should_fire` 会因 ``0 >= limit`` 为假而误
+        产出一场常规战 (即使游戏内已达上限)。
+
+        校准失败 (OCR 引擎不可用 / 导航异常) **不降级** —— 战斗未必掉落, 降级
+        靠首场战斗自行校准不可靠 (计数器可能一直为 0 → 持续误触发)。改为直接
+        禁用依赖计数器的常规战触发器并提示用户, 不阻塞主循环。
+        """
+        da = self._ctx.config.daily_automation
+        if da is None or not (da.stop_max_ship or da.stop_max_loot):
+            return
+        try:
+            self._ctx.sync_daily_drop_counts()
+        except Exception as exc:
+            _log.opt(exception=True).error(
+                '[Scheduler] 每日掉落计数器校准失败, 已禁用常规战触发器以避免误触发: {}',
+                exc,
+            )
+            _log.error(
+                '[Scheduler] 请检查 OCR 引擎 (ocr_backend) 与截图/导航是否正常后重启脚本',
+            )
+            self._disable_normal_fight(reason=str(exc))
+
+    def _disable_normal_fight(self, reason: str) -> None:
+        """禁用所有常规战触发器 (计数器无法校准时, 避免误触发)。"""
+        from autowsgr.scheduler.triggers import NormalFightTrigger
+
+        for trigger in self._triggers:
+            if isinstance(trigger, NormalFightTrigger):
+                trigger.disable(reason=reason)
 
     # ── 远征检查 ──
 

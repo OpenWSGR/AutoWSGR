@@ -8,15 +8,14 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING
+import types
+
+import pytest
 
 from autowsgr.combat import CombatResult
+from autowsgr.context import GameContext
 from autowsgr.scheduler.scheduler import BatchRunnerAdapter, FightTask, TaskScheduler
 from autowsgr.types import ConditionFlag
-
-
-if TYPE_CHECKING:
-    import pytest
 
 
 # ── 假 runner ──
@@ -218,3 +217,194 @@ def test_starvation_not_warned_when_bath_repair_off():
         normal_fight_tasks=[{'name': 'x'}],
     )
     assert _bath_repair_starved_by_normal_fight(cfg) is False
+
+
+# ── 启动计数器校准 (避免常规战误触发) ──
+
+
+class _FakeDA:
+    """daily_automation 替身: 仅暴露 stop_max_ship / stop_max_loot。"""
+
+    def __init__(self, stop_max_ship: bool = False, stop_max_loot: bool = False) -> None:
+        self.stop_max_ship = stop_max_ship
+        self.stop_max_loot = stop_max_loot
+
+
+def _ctx_with_da(da: _FakeDA | None) -> _FakeCtx:
+    ctx = _FakeCtx()
+    ctx.config = types.SimpleNamespace(daily_automation=da)
+    return ctx
+
+
+def test_sync_initial_counts_skipped_when_no_stop_limit():
+    """未启用 stop_max_ship/loot → 不校准 (常规战无限打, 计数器无需校准)。"""
+    ctx = _ctx_with_da(_FakeDA(stop_max_ship=False, stop_max_loot=False))
+    called: list = []
+    ctx.sync_daily_drop_counts = lambda: called.append(1)  # type: ignore[method-assign]
+
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    sched._sync_initial_counts()
+    assert called == []
+
+
+def test_sync_initial_counts_runs_when_stop_max_ship():
+    """启用 stop_max_ship → 调 ctx.sync_daily_drop_counts 校准。"""
+    ctx = _ctx_with_da(_FakeDA(stop_max_ship=True))
+    called: list = []
+    ctx.sync_daily_drop_counts = lambda: called.append(1)  # type: ignore[method-assign]
+
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    sched._sync_initial_counts()
+    assert called == [1]
+
+
+def test_sync_initial_counts_runs_when_stop_max_loot():
+    """启用 stop_max_loot (未启用 ship) → 仍校准。"""
+    ctx = _ctx_with_da(_FakeDA(stop_max_loot=True))
+    called: list = []
+    ctx.sync_daily_drop_counts = lambda: called.append(1)  # type: ignore[method-assign]
+
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    sched._sync_initial_counts()
+    assert called == [1]
+
+
+def test_sync_initial_counts_skipped_when_da_none():
+    """未配置 daily_automation (None) → 不校准。"""
+    ctx = _ctx_with_da(None)
+    called: list = []
+    ctx.sync_daily_drop_counts = lambda: called.append(1)  # type: ignore[method-assign]
+
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    sched._sync_initial_counts()
+    assert called == []
+
+
+def test_sync_initial_counts_disables_normal_fight_on_failure():
+    """校准抛异常 → 不降级, 直接禁用 NormalFightTrigger 并提示 (不阻塞主循环)。"""
+    from autowsgr.scheduler.triggers import NormalFightPlan, NormalFightTrigger
+
+    def boom() -> None:
+        raise RuntimeError('OCR 不可用')
+
+    ctx = _ctx_with_da(_FakeDA(stop_max_ship=True))
+    ctx.sync_daily_drop_counts = boom  # type: ignore[method-assign]
+
+    plan = NormalFightPlan(factory=lambda _c: object(), name='x', fleet_id=1)
+    trigger = NormalFightTrigger(priority=100, name='常规战', plans=[plan])
+
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    sched.register_trigger(trigger)
+    sched._sync_initial_counts()  # 不抛
+
+    assert trigger._disabled is True
+    assert trigger.should_fire(ctx) is None  # 禁用后不再产出
+
+
+# ── GameContext.sync_daily_drop_counts (识别 + 同步每日计数器) ──
+
+
+class _FakeSortiePage:
+    """MapPage 替身: ensure_panel no-op, get_loot_and_ship_count 返回预设值。"""
+
+    def __init__(
+        self,
+        *,
+        ship: int | None,
+        loot: int | None,
+        raises: type[Exception] | None = None,
+    ) -> None:
+        self._ship = ship
+        self._loot = loot
+        self._raises = raises
+
+    def ensure_panel(self, _panel: object) -> None:
+        return None
+
+    def get_loot_and_ship_count(self) -> types.SimpleNamespace:
+        if self._raises is not None:
+            raise self._raises('OCR 不可用')
+        return types.SimpleNamespace(ship=self._ship, loot=self._loot)
+
+
+def _patch_ctx_sortie(monkeypatch: pytest.MonkeyPatch, page: _FakeSortiePage) -> None:
+    """替换 ctx.sync_daily_drop_counts 的设备依赖 (goto_page / MapPage / sleep) 为 no-op。"""
+    import autowsgr.context.game_context as gc_mod
+    import autowsgr.ops as ops_mod
+    import autowsgr.ui as ui_mod
+
+    monkeypatch.setattr(ops_mod, 'goto_page', lambda *_a, **_kw: None)
+    monkeypatch.setattr(ui_mod, 'MapPage', lambda _ctx: page)
+    monkeypatch.setattr(gc_mod, 'time', types.SimpleNamespace(sleep=lambda *_a: None))
+
+
+def _make_ctx() -> GameContext:
+    return GameContext(ctrl=object(), config=types.SimpleNamespace(), ocr=object())  # type: ignore[arg-type]
+
+
+def test_ctx_sync_drop_counts_writes_both(monkeypatch: pytest.MonkeyPatch):
+    """读到真实计数 → 同步到 dropped_ship_count / dropped_loot_count。"""
+    _patch_ctx_sortie(monkeypatch, _FakeSortiePage(ship=500, loot=50))
+    ctx = _make_ctx()
+    ctx.dropped_ship_count = 0
+    ctx.dropped_loot_count = 0
+
+    ctx.sync_daily_drop_counts()
+    assert ctx.dropped_ship_count == 500
+    assert ctx.dropped_loot_count == 50
+
+
+def test_ctx_sync_drop_counts_ignores_none(monkeypatch: pytest.MonkeyPatch):
+    """单项 OCR 解析失败 (None) → 不覆盖, 只同步成功的那项。"""
+    _patch_ctx_sortie(monkeypatch, _FakeSortiePage(ship=None, loot=50))
+    ctx = _make_ctx()
+    ctx.dropped_ship_count = 0
+    ctx.dropped_loot_count = 0
+
+    ctx.sync_daily_drop_counts()
+    assert ctx.dropped_ship_count == 0  # None 未覆盖
+    assert ctx.dropped_loot_count == 50
+
+
+def test_ctx_sync_drop_counts_raises_on_ocr_unavailable(monkeypatch: pytest.MonkeyPatch):
+    """OCR 引擎不可用 (RuntimeError) → 抛出, 不降级, 计数保持不变。"""
+    _patch_ctx_sortie(monkeypatch, _FakeSortiePage(ship=500, loot=50, raises=RuntimeError))
+    ctx = _make_ctx()
+    ctx.dropped_ship_count = 0
+    ctx.dropped_loot_count = 0
+
+    with pytest.raises(RuntimeError):
+        ctx.sync_daily_drop_counts()
+    assert ctx.dropped_ship_count == 0  # 未同步
+    assert ctx.dropped_loot_count == 0
+
+
+# ── NormalFightTrigger.disable ──
+
+
+def test_normal_fight_trigger_disable_stops_production():
+    """disable() 后 should_fire 永远返回 None。"""
+    from autowsgr.scheduler.triggers import NormalFightPlan, NormalFightTrigger
+
+    plan = NormalFightPlan(factory=lambda _c: object(), name='x', fleet_id=1)
+    ctx = _ctx_with_da(None)
+    trigger = NormalFightTrigger(priority=100, name='常规战', plans=[plan])
+    assert trigger.should_fire(ctx) is not None  # 未禁用能产出
+
+    trigger.disable(reason='OCR 不可用')
+    assert trigger._disabled is True
+    assert trigger.should_fire(ctx) is None  # 禁用后不产出
+
+
+def test_normal_fight_trigger_disable_survives_reset():
+    """reset() (跨日) 不清除禁用 (OCR 可用性不跨日变化)。"""
+    from autowsgr.scheduler.triggers import NormalFightPlan, NormalFightTrigger
+
+    plan = NormalFightPlan(factory=lambda _c: object(), name='x', fleet_id=1)
+    ctx = _ctx_with_da(None)
+    trigger = NormalFightTrigger(priority=100, name='常规战', plans=[plan])
+    trigger.disable(reason='OCR 不可用')
+    trigger.reset()
+
+    assert trigger._disabled is True
+    assert trigger.should_fire(ctx) is None

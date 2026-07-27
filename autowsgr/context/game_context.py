@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -215,3 +216,42 @@ class GameContext:
             fleet_id,
             [s.damage_state.name for s in fleet.ships],
         )
+
+    def sync_daily_drop_counts(self) -> None:
+        """导航到出征面板, 识别今日已获取舰船/战利品数并同步每日计数器。
+
+        ``dropped_ship_count`` / ``dropped_loot_count`` 初始为 0, 仅靠战斗后
+        同步不可靠 (战斗未必掉落舰船/战利品), 故调度层在 ``run_daily`` 启动时
+        调本方法校准真实值, 避免依赖计数器的停止条件 (``stop_max_ship`` /
+        ``stop_max_loot``) 首次误判而触发一场多余的常规战。读取后返回主页面。
+
+        Raises
+        ------
+        RuntimeError
+            OCR 引擎不可用, 无法识别掉落数量。调用方应据此**禁用**依赖计数器
+            的触发器 (常规战) 并提示用户, 而非降级 —— 降级会退化为"靠首场
+            战斗自行校准", 但战斗未必掉落, 计数器可能一直为 0 → 持续误触发。
+        """
+        from autowsgr.ops import goto_page
+        from autowsgr.types import PageName
+        from autowsgr.ui import MapPage, MapPanel
+
+        goto_page(self, PageName.MAP)
+        map_page = MapPage(self)
+        map_page.ensure_panel(MapPanel.SORTIE)
+        time.sleep(0.25)
+        # OCR 引擎不可用时 get_loot_and_ship_count 抛 RuntimeError — 不吞, 上抛
+        counts = map_page.get_loot_and_ship_count()
+        if counts.ship is not None:
+            self.dropped_ship_count = counts.ship
+        if counts.loot is not None:
+            self.dropped_loot_count = counts.loot
+        _log.info(
+            '[Context] 每日掉落计数同步: 舰船 {}, 战利品 {}',
+            counts.ship,
+            counts.loot,
+        )
+        try:
+            goto_page(self, PageName.MAIN)
+        except Exception:
+            _log.warning('[Context] 每日掉落计数同步后返回主页面失败')

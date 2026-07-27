@@ -88,16 +88,17 @@ def repair_one_available(
     *,
     blacklist: list[str] | None = None,
 ) -> bool:
-    """有空闲修理槽时, 派修修理时间最长的非黑名单舰船 (调度入口)。
+    """有空闲修理槽时, 派修直到填满所有空闲槽或无可修舰船 (调度入口)。
 
     由 ``auto_daily`` 调度器以 :class:`~autowsgr.scheduler.triggers.TimerTrigger`
     周期产出, 经优先级队列在所有战斗任务 (战役/演习/常规战) 完成后才执行
     (空闲修船, 见 ``daily_plan.PRIO_BATH_REPAIR``)。流程:
 
     1. ``ctx.bathroom`` 无空闲槽 → 直接返回 (省一次开 overlay)。
-    2. 导航浴室 → 开选择修理 overlay → 修最长非黑名单船。
-    3. 成功 → ``ctx.bathroom.occupy`` 记录释放时间, 返回 ``True``。
-       浴场满 → ``mark_unknown`` 退避, 返回 ``False``。
+    2. 导航浴室 → 循环 ``开选择修理 overlay → 修最长非黑名单船 → occupy 一个槽``,
+       直到无空闲槽 / 无可修候选 / 浴场满。
+       (游戏机制: 点击一艘船后 overlay 自动关闭, 故每修一艘需重开 overlay。)
+    3. 派完后 ``ctx.bathroom.occupy`` 记录各槽释放时间, 返回主界面。
 
     Parameters
     ----------
@@ -109,7 +110,7 @@ def repair_one_available(
     Returns
     -------
     bool
-        ``True`` 成功派出一艘修理; ``False`` 无空位 / 无可修船 / 浴场满。
+        ``True`` 至少派出一艘修理; ``False`` 无空位 / 无可修船 / 浴场满。
     """
     bath = ctx.bathroom
     bath.slot_count = ctx.config.bathroom_count
@@ -117,27 +118,35 @@ def repair_one_available(
         _log.debug('[OPS] 浴室无空闲槽, 跳过修理')
         return False
 
+    blocked = set(blacklist or [])
     goto_page(ctx, PageName.BATH)
     page = BathPage(ctx)
-    page.go_to_choose_repair()
-    secs = page.repair_longest(blacklist=set(blacklist or []))
+    repaired = 0
 
-    if secs > 0:
-        bath.occupy(secs)
-        _log.info('[OPS] 浴室修理派单成功 ({}s)', secs)
-        result = True
-    elif secs == -2:
-        # 浴场满: 状态不可靠, 标记未知下次重试
-        bath.mark_unknown()
-        _log.warning('[OPS] 浴场已满, 稍后重试')
-        result = False
-    else:
-        # secs == -1: 无可修候选, 状态不变
-        result = False
+    # 循环填满所有空闲槽: 每修一艘 overlay 即自动关闭, 故每轮需重开 overlay。
+    # 终止条件: 无空闲槽 (is_available False) / 无可修候选 (secs==-1) /
+    # 浴场满 (secs==-2)。空闲槽数 = slot_count, 故循环上限即槽位数, 不会死循环。
+    while bath.is_available():
+        page.go_to_choose_repair()
+        secs = page.repair_longest(blacklist=blocked)
+
+        if secs > 0:
+            bath.occupy(secs)
+            repaired += 1
+            _log.info('[OPS] 浴室修理派单成功 ({}s, 本轮已派 {} 艘)', secs, repaired)
+            continue
+        if secs == -2:
+            # 浴场满: 状态不可靠, 标记未知下次重试
+            bath.mark_unknown()
+            _log.warning('[OPS] 浴场已满, 稍后重试 (本轮已派 {} 艘)', repaired)
+            break
+        # secs == -1 (无可修候选) 或 == 0 (修理时间解析失败): 状态不变, 结束派单
+        _log.debug('[OPS] 无可修理舰船, 结束派单 (本轮已派 {} 艘)', repaired)
+        break
 
     time.sleep(1.0)
     try:
         goto_page(ctx, PageName.MAIN)
     except Exception:
         _log.warning('[OPS] 浴室修理后返回主界面失败')
-    return result
+    return repaired > 0

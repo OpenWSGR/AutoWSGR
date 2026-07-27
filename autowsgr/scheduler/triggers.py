@@ -303,8 +303,24 @@ class NormalFightTrigger(Trigger):
         self._current: NormalFightPlan | None = None
         # 无限 plan (target=None) 的轮询游标
         self._round_robin = 0
+        # 是否被禁用 (不再产出任务)。启动校准计数器失败 (OCR 不可用) 等场景由
+        # 调度层设置; 持续整个会话, reset() 不清除 (OCR 可用性不跨日变化)。
+        self._disabled = False
+
+    def disable(self, reason: str = '') -> None:
+        """禁用本触发器 (不再产出任务)。
+
+        用于依赖的每日计数器无法校准 (OCR 引擎不可用) 等场景 —— 与其降级后
+        靠首场战斗自行校准 (战斗未必掉落, 计数器可能一直为 0 → 持续误触发),
+        不如直接禁用并提示用户。持续整个会话, :meth:`reset` 不清除。
+        """
+        if not self._disabled:
+            self._disabled = True
+            _log.warning('[Trigger] 常规战触发器已禁用: {}', reason)
 
     def should_fire(self, ctx: GameContext) -> FightTask | None:
+        if self._disabled:
+            return None
         if not self._idle:
             return None
         if self._is_exhausted(ctx):
