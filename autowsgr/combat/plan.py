@@ -271,7 +271,21 @@ class CombatPlan:
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CombatPlan:
+        from autowsgr.infra.config_compat import (
+            LegacyConfigError,
+            detect_legacy_plan,
+        )
+
         data = load_yaml(path)
+        legacy = detect_legacy_plan(data)
+        if legacy:
+            raise LegacyConfigError(
+                f'计划文件 {path} 含 classic 老版本格式, 拒绝加载:\n  - '
+                + '\n  - '.join(legacy)
+                + '\n请先运行迁移工具迁移计划目录 (原文件不动):\n'
+                '  python tools/migrate_config.py --planroot <计划目录>'
+                '  (默认输出到 migrated_config/)',
+            )
         return cls.from_dict(data, name=Path(path).stem)
 
     @classmethod
