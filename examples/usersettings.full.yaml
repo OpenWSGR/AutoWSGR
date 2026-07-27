@@ -22,8 +22,6 @@ emulator:
 # ═══════════════════════════════════════════
 account:
   game_app: 官服                   # 官服 / 小米服 / 应用宝服
-  account: null                    # 游戏账号 (用于自动登录)
-  password: null                   # 游戏密码
 
 # ═══════════════════════════════════════════
 # OCR 引擎
@@ -46,14 +44,7 @@ log:
   # dir: null                      # 日志保存路径; null = 自动按日期生成
 
   # 细粒度显示开关
-  show_map_node: false
-  show_android_input: true
-  show_enemy_rules: true
-  show_fight_stage: true
-  show_chapter_info: true
-  show_match_fight_stage: true
   show_decisive_battle_info: true
-  show_ocr_info: true
   show_emulator_debug: true         # 是否输出 emulator 通道 DEBUG (click/swipe 等操作)
   show_ui_debug: true               # 是否输出 ui 通道 DEBUG (页面识别/等待轮询)
   show_vision_debug: true           # 是否输出 vision 通道 DEBUG (模板匹配规则结果)
@@ -69,12 +60,10 @@ log:
 # ═══════════════════════════════════════════
 # 脚本行为
 # ═══════════════════════════════════════════
-delay: 1.5                         # 延迟时间基本单位 (秒)
-check_page: true                   # 启动时是否检查游戏页面
 dock_full_destroy: true            # 船坞满时自动清空
 repair_manually: false             # 是否手动修理
-bathroom_feature_count: 1          # 浴室装饰数 (1-3)
-bathroom_count: 2                  # 修理位置总数 (≤12)
+bathroom_feature_count: 1          # 预留: 智能浴场装饰调度 (暂未启用)
+bathroom_count: 2                  # 浴室修理槽位数 (auto_bath_repair 空位调度用)
 
 # ── 解装设置 ──
 destroy_ship_work_mode: 不启用     # 不启用 / 黑名单 / 白名单
@@ -85,7 +74,6 @@ remove_equipment_mode: true        # 拆解时默认卸下装备
 
 # ── 数据路径 ──
 plan_root: null                    # 自定义计划文件目录
-ship_name_file: null               # 自定义舰船名文件
 
 # ═══════════════════════════════════════════
 # 日常自动化 (不需要可删除整个 daily_automation 块)
@@ -95,6 +83,7 @@ daily_automation:
   auto_expedition: true            # 自动重复远征
   auto_gain_bonus: true            # 任务完成时自动点击
   auto_bath_repair: true           # 空闲时自动澡堂修理
+  bath_repair_blacklist: []        # 不修理的舰船名 (auto_bath_repair 黑名单)
   auto_set_support: false          # 自动开启战役支援
 
   # 战役
