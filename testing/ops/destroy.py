@@ -26,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:  # noqa: S110
     pass
 from loguru import logger
@@ -104,7 +104,7 @@ def main() -> None:
         from autowsgr.ops.destroy import destroy_ships
 
         destroy_ships(
-            ctrl,
+            ctx,
             ship_types=ship_types,
             remove_equipment=args.remove_equipment,
         )

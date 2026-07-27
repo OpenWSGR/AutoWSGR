@@ -202,7 +202,11 @@ def match_mission_name(
         and min(len(name), len(ocr_text)) >= 0.7 * max(len(name), len(ocr_text))
     ]
     if substring_hits:
-        return max(substring_hits, key=len)
+        longest = substring_hits[0]
+        for name in substring_hits[1:]:
+            if len(name) > len(longest):
+                longest = name
+        return longest
 
     # Levenshtein 模糊匹配
     from autowsgr.vision.ocr import _edit_distance

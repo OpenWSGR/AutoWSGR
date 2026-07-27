@@ -30,8 +30,8 @@ from pathlib import Path
 # ── UTF-8 输出兼容 (Windows 终端) ──
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:
     try:
         if isinstance(sys.stdout, io.TextIOWrapper):
@@ -46,7 +46,7 @@ except Exception:
         pass
 from loguru import logger
 
-from autowsgr.emulator import ADBController
+from autowsgr.emulator import ScrcpyController
 from autowsgr.infra import ConfigManager, setup_logger
 from autowsgr.ops.startup import restart_game
 from autowsgr.types import GameAPP
@@ -105,7 +105,7 @@ def main() -> None:
 
     # ── 连接设备 ──
     logger.info('正在连接设备{}...', f' ({serial})' if serial else ' (自动检测)')
-    ctrl = ADBController(serial=serial or cfg.emulator.serial)
+    ctrl = ScrcpyController(serial=serial or cfg.emulator.serial)
     try:
         dev_info = ctrl.connect()
         logger.info(

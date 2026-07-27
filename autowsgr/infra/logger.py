@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     import numpy as np
-    from loguru import Logger
+    from loguru import Logger, Record
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -103,7 +103,7 @@ _channel_levels: dict[str, int] = {}
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def _src_patcher(record: dict) -> None:
+def _src_patcher(record: Record) -> None:
     """将 record["file"].path 转为以项目根目录为基准的相对路径，并存入 extra["src"]。
 
     格式示例：``emulator/controller.py:346``
@@ -382,11 +382,11 @@ def save_image(
         保存的文件路径，未保存时返回 None。
     """
 
-    target_dir = str(img_dir or _image_dir)
-    target_dir = Path(target_dir)
+    target_dir = img_dir or _image_dir
     if target_dir is None:
         raise ValueError('未配置图片保存目录，请在 setup_logger 中设置 log_dir 并启用 save_images')
 
+    target_dir = Path(target_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
     ts = _time.strftime('%H%M%S') + f'_{int(_time.monotonic() * 1000) % 1000:03d}'
     filename = f'{tag}_{ts}.png'

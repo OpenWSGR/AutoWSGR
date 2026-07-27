@@ -52,6 +52,7 @@ ignore-words = "docs/spelling_wordlist.txt"
 
 [tool.pytest.ini_options]
 testpaths = ["testing"]
+addopts = ["--import-mode=importlib"]
 
 [tool.ruff]
 target-version = "py312"
@@ -211,3 +212,23 @@ inline-quotes = "single"
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+exclude = [
+    ".venv/**",
+    "dist/**",
+    "build/**",
+    ".git/**",
+    ".pytest_cache/**",
+    ".ruff_cache/**",
+]
+
+[tool.ty.rules]
+# Treat unresolved-attribute as warning to reduce noise from platform-specific
+# modules (e.g. winreg on Linux) and third-party C extensions during beta.
+unresolved-attribute = "warn"
+# Ban invalid / unused type-ignore comments.
+unused-type-ignore-comment = "error"

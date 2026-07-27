@@ -27,3 +27,13 @@ repos:
     hooks:
       - id: codespell
         additional_dependencies: [".[toml]"]
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: ty type check
+        description: Run Astral's ty type checker.
+        entry: uvx ty check
+        language: system
+        pass_filenames: false
+        require_serial: true
+        types: [python]

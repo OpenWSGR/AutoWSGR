@@ -30,10 +30,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import Formation
+
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 # 允许在规则中出现的舰种标识符
@@ -134,7 +138,7 @@ class Condition:
         if self.op not in _OPERATORS:
             raise ValueError(f"不支持的操作符: '{self.op}'，支持: {list(_OPERATORS)}")
 
-    def evaluate(self, context: dict[str, int | float]) -> bool:
+    def evaluate(self, context: Mapping[str, int | float]) -> bool:
         """在给定上下文中评估此条件。"""
         if '+' in self.field:
             parts = [p.strip() for p in self.field.split('+')]
@@ -159,7 +163,7 @@ class Rule:
     conditions: list[Condition]
     action: RuleAction
 
-    def evaluate(self, context: dict[str, int | float]) -> bool:
+    def evaluate(self, context: Mapping[str, int | float]) -> bool:
         """所有条件是否均满足。"""
         return all(c.evaluate(context) for c in self.conditions)
 
@@ -184,7 +188,7 @@ class RuleEngine:
     rules: list[Rule] = field(default_factory=list)
     default: RuleAction = field(default_factory=RuleAction.no_action)
 
-    def evaluate(self, context: dict[str, int | float]) -> RuleAction:
+    def evaluate(self, context: Mapping[str, int | float]) -> RuleAction:
         """对敌方编成上下文评估所有规则。
 
         Parameters

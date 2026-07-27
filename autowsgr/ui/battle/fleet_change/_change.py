@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 import time
 from collections import Counter
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.ui.battle.constants import CLICK_SHIP_SLOT
@@ -292,7 +292,7 @@ class FleetChangeMixin(FleetDetectMixin):
         return name or None
 
     @staticmethod
-    def _extract_selector(slot: object | None) -> dict | None:
+    def _extract_selector(slot: Any | None) -> dict | None:
         if slot is None or isinstance(slot, str):
             return None
 

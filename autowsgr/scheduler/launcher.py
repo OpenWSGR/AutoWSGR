@@ -155,6 +155,7 @@ class Launcher:
         """
         if self._ocr is None:
             self.create_ocr()
+        assert self._ocr is not None
 
         ctx = GameContext(
             ctrl=self.ctrl,
