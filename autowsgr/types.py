@@ -406,6 +406,9 @@ class ConditionFlag(StrEnum):
     """跳过战斗"""
     SL = 'SL'
     """需要 / 进行了 SL 操作"""
+    ACTION_FAILED = 'action failed'
+    """操作失败 (子任务异常, 调度器捕获后结束本子任务; 不属于成功/耗尽标志,
+    故触发器 on_done 不会计入完成次数、不会误判耗尽)"""
 
 
 class PageName(StrEnum):
