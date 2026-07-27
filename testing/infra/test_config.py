@@ -330,7 +330,14 @@ class TestConfigCompat:
     def test_operation_delay_field_sets_globals(self):
         from autowsgr.infra import config
 
-        cfg = UserConfig(operation_delay_min=1.0, operation_delay_max=2.0)
+        # 给定 serial+path 的 emulator: 既满足 linux/WSL 分支的强制要求,
+        # 又让 windows 分支跳过 auto_emulator_path (避免在非 Windows 上 import winreg)。
+        # 本用例只验证 operation_delay 字段 → 模块全局, 与模拟器无关。
+        cfg = UserConfig(
+            emulator=EmulatorConfig(serial='emulator-5554', path='/fake/dnplayer.exe'),
+            operation_delay_min=1.0,
+            operation_delay_max=2.0,
+        )
         assert cfg.operation_delay_min == 1.0
         assert cfg.operation_delay_max == 2.0
         assert config.OPERATION_DELAY_MIN == 1.0
