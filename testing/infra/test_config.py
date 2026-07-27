@@ -330,6 +330,97 @@ dock_full_destroy: false
         assert 'emulator_type' not in out
 
 
+# ── PlanCompat (计划文件迁移: classic fleet 前导空占位) ──
+
+
+class TestPlanCompat:
+    """计划文件向下兼容迁移: migrate_plan_dict + classic 1-indexed fleet。"""
+
+    def test_leading_empty_string_stripped(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        out = migrate_plan_dict({'fleet': ['', '吹雪', '明斯克', '胡德', '赤诚', '']})
+        # 前导 "" 占位被剥离; 尾部 "" 保留 (运行期归一化为 None = 不关心该槽位)
+        assert out['fleet'] == ['吹雪', '明斯克', '胡德', '赤诚', '']
+
+    def test_leading_none_stripped(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        out = migrate_plan_dict({'fleet': [None, '吹雪', '明斯克']})
+        assert out['fleet'] == ['吹雪', '明斯克']
+
+    def test_multiple_leading_empties_stripped(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        out = migrate_plan_dict({'fleet': ['', '', '吹雪']})
+        assert out['fleet'] == ['吹雪']
+
+    def test_whitespace_only_treated_as_empty(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        out = migrate_plan_dict({'fleet': ['   ', '吹雪']})
+        assert out['fleet'] == ['吹雪']
+
+    def test_clean_fleet_unchanged(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        clean = ['飞龙', 'U-1206', 'U-47', '射水鱼', 'U-96', '鲃鱼']
+        out = migrate_plan_dict({'fleet': list(clean)})
+        assert out['fleet'] == clean
+
+    def test_non_list_fleet_skipped(self):
+        """fleet 缺省 / None / 非 list 都不动。"""
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        assert migrate_plan_dict({}) == {}
+        assert migrate_plan_dict({'fleet': None}) == {'fleet': None}
+        assert migrate_plan_dict({'fleet': '吹雪'}) == {'fleet': '吹雪'}
+
+    def test_empty_list_fleet_skipped(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        assert migrate_plan_dict({'fleet': []}) == {'fleet': []}
+
+    def test_non_dict_passthrough(self):
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
+        assert migrate_plan_dict(None) is None  # type: ignore[arg-type]
+
+    def test_plan_fleet_written_back(self, tmp_yaml: Callable[[str, str], Path]):
+        """CombatPlan.from_yaml 应把迁移结果写回原文件 (前导空剥离)。"""
+        from autowsgr.combat.plan import CombatPlan
+
+        content = 'fleet: ["", "吹雪", "明斯克", "胡德", "赤诚", ""]\n'
+        path = tmp_yaml('plan_legacy.yaml', content)
+        plan = CombatPlan.from_yaml(path)
+        # 内存: 前导空已剥离
+        assert plan.fleet == ['吹雪', '明斯克', '胡德', '赤诚', '']
+        # 磁盘: 已回写, fleet 不再有前导空
+        rewritten = load_yaml(path)
+        assert rewritten['fleet'] == ['吹雪', '明斯克', '胡德', '赤诚', '']
+
+    def test_plan_fleet_writeback_idempotent(self, tmp_yaml: Callable[[str, str], Path]):
+        """迁移写回后再次加载, 文件不再改动 (一次性生效)。"""
+        from autowsgr.combat.plan import CombatPlan
+
+        path = tmp_yaml('plan_idem.yaml', 'fleet: ["", "吹雪"]\n')
+        CombatPlan.from_yaml(path)
+        first = load_yaml(path)
+        # 第二次加载: fleet 已无前导空, 无迁移发生, 文件不动
+        CombatPlan.from_yaml(path)
+        assert load_yaml(path) == first
+
+    def test_clean_plan_not_rewritten(self, tmp_yaml: Callable[[str, str], Path]):
+        """干净 fleet 的计划文件不被改写 (格式保留)。"""
+        from autowsgr.combat.plan import CombatPlan
+
+        content = 'fleet: ["飞龙", "U-1206"]\n'
+        path = tmp_yaml('plan_clean.yaml', content)
+        before = path.read_text(encoding='utf-8')
+        CombatPlan.from_yaml(path)
+        assert path.read_text(encoding='utf-8') == before
+
+
 # ── LogConfig (setup_logger) ──
 
 

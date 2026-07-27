@@ -90,7 +90,9 @@ def repair_one_available(
 ) -> bool:
     """有空闲修理槽时, 派修修理时间最长的非黑名单舰船 (调度入口)。
 
-    由 ``BathRepairTrigger`` 周期调用。流程:
+    由 ``auto_daily`` 调度器以 :class:`~autowsgr.scheduler.triggers.TimerTrigger`
+    周期产出, 经优先级队列在所有战斗任务 (战役/演习/常规战) 完成后才执行
+    (空闲修船, 见 ``daily_plan.PRIO_BATH_REPAIR``)。流程:
 
     1. ``ctx.bathroom`` 无空闲槽 → 直接返回 (省一次开 overlay)。
     2. 导航浴室 → 开选择修理 overlay → 修最长非黑名单船。

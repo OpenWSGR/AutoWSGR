@@ -1,8 +1,12 @@
 """向下兼容层 — 集中处理用户 YAML 中的废弃 / 迁移字段。
 
 所有 classic 遗留配置的迁移、删除提示、自动映射都集中在本模块,
-不分散到各子模型。在 :func:`UserConfig.from_yaml` 的
-``model_validate`` 之前对 raw dict 做一次性预处理。
+不分散到各子模型。两个入口对 raw dict 做一次性预处理:
+
+- :func:`migrate_raw_config` — 用户配置 (``UserConfig.from_yaml``,
+  ``model_validate`` 之前);
+- :func:`migrate_plan_dict` — 作战计划 (``CombatPlan.from_yaml``,
+  ``from_dict`` 之前), 目前处理 classic 的 1-indexed ``fleet`` 前导空占位。
 
 设计要点
 --------
@@ -16,6 +20,8 @@
   :data:`~autowsgr.infra.config.OPERATION_DELAY_MIN` /
   :data:`~autowsgr.infra.config.OPERATION_DELAY_MAX`,
   由 :func:`~autowsgr.infra.config.operation_delay` 运行期读取。
+- ``fleet`` (classic 1-indexed, 首位 ``""`` 占位) 由
+  :func:`_migrate_plan_fleet` 剥离前导空占位, 迁移为 dev 0-indexed 格式。
 """
 
 from __future__ import annotations
@@ -59,6 +65,33 @@ def migrate_raw_config(
     _migrate_delay(data)
     _migrate_emulator_legacy(data)
     _migrate_misc_legacy(data)
+
+    if source_path is not None and data != before:
+        _persist(data, source_path)
+
+    return data
+
+
+def migrate_plan_dict(
+    data: dict[str, Any],
+    *,
+    source_path: str | Path | None = None,
+) -> dict[str, Any]:
+    """预处理作战计划 raw dict: 迁移 classic 计划字段。
+
+    在 :meth:`autowsgr.combat.plan.CombatPlan.from_yaml` 的 ``from_dict``
+    之前调用。目前处理 classic 的 1-indexed ``fleet`` 前导空占位
+    (见 :func:`_migrate_plan_fleet`)。
+
+    与 :func:`migrate_raw_config` 同: 原地修改并返回同一对象; 若给出
+    *source_path* 且检测到改动, best-effort 写回原文件, 使迁移一次性生效、
+    后续运行不再重复告警。
+    """
+    if not isinstance(data, dict):
+        return data
+
+    before = copy.deepcopy(data)
+    _migrate_plan_fleet(data)
 
     if source_path is not None and data != before:
         _persist(data, source_path)
@@ -208,3 +241,47 @@ def _migrate_misc_legacy(data: dict[str, Any]) -> None:
         '[compat] classic 顶层字段 {} 已废弃 (新版不使用), 已删除。',
         '/'.join(dropped),
     )
+
+
+def _is_empty_fleet_slot(value: object) -> bool:
+    """是否是 fleet 的"空槽位" (``None`` / 空串 / 纯空白)。
+
+    与 :func:`autowsgr.ui.battle.fleet_change._normalize_ship_name` 的
+    空判定一致: 这些值在运行期都会被归一化为 ``None`` (该槽位留空)。
+    """
+    if value is None:
+        return True
+    return isinstance(value, str) and not value.strip()
+
+
+def _migrate_plan_fleet(data: dict[str, Any]) -> None:
+    r"""classic 1-indexed ``fleet`` → dev 0-indexed: 剥离前导空占位元素。
+
+    classic 计划的 ``fleet`` 是 1-indexed, 首位恒为 ``""`` 占位, 例如::
+
+        fleet: ["", "吹雪", "明斯克", "胡德", "赤诚", ""]
+
+    dev 的 :meth:`~autowsgr.ui.battle.fleet_change.FleetChangeMixin.change_fleet`
+    按 0-indexed 取前 6 个, 前导空占位会把舰船整体右移一位、丢掉第 6 船,
+    并触发 ``_reorder`` 的 ``break`` 致验证反复重试 ("卡很多次 fleet 验证")。
+    本函数剥离所有前导"空槽位", 让经典写法直接生效。
+
+    中间 / 尾部的 ``""`` 原样保留 —— 运行期 ``_normalize_ship_name`` 会把
+    它们归一化为 ``None`` (= 不关心该槽位), 无需在此处理。
+    """
+    fleet = data.get('fleet')
+    if not isinstance(fleet, list) or not fleet:
+        return
+
+    cleaned = list(fleet)
+    while cleaned and _is_empty_fleet_slot(cleaned[0]):
+        cleaned.pop(0)
+
+    if cleaned != fleet:
+        data['fleet'] = cleaned
+        _log.warning(
+            '[compat] classic 1-indexed fleet 前导空占位已剥离 ({} → {}), '
+            '已迁移为 dev 0-indexed 格式。',
+            fleet,
+            cleaned,
+        )

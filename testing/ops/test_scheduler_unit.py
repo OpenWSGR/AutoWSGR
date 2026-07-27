@@ -127,3 +127,94 @@ def test_run_task_single_runner_still_works(monkeypatch: pytest.MonkeyPatch):
 
     assert received == [result]
     assert task.results == [result]
+
+
+# ── 浴室修理优先级 (空闲修船: 所有战斗完成后才执行) ──
+
+
+def test_bath_repair_priority_after_all_combat():
+    """浴室修理优先级 > 所有战斗任务, 还原 classic '所有战斗 (含常规战) 完成后才修船'。"""
+    from autowsgr.scheduler.daily_plan import (
+        PRIO_BATH_REPAIR,
+        PRIO_BONUS,
+        PRIO_CAMPAIGN,
+        PRIO_EXERCISE,
+        PRIO_EXPEDITION,
+        PRIO_NORMAL_FIGHT,
+    )
+
+    assert PRIO_BATH_REPAIR > PRIO_NORMAL_FIGHT
+    assert PRIO_BATH_REPAIR > PRIO_EXERCISE
+    assert PRIO_BATH_REPAIR > PRIO_CAMPAIGN
+    assert PRIO_BATH_REPAIR > PRIO_BONUS
+    assert PRIO_BATH_REPAIR > PRIO_EXPEDITION
+
+
+def test_bath_repair_queues_behind_normal_fight():
+    """同一队列里浴室修理 (prio 200) 永远排在常规战 (prio 100) 之后出队。"""
+    ctx = _FakeCtx()
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    bath = FightTask(runner=object(), priority=200, name='浴室修理')
+    normal = FightTask(runner=object(), priority=100, name='常规战')
+
+    # 无论入队顺序, 常规战 (100) 先出队 → 浴室修理等常规战打完才轮到
+    sched._enqueue(bath)
+    sched._enqueue(normal)
+    assert sched._dequeue().name == '常规战'
+    assert sched._dequeue().name == '浴室修理'
+
+
+# ── 无限常规战饿死浴室修理的启动告警 ──
+
+
+def test_starvation_warned_when_infinite_normal_fight_no_limits():
+    """无限常规战 (times=None) + 停止上限全关 + 启用浴室修理 → 应告警。"""
+    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.scheduler.daily_plan import _bath_repair_starved_by_normal_fight
+
+    cfg = DailyAutomationConfig(
+        auto_bath_repair=True,
+        auto_normal_fight=True,
+        normal_fight_tasks=[{'name': 'x'}],  # times 默认 None
+    )
+    assert _bath_repair_starved_by_normal_fight(cfg) is True
+
+
+def test_starvation_not_warned_when_times_set():
+    """常规战设了 times (有限) → 不会饿死浴室修理, 不告警。"""
+    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.scheduler.daily_plan import _bath_repair_starved_by_normal_fight
+
+    cfg = DailyAutomationConfig(
+        auto_bath_repair=True,
+        auto_normal_fight=True,
+        normal_fight_tasks=[{'name': 'x', 'times': 10}],
+    )
+    assert _bath_repair_starved_by_normal_fight(cfg) is False
+
+
+def test_starvation_not_warned_when_stop_limit_enabled():
+    """开启任一停止上限 → 常规战终会耗尽让位, 不告警。"""
+    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.scheduler.daily_plan import _bath_repair_starved_by_normal_fight
+
+    cfg = DailyAutomationConfig(
+        auto_bath_repair=True,
+        auto_normal_fight=True,
+        normal_fight_tasks=[{'name': 'x'}],
+        stop_max_ship=True,
+    )
+    assert _bath_repair_starved_by_normal_fight(cfg) is False
+
+
+def test_starvation_not_warned_when_bath_repair_off():
+    """未启用浴室修理 → 无所谓饿死, 不告警。"""
+    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.scheduler.daily_plan import _bath_repair_starved_by_normal_fight
+
+    cfg = DailyAutomationConfig(
+        auto_bath_repair=False,
+        auto_normal_fight=True,
+        normal_fight_tasks=[{'name': 'x'}],
+    )
+    assert _bath_repair_starved_by_normal_fight(cfg) is False

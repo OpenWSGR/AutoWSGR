@@ -187,7 +187,12 @@ class NormalFightTaskConfig(BaseModel):
     fleet_id: int | None = None
     """出征舰队编号; 留空则用 plan 内配置。"""
     times: int | None = None
-    """目标出击次数; ``None`` 表示无限 (空闲填充, 仅受全局上限约束)。"""
+    """目标出击次数; ``None`` 表示无限 (空闲填充, 仅受全局上限约束)。
+
+    .. note:: ``times=None`` (无限) 且未开启 ``stop_max_ship`` /
+       ``stop_max_loot`` / ``quick_repair_limit`` 任一上限时, 常规战会持续
+       产出任务、永远抢占浴室修理 (优先级更低), 致浴室修理永不执行。
+    """
 
 
 class DailyAutomationConfig(BaseModel):

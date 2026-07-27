@@ -5,7 +5,7 @@
 
 优先级 (数值小先执行, 由 :mod:`autowsgr.scheduler.triggers` 定义)::
 
-    远征 0  <  战役 5  <  演习 10  <  常规战 100 (空闲填充)
+    远征 0  <  奖励 1  <  战役 5  <  演习 10  <  常规战 100  <  浴室修理 200 (空闲填充, 最后执行)
 
 使用方式::
 
@@ -47,10 +47,14 @@ _log = get_logger('scheduler')
 # 优先级常量 (数值越小越先执行)
 PRIO_EXPEDITION = 0
 PRIO_BONUS = 1
-PRIO_BATH_REPAIR = 2
 PRIO_CAMPAIGN = 5
 PRIO_EXERCISE = 10
 PRIO_NORMAL_FIGHT = 100
+# 浴室修理: 空闲填充, 排在所有战斗任务之后 —— 仅当战役/演习/常规战都无 pending
+# 任务 (常规战 _is_exhausted、战役演习 _exhausted) 时才出队执行, 还原 classic
+# "所有战斗 (含常规战) 完成后才修船" 的语义。与 NormalFightTrigger 用 prio=100
+# 实现"空闲填充"同理, 只是浴室修理比常规战更晚 (优先级更低)。
+PRIO_BATH_REPAIR = 200
 
 # 远征定时触发间隔 (秒)。collect_expedition 内部会先检查是否有远征可收取,
 # 无则空转返回, 故可较短; 默认 10 分钟轮询一次。
@@ -132,7 +136,7 @@ def build_daily_plan(
             ),
         )
 
-    # ── 浴室修理 (定时, prio 2, 完整空位调度 + 黑名单) ──
+    # ── 浴室修理 (定时, prio 200, 空闲填充: 所有战斗完成后才执行) ──
     if cfg.auto_bath_repair:
         from autowsgr.ops.repair import repair_one_available
 
@@ -182,8 +186,36 @@ def build_daily_plan(
     if cfg.auto_normal_fight and cfg.normal_fight_tasks:
         _register_normal_fight(scheduler, cfg, plan_root=ctx.config.plan_root)
 
+    # ── 浴室修理被无限常规战抢占的告警 ──
+    # 改 prio 后浴室修理 (200) 排在常规战 (100) 之后; 若存在无限常规战
+    # (times=None) 且未开任何停止上限, 常规战会持续产出 prio=100 任务、
+    # 永远抢占浴室修理致其无声失效。这是 classic 没有的 dev 新场景, 显式提示。
+    if _bath_repair_starved_by_normal_fight(cfg):
+        _log.warning(
+            '[daily] 已启用浴室修理, 但存在无限常规战 (times 未设置) 且未开启任何'
+            '停止上限 (stop_max_ship / stop_max_loot / quick_repair_limit)。'
+            '常规战会持续抢占浴室修理, 后者将永远不会执行。请为常规战设置 times '
+            '或开启任一停止上限。',
+        )
+
     if not scheduler._triggers:
         _log.warning('[daily] 未启用任何日常任务, run_daily 将空转')
+
+
+def _bath_repair_starved_by_normal_fight(cfg: DailyAutomationConfig) -> bool:
+    """无限常规战是否会持续抢占浴室修理、致其永不执行。
+
+    条件: 启用浴室修理 + 启用常规战 + 存在 ``times=None`` 的常规战任务 +
+    三个停止上限 (stop_max_ship / stop_max_loot / quick_repair_limit) 全关。
+    抽成纯函数便于单测。
+    """
+    return (
+        cfg.auto_bath_repair
+        and cfg.auto_normal_fight
+        and bool(cfg.normal_fight_tasks)
+        and any(task.times is None for task in cfg.normal_fight_tasks)
+        and not (cfg.stop_max_ship or cfg.stop_max_loot or cfg.quick_repair_limit)
+    )
 
 
 def _register_normal_fight(

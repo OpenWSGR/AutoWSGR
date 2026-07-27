@@ -271,7 +271,11 @@ class CombatPlan:
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CombatPlan:
+        from autowsgr.infra.config_compat import migrate_plan_dict
+
         data = load_yaml(path)
+        # 迁移 classic 计划字段 (如 1-indexed fleet 前导空占位), best-effort 回写原文件
+        data = migrate_plan_dict(data, source_path=path)
         return cls.from_dict(data, name=Path(path).stem)
 
     @classmethod
