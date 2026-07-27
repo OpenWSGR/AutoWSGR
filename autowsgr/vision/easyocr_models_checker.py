@@ -20,14 +20,13 @@ from .easyocr_models_cli import (
     check_model_file,
     download_model_file,
     ensure_model_dir,
-    ensure_modelscope,
 )
 
 
 _log = get_logger('vision.model_download')
 
 
-def ensure_models(mirror: str = 'tencent') -> None:
+def ensure_models(mirror: str = 'modelscope') -> None:
     """确保所有 EasyOCR 模型就绪。
 
     Parameters
@@ -40,9 +39,6 @@ def ensure_models(mirror: str = 'tencent') -> None:
 
     if mirror == 'origin':
         return
-
-    if mirror == 'modelscope':
-        ensure_modelscope()
 
     for fname in MODEL_FILES:
         path = os.path.join(model_dir, fname)

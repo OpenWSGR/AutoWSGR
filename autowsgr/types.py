@@ -192,7 +192,7 @@ class OcrMirror(StrEnum):
     github = 'github'
     """GitHub releases"""
     tencent = 'tencent'
-    """EdgeOne CDN (腾讯云)"""
+    """腾讯云 EdgeOne"""
     modelscope = 'modelscope'
     """ModelScope 镜像"""
 

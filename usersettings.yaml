@@ -31,7 +31,7 @@ account:
 ocr:
   backend: easyocr                 # easyocr / paddleocr
   gpu: false                       # 是否使用 GPU 加速
-  mirror: tencent                  # Easyocr 模型镜像, 用于下载模型, 可选值如下
+  mirror: modelscope               # Easyocr 模型镜像, 用于下载模型, 可选值如下
   # origin: 使用Easyocr原生下载
   # github: 使用Github地址下载, 由官方提供
   # tencent: 使用kuai提供的镜像下载, 由腾讯云托管

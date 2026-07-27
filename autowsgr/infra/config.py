@@ -81,7 +81,7 @@ class OCRConfig(BaseModel):
     """OCR 后端"""
     gpu: bool = False
     """是否使用 GPU 加速"""
-    mirror: OcrMirror = OcrMirror.tencent
+    mirror: OcrMirror = OcrMirror.modelscope
     """EasyOCR 模型下载镜像源"""
 
 

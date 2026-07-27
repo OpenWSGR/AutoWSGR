@@ -1,7 +1,7 @@
 """
-EasyOCR 模型下载助手（支持 GitHub/EdgeOne/ModelScope 镜像）
+EasyOCR 模型下载助手（支持 GitHub/Tencent/ModelScope 镜像）
 GitHub 源：从官方地址自动下载 zip 并解压提取 .pth 文件。
-EdgeOne 源：从 EdgeOne 镜像下载模型文件，由 kuai 提供。
+Tencent 源：从腾讯云镜像下载模型文件，由 kuai 提供。
 ModelScope 源：从 ModelScope 镜像下载模型文件，由 Ceceliachenen 提供。
 """
 
@@ -10,8 +10,8 @@ import importlib.util
 import logging
 import os
 import shutil
-import subprocess
 import sys
+import time
 import urllib.parse
 import urllib.request
 import zipfile
@@ -51,41 +51,27 @@ EXPECTED_MD5 = {
 # 按镜像名称索引的下载配置，与 YAML 中 ocr.mirror 枚举值对齐
 MIRROR_CONFIG: dict[str, dict[str, Any]] = {
     'github': {
-        'type': 'github',
+        'type': 'zip',
         'urls': {
             'craft_mlt_25k.pth': 'https://github.com/JaidedAI/EasyOCR/releases/download/pre-v1.1.6/craft_mlt_25k.zip',
             'zh_sim_g2.pth': 'https://github.com/JaidedAI/EasyOCR/releases/download/v1.3/zh_sim_g2.zip',
         },
     },
     'tencent': {
-        'type': 'edgeone',
+        'type': 'http',
         'base_url': 'https://easyocr.v.ekuai.tech/',
         'split': {
             'craft_mlt_25k.pth': 4,
         },
     },
     'modelscope': {
-        'type': 'modelscope',
+        'type': 'http',
+        'base_url': 'https://modelscope.cn/models/Ceceliachenen/easyocr/resolve/master/',
     },
 }
 
-# CLI 交互用的镜像选项（引用 MIRROR_CONFIG 避免重复声明 URL）
-MIRROR_OPTIONS: dict[str, dict[str, Any]] = {
-    '0': {
-        'name': 'GitHub',
-        'key': 'github',
-    },
-    '1': {
-        'name': 'EdgeOne (腾讯云)',
-        'key': 'tencent',
-    },
-    '2': {
-        'name': 'ModelScope',
-        'key': 'modelscope',
-    },
-}
-
-MODELSCOPE_MODEL = 'Ceceliachenen/easyocr'
+# CLI 交互用的镜像选项（小写后即为 MIRROR_CONFIG key）
+MIRROR_OPTIONS: list[str] = ['ModelScope', 'Tencent', 'GitHub']
 
 
 def ensure_model_dir() -> str:
@@ -110,6 +96,8 @@ def download_model_file(
         模型文件名，如 ``'craft_mlt_25k.pth'``。
     mirror:
         镜像名称: ``'github'`` / ``'tencent'`` / ``'modelscope'``。
+    mtype:
+        下载方式: ``'zip'``（下载后解压）/ ``'http'``（直连下载，支持分片）。
     dest:
         目标文件路径。
     expected_md5:
@@ -118,23 +106,14 @@ def download_model_file(
     cfg = MIRROR_CONFIG[mirror]
     mtype = cfg['type']
 
-    if mtype == 'github':
-        download_github_zip(cfg['urls'][fname], fname, dest)
-    elif mtype == 'edgeone':
+    if mtype == 'zip':
+        download_zip(cfg['urls'][fname], fname, dest)
+    elif mtype == 'http':
         split_count = cfg.get('split', {}).get(fname)
         if split_count is not None:
-            download_edgeone_split(cfg['base_url'], fname, dest, parts=split_count)
+            download_split(cfg['base_url'], fname, dest, parts=split_count)
         else:
             download_file(cfg['base_url'] + fname, dest)
-    elif mtype == 'modelscope':
-        dest_dir = os.path.dirname(dest) or '.'
-        download_modelscope(fname, dest_dir)
-        # modelscope API 直接写入 local_dir，若目标路径不同则移动
-        src = os.path.join(dest_dir, fname)
-        if src != dest and os.path.exists(src):
-            if os.path.exists(dest):
-                os.remove(dest)
-            shutil.move(src, dest)
     else:
         raise ValueError(f'未知下载方式: {mtype}')
 
@@ -147,6 +126,26 @@ def download_model_file(
 
 
 # -------------------- 工具函数 --------------------
+def format_size(size_bytes: int) -> str:
+    """将字节数格式化为人类可读的字符串（KB/MB/GB）"""
+    if size_bytes < 1024:
+        return f'{size_bytes} B'
+    elif size_bytes < 1024 * 1024:
+        return f'{size_bytes / 1024:.1f} KB'
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f'{size_bytes / (1024 * 1024):.1f} MB'
+    else:
+        return f'{size_bytes / (1024 * 1024 * 1024):.1f} GB'
+
+
+def format_speed(speed_bytes_per_sec: float) -> str:
+    """将下载速度格式化为人类可读的字符串（KB/s 或 MB/s）"""
+    if speed_bytes_per_sec < 1024 * 1024:
+        return f'{speed_bytes_per_sec / 1024:.1f} KB/s'
+    else:
+        return f'{speed_bytes_per_sec / (1024 * 1024):.1f} MB/s'
+
+
 def get_input(prompt: str, default: str = '0', choices: list[str] | None = None) -> str:
     while True:
         user_input = input(prompt).strip()
@@ -164,7 +163,7 @@ def print_step(msg: str) -> None:
 
 
 def download_file(url: str, dest: str) -> None:
-    """通用文件下载（带进度）"""
+    """通用文件下载（带进度、大小、速度）"""
     logger.info('下载: %s -> %s', url, dest)
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ('http', 'https'):
@@ -174,6 +173,11 @@ def download_file(url: str, dest: str) -> None:
             total = int(response.headers.get('Content-Length', 0))
             downloaded = 0
             block_size = 4096
+            start_time = time.time()
+            last_speed_time = start_time
+            last_speed_bytes = 0
+            current_speed = 0
+            last_display_time = start_time
 
             with open(dest, 'wb') as f:
                 while True:
@@ -183,14 +187,44 @@ def download_file(url: str, dest: str) -> None:
                     f.write(chunk)
                     downloaded += len(chunk)
 
-                    if total > 0:
-                        pct = min(100, downloaded * 100 / total)
-                        sys.stdout.write(f'\r下载进度: {pct:.1f}%')
-                        sys.stdout.flush()
+                    current_time = time.time()
 
-            if total > 0:
-                sys.stdout.write('\n')
-        logger.info('下载完成')
+                    # Calculate speed every second
+                    if current_time - last_speed_time >= 1.0:
+                        time_interval = current_time - last_speed_time
+                        current_speed = (downloaded - last_speed_bytes) / time_interval
+                        last_speed_time = current_time
+                        last_speed_bytes = downloaded
+
+                    # Update display every 0.1 seconds or when download completes
+                    if current_time - last_display_time >= 0.1 or (
+                        total > 0 and downloaded >= total
+                    ):
+                        speed_str = format_speed(current_speed)
+                        downloaded_str = format_size(downloaded)
+
+                        if total > 0:
+                            total_str = format_size(total)
+                            pct = min(100, downloaded * 100 / total)
+                            sys.stdout.write(
+                                f'\r下载进度: {pct:.1f}% | '
+                                f'{downloaded_str}/{total_str} | '
+                                f'速度: {speed_str}'
+                            )
+                        else:
+                            sys.stdout.write(f'\r已下载: {downloaded_str} | 速度: {speed_str}')
+                        sys.stdout.flush()
+                        last_display_time = current_time
+
+            # Final newline and summary
+            total_time = time.time() - start_time
+            avg_speed = downloaded / total_time if total_time > 0 else 0
+            sys.stdout.write('\n')
+            logger.info(
+                '下载完成: %s, 平均速度: %s',
+                format_size(downloaded),
+                format_speed(avg_speed),
+            )
     except Exception as e:
         logger.error('下载失败: %s', e)
         raise
@@ -211,25 +245,10 @@ def check_model_file(path: str, fname: str) -> bool:
     return md5(path) == EXPECTED_MD5[fname]
 
 
-def download_modelscope(filename: str, local_dir: str = '.') -> None:
-    """使用 ModelScope Python API 下载单个文件"""
-    try:
-        from modelscope.hub.file_download import model_file_download
-    except ImportError as err:
-        raise RuntimeError('modelscope 安装不完整，缺少 hub.file_download 模块') from err
-    logger.info('ModelScope API 下载: %s -> %s', filename, local_dir)
-    model_file_download(
-        model_id=MODELSCOPE_MODEL,
-        file_path=filename,
-        local_dir=local_dir,
-    )
-    logger.info('下载完成')
-
-
-def download_edgeone_split(base_url: str, filename: str, dest: str, *, parts: int = 4) -> None:
-    """EdgeOne 分片下载并合并"""
+def download_split(base_url: str, filename: str, dest: str, *, parts: int = 4) -> None:
+    """分片下载并合并"""
     tmp_parts: list[str] = []
-    logger.info('EdgeOne 分片下载: %s (共 %d 部分)', filename, parts)
+    logger.info('分片下载: %s (共 %d 部分)', filename, parts)
     try:
         for i in range(1, parts + 1):
             suffix = f'.part_{i:03d}'
@@ -255,7 +274,7 @@ def download_edgeone_split(base_url: str, filename: str, dest: str, *, parts: in
                 os.remove(p)
 
 
-def download_github_zip(zip_url: str, pth_name: str, dest_path: str) -> None:
+def download_zip(zip_url: str, pth_name: str, dest_path: str) -> None:
     """下载 zip 文件并解压提取指定的 .pth 模型文件"""
     tmp_zip = dest_path + '.zip'
     try:
@@ -305,39 +324,10 @@ def prepare_model_dir() -> str:
 def select_mirror() -> str:
     """选择下载镜像源，返回镜像 key（如 'github' / 'tencent' / 'modelscope'）"""
     print_step('3. 选择下载镜像源')
-    for k, v in MIRROR_OPTIONS.items():
-        logger.info('  [%s] %s', k, v['name'])
-    choice = get_input('请输入数字 (默认0): ', '0', ['0', '1', '2'])
-    mirror_key = MIRROR_OPTIONS[choice]['key']
-
-    if mirror_key == 'modelscope':
-        _ensure_modelscope_interactive()
-
-    return mirror_key
-
-
-def ensure_modelscope() -> None:
-    """确保 modelscope 已安装，未安装时静默自动安装。"""
-    if importlib.util.find_spec('modelscope') is not None:
-        return
-    logger.info('安装 modelscope ...')
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'modelscope'])
-    logger.info('modelscope 安装成功')
-
-
-def _ensure_modelscope_interactive() -> None:
-    """CLI 交互模式：确认后安装 modelscope。"""
-    if importlib.util.find_spec('modelscope') is not None:
-        logger.info('modelscope 已安装。')
-        return
-
-    logger.warning('未安装 modelscope')
-    ins = get_input('自动安装? [0] 是 (默认)  [1] 否: ', '0', ['0', '1'])
-    if ins == '0':
-        ensure_modelscope()
-    else:
-        logger.warning('请手动安装 modelscope 后重试。')
-        sys.exit(0)
+    for i, name in enumerate(MIRROR_OPTIONS):
+        logger.info('  [%d] %s', i, name)
+    choice = get_input('请输入数字 (默认0): ', '0', [str(i) for i in range(len(MIRROR_OPTIONS))])
+    return MIRROR_OPTIONS[int(choice)].lower()
 
 
 def download_models(
