@@ -67,6 +67,9 @@ bathroom_count: 2                  # 浴室修理槽位数 (auto_bath_repair 空
 
 # ── 解装设置 ──
 destroy_ship_work_mode: 不启用     # 不启用 / 黑名单 / 白名单
+# 不启用: 解装所有舰船
+# 黑名单: 解装列表中的舰种
+# 白名单: 解装不在列表中的舰种
 destroy_ship_types: []             # 指定舰种列表, 参照 ShipType 枚举使用中文
   # - 航母
   # - 潜艇
