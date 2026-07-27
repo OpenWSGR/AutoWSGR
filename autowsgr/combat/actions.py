@@ -190,8 +190,8 @@ def click_speed_up(device: AndroidController, *, battle_mode: bool = False) -> N
     coords = Coords.SPEED_UP_BATTLE if battle_mode else Coords.SPEED_UP_NORMAL
 
     # 由于加速过快可能导致卡顿, 增加极短延迟以确保点击生效
-    device.click(*coords, delay=False)
     time.sleep(0.05)
+    device.click(*coords, delay=False)
 
 
 def click_skip_missile_animation(device: AndroidController) -> None:
