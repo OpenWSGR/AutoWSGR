@@ -86,7 +86,9 @@ daily_automation:
   auto_expedition: true            # 自动重复远征
   auto_gain_bonus: true            # 任务完成时自动点击
   auto_bath_repair: true           # 空闲时自动澡堂修理
-  bath_repair_blacklist: []        # 不修理的舰船名 (auto_bath_repair 黑名单)
+  bath_repair_blacklist:           # 不修理的舰船名 (auto_bath_repair 黑名单)
+    - 昆西
+    - 玛丽亚皇后
   auto_set_support: false          # 自动开启战役支援
 
   # 战役
