@@ -11,7 +11,7 @@
     python examples/auto_daily.py
 
     # 显式指定配置 (推荐, 用户常用文件名带下划线)
-    python examples/auto_daily.py --config D:/Games/autowsgr/old/user_settings.yaml
+    python examples/auto_daily.py --config /path/to/user_settings.yaml
 
 停止:
     - 第一次 Ctrl+C → 设置停止信号, 等当前战斗结束后优雅退出。
