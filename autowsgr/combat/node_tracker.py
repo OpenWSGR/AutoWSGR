@@ -40,6 +40,14 @@ from autowsgr.vision import (
 # 地图数据根目录
 _MAP_DATA_ROOT = Path(__file__).resolve().parent.parent / 'data' / 'map' / 'normal'
 
+# 活动入口标识 (内部 a/b) ↔ 地图文件名希腊字母 (α/β)；仅活动地图有 α/β 入口概念
+ENTRANCE_TO_GREEK = {'a': 'α', 'b': 'β'}
+
+# 活动地图入口节点 (α/β) → 起始点 '0'。
+# 每个活动地图文件只有一个入口点 (由文件名后缀 α/β 决定), 加载时统一映射为 '0',
+# 与常规战 '0' 起始一致 —— NodeTracker 初始节点 '0' 即可直接匹配, 无需特殊适配。
+_START_NODE_REMAP = {'α': '0', 'β': '0'}
+
 _log = get_logger('combat.tracker')
 
 
@@ -68,6 +76,53 @@ class NodePosition:
     x: float
     y: float
     next_nodes: list[str] = field(default_factory=list)
+
+
+def _resolve_event_map_path(
+    event_root: Path,
+    event_name: str,
+    chapter: int | str,
+    map_id: int | str,
+    entrance: str | None,
+) -> Path | None:
+    """解析活动地图文件路径。
+
+    - ``entrance`` 为 ``None``: 旧命名 ``{chapter}-{map_id}.yaml`` (如 ``E-1.yaml``)
+    - ``entrance`` 为 ``'a'``/``'b'``: 新活动中文命名
+      ``{中文prefix}{H?}-Ex-{map_id}-{α|β}.yaml``。H 章 (困难) 文件名含 ``H-Ex``，
+      E 章 (简单) 不含；用 glob 通配中文 prefix，无需硬编码活动名。
+
+    Returns
+    -------
+    Path | None
+        唯一匹配返回路径；零个或多个匹配 (歧义) 返回 ``None``。
+    """
+    event_dir = event_root / event_name
+    if entrance is None:
+        return event_dir / f'{chapter}-{map_id}.yaml'
+
+    greek = ENTRANCE_TO_GREEK.get(entrance)
+    if greek is None:
+        _log.warning('[NodeTracker] 未知入口标识 {!r}, 应为 a/b', entrance)
+        return None
+
+    chap = str(chapter).upper()
+    hard_prefix = 'H' if chap == 'H' else ''
+    pattern = f'*{hard_prefix}-Ex-{map_id}-{greek}.yaml'
+    matches = sorted(event_dir.glob(pattern))
+    # E 章 (简单) 排除误匹配的困难文件 (其文件名含 H-Ex)
+    if chap != 'H':
+        matches = [p for p in matches if 'H-Ex' not in p.stem]
+    if not matches:
+        return None
+    if len(matches) > 1:
+        _log.warning(
+            '[NodeTracker] 活动地图文件匹配歧义 ({} 个): {}',
+            len(matches),
+            matches,
+        )
+        return None
+    return matches[0]
 
 
 class MapNodeData:
@@ -136,29 +191,42 @@ class MapNodeData:
         event_name: str,
         chapter: int | str,
         map_id: int | str,
+        entrance: str | None = None,
     ) -> MapNodeData | None:
         """从 YAML 文件加载活动地图节点数据。
 
-        数据路径: ``autowsgr/data/map/event/{event_name}/{chapter}-{map_id}.yaml``
+        支持两种命名 (见 :func:`_resolve_event_map_path`):
+
+        - 旧活动 (``entrance`` 为 ``None``): ``{chapter}-{map_id}.yaml``
+        - 新活动 (``entrance`` 为 ``'a'``/``'b'``): 中文命名
+          ``{中文prefix}{H?}-Ex-{map_id}-{α|β}.yaml``
 
         Parameters
         ----------
         event_name:
-            活动名称，如 ``"20260212"``。
+            活动名称，如 ``"20260730"``。
         chapter:
             活动难度档，如 ``"H"``、``"E"``。
         map_id:
             地图编号，如 ``5``。
+        entrance:
+            活动入口 ``'a'`` (α) / ``'b'`` (β) / ``None``。新活动必填。
 
         Returns
         -------
         MapNodeData | None
-            加载成功返回数据对象；文件不存在返回 ``None``。
+            加载成功返回数据对象；文件不存在或匹配歧义返回 ``None``。
         """
         _event_root = Path(__file__).resolve().parent.parent / 'data' / 'map' / 'event'
-        path = _event_root / event_name / f'{chapter}-{map_id}.yaml'
-        if not path.exists():
-            _log.warning('[NodeTracker] 活动地图文件不存在: {}', path)
+        path = _resolve_event_map_path(_event_root, event_name, chapter, map_id, entrance)
+        if path is None or not path.exists():
+            _log.warning(
+                '[NodeTracker] 活动地图文件不存在: {}/{}-{} (entrance={})',
+                event_name,
+                chapter,
+                map_id,
+                entrance,
+            )
             return None
 
         from autowsgr.infra.file_utils import load_yaml
@@ -173,19 +241,20 @@ class MapNodeData:
         nodes: dict[str, NodePosition] = {}
 
         for key, value in raw.items():
-            name = str(key)
+            # 活动入口节点 α/β 映射为起始点 '0' (见 _START_NODE_REMAP)
+            name = _START_NODE_REMAP.get(str(key), str(key))
 
             if isinstance(value, dict):
                 # 格式: {"position": [x, y], "next": ["B", "C"]}
                 pos = value.get('position', [0, 0])
-                next_nodes = value.get('next', [])
+                raw_next = value.get('next', [])
                 rel_x = pos[0]
                 rel_y = pos[1]
                 nodes[name] = NodePosition(
                     name=name,
                     x=rel_x,
                     y=rel_y,
-                    next_nodes=list(next_nodes),
+                    next_nodes=[_START_NODE_REMAP.get(str(n), str(n)) for n in raw_next],
                 )
             else:
                 _log.warning(

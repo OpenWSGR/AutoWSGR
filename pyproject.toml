@@ -148,7 +148,7 @@ ignore = [
     "UP047",   # type parameters
     "W505",    # doc-line-too-long
 ]
-allowed-confusables = ["，", "。", "：", "？", "！", "、", "（", "）", "；", "“", "”"]
+allowed-confusables = ["，", "。", "：", "？", "！", "、", "（", "）", "；", "“", "”", "α", "β"]  # α/β: 活动入口语义字符 (地图文件名/ENTRANCE_TO_GREEK/_START_NODE_REMAP)
 extend-safe-fixes = [
     "C408",     # unnecessary-collection-call
     "E711",     # none-comparison

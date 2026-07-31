@@ -8,15 +8,15 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat
 from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
-from autowsgr.ops import goto_page
+from autowsgr.ops.navigate import goto_page
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
-from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel, RepairStrategy
+from autowsgr.ui import BaseEventPage, BattlePreparationPage, MapPage, MapPanel, RepairStrategy
 from autowsgr.ui.utils import NavigationError
 
 
@@ -52,13 +52,33 @@ class NormalFightRunner:
         self._dock_full_destroy = ctx.config.dock_full_destroy
         self._destroy_ship_types = ctx.config.destroy_ship_types or None
 
-        # 确保 plan 模式是 NORMAL
-        if plan.mode != CombatMode.NORMAL:
-            _log.warning(
-                '[OPS] NormalFightRunner 收到非 NORMAL 模式的计划: {}, 已修正',
+        # chapter 为 E/H → 活动地图入口; 否则常规地图。仅靠 plan 决定导航,
+        # event 与 normal 共用本 runner (融合), 复用 normal_fight 触发器。
+        self._is_event = str(plan.chapter).upper() in ('E', 'H')
+
+        target_mode = CombatMode.EVENT if self._is_event else CombatMode.NORMAL
+        if plan.mode != target_mode:
+            _log.info(
+                '[OPS] 出击: 计划模式 {} → {} (chapter={})',
                 plan.mode,
+                target_mode,
+                plan.chapter,
             )
-            plan.mode = CombatMode.NORMAL
+            plan.mode = target_mode
+
+        if self._is_event:
+            # 推导 UI 层入口 (a→alpha, b→beta) 与活动地图代号 (如 "H1")
+            self._entrance: Literal['alpha', 'beta'] | None = {
+                'a': 'alpha',
+                'b': 'beta',
+            }.get(plan.entrance or '')
+            self._map_code: str = f'{str(plan.chapter).upper()}{plan.map_id}'
+        else:
+            self._entrance = None
+            self._map_code = ''
+
+        # 首次执行检查难度/节点, 后续重复出征跳过 (仅 event 分支使用)
+        self._skip_check = False
 
         self._results: list[CombatResult] = []
         self._loot_count: int | None = None
@@ -145,6 +165,8 @@ class NormalFightRunner:
         # 4. 处理结果
         self._handle_result(result)
 
+        # 后续重复出征跳过难度/节点检查 (event 分支使用)
+        self._skip_check = True
         return result
 
     def run_for_times(
@@ -283,7 +305,14 @@ class NormalFightRunner:
     # ── 进入地图 ──
 
     def _enter_fight(self) -> None:
-        """导航到目标地图并进入。"""
+        """导航到目标地图并进入 (按 chapter 自动选择常规/活动入口)。"""
+        if self._is_event:
+            self._enter_event()
+        else:
+            self._enter_normal()
+
+    def _enter_normal(self) -> None:
+        """导航到常规出征面板并进入地图。"""
         goto_page(self._ctx, PageName.MAP)
         map_page = MapPage(self._ctx)
 
@@ -307,6 +336,16 @@ class NormalFightRunner:
             except NavigationError as back_err:
                 _log.error('[OPS] 返回主页面失败: {}', back_err)
             raise ActionFailedError('地图章节识别/导航失败，已跳过本轮并返回主页面') from e
+
+    def _enter_event(self) -> None:
+        """导航到活动地图页面并完成: 难度切换 → 节点选择 → 入口选择 → 出击。
+
+        弹窗关闭由 UI 层 (:class:`BaseEventPage`) 内部处理。
+        """
+        goto_page(self._ctx, PageName.EVENT_MAP)
+        time.sleep(0.25)
+        event_page = BaseEventPage(self._ctx, event_name=self._plan.event_name)
+        event_page.start_fight(self._map_code, self._entrance, self._skip_check)
 
     # ── 出征准备 ──
 
@@ -429,19 +468,31 @@ def get_normal_fight_plan(
     yaml_path: str,
     plan_root: str | Path | None = None,
 ) -> CombatPlan:
-    """从 YAML 文件加载常规战计划。
+    """从 YAML 文件加载出击计划 (常规战或活动)。
 
-    *plan_root* 透传给 :func:`resolve_plan_path`: 用户自定义目录优先于包内默认,
-    未命中则回退到 ``autowsgr/data/plan/normal_fight/``。
+    查找顺序: 先 ``normal_fight`` 再 ``event`` (活动 plan, chapter E/H)。
+    这样 ``normal_fight_tasks`` 可直接容纳活动计划, 复用 normal_fight 触发器,
+    无需为活动单独配置/调用。
+
+    *plan_root* 透传给 :func:`resolve_plan_path`: 用户自定义目录优先于包内默认。
     """
     from autowsgr.infra.file_utils import resolve_plan_path
 
-    resolved = resolve_plan_path(
-        yaml_path,
-        category='normal_fight',
-        plan_root=plan_root,
-    )
-    return CombatPlan.from_yaml(resolved)
+    last_err: Exception | None = None
+    for category in ('normal_fight', 'event'):
+        try:
+            resolved = resolve_plan_path(
+                yaml_path,
+                category=category,
+                plan_root=plan_root,
+            )
+        except FileNotFoundError as exc:
+            last_err = exc
+            continue
+        return CombatPlan.from_yaml(resolved)
+    raise FileNotFoundError(
+        f'找不到计划 {yaml_path!r} (已查找 normal_fight / event)',
+    ) from last_err
 
 
 def run_normal_fight(

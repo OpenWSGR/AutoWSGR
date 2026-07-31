@@ -126,7 +126,12 @@ class CombatEngine(PhaseHandlersMixin):
                     plan.map_id,
                 )
         elif plan.mode == CombatMode.EVENT and plan.event_name:
-            map_data = MapNodeData.load_event(plan.event_name, plan.chapter, plan.map_id)
+            map_data = MapNodeData.load_event(
+                plan.event_name,
+                plan.chapter,
+                plan.map_id,
+                plan.entrance,
+            )
             if map_data is not None:
                 self._tracker = NodeTracker(map_data)
                 _log.info(

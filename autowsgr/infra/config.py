@@ -18,7 +18,6 @@ from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
     GameAPP,
-    MapEntrance,
     OcrBackend,
     OcrMirror,
     OSType,
@@ -526,10 +525,6 @@ class FightConfig(BaseModel):
     """白名单节点"""
     fight_condition: int = 4
     """战况选择 (1-5)"""
-
-    # 活动专属
-    map_entrance: MapEntrance | None = None
-    """入口选择"""
 
     @model_validator(mode='after')
     def _normalize_repair_mode(self) -> FightConfig:

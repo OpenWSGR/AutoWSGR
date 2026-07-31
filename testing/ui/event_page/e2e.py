@@ -18,7 +18,6 @@
 
     A. 页面识别
         1. 验证初始状态 (is_current_page)
-        2. 浮层检测 (detect_overlay — 地图进入页弹窗)
 
     B. 难度系统
         3. 读取当前难度 (_get_difficulty)
@@ -88,14 +87,6 @@ def run_test(runner: UIControllerTestRunner) -> None:
     )
     if runner.aborted:
         return
-
-    # ───── Step 2: 浮层检测 ──────────────────────────────────────────
-    runner.read_state(
-        '活动地图状态',
-        readers={
-            '浮层 (进入页弹窗)': BaseEventPage._detect_overlay,
-        },
-    )
 
     # ═══════════════════════════════════════════════════════════════════════
     # B. 难度系统

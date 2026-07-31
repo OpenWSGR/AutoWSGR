@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from autowsgr.combat.actions import check_blood
@@ -11,7 +13,15 @@ from autowsgr.combat.history import (
     EventType,
     FightResult,
 )
-from autowsgr.combat.plan import _MODE_SPECS, MODE_TRANSITIONS, CombatMode, CombatPlan, NodeDecision
+from autowsgr.combat.node_tracker import MapNodeData, _resolve_event_map_path
+from autowsgr.combat.plan import (
+    _MODE_SPECS,
+    MODE_TRANSITIONS,
+    CombatMode,
+    CombatPlan,
+    NodeDecision,
+    parse_map_value,
+)
 from autowsgr.combat.rules import (
     Condition,
     Rule,
@@ -27,6 +37,10 @@ from autowsgr.combat.state import (
     resolve_successors,
 )
 from autowsgr.types import Formation, RepairMode, ShipDamageState
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -476,3 +490,133 @@ class TestCheckBlood:
         r = RepairMode
         stats = [s.NORMAL, s.MODERATE, s.NORMAL, s.NORMAL, s.NORMAL, s.NORMAL]
         assert check_blood(stats, r.moderate_damage) is False
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# parse_map_value / entrance 测试
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestParseMapValue:
+    """parse_map_value 测试 (map 字段 → map_id + entrance)。"""
+
+    def test_int(self):
+        assert parse_map_value(5) == (5, None)
+
+    def test_str_int(self):
+        assert parse_map_value('1') == (1, None)
+
+    def test_entrance_a(self):
+        assert parse_map_value('1a') == (1, 'a')
+
+    def test_entrance_b_upper(self):
+        assert parse_map_value('3B') == (3, 'b')
+
+    def test_whitespace(self):
+        assert parse_map_value('  2A  ') == (2, 'a')
+
+    def test_invalid_letters(self):
+        with pytest.raises(ValueError, match='无法解析'):
+            parse_map_value('1c')
+
+    def test_invalid_non_numeric(self):
+        with pytest.raises(ValueError, match='无法解析'):
+            parse_map_value('abc')
+
+
+class TestCombatPlanEntrance:
+    """CombatPlan.entrance 从 map 字段解析。"""
+
+    def test_entrance_from_map(self):
+        plan = CombatPlan.from_dict({'chapter': 'H', 'map': '1a'})
+        assert plan.map_id == 1
+        assert plan.entrance == 'a'
+
+    def test_no_entrance_pure_int(self):
+        plan = CombatPlan.from_dict({'chapter': 5, 'map': 4})
+        assert plan.map_id == 4
+        assert plan.entrance is None
+
+    def test_default_map_is_none(self):
+        plan = CombatPlan.from_dict({})
+        assert plan.entrance is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# node_tracker load_event 测试
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestResolveEventMapPath:
+    """_resolve_event_map_path 中文命名 glob 测试 (自包含, 不依赖真实数据)。"""
+
+    @pytest.fixture
+    def event_root(self, tmp_path: Path) -> Path:
+        """构造含中文命名地图文件的临时活动目录。"""
+        d = tmp_path / '20260730'
+        d.mkdir()
+        yaml_body = 'A:\n  position: [0.1, 0.2]\n  next: []\n'
+        (d / '激斗漩涡-Ex-1-α.yaml').write_text(yaml_body, encoding='utf-8')
+        (d / '激斗漩涡-Ex-1-β.yaml').write_text(yaml_body, encoding='utf-8')
+        (d / '激斗漩涡H-Ex-1-α.yaml').write_text(yaml_body, encoding='utf-8')
+        (d / '激斗漩涡H-Ex-1-β.yaml').write_text(yaml_body, encoding='utf-8')
+        return tmp_path
+
+    def test_hard_alpha(self, event_root: Path) -> None:
+        path = _resolve_event_map_path(event_root, '20260730', 'H', 1, 'a')
+        assert path is not None
+        assert path.name == '激斗漩涡H-Ex-1-α.yaml'
+
+    def test_easy_alpha_excludes_hard(self, event_root: Path) -> None:
+        """E 章 glob 须排除文件名含 H-Ex 的困难文件。"""
+        path = _resolve_event_map_path(event_root, '20260730', 'E', 1, 'a')
+        assert path is not None
+        assert path.name == '激斗漩涡-Ex-1-α.yaml'
+
+    def test_beta(self, event_root: Path) -> None:
+        path = _resolve_event_map_path(event_root, '20260730', 'H', 1, 'b')
+        assert path is not None
+        assert path.name == '激斗漩涡H-Ex-1-β.yaml'
+
+    def test_missing_returns_none(self, event_root: Path) -> None:
+        assert _resolve_event_map_path(event_root, '20260730', 'H', 99, 'a') is None
+
+    def test_no_entrance_legacy_naming(self, event_root: Path) -> None:
+        """entrance=None 走旧命名 {chapter}-{map}.yaml。"""
+        (event_root / '20260730' / 'H-1.yaml').write_text(
+            'A:\n  position: [0.1, 0.2]\n  next: []\n',
+            encoding='utf-8',
+        )
+        path = _resolve_event_map_path(event_root, '20260730', 'H', 1, None)
+        assert path is not None
+        assert path.name == 'H-1.yaml'
+
+
+class TestLoadEvent:
+    """MapNodeData.load_event 集成测试 (加载真实包数据文件)。"""
+
+    def test_load_real_hard_alpha(self):
+        """加载真实激斗漩涡 H1 α 地图文件。"""
+        data = MapNodeData.load_event('20260730', 'H', 1, 'a')
+        assert data is not None
+        assert 'A' in data
+        # 入口节点 α 已映射为起始点 '0' (不再以 α 命名)
+        assert '0' in data
+        assert 'α' not in data
+
+    def test_entrance_remapped_to_zero(self):
+        """活动入口节点 α/β 映射为 '0', 且 '0' 的 next 指向真实节点。"""
+        data = MapNodeData.load_event('20260730', 'H', 1, 'a')
+        assert data is not None
+        start = data.get('0')
+        assert start is not None
+        assert len(start.next_nodes) > 0  # α → [A, B, C]
+
+    def test_load_real_easy_alpha(self):
+        """加载真实激斗漩涡 E1 α 地图文件。"""
+        data = MapNodeData.load_event('20260730', 'E', 1, 'a')
+        assert data is not None
+        assert 'A' in data
+
+    def test_missing_returns_none(self):
+        assert MapNodeData.load_event('20260730', 'H', 99, 'a') is None

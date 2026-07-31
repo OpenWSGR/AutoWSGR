@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -197,6 +198,24 @@ MODE_CATEGORIES: dict[str, ModeCategory] = {mode: cat for mode, (cat, _ep) in _M
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+def parse_map_value(map_value: Any) -> tuple[int, str | None]:
+    """解析 plan 的 ``map`` 字段，返回 ``(map_id, entrance)``。
+
+    纯数字 (``1`` 或 ``'1'``)  -> ``(1, None)``   # 无入口 (常规战 / 旧活动)
+    ``'1a'`` / ``'1A'``       -> ``(1, 'a')``     # α 入口
+    ``'3b'`` / ``'3B'``       -> ``(3, 'b')``     # β 入口
+
+    入口绑定在活动地图文件名上 (α/β)，不再作为独立配置项。
+    """
+    m = re.fullmatch(r'(\d+)([abAB])?', str(map_value).strip())
+    if not m:
+        raise ValueError(
+            f'无法解析 map 值: {map_value!r}, 应为数字或 数字+a/b (如 1、1a、3b)',
+        )
+    entrance = m.group(2).lower() if m.group(2) else None
+    return int(m.group(1)), entrance
+
+
 @dataclass
 class CombatPlan:
     """完整的作战计划。
@@ -233,6 +252,11 @@ class CombatPlan:
     mode: str = CombatMode.NORMAL
     chapter: int | str = 1
     map_id: int | str = 1
+    entrance: str | None = None
+    """活动入口: ``'a'``=α / ``'b'``=β / ``None``=无入口。
+
+    从 yaml ``map`` 字段 (如 ``1a``) 解析，仅活动地图有 α/β 入口概念。
+    """
     fleet_id: int = 1
     fleet: list[str] | None = None
     repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
@@ -293,7 +317,7 @@ class CombatPlan:
         # 基础配置
         mode = data.get('mode', CombatMode.NORMAL)
         chapter = data.get('chapter', 1)
-        map_id = data.get('map', 1)
+        map_id, entrance = parse_map_value(data.get('map', 1))
         fleet_id = data.get('fleet_id', 1)
         fleet = data.get('fleet')
         fight_condition = FightCondition(data.get('fight_condition', 4))
@@ -333,6 +357,7 @@ class CombatPlan:
             mode=mode,
             chapter=chapter,
             map_id=map_id,
+            entrance=entrance,
             fleet_id=fleet_id,
             fleet=fleet,
             repair_mode=repair_mode,

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra import get_logger
 from autowsgr.vision import (
-    CompositePixelSignature,
     ImageChecker,
     MatchStrategy,
     PixelChecker,
@@ -26,6 +25,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from autowsgr.context import GameContext
+    from autowsgr.vision import ImageTemplate
 
 
 _log = get_logger('combat.recognition')
@@ -53,24 +53,28 @@ class PhaseSignature:
         匹配到此状态后的额外等待时间（秒），用于等待 UI 动画完成。
     pixel_signature:
         像素特征签名，当 ``template_key`` 为 ``None`` 时使用像素匹配。
+    image_templates:
+        图像模板列表 (不归属 :class:`TemplateKey` 体系的自定义模板, 如活动标题图)。
+        ``template_key`` 与 ``pixel_signature`` 均为 ``None`` 时使用, ``find_any``
+        命中任一即匹配。
     """
 
     template_key: TemplateKey | None
     default_timeout: float = 15.0
     confidence: float = 0.8
     after_match_delay: float = 0.0
-    pixel_signature: PixelSignature | CompositePixelSignature | None = None
+    pixel_signature: PixelSignature | None = None
+    image_templates: list[ImageTemplate] | None = None
 
 
-def _get_event_map_signatures() -> CompositePixelSignature:
-    """延迟导入活动地图页面的组合像素签名（基础页面 OR 浮层）。"""
-    from autowsgr.ui.event.event_page import BASE_PAGE_SIGNATURE, OVERLAY_SIGNATURE
+def _get_event_map_title_templates() -> list[ImageTemplate]:
+    """延迟导入活动地图页面标题图模板。
 
-    return CompositePixelSignature.any_of(
-        'event_map_page_composite',
-        BASE_PAGE_SIGNATURE,
-        OVERLAY_SIGNATURE,
-    )
+    用于识别活动战斗结束回港后的活动地图页 (CombatPhase.EVENT_MAP_PAGE)。
+    """
+    from autowsgr.ui.event.event_page import _get_event_title_templates
+
+    return _get_event_title_templates()
 
 
 _CHOOSE_FORMATION_SIGNATURE = PixelSignature(
@@ -151,7 +155,7 @@ PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
     CombatPhase.EVENT_MAP_PAGE: PhaseSignature(
         template_key=None,
         default_timeout=7.5,
-        pixel_signature=_get_event_map_signatures(),
+        image_templates=_get_event_map_title_templates(),
     ),
 }
 
@@ -216,9 +220,9 @@ class CombatRecognizer:
     @staticmethod
     def _match_pixel(
         screen: np.ndarray,
-        sig: PixelSignature | CompositePixelSignature,
+        sig: PixelSignature,
     ) -> bool:
-        """检查截图是否匹配像素特征签名（支持单签名或组合签名）。"""
+        """检查截图是否匹配像素特征签名。"""
         return PixelChecker.check_signature(screen, sig).matched
 
     @staticmethod
@@ -226,9 +230,14 @@ class CombatRecognizer:
         screen: np.ndarray,
         sig: PhaseSignature,
     ) -> bool:
-        """检查截图是否匹配指定状态的视觉签名（模板或像素）。"""
+        """检查截图是否匹配指定状态的视觉签名（模板、图像列表或像素）。"""
         if sig.template_key is not None:
             return CombatRecognizer._match_template(screen, sig.template_key, sig.confidence)
+        if sig.image_templates is not None:
+            return (
+                ImageChecker.find_any(screen, sig.image_templates, confidence=sig.confidence)
+                is not None
+            )
         if sig.pixel_signature is not None:
             return CombatRecognizer._match_pixel(screen, sig.pixel_signature)
         return False
@@ -294,7 +303,11 @@ class CombatRecognizer:
                 poll_action(screen)
 
             for phase, sig in phase_sigs:
-                if sig.template_key is None and sig.pixel_signature is None:
+                if (
+                    sig.template_key is None
+                    and sig.pixel_signature is None
+                    and sig.image_templates is None
+                ):
                     continue
                 if self._match_phase(screen, sig):
                     if sig.after_match_delay > 0:
@@ -326,7 +339,11 @@ class CombatRecognizer:
         """
         for phase in candidates:
             sig = CombatRecognizer.get_signature(phase)
-            if sig.template_key is None and sig.pixel_signature is None:
+            if (
+                sig.template_key is None
+                and sig.pixel_signature is None
+                and sig.image_templates is None
+            ):
                 continue
             if CombatRecognizer._match_phase(screen, sig):
                 return phase

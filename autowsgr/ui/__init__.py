@@ -124,9 +124,13 @@ register_page(PageName.CANTEEN, CanteenPage.is_current_page)
 register_page(PageName.BUILD, BuildPage.is_current_page)
 register_page(PageName.INTENSIFY, IntensifyPage.is_current_page)
 register_page(PageName.FRIEND, FriendPage.is_current_page)
+# EVENT_MAP 必须在 DECISIVE_BATTLE 之前注册。get_current_page 按注册顺序 first-match-wins,
+# 而决战签名是 4 个深色背景像素点 (不特异), 在深色主题活动页面 (如 20260730 激斗漩涡) 上
+# 会误命中 → 活动页被冒认为决战页 → 导航误判"进活动后立刻退出"。活动页改用标题图模板
+# 识别 (高度特异), 排在决战前即可优先正确识别。参见 event_page._get_event_title_templates。
+register_page(PageName.EVENT_MAP, BaseEventPage.is_current_page)
 register_page(PageName.DECISIVE_BATTLE, DecisiveBattlePage.is_current_page)
 register_page(PageName.CHOOSE_SHIP, ChooseShipPage.is_current_page)
-register_page(PageName.EVENT_MAP, BaseEventPage.is_current_page)
 
 __all__ = [
     # ── 数据 ──

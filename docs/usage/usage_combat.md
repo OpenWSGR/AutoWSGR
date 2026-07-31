@@ -86,13 +86,13 @@ node_args:
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `name` | str | `""` | 计划名称 (日志用) |
-| `chapter` | int | `1` | 章节编号 |
-| `map` | int | `1` | 地图编号 |
+| `chapter` | int \| str | `1` | 章节编号；活动用 `E`(简单) / `H`(困难) |
+| `map` | int \| str | `1` | 地图编号；活动入口写作 `1a`(α) / `1b`(β) |
 | `fleet_id` | int | `1` | 出征舰队 (1~4) |
 | `repair_mode` | int | `2` | 修理策略: 1=中破修, 2=大破修 |
 | `fight_condition` | int | `1` | 战况选择 (1~5) |
 | `selected_nodes` | list | `[]` | 白名单节点 (空=全部) |
-| `map_entrance` | str | `"alpha"` | 地图入口 (alpha/beta) |
+| `event` | str | — | 活动名 (如 `"20260730"`)，仅活动 plan 需要 |
 | `node_defaults` | dict | `{}` | 所有节点的默认决策 |
 | `node_args` | dict | `{}` | 各节点独立决策 (覆盖默认) |
 
@@ -182,6 +182,33 @@ results = runner.run_for_times(10, gap=3.0)
 4. **出征准备**: 选舰队 → 修理 → 检测血量 → 出征
 5. **战斗循环**: CombatEngine 按 `NORMAL_FIGHT_TRANSITIONS` 状态图执行
 6. **结果处理**: 返回 `CombatResult`，含 `flag`、`ship_stats`、`node_count`
+
+### 活动战斗 (Event)
+
+活动战与常规战已融合：把活动 plan 的 `chapter` 写成 `E`(简单) 或 `H`(困难)，
+入口编码进 `map`（`1a`=α、`1b`=β），即可由 `NormalFightRunner` 按章节自动
+路由到活动地图，复用 `NormalFightTrigger`，无需为活动单独配置触发器。
+
+```yaml
+# 活动示例: 激斗漩涡 H1 的 α 入口
+event: "20260730"
+chapter: H
+map: 1a                 # 1a=α 入口, 1b=β 入口
+fleet_id: 1
+# node_defaults / node_args 与常规战写法一致
+```
+
+两种调用方式：
+
+```python
+# 方式一: 把活动 plan 名加入全局配置的 normal_fight_tasks,
+#         auto_daily 即按 chapter 自动调度 (与常规战共用触发器)
+
+# 方式二: 显式调用兼容入口
+from autowsgr.ops import run_event_fight_from_yaml
+
+results = run_event_fight_from_yaml(ctx, '激斗漩涡H1a', times=5)
+```
 
 ---
 

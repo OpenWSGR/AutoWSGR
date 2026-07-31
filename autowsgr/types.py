@@ -447,13 +447,6 @@ class PageName(StrEnum):
     """活动地图页面"""
 
 
-class MapEntrance(StrEnum):
-    """地图入口。"""
-
-    alpha = 'alpha'
-    beta = 'beta'
-
-
 class DecisiveEntryStatus(StrEnum):
     """决战总览页入口状态。
 

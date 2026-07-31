@@ -31,14 +31,25 @@ _log = get_logger('ui')
 
 @lru_cache(maxsize=1)
 def _get_event_icon_templates() -> list[ImageTemplate]:
-    """延迟加载活动入口图标模板。"""
+    """延迟加载活动入口图标模板。
+
+    每个活动主页面的入口图标外观不同, 这里收集各活动期的图标模板,
+    匹配引擎按 ``source_resolution`` 自动缩放以适配当前截图分辨率,
+    故 540p/720p 采集的模板可共存。导航时 ``find_any`` 命中任一即视为
+    检测到活动入口。
+    """
     from autowsgr.image_resources._lazy import load_template
 
     return [
         load_template(
             'event/event_icon_20260212_720p.png',
-            name='event_icon',
+            name='event_icon_20260212',
             source_resolution=(1280, 720),
+        ),
+        load_template(
+            'event/event_icon_20260730_540p.png',
+            name='event_icon_20260730',
+            source_resolution=(960, 540),
         ),
     ]
 
