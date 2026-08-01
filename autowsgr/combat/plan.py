@@ -236,6 +236,8 @@ class CombatPlan:
         出征舰队编号。
     fleet:
         舰队成员名单（换船用）。
+    fleet_presets:
+        GUI 整理后的舰队预设列表。
     repair_mode:
         修理策略。
     fight_condition:
@@ -259,6 +261,7 @@ class CombatPlan:
     """
     fleet_id: int = 1
     fleet: list[str] | None = None
+    fleet_presets: list[dict[str, Any]] | None = None
     repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
     fight_condition: FightCondition = FightCondition.aim
     selected_nodes: list[str] = field(default_factory=list)
@@ -294,6 +297,50 @@ class CombatPlan:
         return node in self.selected_nodes
 
     @classmethod
+    def _parse_fleet_presets(cls, raw: Any) -> list[dict[str, Any]] | None:
+        """解析舰队预设，并整理名称、舰名和候选列表。"""
+        if raw is None:
+            return None
+        if not isinstance(raw, list):
+            raise TypeError('fleet_presets 必须是列表')
+
+        presets: list[dict[str, Any]] = []
+        for raw_preset in raw:
+            name = cls._trim_text(raw_preset.get('name', ''))
+            ships = [
+                cls._normalize_preset_slot(raw_slot)
+                for raw_slot in raw_preset.get('ships', [])
+            ]
+            presets.append({'name': name, 'ships': ships})
+        return presets
+
+    @staticmethod
+    def _trim_text(value: Any) -> Any:
+        """删除字符串首尾空格，其他类型保持不变。"""
+        return value.strip() if isinstance(value, str) else value
+
+    @classmethod
+    def _normalize_preset_slot(cls, raw_slot: Any) -> Any:
+        """整理一个舰队槽位，并按填写顺序去除重复候选。"""
+        if isinstance(raw_slot, str):
+            return raw_slot.strip()
+        if not isinstance(raw_slot, dict):
+            return raw_slot
+
+        result = {
+            key: cls._trim_text(value)
+            for key, value in raw_slot.items()
+        }
+        candidates = result.get('candidates')
+        if isinstance(candidates, list):
+            candidates = [
+                cls._trim_text(candidate)
+                for candidate in candidates
+            ]
+            result['candidates'] = list(dict.fromkeys(candidates))
+        return result
+
+    @classmethod
     def from_yaml(cls, path: str | Path) -> CombatPlan:
         from autowsgr.infra.config_compat import (
             LegacyConfigError,
@@ -320,6 +367,7 @@ class CombatPlan:
         map_id, entrance = parse_map_value(data.get('map', 1))
         fleet_id = data.get('fleet_id', 1)
         fleet = data.get('fleet')
+        fleet_presets = cls._parse_fleet_presets(data.get('fleet_presets'))
         fight_condition = FightCondition(data.get('fight_condition', 4))
         selected_nodes = data.get('selected_nodes', [])
 
@@ -360,6 +408,7 @@ class CombatPlan:
             entrance=entrance,
             fleet_id=fleet_id,
             fleet=fleet,
+            fleet_presets=fleet_presets,
             repair_mode=repair_mode,
             fight_condition=fight_condition,
             selected_nodes=selected_nodes,

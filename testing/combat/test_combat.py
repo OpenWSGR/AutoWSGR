@@ -433,6 +433,81 @@ class TestCombatPlan:
         assert result.result == RuleResult.RETREAT
 
 
+class TestFleetPresetsParsing:
+    """fleet_presets 解析测试。"""
+
+    def test_missing_presets_keeps_legacy_fleet(self):
+        """未配置预设时，旧 fleet 字段保持不变。"""
+        plan = CombatPlan.from_dict({'fleet': ['飞龙', 'U-1206']})
+        assert plan.fleet == ['飞龙', 'U-1206']
+        assert plan.fleet_presets is None
+
+    @pytest.mark.parametrize('invalid_presets', [{}, 'preset', 1])
+    def test_presets_must_be_list(self, invalid_presets: object):
+        """fleet_presets 顶层必须使用列表。"""
+        with pytest.raises(TypeError, match='fleet_presets 必须是列表'):
+            CombatPlan.from_dict({'fleet_presets': invalid_presets})
+
+    def test_empty_presets_is_preserved(self):
+        """空列表由上层决定业务含义。"""
+        plan = CombatPlan.from_dict({'fleet_presets': []})
+        assert plan.fleet_presets == []
+
+    def test_preset_content_is_normalized(self):
+        """整理名称和槽位，并按顺序去除重复候选。"""
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'name': ' 测试舰队 ',
+                        'ships': [
+                            ' 飞龙·改 ',
+                            {
+                                'candidates': [' 岛风 ', '黑潮', '岛风'],
+                                'ship_type': ' dd ',
+                                'min_level': 100,
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+
+        assert plan.fleet_presets == [
+            {
+                'name': '测试舰队',
+                'ships': [
+                    '飞龙·改',
+                    {
+                        'candidates': ['岛风', '黑潮'],
+                        'ship_type': 'dd',
+                        'min_level': 100,
+                    },
+                ],
+            },
+        ]
+
+    def test_unknown_slot_fields_are_preserved(self):
+        """解析阶段不删除槽位中的其他字段。"""
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'ships': [
+                            {'name': '契卡洛夫', 'max_level': 110},
+                        ],
+                    },
+                ],
+            },
+        )
+        assert plan.fleet_presets == [
+            {
+                'name': '',
+                'ships': [{'name': '契卡洛夫', 'max_level': 110}],
+            },
+        ]
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # actions.py 测试
 # ═══════════════════════════════════════════════════════════════════════════════
