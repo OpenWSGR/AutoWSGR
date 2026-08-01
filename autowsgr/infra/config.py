@@ -292,6 +292,8 @@ class DecisiveConfig(BaseModel):
     """决战章节 (1-6)"""
     decisive_rounds: int = 1
     """决战连续执行轮数"""
+    use_new_fleet_change_algorithm: bool = False
+    """决战是否使用新的换船算法；关闭时继续使用原有流程。"""
     level1: list[str] = Field(
         default_factory=lambda: ['鲃鱼', 'U-1206', 'U-47', '射水鱼', 'U-96', 'U-1405']
     )

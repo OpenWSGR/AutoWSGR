@@ -10,6 +10,7 @@ import pytest
 
 from autowsgr.context import GameContext
 from autowsgr.emulator import AndroidController
+from autowsgr.infra import DecisiveConfig
 from autowsgr.ui.battle.base import PAGE_SIGNATURE
 from autowsgr.ui.battle.constants import (
     AUTO_SUPPLY_PROBE,
@@ -26,6 +27,8 @@ from autowsgr.ui.battle.preparation import (
     BattlePreparationPage,
     Panel,
 )
+from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
+from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 
 
 if TYPE_CHECKING:
@@ -289,3 +292,70 @@ class TestToggles:
         pg, ctrl = page
         pg.toggle_auto_supply()
         ctrl.click.assert_called_once_with(*CLICK_AUTO_SUPPLY)
+
+
+# ─────────────────────────────────────────────
+# 决战换船算法开关
+# ─────────────────────────────────────────────
+
+
+class TestDecisiveFleetChangeFeatureGate:
+    def test_original_flow_uses_pool_ocr_without_target_context(self):
+        page = MagicMock()
+        page.detect_fleet.return_value = ['A', None, None, None, None, None]
+        page._validate_with_selector.return_value = True
+
+        assert change_fleet_legacy(page, None, ['A'])
+
+        page.detect_fleet.assert_called_once_with()
+
+    def test_original_flow_changes_ship_and_verifies_result(self):
+        page = MagicMock()
+        empty_fleet = [None] * 6
+        target_fleet = ['A', None, None, None, None, None]
+        page.get_selected_fleet.return_value = 3
+        page.detect_fleet.side_effect = [empty_fleet, target_fleet, target_fleet]
+        page._validate_with_selector.side_effect = [False, True]
+        page._match_existing_members.return_value = ([False] * 6, set())
+        page._change_single_ship.return_value = 'A'
+
+        with patch('autowsgr.ui.decisive.legacy_fleet_change.time.sleep'):
+            assert change_fleet_legacy(page, 2, [' A '])
+
+        page.select_fleet.assert_called_once_with(2)
+        page._change_single_ship.assert_called_once_with(
+            0,
+            'A',
+            selector=None,
+            slot_occupied=False,
+        )
+        page._reorder.assert_called_once_with(target_fleet, target_fleet)
+
+    def test_decisive_uses_original_flow_by_default(self):
+        page = DecisiveBattlePreparationPage(
+            _make_ctx(MagicMock(spec=AndroidController)),
+            DecisiveConfig(),
+        )
+
+        with patch(
+            'autowsgr.ui.decisive.preparation.change_fleet_legacy',
+            return_value=True,
+        ) as legacy_change:
+            assert page.change_fleet(None, ['A'])
+
+        legacy_change.assert_called_once_with(page, None, ['A'])
+
+    def test_decisive_uses_new_flow_when_enabled(self):
+        page = DecisiveBattlePreparationPage(
+            _make_ctx(MagicMock(spec=AndroidController)),
+            DecisiveConfig(use_new_fleet_change_algorithm=True),
+        )
+
+        with patch.object(
+            BattlePreparationPage,
+            'change_fleet',
+            return_value=True,
+        ) as new_change:
+            assert page.change_fleet(None, ['A'])
+
+        new_change.assert_called_once_with(None, ['A'])

@@ -57,6 +57,14 @@ class TestDecisiveConfig:
         with pytest.raises(ValueError, match='决战章节'):
             DecisiveConfig(chapter=0)
 
+    def test_fleet_change_algorithm_is_disabled_by_default(self):
+        assert DecisiveConfig().use_new_fleet_change_algorithm is False
+
+    def test_fleet_change_algorithm_can_be_enabled(self):
+        config = DecisiveConfig(use_new_fleet_change_algorithm=True)
+
+        assert config.use_new_fleet_change_algorithm is True
+
 
 # ── UserConfig ──
 

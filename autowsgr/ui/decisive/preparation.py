@@ -20,9 +20,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.ui.battle.preparation import BattlePreparationPage
+from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from autowsgr.context import GameContext
     from autowsgr.infra import DecisiveConfig
     from autowsgr.vision import OCREngine
@@ -56,3 +59,13 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
         super().__init__(ctx, ocr)
         self._ocr: OCREngine = ocr or ctx.ocr  # type: ignore[assignment]
         self._config = config
+
+    def change_fleet(
+        self,
+        fleet_id: int | None,
+        ship_names: Sequence[str | None],
+    ) -> bool:
+        """按配置选择决战原有流程或新的换船算法。"""
+        if self._config.use_new_fleet_change_algorithm:
+            return super().change_fleet(fleet_id, ship_names)
+        return change_fleet_legacy(self, fleet_id, ship_names)

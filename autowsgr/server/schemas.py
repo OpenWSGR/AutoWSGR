@@ -232,6 +232,10 @@ class DecisiveRequest(BaseModel):
     type: Literal[TaskType.DECISIVE] = TaskType.DECISIVE
     chapter: int = Field(default=6, ge=1, le=6, description='决战章节')
     decisive_rounds: int = Field(default=1, ge=1, description='决战执行轮数')
+    use_new_fleet_change_algorithm: bool = Field(
+        default=False,
+        description='决战是否使用新的换船算法；关闭时使用原有流程',
+    )
     level1: list[str] = Field(
         default_factory=lambda: [
             'U-1206',
