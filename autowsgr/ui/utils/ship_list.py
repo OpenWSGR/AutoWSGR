@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 import cv2
@@ -14,7 +13,17 @@ import cv2
 from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import apply_ship_patches, get_api_dll
-from autowsgr.vision.ocr import _fuzzy_match
+from autowsgr.vision.ocr import OCRResult, _fuzzy_match
+from autowsgr.vision.ocr_rules import (
+    LEVEL_NOISY_PATTERN as _LEVEL_NOISY_PATTERN,
+)
+from autowsgr.vision.ocr_rules import (
+    LEVEL_PATTERN as _LEVEL_PATTERN,
+)
+from autowsgr.vision.ocr_rules import (
+    is_valid_ship_level,
+    normalize_level_digits,
+)
 
 
 if TYPE_CHECKING:
@@ -31,11 +40,10 @@ LEGACY_HEIGHT: int = 720
 #: Legacy 选船列表左侧裁剪宽度 (px@1280)
 LEGACY_LIST_WIDTH: int = 1048
 
-_LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILilOo]{1,6})')
-_LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILilOo]{1,6})')
-_MAX_LEVEL_VALUE = 200
-_MAX_LEVEL_NOISE_CHARS = 1
+# 110 在 720p 下常被识别为 ``Il0`` / ``ll0``，其中两个 1 都会成为易混淆字符。
+_MAX_LEVEL_NOISE_CHARS = 2
 _MAX_NOISY_LEVEL_HITS_BEFORE_RETRY = 5
+_MIN_SPLIT_LEVEL_CONFIDENCE = 0.85
 
 
 class LevelOCRRetryNeededError(RuntimeError):
@@ -61,6 +69,19 @@ def to_legacy_format(screen: np.ndarray) -> tuple[np.ndarray, float, float]:
     resized = cv2.resize(screen, (LEGACY_WIDTH, LEGACY_HEIGHT))
     bgr = cv2.cvtColor(resized, cv2.COLOR_RGB2BGR)
     return bgr, scale_y, scale_x
+
+
+def _match_ship_results(results: list[OCRResult]) -> list[tuple[OCRResult, str]]:
+    """返回 OCR 结果中能够安全映射到唯一标准舰名的项目。"""
+    matches: list[tuple[OCRResult, str]] = []
+    for result in results:
+        text = result.text.strip()
+        if not text:
+            continue
+        name = _fuzzy_match(apply_ship_patches(text), SHIPNAMES)
+        if name is not None:
+            matches.append((result, name))
+    return matches
 
 
 def locate_ship_rows(
@@ -102,10 +123,6 @@ def locate_ship_rows(
         ``(ship_name, cx_rel, cy_rel, row_key)``。
         ``row_key`` 用于与等级识别结果做行级关联。
     """
-    from autowsgr.constants import SHIPNAMES
-    from autowsgr.vision import get_api_dll
-    from autowsgr.vision.ocr import _fuzzy_match
-
     h, w = screen.shape[:2]
 
     # 转为 legacy 格式 (1280x720, BGR)
@@ -131,14 +148,24 @@ def locate_ship_rows(
 
         # 对齐 legacy: recognize(multiple=True) -- 同一 DLL 行可含多个舰船名
         results = ocr.recognize(row_img)
-        for r in results:
-            text = r.text.strip()
-            if not text:
-                continue
-            correct_name = apply_ship_patches(text)
-            name = _fuzzy_match(correct_name, SHIPNAMES)
-            if name is None:
-                continue
+        matched_results = _match_ship_results(results)
+        upscaled_results: list[OCRResult] = []
+        result_scale = 1.0
+
+        # 原图没有可靠舰名时才放大重试，避免增加正常识别路径的耗时。
+        if not matched_results:
+            upscaled = cv2.resize(
+                row_img,
+                None,
+                fx=2,
+                fy=2,
+                interpolation=cv2.INTER_CUBIC,
+            )
+            upscaled_results = ocr.recognize(upscaled)
+            matched_results = _match_ship_results(upscaled_results)
+            result_scale = 2.0
+
+        for r, name in matched_results:
             if deduplicate_by_name and name in seen:
                 continue
             if deduplicate_by_name:
@@ -146,8 +173,8 @@ def locate_ship_rows(
             # 从 bbox 计算精确位置 (bbox 相对于 row_img)
             if r.bbox is not None:
                 x1, y1, x2, y2 = r.bbox
-                cx = (x1 + x2) / 2 / w
-                cy = (y_start + (y1 + y2) / 2) / h
+                cx = (x1 + x2) / 2 / result_scale / w
+                cy = (y_start + (y1 + y2) / 2 / result_scale) / h
             else:
                 cx = list_w_native / 2 / w
                 cy = (y_start + y_end) / 2 / h
@@ -213,43 +240,30 @@ def _noise_char_count(raw_digits: str) -> int:
 
 def _coerce_level_digits(raw_digits: str) -> int | None:
     """将 OCR 提取出的数字串映射为合法等级值。"""
-    trans = str.maketrans(
-        {
-            'I': '1',
-            'i': '1',
-            'l': '1',
-            'L': '1',
-            'O': '0',
-            'o': '0',
-        }
-    )
-    normalized = raw_digits.translate(trans)
-    digits = ''.join(ch for ch in normalized if ch.isdigit())
-    if not digits:
+    digits = normalize_level_digits(raw_digits)
+    if digits is None:
         return None
-
-    candidates: list[int] = []
-
-    # 先尝试前 3 位（常见误读: 1046 -> 104, 110544 -> 110）
-    if len(digits) >= 3:
-        candidates.append(int(digits[:3]))
-    if len(digits) >= 2:
-        candidates.append(int(digits[:2]))
-    candidates.append(int(digits[:1]))
 
     # 兼容前导 0 的场景（如 051 -> 51）
     if digits.startswith('0') and len(digits) >= 3:
-        candidates.insert(0, int(digits[1:3]))
+        value = int(digits[1:3])
+        return value if is_valid_ship_level(value) else None
 
-    seen_vals: set[int] = set()
-    for value in candidates:
-        if value in seen_vals:
-            continue
-        seen_vals.add(value)
-        if 1 <= value <= _MAX_LEVEL_VALUE:
-            return value
+    # 三位以上只读取前三位；超过 110 时不再降级猜成两位等级。
+    value = int(digits[:3] if len(digits) >= 3 else digits)
+    return value if is_valid_ship_level(value) else None
 
-    return None
+
+def _parse_bare_level(text: str, confidence: float) -> int | None:
+    """解析等级 ROI 中与 ``Lv.`` 标签分离的高置信度纯数字。"""
+    candidate = text.removeprefix('.')
+    if confidence < _MIN_SPLIT_LEVEL_CONFIDENCE:
+        return None
+    digits = normalize_level_digits(candidate)
+    if digits is None:
+        return None
+    value = int(digits)
+    return value if is_valid_ship_level(value) else None
 
 
 def _center_x(bbox: tuple[int, int, int, int] | None, width: int) -> float:
@@ -292,8 +306,10 @@ def _probe_level_near_name(
     def collect_levels(img: np.ndarray) -> None:
         nonlocal noisy_level_hits
         results = ocr.recognize(img, allowlist='LlVvIiYy0Oo1.:-/0123456789')
+        split_level_hits: list[int] = []
         for r in results:
             text = r.text.strip()
+            split_level = _parse_bare_level(text, r.confidence)
             if not text:
                 continue
             level, need_retry = _parse_level_with_status(text)
@@ -302,6 +318,11 @@ def _probe_level_near_name(
                 continue
             if level is not None:
                 parsed_levels.append(level)
+            elif split_level is not None:
+                split_level_hits.append(split_level)
+
+        # 当前 ROI 只覆盖一艘船的紧凑等级区域，高置信度数字不强制带 Lv.。
+        parsed_levels.extend(split_level_hits)
 
     collect_levels(roi)
 
@@ -380,7 +401,10 @@ def read_ship_levels(  # noqa: PLR0912
         row_img = list_area_native[y_start:y_end]
         results = ocr.recognize(row_img)
 
-        name_hits: list[tuple[str, float]] = []
+        name_hits = [
+            (name, _center_x(result.bbox, row_img.shape[1]))
+            for result, name in _match_ship_results(results)
+        ]
         local_level_hits: list[tuple[int, float]] = []
 
         for r in results:
@@ -394,13 +418,22 @@ def read_ship_levels(  # noqa: PLR0912
             if level is not None:
                 local_level_hits.append((level, x_center))
 
-            correct_name = apply_ship_patches(text)
-            name = _fuzzy_match(correct_name, SHIPNAMES)
-            if name is not None:
-                name_hits.append((name, x_center))
-
+        # 等级约束路径也仅在原图舰名失败时执行一次 2x 放大。
         if not name_hits:
-            continue
+            upscaled = cv2.resize(
+                row_img,
+                None,
+                fx=2,
+                fy=2,
+                interpolation=cv2.INTER_CUBIC,
+            )
+            upscaled_results = ocr.recognize(upscaled)
+            name_hits = [
+                (name, _center_x(result.bbox, upscaled.shape[1]) / 2)
+                for result, name in _match_ship_results(upscaled_results)
+            ]
+            if not name_hits:
+                continue
 
         name_hits.sort(key=lambda item: item[1])
         local_level_hits.sort(key=lambda item: item[1])

@@ -177,13 +177,6 @@ class EmulatorType(StrEnum):
         raise FileNotFoundError(f'没有找到 {self.value} 的安装路径')
 
 
-class OcrBackend(StrEnum):
-    """OCR 后端。"""
-
-    easyocr = 'easyocr'
-    paddleocr = 'paddleocr'
-
-
 class OcrMirror(StrEnum):
     """EasyOCR 模型下载镜像源。"""
 

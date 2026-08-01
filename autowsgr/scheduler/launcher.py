@@ -133,11 +133,29 @@ class Launcher:
     # ── OCR ──
 
     def create_ocr(self) -> OCREngine:
-        """根据配置创建 OCR 引擎。"""
+        """根据配置创建 EasyOCR 引擎。"""
         cfg = self.config
-        _log.info('[Launcher] 创建 OCR 引擎 (backend={})', cfg.ocr.backend.value)
-        # 目前仅支持 EasyOCR，后续可按 cfg.ocr.backend 分发
+        _log.info('[Launcher] 创建 EasyOCR 引擎')
         self._ocr = EasyOCREngine.create(gpu=cfg.ocr.gpu, mirror=cfg.ocr.mirror)
+        # 同步船池感知匹配置信度到 ocr 模块
+        from autowsgr.vision.ocr import set_ship_name_match_confidence
+        from autowsgr.vision.ocr_rules import (
+            set_user_ship_name_aliases,
+            set_user_ship_name_corrections,
+        )
+
+        set_ship_name_match_confidence(cfg.ocr.ship_name_match_confidence)
+        loaded_rules = set_user_ship_name_corrections(cfg.ocr.ship_name_corrections)
+        loaded_aliases = set_user_ship_name_aliases(cfg.ocr.ship_name_aliases)
+        if cfg.ocr.ship_name_match_confidence > 0.0:
+            _log.info(
+                '[Launcher] OCR置信度匹配机制加载（当前参数：{:.2f}）',
+                cfg.ocr.ship_name_match_confidence,
+            )
+        if loaded_rules:
+            _log.info('[Launcher] OCR用户舰名规则加载（有效规则：{}）', loaded_rules)
+        if loaded_aliases:
+            _log.info('[Launcher] OCR用户舰名别名加载（有效别名：{}）', loaded_aliases)
         return self._ocr
 
     # ── 构造 GameContext ──

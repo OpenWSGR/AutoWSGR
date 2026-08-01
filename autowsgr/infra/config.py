@@ -18,7 +18,6 @@ from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
     GameAPP,
-    OcrBackend,
     OcrMirror,
     OSType,
     RepairMode,
@@ -36,7 +35,6 @@ _log = get_logger('infra')
 OPERATION_DELAY_MIN: float = 0.0
 OPERATION_DELAY_MAX: float = 0.0
 
-
 def operation_delay() -> float:
     """本次 UI 操作后的随机延迟秒数。
 
@@ -50,8 +48,7 @@ def operation_delay() -> float:
         max(OPERATION_DELAY_MIN, OPERATION_DELAY_MAX),
     )
 
-
-# ── 子配置模型 ──
+# ── 基础运行配置 ──
 
 
 class EmulatorConfig(BaseModel):
@@ -88,13 +85,45 @@ class OCRConfig(BaseModel):
 
     model_config = {'frozen': True}
 
-    backend: OcrBackend = OcrBackend.easyocr
-    """OCR 后端"""
     gpu: bool = False
     """是否使用 GPU 加速"""
     mirror: OcrMirror = OcrMirror.modelscope
     """EasyOCR 模型下载镜像源"""
 
+    # 舰名匹配
+    ship_name_match_confidence: float = Field(
+        default=0.65,
+        ge=0.0,
+        le=1.0,
+    )
+    """舰名匹配置信度：0 为关闭，0.65 为默认，1 为完全匹配；越大越严格，建议勿改。"""
+    ship_name_corrections: dict[str, str] = Field(default_factory=dict)
+    """用户舰名 OCR 修正规则，格式为 ``OCR 原文: SHIPNAMES 标准舰名``。"""
+    ship_name_aliases: dict[str, str] = Field(default_factory=dict)
+    """用户舰名别名，格式为 ``用户自定义名: SHIPNAMES 标准舰名``。"""
+
+    @field_validator('ship_name_corrections', 'ship_name_aliases', mode='before')
+    @classmethod
+    def _normalize_ship_name_corrections(cls, value: object) -> dict[str, str]:
+        """逐条清理用户舰名配置；格式错误的条目直接跳过。"""
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            _log.warning('OCR 用户舰名配置必须是映射，已跳过全部配置')
+            return {}
+
+        corrections: dict[str, str] = {}
+        for raw_text, ship_name in value.items():
+            if not isinstance(raw_text, str) or not isinstance(ship_name, str):
+                _log.warning('跳过格式错误的 OCR 用户舰名配置: {} -> {}', raw_text, ship_name)
+                continue
+            source = raw_text.strip()
+            target = ship_name.strip()
+            if not source or not target:
+                _log.warning('跳过内容为空的 OCR 用户舰名配置')
+                continue
+            corrections[source] = target
+        return corrections
 
 class LogConfig(BaseModel):
     """日志配置。"""
@@ -170,7 +199,7 @@ class LogConfig(BaseModel):
         merged.update(self.channels)
         return merged
 
-
+# ── 自动化任务配置 ──
 class NormalFightTaskConfig(BaseModel):
     """单个常规战任务配置。
 
@@ -178,7 +207,6 @@ class NormalFightTaskConfig(BaseModel):
     (经 :func:`_parse_normal_fight_tasks` 解析), 也支持纯字符串 (仅 plan 名)
     或完整字典。
     """
-
     model_config = {'frozen': True}
 
     name: str
@@ -192,7 +220,6 @@ class NormalFightTaskConfig(BaseModel):
        ``stop_max_loot`` / ``quick_repair_limit`` 任一上限时, 常规战会持续
        产出任务、永远抢占浴室修理 (优先级更低), 致浴室修理永不执行。
     """
-
 
 class DailyAutomationConfig(BaseModel):
     """日常自动化设置。"""
@@ -282,7 +309,6 @@ class DailyAutomationConfig(BaseModel):
                 raise TypeError(f'无法识别的常规战任务条目: {item!r}')
         return result
 
-
 class DecisiveConfig(BaseModel):
     """决战自动化配置。"""
 
@@ -322,8 +348,7 @@ class DecisiveConfig(BaseModel):
             raise ValueError('决战章节必须为 1-6 之间的整数')
         return v
 
-
-# ── 顶层配置 ──
+# ── 顶层用户配置 ──
 
 
 class UserConfig(BaseModel):
@@ -356,8 +381,6 @@ class UserConfig(BaseModel):
     """船坞满时自动清空"""
     repair_manually: bool = False
     """是否手动修理"""
-    bathroom_feature_count: int = 1
-    """浴室装饰数 (1-3)。预留:智能浴场空位调度用。"""
     bathroom_count: int = 2
     """修理位置总数 (≤12)。预留:智能浴场空位调度用。"""
 
@@ -467,10 +490,7 @@ class UserConfig(BaseModel):
             )
         return cls.model_validate(data)
 
-
 # ── 战斗相关配置 ──
-
-
 class NodeConfig(BaseModel):
     """单个地图节点的战斗配置。"""
 
@@ -507,7 +527,6 @@ class NodeConfig(BaseModel):
     proceed_stop: RepairMode | list[RepairMode] = RepairMode.severe_damage
     """达到指定破损状态时停止前进"""
 
-
 class FightConfig(BaseModel):
     """出征配置（通用）。"""
 
@@ -536,12 +555,10 @@ class FightConfig(BaseModel):
             object.__setattr__(self, 'repair_mode', modes)
         return self
 
-
 class BattleConfig(FightConfig):
     """战役配置。"""
 
     repair_mode: RepairMode | list[RepairMode] = RepairMode.moderate_damage
-
 
 class ExerciseConfig(FightConfig):
     """演习配置。"""
@@ -555,13 +572,9 @@ class ExerciseConfig(FightConfig):
     max_refresh_times: int = 2
     """最大刷新次数"""
 
-
 # ── ConfigManager ──
-
-
 # 默认配置文件名（当前目录下）
 _DEFAULT_CONFIG_FILENAME = 'usersettings.yaml'
-
 
 class ConfigManager:
     """配置管理器 — 提供加载入口。"""

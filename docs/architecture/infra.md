@@ -166,7 +166,6 @@ result = merge_dicts(base_dict, override_dict)
 |-----------------|-------------------------------|---------------|
 | `OSType`        | `windows/linux/macos`         | 操作系统类型  |
 | `EmulatorType`  | `雷电/蓝叠/MuMu/云手机/其他` | 模拟器类型    |
-| `OcrBackend`    | `easyocr/paddleocr`           | OCR 后端      |
 | `GameAPP`       | `官服/小米/应用宝`             | 游戏渠道服    |
 
 `EmulatorType` 提供两个平台感知方法：

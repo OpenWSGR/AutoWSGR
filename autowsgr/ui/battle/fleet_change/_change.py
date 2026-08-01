@@ -20,6 +20,7 @@ import re
 import time
 from typing import TYPE_CHECKING, TypedDict
 
+from autowsgr.constants import ship_name_identity
 from autowsgr.infra.logger import get_logger
 from autowsgr.ui.battle.constants import CLICK_SHIP_SLOT
 
@@ -165,7 +166,7 @@ class FleetChangeMixin(FleetDetectMixin):
 
         return False
 
-    # 将 OCR、YAML 和选船结果中的舰名统一成可比较的标准舰名。
+    # 清理 OCR、YAML 和选船结果中的明确后缀，保留用户自定义舰名。
     @staticmethod
     def _normalize_ship_name(value: object) -> str | None:
         if value is None:
@@ -177,6 +178,12 @@ class FleetChangeMixin(FleetDetectMixin):
         normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
         normalized = normalized.strip()
         return normalized or None
+
+    # 将同一 No.xxx 舰船组中的标准名和用户自定义名统一为同一身份。
+    @classmethod
+    def _ship_identity(cls, value: object) -> str | None:
+        normalized = cls._normalize_ship_name(value)
+        return ship_name_identity(normalized) if normalized is not None else None
 
     # 从一个槽位读取优选、备选、搜索名、舰种和等级条件。
     @classmethod
@@ -217,14 +224,15 @@ class FleetChangeMixin(FleetDetectMixin):
         # candidates 保存去空格后的原始舰名，交给选船页面使用。
         candidates: list[str] = []
 
-        # seen 保存标准舰名，防止“岛风”和“岛风·改”等价项重复。
+        # seen 保存舰船组身份，防止同一艘船的不同名称重复。
         seen: set[str] = set()
         for value in raw_values:
             candidate = str(value).strip()
             normalized = cls._normalize_ship_name(candidate)
-            if candidate and normalized and normalized not in seen:
+            identity = cls._ship_identity(normalized)
+            if candidate and normalized and identity and identity not in seen:
                 candidates.append(candidate)
-                seen.add(normalized)
+                seen.add(identity)
 
         # 没有舰名候选时无法形成有效选船规则。
         if not candidates:
@@ -248,11 +256,12 @@ class FleetChangeMixin(FleetDetectMixin):
         out: list[str] = []
         seen: set[str] = set()
         normalized_name = cls._normalize_ship_name(name)
+        name_identity = cls._ship_identity(normalized_name)
 
         # 已分配舰名存在时，将它放在候选列表第一位。
-        if normalized_name:
+        if normalized_name and name_identity:
             out.append(normalized_name)
-            seen.add(normalized_name)
+            seen.add(name_identity)
 
         # 有 selector 时，继续补充本槽位的原始候选。
         if selector is not None:
@@ -262,9 +271,10 @@ class FleetChangeMixin(FleetDetectMixin):
             if isinstance(raw, list):
                 for value in raw:
                     normalized = cls._normalize_ship_name(value)
-                    if normalized and normalized not in seen:
+                    identity = cls._ship_identity(normalized)
+                    if normalized and identity and identity not in seen:
                         out.append(normalized)
-                        seen.add(normalized)
+                        seen.add(identity)
         return out
 
     # 为六个槽位挑选互不重复的目标舰名，冲突时自动尝试备选。
@@ -290,13 +300,14 @@ class FleetChangeMixin(FleetDetectMixin):
             if names[slot] is None:
                 return assign(slot + 1, used)
             for candidate in options[slot]:
-                if candidate in used:
+                identity = cls._ship_identity(candidate)
+                if identity is None or identity in used:
                     continue
                 assigned[slot] = candidate
-                used.add(candidate)
+                used.add(identity)
                 if assign(slot + 1, used):
                     return True
-                used.remove(candidate)
+                used.remove(identity)
                 assigned[slot] = None
             return False
 
@@ -317,7 +328,7 @@ class FleetChangeMixin(FleetDetectMixin):
         if current_name == search_name:
             return True
 
-        return current_name == cls._normalize_ship_name(search_name)
+        return cls._ship_identity(current_name) == cls._ship_identity(search_name)
 
     # 从本槽候选中排除队内同名舰，并返回实际可用于选船的规则。
     @classmethod
@@ -336,12 +347,18 @@ class FleetChangeMixin(FleetDetectMixin):
 
         # candidates 是本槽位按优先级排列的标准舰名。
         candidates = cls._slot_candidates(name, selector)
-        # occupied 保存队内其他槽位已经占用的舰名。
+        # occupied 保存队内其他槽位已经占用的舰船组身份。
         occupied = {
-            ship for idx, ship in enumerate(current) if ship is not None and idx != slot_to_replace
+            cls._ship_identity(ship)
+            for idx, ship in enumerate(current)
+            if ship is not None and idx != slot_to_replace
         }
         # available 保留当前舰队中尚未占用的候选。
-        available = [candidate for candidate in candidates if candidate not in occupied]
+        available = [
+            candidate
+            for candidate in candidates
+            if cls._ship_identity(candidate) not in occupied
+        ]
 
         if len(available) == 0:
             return None, None
@@ -381,7 +398,7 @@ class FleetChangeMixin(FleetDetectMixin):
         # 判断一艘当前舰船能否满足指定目标槽位。
         def matches(slot: int, ship: str | None) -> bool:
             selector = selectors[slot]
-            return ship == desired[slot] and (
+            return cls._ship_identity(ship) == cls._ship_identity(desired[slot]) and (
                 selector is None or cls._matches_search_name(ship, selector.get('search_name'))
             )
 
@@ -423,11 +440,15 @@ class FleetChangeMixin(FleetDetectMixin):
         if target is None:
             return current_name is None
         if selector is None:
-            return current_name == target
+            return cls._ship_identity(current_name) == cls._ship_identity(target)
+        candidate_identities = {
+            cls._ship_identity(candidate)
+            for candidate in cls._slot_candidates(target, selector)
+        }
         return cls._matches_search_name(
             current_name,
             selector.get('search_name'),
-        ) and current_name in cls._slot_candidates(target, selector)
+        ) and cls._ship_identity(current_name) in candidate_identities
 
     # 验证当前六个槽位是否完整满足目标，并拒绝队内同名舰。
     @classmethod
@@ -437,7 +458,7 @@ class FleetChangeMixin(FleetDetectMixin):
         desired: list[str | None],
         selectors: list[dict | None],
     ) -> bool:
-        members = [name for name in current if name is not None]
+        members = [cls._ship_identity(name) for name in current if name is not None]
         if len(members) != len(set(members)):
             return False
 
@@ -590,12 +611,17 @@ class FleetChangeMixin(FleetDetectMixin):
             target = desired[i]
             if target is None:
                 break
-            if current[i] == target:
+            target_identity = self._ship_identity(target)
+            if self._ship_identity(current[i]) == target_identity:
                 continue
             try:
-                src = current.index(target)
+                src = next(
+                    idx
+                    for idx, current_name in enumerate(current)
+                    if self._ship_identity(current_name) == target_identity
+                )
             # 当前舰队中找不到目标舰船时，保留现场交给最终验证处理。
-            except ValueError:
+            except StopIteration:
                 _log.warning(
                     "[准备页] 位置对齐: '{}' 不在当前舰队中, 跳过",
                     target,

@@ -11,6 +11,7 @@ from autowsgr.infra import (
     DecisiveConfig,
     EmulatorConfig,
     FightConfig,
+    OCRConfig,
     UserConfig,
 )
 from autowsgr.types import (
@@ -49,6 +50,52 @@ class TestEmulatorConfig:
         assert cfg.serial == '127.0.0.1:5555'
 
 
+# ── OCRConfig ──
+
+
+class TestOCRConfig:
+    def test_unused_backend_field_is_removed(self):
+        assert not hasattr(OCRConfig(), 'backend')
+
+    def test_ship_name_match_confidence_default(self):
+        assert OCRConfig().ship_name_match_confidence == 0.65
+
+    def test_ship_name_corrections_default(self):
+        assert OCRConfig().ship_name_corrections == {}
+
+    def test_ship_name_aliases_default(self):
+        assert OCRConfig().ship_name_aliases == {}
+
+    def test_ship_name_corrections_skip_malformed_entries(self):
+        config = OCRConfig(
+            ship_name_corrections={
+                ' 误识别 ': ' 胡德 ',
+                'empty': ' ',
+                1: '雪风',
+            },
+        )
+
+        assert config.ship_name_corrections == {'误识别': '胡德'}
+
+    def test_ship_name_corrections_skip_non_mapping(self):
+        config = OCRConfig(ship_name_corrections=['误识别', '胡德'])  # type: ignore[arg-type]
+
+        assert config.ship_name_corrections == {}
+
+    def test_ship_name_aliases_are_trimmed(self):
+        config = OCRConfig(ship_name_aliases={' 契卡洛夫 ': ' 85工程 '})
+
+        assert config.ship_name_aliases == {'契卡洛夫': '85工程'}
+
+    @pytest.mark.parametrize(
+        ('value', 'message'),
+        [(-0.01, 'greater than or equal'), (1.01, 'less than or equal')],
+    )
+    def test_ship_name_match_confidence_bounds(self, value: float, message: str):
+        with pytest.raises(ValueError, match=message):
+            OCRConfig(ship_name_match_confidence=value)
+
+
 # ── DecisiveBattleConfig ──
 
 
@@ -70,6 +117,9 @@ class TestDecisiveConfig:
 
 
 class TestUserConfig:
+    def test_unused_bathroom_feature_count_is_removed(self):
+        assert not hasattr(UserConfig(), 'bathroom_feature_count')
+
     def test_from_yaml(self, tmp_yaml: Callable[[str, str], Path]):
         content = """\
 emulator:

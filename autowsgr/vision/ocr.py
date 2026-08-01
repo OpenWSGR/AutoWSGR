@@ -21,6 +21,11 @@ import easyocr
 
 from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
+from autowsgr.vision.ocr_rules import (
+    apply_ship_name_rules,
+    expand_ship_name_candidates,
+    resolve_ship_name_alias,
+)
 
 
 if TYPE_CHECKING:
@@ -30,49 +35,26 @@ if TYPE_CHECKING:
 _log = get_logger('vision.ocr')
 
 
+_ship_name_match_confidence: float = 0.0
+_MIN_CUSTOM_NAME_BASE_LENGTH = 2
+_MIN_TRUNCATED_OCR_LENGTH = 4
+_MIN_FRAGMENT_OCR_LENGTH = 4
+
+
+def set_ship_name_match_confidence(threshold: float) -> None:
+    """设置船池匹配置信度；0 为关闭，其他值限制在 0 到 1。"""
+    global _ship_name_match_confidence  # noqa: PLW0603
+    _ship_name_match_confidence = max(0.0, min(1.0, threshold))
+
+
 # ── 结果数据类 ──
-
-REPLACE_RULE: dict[str, str] = {
-    '鲍鱼': '鲃鱼',
-    '296': 'M-296',
-    '维内托': '维托里奥·维内托',
-    'IA': 'IIIA',
-}
-
 
 # ── 舰船名文本补丁管线 ──
 
 
-def _patch_replace_rule(text: str) -> str:
-    """替换已知 OCR 误识别（包含匹配）。"""
-    for old, new in REPLACE_RULE.items():
-        if old in text:
-            return new
-    return text
-
-
-def _patch_submarine_prefix(text: str) -> str:
-    """修正潜艇名首字符误识别: 以 0 开头且含 3+ 位数字 -> 首字符改为 U。
-
-    常见误读: U-96 -> 096, U-1206 -> 01206 等。
-    """
-    if text.startswith('0') and sum(c.isdigit() for c in text) >= 3:
-        return 'U' + text[1:]
-    return text
-
-
-SHIP_TEXT_PATCHES = [
-    _patch_replace_rule,
-    _patch_submarine_prefix,
-]
-"""舰船名 OCR 文本补丁列表, 按序执行。每个补丁签名: str -> str。"""
-
-
 def apply_ship_patches(text: str) -> str:
-    """依次执行所有舰船名文本补丁。"""
-    for patch in SHIP_TEXT_PATCHES:
-        text = patch(text)
-    return text
+    """应用集中登记的舰名 OCR 特殊规则。"""
+    return apply_ship_name_rules(text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -452,15 +434,36 @@ class EasyOCREngine(OCREngine):
 
 
 def _fuzzy_match(text: str, candidates: list[str], threshold: int = 3) -> str | None:
-    """基于编辑距离的模糊匹配。"""
-    best_name: str | None = None
-    best_dist = threshold + 1
-    for name in candidates:
-        dist = _edit_distance(text, name)
-        if dist < best_dist:
-            best_dist = dist
-            best_name = name
-    if best_name is not None and best_dist <= threshold:
+    """按明确关系和唯一编辑距离匹配舰名，不在歧义时猜测。"""
+    unique_candidates = list(dict.fromkeys(expand_ship_name_candidates(candidates)))
+    if not text or not unique_candidates:
+        return None
+
+    if _ship_name_match_confidence > 0.0:
+        pool_name, handled = _fuzzy_match_pool_aware(
+            text,
+            unique_candidates,
+            _ship_name_match_confidence,
+        )
+        if handled:
+            return resolve_ship_name_alias(pool_name) if pool_name is not None else None
+
+    # 单字只接受精确匹配，二至三字最多允许一个字符识别错误。
+    effective_threshold = (
+        0 if len(text) == 1 else min(threshold, 1) if len(text) <= 3 else threshold
+    )
+    distances = [(name, _edit_distance(text, name)) for name in unique_candidates]
+    best_dist = min(distance for _, distance in distances)
+    nearest = list(
+        dict.fromkeys(
+            resolve_ship_name_alias(name)
+            for name, distance in distances
+            if distance == best_dist
+        ),
+    )
+    best_name = nearest[0] if len(nearest) == 1 and best_dist <= effective_threshold else None
+
+    if best_name is not None:
         _log.debug(
             "[OCR] fuzzy_match: '{}' -> '{}' (distance={})",
             text,
@@ -468,14 +471,110 @@ def _fuzzy_match(text: str, candidates: list[str], threshold: int = 3) -> str | 
             best_dist,
         )
         return best_name
+
+    if len(nearest) != 1:
+        _log.debug("[OCR] fuzzy_match: '{}' -> 最近候选并列: {}", text, nearest)
+        return None
+
     _log.debug(
         "[OCR] fuzzy_match: '{}' -> 无匹配 (best='{}', distance={}, threshold={})",
         text,
-        best_name,
+        nearest[0],
         best_dist,
-        threshold,
+        effective_threshold,
     )
     return None
+
+
+def _fuzzy_match_pool_aware(  # noqa: PLR0911
+    text: str,
+    candidates: list[str],
+    confidence_threshold: float,
+) -> tuple[str | None, bool]:
+    """处理精确名称、明确自定义后缀和唯一长舰名片段。"""
+    exact = [name for name in candidates if name == text]
+    if exact:
+        name = resolve_ship_name_alias(exact[0])
+        _log.debug("[OCR] pool_match: '{}' -> '{}' (exact)", text, name)
+        return name, True
+
+    # 单字基础名不能通过自定义后缀扩展，避免把长 OCR 文本强制映射到单字舰名。
+    if any(len(name) == 1 and text.startswith(f'{name}·') for name in candidates):
+        return None, True
+
+    custom_suffix_matches = [
+        name
+        for name in candidates
+        if len(name) >= _MIN_CUSTOM_NAME_BASE_LENGTH and text.startswith(f'{name}·')
+    ]
+    truncated_matches = [
+        name
+        for name in candidates
+        if len(text) >= _MIN_TRUNCATED_OCR_LENGTH and name.startswith(text)
+    ]
+    fragment_matches = [
+        name
+        for name in candidates
+        if len(text) >= _MIN_FRAGMENT_OCR_LENGTH and text in name and not name.startswith(text)
+    ]
+
+    relation_count = sum(
+        bool(matches) for matches in (custom_suffix_matches, truncated_matches, fragment_matches)
+    )
+    if relation_count > 1:
+        related_names = {
+            resolve_ship_name_alias(name)
+            for matches in (custom_suffix_matches, truncated_matches, fragment_matches)
+            for name in matches
+        }
+        if len(related_names) != 1:
+            _log.warning("[OCR] pool_match: '{}' 同时符合多种舰名关系，拒绝猜测", text)
+            return None, True
+
+    if custom_suffix_matches:
+        longest = max(map(len, custom_suffix_matches))
+        matches = [name for name in custom_suffix_matches if len(name) == longest]
+        match_type = 'custom suffix'
+        matched_length = len(matches[0]) if len(matches) == 1 else 0
+        compared_text_length = len(text) - 1
+    elif truncated_matches:
+        matches = truncated_matches
+        match_type = 'truncated OCR'
+        matched_length = len(text)
+        compared_text_length = len(text)
+    elif fragment_matches:
+        matches = fragment_matches
+        match_type = 'unique OCR fragment'
+        matched_length = len(text)
+        compared_text_length = len(text)
+    else:
+        return None, False
+
+    standard_names = list(dict.fromkeys(resolve_ship_name_alias(name) for name in matches))
+    if len(standard_names) != 1:
+        if standard_names:
+            _log.warning("[OCR] pool_match: '{}' 前缀候选不唯一: {}", text, standard_names)
+        return None, True
+
+    matched_candidate = matches[0]
+    name = standard_names[0]
+    # 唯一的四字符以上原文片段已经包含完整文字证据，不按目标总长度降权。
+    confidence = (
+        1.0
+        if match_type == 'unique OCR fragment'
+        else 2 * matched_length / (compared_text_length + len(matched_candidate))
+    )
+    if confidence < confidence_threshold:
+        return None, True
+    _log.debug(
+        "[OCR] pool_match: '{}' -> '{}' ({}, confidence={:.3f}, threshold={:.3f})",
+        text,
+        name,
+        match_type,
+        confidence,
+        confidence_threshold,
+    )
+    return name, True
 
 
 def _edit_distance(a: str, b: str) -> int:

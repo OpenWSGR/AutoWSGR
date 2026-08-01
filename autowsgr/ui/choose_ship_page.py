@@ -13,10 +13,10 @@
 
 from __future__ import annotations
 
-import re
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
     MatchStrategy,
@@ -24,6 +24,8 @@ from autowsgr.vision import (
     PixelRule,
     PixelSignature,
 )
+from autowsgr.vision.ocr import _fuzzy_match
+from autowsgr.vision.ocr_rules import normalize_ship_name_suffix
 
 from .utils import wait_for_page, wait_leave_page
 from .utils.ship_list import LevelOCRRetryNeededError, locate_ship_rows, read_ship_levels
@@ -57,7 +59,6 @@ CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
 _SCROLL_FROM_Y: float = 0.55
 _SCROLL_TO_Y: float = 0.30
 _OCR_MAX_ATTEMPTS: int = 3
-_SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
 _SHIP_TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
     'dd': ('驱逐',),
@@ -386,7 +387,6 @@ class ChooseShipPage:
             匹配并点击成功时返回舰船名；失败返回 ``None``。
         """
         assert self._ctx.ocr is not None
-        normalized_target = self._normalize_ship_name(name)
 
         for attempt in range(_OCR_MAX_ATTEMPTS):
             screen = self._ctrl.screenshot()
@@ -429,7 +429,7 @@ class ChooseShipPage:
 
             for matched, cx, cy, row_key in hits:
                 normalized_matched = self._normalize_ship_name(matched)
-                if normalized_matched != normalized_target:
+                if not self._matches_ship_name(name, matched):
                     continue
 
                 level = None
@@ -543,15 +543,22 @@ class ChooseShipPage:
 
     @staticmethod
     def _normalize_search_keyword(name: str) -> str:
-        normalized = name.strip()
-        if normalized.endswith('·改'):
-            normalized = normalized.removesuffix('·改').strip()
-        normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
-        return normalized.strip()
+        """保留用户在游戏内使用的自定义舰名作为搜索条件。"""
+        return name.strip()
 
     @staticmethod
     def _normalize_ship_name(name: str) -> str:
-        normalized = name.strip()
-        normalized = normalized.removesuffix('·改')
-        normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
-        return normalized.strip()
+        return normalize_ship_name_suffix(name)
+
+    @classmethod
+    def _matches_ship_name(cls, target: str, matched: str) -> bool:
+        """比较目标名与 OCR 船池结果，不修改任一原始文本。"""
+        normalized_target = cls._normalize_ship_name(target)
+        normalized_matched = cls._normalize_ship_name(matched)
+        if normalized_target == normalized_matched:
+            return True
+
+        pool_target = _fuzzy_match(target, SHIPNAMES, threshold=0)
+        return (
+            pool_target is not None and cls._normalize_ship_name(pool_target) == normalized_matched
+        )

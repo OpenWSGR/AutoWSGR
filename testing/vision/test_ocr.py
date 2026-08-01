@@ -7,9 +7,21 @@ from typing import ClassVar
 import numpy as np
 import pytest
 
+from autowsgr.constants import (
+    SHIPNAME_GROUPS,
+    SHIPNAMES,
+    get_ship_name_variants,
+    ship_name_identity,
+)
 from autowsgr.vision import OCREngine, OCRResult, ShipNameMismatchError
 from autowsgr.vision.ocr import (
     _fuzzy_match,
+    apply_ship_patches,
+    set_ship_name_match_confidence,
+)
+from autowsgr.vision.ocr_rules import (
+    set_user_ship_name_aliases,
+    set_user_ship_name_corrections,
 )
 
 
@@ -302,3 +314,187 @@ class TestOCREngineCreate:
     def test_paddleocr_not_supported(self):
         with pytest.raises(ValueError, match='不支持的 OCR 引擎'):
             OCREngine.create('paddleocr')
+
+
+class TestPoolAwareMatch:
+    """测试安全舰名匹配、明确后缀和长舰名片段。"""
+
+    CANDIDATES: ClassVar[list[str]] = [
+        '胡德',
+        '扶桑',
+        '岛风',
+        '安德烈亚·多利亚',
+        '卡约·杜伊里奥',
+        '乌尔里希·冯·胡滕',
+        '乌戈里尼·维瓦尔迪',
+        'U-96',
+        'Z21',
+        'K-21',
+    ]
+
+    def setup_method(self):
+        set_ship_name_match_confidence(0.0)
+        set_user_ship_name_aliases({})
+        set_user_ship_name_corrections({})
+
+    def teardown_method(self):
+        set_ship_name_match_confidence(0.0)
+        set_user_ship_name_aliases({})
+        set_user_ship_name_corrections({})
+
+    def test_only_confirmed_cjk_separator_is_corrected(self):
+        assert apply_ship_patches('安德烈亚:多利亚') == '安德烈亚·多利亚'
+        assert apply_ship_patches('鳟盹') == '鳞鲀'
+        assert apply_ship_patches('U/96') == 'U/96'
+        assert apply_ship_patches('U:96') == 'U:96'
+
+    def test_user_ship_name_corrections_skip_unknown_targets(self):
+        loaded = set_user_ship_name_corrections(
+            {
+                '用户误识别': '胡德',
+                '无效规则': '不存在的舰名',
+            },
+        )
+
+        assert loaded == 1
+        assert apply_ship_patches('用户误识别') == '胡德'
+        assert apply_ship_patches('无效规则') == '无效规则'
+
+    def test_user_ship_name_corrections_override_system_rules(self):
+        set_user_ship_name_corrections({'鲍鱼': '胡德'})
+
+        assert apply_ship_patches('鲍鱼') == '胡德'
+
+    def test_user_ship_name_aliases_map_display_names_to_standard_names(self):
+        loaded = set_user_ship_name_aliases(
+            {
+                '希尔德布兰德': 'AIII',
+                '契卡洛夫': '85工程',
+                'U-47·狼群': 'U-47',
+                '巴尔的摩·英魂': '巴尔的摩',
+            },
+        )
+
+        assert loaded == 4
+        assert _fuzzy_match(apply_ship_patches('希尔德布兰德'), SHIPNAMES) == 'AIII'
+        assert _fuzzy_match(apply_ship_patches('契卡洛夫'), SHIPNAMES) == '85工程'
+        assert _fuzzy_match(apply_ship_patches('U-47·狼群'), SHIPNAMES) == 'U-47'
+        assert _fuzzy_match(apply_ship_patches('巴尔的摩:英魂'), SHIPNAMES) == '巴尔的摩'
+
+    def test_user_ship_name_is_added_to_the_same_ship_group(self):
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+
+        assert SHIPNAME_GROUPS['No.285'] == ['85工程', '契卡洛夫']
+        assert get_ship_name_variants('契卡洛夫') == ['85工程', '契卡洛夫']
+        assert ship_name_identity('契卡洛夫') == ship_name_identity('85工程')
+        assert '契卡洛夫' in SHIPNAMES
+
+    def test_user_ship_name_aliases_participate_in_fuzzy_matching(self):
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+
+        assert apply_ship_patches('契卡洛大') == '契卡洛大'
+        assert _fuzzy_match('契卡洛大', SHIPNAMES) == '85工程'
+
+    def test_alias_tie_for_same_standard_name_is_not_ambiguous(self):
+        set_user_ship_name_aliases(
+            {
+                '契卡洛夫': '85工程',
+                '契卡洛天': '85工程',
+            },
+        )
+
+        assert _fuzzy_match('契卡洛大', SHIPNAMES) == '85工程'
+
+    def test_alias_tie_for_different_standard_names_is_rejected(self):
+        set_user_ship_name_aliases(
+            {
+                '契卡洛夫': '85工程',
+                '契卡洛天': 'AIII',
+            },
+        )
+
+        assert _fuzzy_match('契卡洛大', SHIPNAMES) is None
+
+    def test_user_ship_name_aliases_skip_invalid_entries(self):
+        loaded = set_user_ship_name_aliases(
+            {
+                '自定义舰名': '不存在的舰名',
+                '胡德': '雪风',
+            },
+        )
+
+        assert loaded == 0
+        assert apply_ship_patches('自定义舰名') == '自定义舰名'
+        assert apply_ship_patches('胡德') == '胡德'
+
+    def test_short_text_does_not_guess_from_full_ship_pool(self):
+        set_ship_name_match_confidence(0.65)
+        assert _fuzzy_match('71', SHIPNAMES, threshold=2) is None
+
+    def test_single_character_only_accepts_exact_match(self):
+        assert _fuzzy_match('帅', ['晓', '虎'], threshold=3) is None
+        assert _fuzzy_match('虎', ['晓', '虎'], threshold=3) == '虎'
+
+    def test_equal_edit_distance_candidates_are_rejected(self):
+        assert _fuzzy_match('蜂风', ['雪风', '峰风', '东风'], threshold=2) is None
+
+    def test_duplicate_names_do_not_create_false_ambiguity(self):
+        assert _fuzzy_match('胡德', ['胡德', '胡德'], threshold=2) == '胡德'
+
+    def test_short_unique_one_character_error_is_accepted(self):
+        assert _fuzzy_match('帅力', ['火力', '胡德'], threshold=3) == '火力'
+
+    def test_custom_suffix_obeys_confidence(self):
+        set_ship_name_match_confidence(0.65)
+        assert _fuzzy_match('胡德·荣耀', self.CANDIDATES) == '胡德'
+
+        set_ship_name_match_confidence(0.67)
+        assert _fuzzy_match('胡德·荣耀', self.CANDIDATES) is None
+
+    def test_symbol_only_difference_is_exact(self):
+        set_ship_name_match_confidence(0.65)
+        text = apply_ship_patches('安德烈亚:多利亚')
+        assert _fuzzy_match(text, self.CANDIDATES, threshold=0) == '安德烈亚·多利亚'
+
+    def test_unregistered_symbol_substitution_is_not_ignored(self):
+        set_ship_name_match_confidence(0.65)
+        assert _fuzzy_match('U:96', ['U-96'], threshold=0) is None
+
+    def test_four_character_truncation_obeys_confidence(self):
+        set_ship_name_match_confidence(0.8)
+        assert _fuzzy_match('卡约·杜伊', self.CANDIDATES) == '卡约·杜伊里奥'
+
+        set_ship_name_match_confidence(0.84)
+        assert _fuzzy_match('卡约·杜伊', self.CANDIDATES) is None
+
+    def test_short_truncated_prefix_is_rejected(self):
+        set_ship_name_match_confidence(0.1)
+        assert _fuzzy_match('卡约·', self.CANDIDATES) is None
+
+    def test_one_character_custom_name_is_rejected(self):
+        set_ship_name_match_confidence(0.1)
+        assert _fuzzy_match('狮·荣耀', ['狮', '哥特雄狮']) is None
+
+    def test_longest_custom_name_prefix_wins(self):
+        set_ship_name_match_confidence(0.65)
+        assert _fuzzy_match('约克城·荣耀', ['约克', '约克城'], threshold=0) == '约克城'
+
+    def test_ambiguous_truncated_prefix_is_rejected(self):
+        set_ship_name_match_confidence(0.1)
+        candidates = ['卡约·杜伊里奥', '卡约·杜伊长名']
+        assert _fuzzy_match('卡约·杜伊', candidates) is None
+
+    def test_unique_long_name_fragment_matches(self):
+        set_ship_name_match_confidence(0.65)
+        assert _fuzzy_match('维瓦尔迪', self.CANDIDATES) == '乌戈里尼·维瓦尔迪'
+        assert _fuzzy_match('冯·胡滕', self.CANDIDATES) == '乌尔里希·冯·胡滕'
+
+    def test_ambiguous_long_name_fragment_is_rejected(self):
+        set_ship_name_match_confidence(0.65)
+        candidates = ['乌尔里希·冯·胡滕', '测试舰·冯·胡滕']
+        assert _fuzzy_match('冯·胡滕', candidates) is None
+
+    def test_unrelated_text_falls_back_to_edit_distance(self):
+        set_ship_name_match_confidence(0.65)
+        assert _fuzzy_match('扶桑', self.CANDIDATES, threshold=2) == '扶桑'
+        assert _fuzzy_match('战列舰', self.CANDIDATES, threshold=2) is None

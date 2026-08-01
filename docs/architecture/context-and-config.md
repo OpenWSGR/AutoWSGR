@@ -80,7 +80,7 @@ UserConfig (顶层)
 ├── account: AccountConfig
 │     game_app, account, password  (+property: package_name)
 ├── ocr: OCRConfig
-│     backend, gpu
+│     gpu, mirror, ship_name_match_confidence, ship_name_corrections, ship_name_aliases
 ├── log: LogConfig
 │     level, root, dir, show_*_debug 开关, channels
 │     (+property: effective_channels)
@@ -90,11 +90,10 @@ UserConfig (顶层)
 │     chapter, level1, level2, flagship_priority, repair_level, ...
 │
 ├── os_type: OSType              # 自动检测
-├── delay: float = 1.5           # 延迟基本单位 (秒)
-├── check_page: bool = True      # 启动时检查页面
+├── operation_delay_min: float   # UI 操作延迟下界 (秒)
+├── operation_delay_max: float   # UI 操作延迟上界 (秒)
 ├── dock_full_destroy: bool      # 船坞满自动清空
 ├── repair_manually: bool        # 手动修理模式
-├── bathroom_feature_count: int  # 浴室装饰数
 ├── bathroom_count: int          # 修理位置总数
 ├── destroy_ship_work_mode       # 解装模式 (disable/include/exclude)
 ├── destroy_ship_types           # 解装舰种列表

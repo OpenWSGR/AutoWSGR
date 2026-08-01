@@ -27,13 +27,22 @@ account:
 # OCR 引擎
 # ═══════════════════════════════════════════
 ocr:
-  backend: easyocr                 # easyocr / paddleocr
   gpu: false                       # 是否使用 GPU 加速
   mirror: modelscope               # Easyocr 模型镜像, 用于下载模型, 可选值如下
   # origin: 使用Easyocr原生下载
   # github: 使用Github地址下载, 由官方提供
   # tencent: 使用kuai提供的镜像下载, 由腾讯云托管
   # modelscope: 使用Ceceliachenen提供的镜像下载, 由ModelScope托管
+  ship_name_match_confidence: 0.65 # 舰名匹配置信度, 越大越严格, 建议勿改
+  ship_name_corrections: {}        # OCR误识别文字 -> SHIPNAMES标准舰名
+  # ship_name_corrections:
+  #   "OCR误识别文字": "标准舰名"
+  #   “巧心”: “热心”
+  ship_name_aliases:               # 用户自定义名 -> SHIPNAMES标准舰名
+    希尔德布兰德: AIII
+    契卡洛夫: 85工程
+    U-47·狼群: U-47
+    巴尔的摩·英魂: 巴尔的摩
 
 # ═══════════════════════════════════════════
 # 日志
@@ -60,9 +69,10 @@ log:
 # ═══════════════════════════════════════════
 # 脚本行为
 # ═══════════════════════════════════════════
+operation_delay_min: 0.0           # 单次操作最小延迟
+operation_delay_max: 0.0           # 单次操作最大延迟
 dock_full_destroy: true            # 船坞满时自动清空
 repair_manually: false             # 是否手动修理
-bathroom_feature_count: 1          # 预留: 智能浴场装饰调度 (暂未启用)
 bathroom_count: 2                  # 浴室修理槽位数 (auto_bath_repair 空位调度用)
 
 # ── 解装设置 ──

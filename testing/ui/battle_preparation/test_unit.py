@@ -29,6 +29,8 @@ from autowsgr.ui.battle.preparation import (
 )
 from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
+from autowsgr.vision import OCRResult
+from autowsgr.vision.ocr_rules import set_user_ship_name_aliases
 
 
 if TYPE_CHECKING:
@@ -49,6 +51,13 @@ _AUTO_OFF = (50, 50, 50)
 
 # 屏幕尺寸
 _W, _H = 960, 540
+
+
+@pytest.fixture(autouse=True)
+def _reset_ship_name_aliases():
+    set_user_ship_name_aliases({})
+    yield
+    set_user_ship_name_aliases({})
 
 
 def _make_ctx(ctrl: AndroidController, ocr: OCREngine | None = None) -> GameContext:
@@ -295,6 +304,100 @@ class TestToggles:
 
 
 # ─────────────────────────────────────────────
+# 准备页目标上下文匹配
+# ─────────────────────────────────────────────
+
+
+class TestContextShipNameMatch:
+    def test_unique_nearest_target_matches(self):
+        expected = ['Z1', 'Z16', 'Z17', 'Z21', '克劳塞维茨', '契卡洛夫']
+        assert BattlePreparationPage._match_context_ship_name('71', expected) == 'Z1'
+
+    def test_equal_distance_targets_are_rejected(self):
+        assert BattlePreparationPage._match_context_ship_name('71', ['K1', 'Z1']) is None
+
+    def test_target_context_keeps_yaml_slot_positions(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        ocr.recognize.return_value = [
+            OCRResult(text='可怖', confidence=0.8, bbox=(127, 3, 167, 23)),
+            OCRResult(text='鳟盹', confidence=0.8, bbox=(273, 3, 313, 23)),
+            OCRResult(text='霄风', confidence=0.8, bbox=(420, 3, 460, 23)),
+        ]
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+        expected = [None, None, None, '晓', '可畏', '胡德']
+        pool_matches = {
+            '可怖': '可怖',
+            '鳞鲀': '胡德',
+            '霄风': '雪风',
+        }
+
+        with patch(
+            'autowsgr.ui.battle.fleet_change._detect._fuzzy_match',
+            side_effect=lambda text, *_args: pool_matches[text],
+        ):
+            detected = page.detect_fleet(
+                np.zeros((720, 1280, 3), dtype=np.uint8),
+                expected_names=expected,
+            )
+
+        assert detected == ['可怖', '胡德', '雪风', None, None, None]
+
+    def test_unexpected_pool_match_uses_context_target(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        expected = ['峰风', 'Z16', 'Z17', 'Z21', '克劳塞维茨', '契卡洛夫']
+        texts = ['蜂风', *expected[1:]]
+        centers = [147, 293, 440, 587, 733, 880]
+        ocr.recognize.return_value = [
+            OCRResult(text=text, confidence=0.8, bbox=(x - 20, 2, x + 20, 24))
+            for text, x in zip(texts, centers, strict=True)
+        ]
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+
+        detected = page.detect_fleet(
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            expected_names=expected,
+        )
+
+        assert detected == expected
+
+    def test_unrelated_ocr_does_not_force_slot_target(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        ocr.recognize.return_value = [
+            OCRResult(text='71', confidence=0.14, bbox=(117, 3, 139, 21)),
+        ]
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+
+        detected = page.detect_fleet(
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            expected_names=['U-47·狼群', 'U-81', 'U-1206'],
+        )
+
+        assert detected == [None] * 6
+
+    def test_user_ship_name_alias_is_used_for_final_fleet_detection(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        ocr.recognize.return_value = [
+            OCRResult(text='契卡洛夫', confidence=0.99, bbox=(127, 2, 167, 24)),
+        ]
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+
+        try:
+            detected = page.detect_fleet(
+                np.zeros((720, 1280, 3), dtype=np.uint8),
+                expected_names=['契卡洛夫'],
+            )
+        finally:
+            set_user_ship_name_aliases({})
+
+        assert detected == ['85工程', None, None, None, None, None]
+
+
+# ─────────────────────────────────────────────
 # 决战换船算法开关
 # ─────────────────────────────────────────────
 
@@ -367,6 +470,52 @@ class TestDecisiveFleetChangeFeatureGate:
 
 
 class TestSmartFleetChange:
+    def test_custom_name_search_accepts_standard_name_result(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+        old_fleet = ['岛风', None, None, None, None, None]
+        target_fleet = ['85工程', None, None, None, None, None]
+
+        with (
+            patch.object(page, 'get_selected_fleet', return_value=1),
+            patch.object(
+                page,
+                'detect_fleet',
+                side_effect=[old_fleet, target_fleet, target_fleet, target_fleet],
+            ),
+            patch.object(page, '_change_single_ship', return_value='85工程') as change_ship,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            assert page.change_fleet(1, [{'candidates': ['契卡洛夫']}])
+
+        assert change_ship.call_args.args[:2] == (0, '契卡洛夫')
+        assert change_ship.call_args.kwargs['selector']['candidates'] == ['契卡洛夫']
+
+    def test_existing_group_variant_is_reordered_without_reselection(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+        old_fleet = ['岛风', '85工程', None, None, None, None]
+        target_fleet = ['85工程', '岛风', None, None, None, None]
+
+        def move_ship(src: int, dst: int, current: list[str | None]) -> None:
+            current.insert(dst, current.pop(src))
+
+        with (
+            patch.object(page, 'get_selected_fleet', return_value=1),
+            patch.object(
+                page,
+                'detect_fleet',
+                side_effect=[old_fleet, old_fleet, old_fleet, target_fleet],
+            ),
+            patch.object(page, '_change_single_ship') as change_ship,
+            patch.object(page, '_circular_move', side_effect=move_ship) as circular_move,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            assert page.change_fleet(1, [{'candidates': ['契卡洛夫']}, '岛风'])
+
+        change_ship.assert_not_called()
+        assert circular_move.call_args.args[:2] == (1, 0)
+
     def test_first_fleet_replaces_before_removing_extra_ship(self):
         """1 队从 AB 改为 C 时，先替换槽位 0，再移除 B。"""
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
@@ -404,6 +553,18 @@ class TestSmartFleetChange:
             pytest.raises(ValueError, match='1 队槽位 0 不能为空'),
         ):
             page.change_fleet(1, [None, 'B'])
+
+    def test_first_fleet_cannot_be_empty(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+
+        with (
+            patch.object(page, 'get_selected_fleet', return_value=1),
+            patch.object(page, 'detect_fleet') as detect,
+            pytest.raises(ValueError, match='1 队槽位 0 不能为空'),
+        ):
+            page.change_fleet(1, [])
+
+        detect.assert_not_called()
 
     def test_input_over_six_slots_is_truncated(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
@@ -503,6 +664,12 @@ class TestFleetSlotRules:
         ]
 
         assert BattlePreparationPage._assign_unique_targets(names, selectors) is None
+
+    def test_same_ship_group_names_cannot_use_two_slots(self):
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+        names = ['85工程', '契卡洛夫', None, None, None, None]
+
+        assert BattlePreparationPage._assign_unique_targets(names, [None] * 6) is None
 
     def test_occupied_name_is_removed_from_slot_candidates(self):
         selected, selector = BattlePreparationPage._select_available_candidate(
