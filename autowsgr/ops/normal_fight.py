@@ -30,6 +30,12 @@ if TYPE_CHECKING:
 _log = get_logger('ops')
 
 
+def _require_fleet_change(success: bool, source: str) -> None:
+    """换船失败时停止出征，避免使用错误舰队进入战斗。"""
+    if not success:
+        raise ActionFailedError(f'{source} 编队失败')
+
+
 class NormalFightRunner:
     """常规战斗执行器。"""
 
@@ -368,16 +374,16 @@ class NormalFightRunner:
 
         # 换船 (若提供了规则则优先按规则执行)
         if self._fleet_rules is not None:
-            page.change_fleet(
-                self._fleet_id,
-                self._fleet_rules,
+            _require_fleet_change(
+                page.change_fleet(self._fleet_id, self._fleet_rules),
+                '外部 fleet_rules',
             )
             time.sleep(0.5)
             resolved_ship_names = page.detect_fleet()
         elif self._fleet is not None:
-            page.change_fleet(
-                self._fleet_id,
-                self._fleet,
+            _require_fleet_change(
+                page.change_fleet(self._fleet_id, self._fleet),
+                'fleet',
             )
             time.sleep(0.5)
 

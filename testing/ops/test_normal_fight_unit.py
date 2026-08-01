@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from autowsgr.combat import CombatMode, CombatPlan
-from autowsgr.ops.normal_fight import NormalFightRunner
+from autowsgr.infra import ActionFailedError
+from autowsgr.ops.normal_fight import NormalFightRunner, _require_fleet_change
 
 
 def _make_ctx() -> SimpleNamespace:
@@ -21,6 +24,15 @@ def _make_ctx() -> SimpleNamespace:
 
     cfg = SimpleNamespace(dock_full_destroy=False, destroy_ship_types=None)
     return SimpleNamespace(ctrl=None, config=cfg)
+
+
+class TestFleetChangeResult:
+    def test_success_continues(self):
+        _require_fleet_change(True, 'fleet')
+
+    def test_failure_stops_fight(self):
+        with pytest.raises(ActionFailedError, match='fleet 编队失败'):
+            _require_fleet_change(False, 'fleet')
 
 
 class TestEventNormalMerge:

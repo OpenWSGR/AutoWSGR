@@ -359,3 +359,268 @@ class TestDecisiveFleetChangeFeatureGate:
             assert page.change_fleet(None, ['A'])
 
         new_change.assert_called_once_with(None, ['A'])
+
+
+# ─────────────────────────────────────────────
+# 智能换船
+# ─────────────────────────────────────────────
+
+
+class TestSmartFleetChange:
+    def test_first_fleet_replaces_before_removing_extra_ship(self):
+        """1 队从 AB 改为 C 时，先替换槽位 0，再移除 B。"""
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        fleet_a_b = ['A', 'B', None, None, None, None]
+        fleet_c = ['C', None, None, None, None, None]
+
+        with (
+            patch.object(page, 'get_selected_fleet', return_value=1),
+            patch.object(
+                page,
+                'detect_fleet',
+                side_effect=[fleet_a_b, fleet_c, fleet_c, fleet_c],
+            ) as detect,
+            patch.object(
+                page,
+                '_change_single_ship',
+                side_effect=['C', None],
+            ) as change_ship,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            assert page.change_fleet(1, ['C'])
+
+        actions = [
+            (item.args[0], item.args[1], item.kwargs['slot_occupied'])
+            for item in change_ship.call_args_list
+        ]
+        assert actions == [(0, 'C', True), (1, None, True)]
+        assert all(not item.args and not item.kwargs for item in detect.call_args_list)
+
+    def test_first_fleet_slot_zero_cannot_be_empty(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+
+        with (
+            patch.object(page, 'get_selected_fleet', return_value=1),
+            pytest.raises(ValueError, match='1 队槽位 0 不能为空'),
+        ):
+            page.change_fleet(1, [None, 'B'])
+
+    def test_input_over_six_slots_is_truncated(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        target = ['A', 'B', 'C', 'D', 'E', 'F']
+
+        with patch.object(page, 'detect_fleet', return_value=target) as detect:
+            assert page.change_fleet(None, [*target, 'G'])
+
+        detect.assert_called_once_with()
+
+    def test_duplicate_fixed_names_fail_before_ocr(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+
+        with patch.object(page, 'detect_fleet') as detect:
+            assert not page.change_fleet(None, ['A', 'A'])
+
+        detect.assert_not_called()
+
+    def test_failed_verification_uses_two_local_retries(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        wrong = ['X', None, None, None, None, None]
+
+        with (
+            patch.object(page, 'detect_fleet', return_value=wrong),
+            patch.object(page, '_full_align') as full_align,
+            patch.object(page, '_local_fix') as local_fix,
+            patch.object(page, '_reorder'),
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            assert not page.change_fleet(None, ['A'])
+
+        assert full_align.call_count == 1
+        assert local_fix.call_count == 2
+
+
+class TestFleetSlotRules:
+    @pytest.mark.parametrize(
+        ('raw', 'expected'),
+        [
+            (None, None),
+            ('  岛风  ', '岛风'),
+            ('岛风·改', '岛风'),
+            ('飞龙（苍青幻影）', '飞龙'),
+            ('', None),
+        ],
+    )
+    def test_normalize_ship_name(self, raw: object, expected: str | None):
+        assert BattlePreparationPage._normalize_ship_name(raw) == expected
+
+    def test_name_and_candidates_form_one_slot_rule(self):
+        selector = BattlePreparationPage._extract_selector(
+            {
+                'name': '密苏里',
+                'candidates': ['衣阿华', '密苏里'],
+                'ship_type': 'BB',
+                'min_level': 100,
+                'max_level': 110,
+            },
+        )
+
+        assert selector == {
+            'candidates': ['密苏里', '衣阿华'],
+            'ship_type': 'bb',
+            'min_level': 100,
+            'max_level': 110,
+        }
+
+    def test_overlapping_priorities_use_backtracking(self):
+        names = ['A', 'A', None, None, None, None]
+        selectors: list[dict | None] = [
+            {'candidates': ['A', 'B']},
+            {'candidates': ['A']},
+            None,
+            None,
+            None,
+            None,
+        ]
+
+        assert BattlePreparationPage._assign_unique_targets(names, selectors) == [
+            'B',
+            'A',
+            None,
+            None,
+            None,
+            None,
+        ]
+
+    def test_same_candidate_in_two_slots_is_impossible(self):
+        names = ['岛风', '岛风', None, None, None, None]
+        selectors: list[dict | None] = [
+            {'candidates': ['岛风']},
+            {'candidates': ['岛风']},
+            None,
+            None,
+            None,
+            None,
+        ]
+
+        assert BattlePreparationPage._assign_unique_targets(names, selectors) is None
+
+    def test_occupied_name_is_removed_from_slot_candidates(self):
+        selected, selector = BattlePreparationPage._select_available_candidate(
+            ['岛风', None, None, None, None, None],
+            '岛风',
+            {'candidates': ['岛风', '雪风']},
+        )
+
+        assert selected == '雪风'
+        assert selector is not None
+        assert selector['candidates'] == ['雪风']
+
+    def test_replacing_same_slot_may_keep_current_name(self):
+        selected, _selector = BattlePreparationPage._select_available_candidate(
+            ['岛风', None, None, None, None, None],
+            '岛风',
+            {'candidates': ['岛风', '雪风']},
+            slot_to_replace=0,
+        )
+
+        assert selected == '岛风'
+
+    def test_existing_members_are_matched_only_once(self):
+        current = ['炽热', '絮弗伦', '岛风', '黑潮', None, None]
+        desired = ['岛风', '黑潮', '阳炎', '早春', '吹雪', '初夏']
+        shared = ['岛风', '黑潮', '阳炎', '早春', '吹雪', '初夏']
+        selectors: list[dict | None] = [
+            {'candidates': ['岛风']},
+            *[{'candidates': shared} for _ in range(5)],
+        ]
+
+        ok, matched_slots = BattlePreparationPage._match_existing_members(
+            current,
+            desired,
+            selectors,
+        )
+
+        assert matched_slots == {0, 1}
+        assert ok == [False, False, True, True, False, False]
+
+    def test_final_validation_rejects_duplicate_names(self):
+        current = ['岛风', '岛风', None, None, None, None]
+
+        assert not BattlePreparationPage._validate_with_selector(
+            current,
+            current,
+            [None] * 6,
+        )
+
+    def test_find_wrong_slots(self):
+        current = ['X', 'B', 'Y', None, 'E', None]
+        desired = ['A', 'B', 'C', None, None, None]
+
+        assert BattlePreparationPage._find_wrong_slots(
+            current,
+            desired,
+            [None] * 6,
+        ) == [0, 2, 4]
+
+
+class TestFleetAlignment:
+    def test_slot_failure_does_not_borrow_another_slot_candidates(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        current = [None] * 6
+        names = ['契卡洛夫', '岛风', None, None, None, None]
+        selectors: list[dict | None] = [
+            {'candidates': ['契卡洛夫'], 'min_level': 100},
+            {'candidates': ['岛风', '黑潮'], 'min_level': 100},
+            None,
+            None,
+            None,
+            None,
+        ]
+
+        with (
+            patch.object(
+                page,
+                '_change_single_ship',
+                side_effect=RuntimeError('未找到契卡洛夫'),
+            ) as change_ship,
+            pytest.raises(RuntimeError, match='契卡洛夫'),
+        ):
+            page._full_align(current, names, selectors)
+
+        assert change_ship.call_count == 1
+        assert change_ship.call_args.args == (0, '契卡洛夫')
+        assert change_ship.call_args.kwargs['selector']['candidates'] == ['契卡洛夫']
+
+    def test_local_fix_replaces_before_removing(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        current = ['A', 'X', 'C', 'D', None, None]
+        desired = ['A', 'B', 'C', None, None, None]
+        actions: list[str] = []
+
+        with (
+            patch.object(
+                page,
+                '_replace_target',
+                side_effect=lambda *_args: actions.append('replace'),
+            ),
+            patch.object(
+                page,
+                '_change_single_ship',
+                side_effect=lambda *_args, **_kwargs: actions.append('remove'),
+            ),
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._local_fix(current, desired, [None] * 6)
+
+        assert actions == ['replace', 'remove']
+
+    def test_reorder_moves_existing_ship(self):
+        ctrl = MagicMock(spec=AndroidController)
+        page = BattlePreparationPage(_make_ctx(ctrl))
+        current = ['B', 'A', None, None, None, None]
+
+        with patch('autowsgr.ui.battle.fleet_change._change.time.sleep'):
+            page._reorder(current, ['A', 'B', None, None, None, None])
+
+        assert current == ['A', 'B', None, None, None, None]
+        ctrl.swipe.assert_called_once()
