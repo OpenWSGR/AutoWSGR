@@ -52,7 +52,11 @@ class NormalFightRunner:
         self._plan = plan
         self._fleet_id = fleet_id if fleet_id is not None else plan.fleet_id
         self._fleet = fleet if fleet is not None else plan.fleet
-        self._fleet_rules = fleet_rules
+        self._fleet_rules = (
+            fleet_rules
+            if fleet_rules is not None
+            else self._fleet_rules_from_plan(plan)
+        )
 
         # 从 config 读取拆船配置
         self._dock_full_destroy = ctx.config.dock_full_destroy
@@ -92,7 +96,16 @@ class NormalFightRunner:
         self._fleet_ships: list[Ship] | None = None
 
     @staticmethod
+    def _fleet_rules_from_plan(plan: CombatPlan) -> list[Any] | None:
+        """未传接口覆盖值时，使用计划中第一套舰队预设。"""
+        if not plan.fleet_presets:
+            return None
+        ships = plan.fleet_presets[0].get('ships')
+        return ships if isinstance(ships, list) else None
+
+    @staticmethod
     def _primary_names_from_rules(fleet_rules: list[Any] | None) -> list[str | None] | None:
+        """读取每个槽位显式声明的主选舰名。"""
         if not fleet_rules:
             return None
 
@@ -108,15 +121,24 @@ class NormalFightRunner:
                 names.append(_normalize_name(slot))
                 continue
 
-            candidates = None
             if isinstance(slot, dict):
+                name = slot.get('name')
                 candidates = slot.get('candidates')
             else:
+                name = getattr(slot, 'name', None)
                 candidates = getattr(slot, 'candidates', None)
 
-            if isinstance(candidates, list) and len(candidates) > 0:
-                names.append(_normalize_name(candidates[0]))
+            normalized_name = _normalize_name(name)
+            if normalized_name is not None:
+                names.append(normalized_name)
                 continue
+
+            # 旧规则没有 name，candidates 的第一个字符串才是主选。
+            if isinstance(candidates, list) and len(candidates) > 0:
+                legacy_name = candidates[0]
+                if isinstance(legacy_name, str):
+                    names.append(_normalize_name(legacy_name))
+                    continue
             names.append(None)
         return names
 

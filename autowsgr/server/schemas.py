@@ -83,6 +83,14 @@ class NodeDecisionRequest(BaseModel):
         description='停止前进条件 (6个位置)',
     )
     detour: bool = Field(default=False, description='是否迂回')
+    long_missile_support: bool = Field(
+        default=False,
+        description='是否开启远程导弹支援',
+    )
+    SL_when_detour_fails: bool = Field(
+        default=True,
+        description='迂回失败时是否 SL',
+    )
     enemy_rules: list[list[str]] | None = Field(
         default=None,
         description='索敌规则',
@@ -91,40 +99,54 @@ class NodeDecisionRequest(BaseModel):
     model_config = {'extra': 'forbid'}
 
 
-class FleetRuleRequest(BaseModel):
-    """编队槽位候选规则。"""
+class FleetShipRuleRequest(BaseModel):
+    """一艘主选或备选舰船自己的选船规则。"""
 
-    candidates: list[str] = Field(min_length=1, description='候选舰船名（按优先级）')
+    name: str = Field(description='舰船名')
     search_name: str | None = Field(default=None, description='选船搜索关键词（用于同名舰船区分）')
-    ship_type: str | None = Field(default=None, description='舰种约束（如 cl/cav/ss）')
+    ship_type: list[str] | None = Field(default=None, description='允许的舰种列表（如 [ss, ssg]）')
     min_level: int | None = Field(default=None, ge=1, description='等级下限（含）')
     max_level: int | None = Field(default=None, ge=1, description='等级上限（含）')
 
-    @field_validator('candidates')
+    @field_validator('name')
     @classmethod
-    def _validate_candidates(cls, value: list[str]) -> list[str]:
-        normalized = [name.strip() for name in value if name and name.strip()]
-        if len(normalized) == 0:
-            raise ValueError('candidates 不能为空')
+    def _validate_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError('name 不能为空')
         return normalized
 
-    @field_validator('ship_type')
+    @field_validator('search_name')
     @classmethod
-    def _validate_ship_type(cls, value: str | None) -> str | None:
+    def _validate_search_name(cls, value: str | None) -> str | None:
         if value is None:
             return None
+        return value.strip() or None
 
-        normalized = value.strip().lower()
-        if not normalized:
+    @field_validator('ship_type', mode='before')
+    @classmethod
+    def _validate_ship_type(cls, value: Any) -> list[str] | None:
+        if value is None or value == '':
             return None
 
-        if normalized not in _ALLOWED_SHIP_TYPE_CODES:
-            allowed = ', '.join(sorted(_ALLOWED_SHIP_TYPE_CODES))
-            raise ValueError(f'ship_type 不合法: {value!r}, 可选值: {allowed}')
+        values = [value] if isinstance(value, str) else value
+        if not isinstance(values, list) or not values:
+            raise ValueError('ship_type 必须是非空字符串列表')
+
+        normalized: list[str] = []
+        for ship_type in values:
+            if not isinstance(ship_type, str) or not ship_type.strip():
+                raise ValueError('ship_type 必须是非空字符串列表')
+            code = ship_type.strip().lower()
+            if code not in _ALLOWED_SHIP_TYPE_CODES:
+                allowed = ', '.join(sorted(_ALLOWED_SHIP_TYPE_CODES))
+                raise ValueError(f'ship_type 不合法: {ship_type!r}, 可选值: {allowed}')
+            if code not in normalized:
+                normalized.append(code)
         return normalized
 
     @model_validator(mode='after')
-    def _validate_level_range(self) -> FleetRuleRequest:
+    def _validate_level_range(self) -> FleetShipRuleRequest:
         if (
             self.min_level is not None
             and self.max_level is not None
@@ -134,6 +156,81 @@ class FleetRuleRequest(BaseModel):
         return self
 
     model_config = {'extra': 'forbid'}
+
+
+class FleetRuleRequest(FleetShipRuleRequest):
+    """一个槽位的主选规则及其位置级备选规则。"""
+
+    name: str | None = Field(default=None, description='主选舰船名')
+    candidates: list[FleetShipRuleRequest] = Field(
+        default_factory=list,
+        description='位置级备选舰船规则（按填写顺序尝试）',
+    )
+
+    @field_validator('name')
+    @classmethod
+    def _validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+    @model_validator(mode='before')
+    @classmethod
+    def _upgrade_legacy_candidates(cls, value: Any) -> Any:
+        """兼容旧 candidates 字符串列表，主选迁移到 name。"""
+        if not isinstance(value, dict):
+            return value
+
+        result = dict(value)
+        raw_candidates = result.get('candidates')
+        if not isinstance(raw_candidates, list):
+            return result
+
+        candidates = list(raw_candidates)
+        if not isinstance(result.get('name'), str) or not result['name'].strip():
+            first_name = next(
+                (
+                    candidate
+                    for candidate in candidates
+                    if isinstance(candidate, str) and candidate.strip()
+                ),
+                None,
+            )
+            if first_name is None:
+                return result
+            result['name'] = first_name
+            candidates.remove(first_name)
+
+        shared = {
+            key: result[key]
+            for key in ('ship_type', 'min_level', 'max_level')
+            if result.get(key) is not None
+        }
+        result['candidates'] = [
+            {'name': candidate, **shared} if isinstance(candidate, str) else candidate
+            for candidate in candidates
+            if not isinstance(candidate, str) or candidate.strip()
+        ]
+        return result
+
+    @model_validator(mode='after')
+    def _validate_slot(self) -> FleetRuleRequest:
+        """无主选时只允许保留非空的位置级备选队列。"""
+        if self.name is not None:
+            return self
+        if len(self.candidates) == 0:
+            raise ValueError('位置至少需要一艘主选或备选舰船')
+        if any(
+            value is not None
+            for value in (
+                self.search_name,
+                self.ship_type,
+                self.min_level,
+                self.max_level,
+            )
+        ):
+            raise ValueError('没有主选 name 时不能填写主选规则')
+        return self
 
 
 class CombatPlanRequest(BaseModel):

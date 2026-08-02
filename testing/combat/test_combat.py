@@ -454,7 +454,7 @@ class TestFleetPresetsParsing:
         assert plan.fleet_presets == []
 
     def test_preset_content_is_normalized(self):
-        """整理名称和槽位，并按顺序去除重复候选。"""
+        """旧字符串候选迁移为显式主选和完整备选规则。"""
         plan = CombatPlan.from_dict(
             {
                 'fleet_presets': [
@@ -479,9 +479,127 @@ class TestFleetPresetsParsing:
                 'ships': [
                     '飞龙·改',
                     {
-                        'candidates': ['岛风', '黑潮'],
-                        'ship_type': 'dd',
+                        'name': '岛风',
+                        'candidates': [
+                            {
+                                'name': '黑潮',
+                                'ship_type': ['dd'],
+                                'min_level': 100,
+                            },
+                            {
+                                'name': '岛风',
+                                'ship_type': ['dd'],
+                                'min_level': 100,
+                            },
+                        ],
+                        'ship_type': ['dd'],
                         'min_level': 100,
+                    },
+                ],
+            },
+        ]
+
+    def test_independent_candidate_rules_are_preserved(self):
+        """主选和每个备选分别保留自己的舰种及等级范围。"""
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'name': '潜艇队',
+                        'ships': [
+                            {
+                                'name': 'U-47',
+                                'ship_type': ['SS', 'SSG'],
+                                'min_level': 100,
+                                'max_level': 110,
+                                'candidates': [
+                                    {
+                                        'name': 'U-96',
+                                        'ship_type': ['SS'],
+                                        'min_level': 90,
+                                        'max_level': 105,
+                                    },
+                                    {
+                                        'name': 'U-47',
+                                        'ship_type': ['SS'],
+                                        'min_level': 100,
+                                        'max_level': 110,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+
+        assert plan.fleet_presets == [
+            {
+                'name': '潜艇队',
+                'ships': [
+                    {
+                        'name': 'U-47',
+                        'ship_type': ['ss', 'ssg'],
+                        'min_level': 100,
+                        'max_level': 110,
+                        'candidates': [
+                            {
+                                'name': 'U-96',
+                                'ship_type': ['ss'],
+                                'min_level': 90,
+                                'max_level': 105,
+                            },
+                            {
+                                'name': 'U-47',
+                                'ship_type': ['ss'],
+                                'min_level': 100,
+                                'max_level': 110,
+                            },
+                        ],
+                    },
+                ],
+            },
+        ]
+
+    def test_candidate_only_slots_are_preserved(self):
+        """结构化纯备选位置不把第一候选提升为严格主选。"""
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'name': '纯备选',
+                        'ships': [
+                            {
+                                'candidates': [
+                                    {'name': ' 胡德 ', 'ship_type': ['BC']},
+                                    {
+                                        'name': '扶桑',
+                                        'ship_type': ['BB'],
+                                        'min_level': 80,
+                                        'max_level': 110,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+
+        assert plan.fleet_presets == [
+            {
+                'name': '纯备选',
+                'ships': [
+                    {
+                        'candidates': [
+                            {'name': '胡德', 'ship_type': ['bc']},
+                            {
+                                'name': '扶桑',
+                                'ship_type': ['bb'],
+                                'min_level': 80,
+                                'max_level': 110,
+                            },
+                        ],
                     },
                 ],
             },

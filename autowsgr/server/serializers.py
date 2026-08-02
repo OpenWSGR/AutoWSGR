@@ -141,15 +141,11 @@ def convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:  # noq
 def build_combat_plan(request: Any) -> Any:
     """从请求构建 CombatPlan 对象。"""
     from autowsgr.combat import CombatPlan, NodeDecision
-    from autowsgr.types import Formation, RepairMode
+    from autowsgr.types import RepairMode
 
     def _build_node_decision(node_req: Any) -> NodeDecision:
-        return NodeDecision(
-            formation=Formation(node_req.formation),
-            night=node_req.night,
-            proceed=node_req.proceed,
-            proceed_stop=[RepairMode(r) for r in node_req.proceed_stop],
-            detour=node_req.detour,
+        return NodeDecision.from_dict(
+            node_req.model_dump(exclude_none=True),
         )
 
     node_args = {k: _build_node_decision(v) for k, v in request.node_args.items()}
@@ -166,4 +162,5 @@ def build_combat_plan(request: Any) -> Any:
         selected_nodes=request.selected_nodes,
         default_node=_build_node_decision(request.node_defaults),
         nodes=node_args,
+        event_name=request.event_name,
     )

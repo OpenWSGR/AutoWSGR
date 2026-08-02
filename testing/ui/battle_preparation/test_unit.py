@@ -11,6 +11,7 @@ import pytest
 from autowsgr.context import GameContext
 from autowsgr.emulator import AndroidController
 from autowsgr.infra import DecisiveConfig
+from autowsgr.server.schemas import FleetRuleRequest
 from autowsgr.ui.battle.base import PAGE_SIGNATURE
 from autowsgr.ui.battle.constants import (
     AUTO_SUPPLY_PROBE,
@@ -489,7 +490,9 @@ class TestSmartFleetChange:
             assert page.change_fleet(1, [{'candidates': ['契卡洛夫']}])
 
         assert change_ship.call_args.args[:2] == (0, '契卡洛夫')
-        assert change_ship.call_args.kwargs['selector']['candidates'] == ['契卡洛夫']
+        assert change_ship.call_args.kwargs['selector']['options'] == [
+            {'name': '契卡洛夫'},
+        ]
 
     def test_existing_group_variant_is_reordered_without_reselection(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
@@ -614,23 +617,121 @@ class TestFleetSlotRules:
     def test_normalize_ship_name(self, raw: object, expected: str | None):
         assert BattlePreparationPage._normalize_ship_name(raw) == expected
 
-    def test_name_and_candidates_form_one_slot_rule(self):
+    def test_primary_and_candidates_keep_independent_rules(self):
         selector = BattlePreparationPage._extract_selector(
             {
                 'name': '密苏里',
-                'candidates': ['衣阿华', '密苏里'],
-                'ship_type': 'BB',
+                'candidates': [
+                    {
+                        'name': '衣阿华',
+                        'ship_type': ['BC'],
+                        'min_level': 90,
+                        'max_level': 105,
+                    },
+                    {
+                        'name': '密苏里',
+                        'ship_type': ['BB'],
+                        'min_level': 80,
+                        'max_level': 110,
+                    },
+                ],
+                'ship_type': ['BB'],
                 'min_level': 100,
                 'max_level': 110,
             },
         )
 
         assert selector == {
-            'candidates': ['密苏里', '衣阿华'],
-            'ship_type': 'bb',
-            'min_level': 100,
-            'max_level': 110,
+            'options': [
+                {
+                    'name': '密苏里',
+                    'ship_type': ['bb'],
+                    'min_level': 100,
+                    'max_level': 110,
+                },
+                {
+                    'name': '衣阿华',
+                    'ship_type': ['bc'],
+                    'min_level': 90,
+                    'max_level': 105,
+                    'relaxed_constraints': True,
+                },
+                {
+                    'name': '密苏里',
+                    'ship_type': ['bb'],
+                    'min_level': 80,
+                    'max_level': 110,
+                    'relaxed_constraints': True,
+                },
+            ],
         }
+
+    def test_candidate_only_rules_keep_order_and_relax_constraints(self):
+        rule = FleetRuleRequest.model_validate(
+            {
+                'candidates': [
+                    {
+                        'name': '胡德',
+                        'ship_type': ['BC'],
+                        'min_level': 90,
+                    },
+                    {
+                        'name': '扶桑',
+                        'ship_type': ['BB'],
+                        'max_level': 110,
+                    },
+                ],
+            },
+        )
+
+        assert BattlePreparationPage._extract_selector(rule) == {
+            'options': [
+                {
+                    'name': '胡德',
+                    'ship_type': ['bc'],
+                    'min_level': 90,
+                    'relaxed_constraints': True,
+                },
+                {
+                    'name': '扶桑',
+                    'ship_type': ['bb'],
+                    'max_level': 110,
+                    'relaxed_constraints': True,
+                },
+            ],
+        }
+
+    def test_candidate_only_slots_use_backtracking(self):
+        selectors = [
+            BattlePreparationPage._extract_selector(
+                FleetRuleRequest.model_validate(
+                    {
+                        'candidates': [
+                            {'name': '胡德'},
+                            {'name': '扶桑'},
+                        ],
+                    },
+                ),
+            ),
+            BattlePreparationPage._extract_selector(
+                FleetRuleRequest.model_validate(
+                    {'candidates': [{'name': '胡德'}]},
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+        ]
+        names = [
+            selector['options'][0]['name'] if selector is not None else None
+            for selector in selectors
+        ]
+
+        assert BattlePreparationPage._assign_unique_targets(
+            names,
+            selectors,
+        ) == ['扶桑', '胡德', None, None, None, None]
 
     def test_overlapping_priorities_use_backtracking(self):
         names = ['A', 'A', None, None, None, None]
@@ -680,7 +781,9 @@ class TestFleetSlotRules:
 
         assert selected == '雪风'
         assert selector is not None
-        assert selector['candidates'] == ['雪风']
+        assert selector['options'] == [
+            {'name': '雪风', 'relaxed_constraints': True},
+        ]
 
     def test_replacing_same_slot_may_keep_current_name(self):
         selected, _selector = BattlePreparationPage._select_available_candidate(
@@ -756,7 +859,9 @@ class TestFleetAlignment:
 
         assert change_ship.call_count == 1
         assert change_ship.call_args.args == (0, '契卡洛夫')
-        assert change_ship.call_args.kwargs['selector']['candidates'] == ['契卡洛夫']
+        assert change_ship.call_args.kwargs['selector']['options'] == [
+            {'name': '契卡洛夫', 'min_level': 100},
+        ]
 
     def test_local_fix_replaces_before_removing(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))

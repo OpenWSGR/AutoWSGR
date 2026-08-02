@@ -35,6 +35,60 @@ class TestFleetChangeResult:
             _require_fleet_change(False, 'fleet')
 
 
+class TestFleetPresetRules:
+    def test_plan_preset_is_used_without_api_override(self):
+        ships = [
+            {
+                'name': 'U-47',
+                'candidates': [{'name': 'U-96'}],
+            },
+        ]
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'name': '潜艇队',
+                        'ships': ships,
+                    },
+                ],
+            },
+        )
+
+        runner = NormalFightRunner(_make_ctx(), plan)
+
+        assert runner._fleet_rules == ships
+        assert runner._primary_names_from_rules(ships) == ['U-47']
+
+    def test_api_rules_override_plan_preset(self):
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'name': '计划编队',
+                        'ships': [{'name': 'U-47'}],
+                    },
+                ],
+            },
+        )
+        override = [{'name': '岛风'}]
+
+        runner = NormalFightRunner(_make_ctx(), plan, fleet_rules=override)
+
+        assert runner._fleet_rules == override
+
+    def test_candidate_only_slot_has_no_fixed_primary_name(self):
+        rules = [
+            {
+                'candidates': [
+                    {'name': '胡德'},
+                    {'name': '扶桑'},
+                ],
+            },
+        ]
+
+        assert NormalFightRunner._primary_names_from_rules(rules) == [None]
+
+
 class TestEventNormalMerge:
     """chapter (E/H vs 数字) 决定导航分支与 plan.mode。"""
 

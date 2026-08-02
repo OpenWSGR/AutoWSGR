@@ -45,20 +45,34 @@ _CHOOSE_PAGE_TIMEOUT: float = 5.0
 _SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
 
-# 描述一个槽位可以使用的舰名和筛选条件。
-class FleetSlotSelector(TypedDict, total=False):
-    """编队槽位规则。"""
+# 描述一艘主选或备选舰船自己的筛选条件。
+class FleetShipOption(TypedDict, total=False):
+    """单艘舰船的选船规则。"""
 
     name: str
-    candidates: list[str]
     search_name: str
-    ship_type: str
+    ship_type: list[str]
     min_level: int
     max_level: int
+    relaxed_constraints: bool
+
+
+# 描述 YAML 中一个主选槽位及其位置级备选。
+class FleetSlotRule(FleetShipOption, total=False):
+    """YAML 槽位规则。"""
+
+    candidates: list[str | FleetShipOption]
+
+
+# 智能换船内部按尝试顺序使用的完整规则列表。
+class FleetSlotSelector(TypedDict):
+    """后端内部槽位规则，不写回 YAML。"""
+
+    options: list[FleetShipOption]
 
 
 # 一个槽位可以是固定舰名、带条件的规则或空槽。
-FleetSlotInput = str | FleetSlotSelector | None
+FleetSlotInput = str | FleetSlotRule | None
 
 
 # 为普通出征和决战准备页提供同一套智能换船流程。
@@ -83,7 +97,7 @@ class FleetChangeMixin(FleetDetectMixin):
 
         # Step 2：分别保存六个槽位的目标舰名和选船规则。
         names: list[str | None] = []
-        selectors: list[dict | None] = []
+        selectors: list[FleetSlotSelector | None] = []
         for raw_slot in list(ship_names)[:6]:
             selector = self._extract_selector(raw_slot)
             selectors.append(selector)
@@ -91,12 +105,11 @@ class FleetChangeMixin(FleetDetectMixin):
             # 字符串槽位直接使用该舰名。
             if isinstance(raw_slot, str):
                 names.append(self._normalize_ship_name(raw_slot))
-            # 规则槽位先把第一个候选作为优选舰名。
+            # 规则槽位从显式主选规则读取目标舰名。
             elif selector is not None:
-                # candidates 按 YAML 中的填写顺序保存优选和备选。
-                candidates = selector.get('candidates', [])
-                if isinstance(candidates, list) and len(candidates) > 0:
-                    names.append(self._normalize_ship_name(candidates[0]))
+                options = selector['options']
+                if options:
+                    names.append(self._normalize_ship_name(options[0]['name']))
                 else:
                     names.append(None)
             else:
@@ -185,104 +198,154 @@ class FleetChangeMixin(FleetDetectMixin):
         normalized = cls._normalize_ship_name(value)
         return ship_name_identity(normalized) if normalized is not None else None
 
-    # 从一个槽位读取优选、备选、搜索名、舰种和等级条件。
+    # 从一个槽位读取主选及每个备选自己的完整规则。
     @classmethod
-    def _extract_selector(cls, slot: object | None) -> dict | None:
-        """返回选船页面可以直接使用的槽位规则。"""
+    def _extract_selector(cls, slot: object | None) -> FleetSlotSelector | None:
+        """把新旧槽位结构整理为内部完整规则列表。"""
         # 固定舰名和空槽没有额外选船规则。
         if slot is None or isinstance(slot, str):
             return None
 
-        # 字典槽位直接读取 YAML 字段。
-        if isinstance(slot, dict):
-            raw_candidates = slot.get('candidates')
-            raw_search_name = slot.get('search_name')
-            raw_ship_type = slot.get('ship_type')
-            raw_min = slot.get('min_level')
-            raw_max = slot.get('max_level')
-            raw_name = slot.get('name')
-        # selector 对象通过同名属性读取字段。
-        else:
-            raw_candidates = getattr(slot, 'candidates', None)
-            raw_search_name = getattr(slot, 'search_name', None)
-            raw_ship_type = getattr(slot, 'ship_type', None)
-            raw_min = getattr(slot, 'min_level', None)
-            raw_max = getattr(slot, 'max_level', None)
-            raw_name = getattr(slot, 'name', None)
+        raw_candidates = cls._rule_field(slot, 'candidates')
+        candidates = list(raw_candidates) if isinstance(raw_candidates, list) else []
 
-        # raw_values 按“name 优先、candidates 备选”的顺序合并舰名。
-        raw_values: list[object] = []
+        # 主选显式读取 name；旧结构缺少 name 时才取第一个字符串候选。
+        primary = cls._normalize_option(slot)
+        if primary is None:
+            primary_index = next(
+                (
+                    index
+                    for index, candidate in enumerate(candidates)
+                    if isinstance(candidate, str) and candidate.strip()
+                ),
+                None,
+            )
+            if primary_index is not None:
+                primary = cls._normalize_option(
+                    candidates.pop(primary_index),
+                    inherited=slot,
+                    inherit_search=True,
+                )
 
-        # 有效的 name 放在候选列表首位。
-        if isinstance(raw_name, str) and raw_name.strip():
-            raw_values.append(raw_name)
+        # 没有主选时，结构化 candidates 仍是该位置的完整宽泛候选队列。
+        options = [primary] if primary is not None else []
 
-        # candidates 紧跟在 name 后面，保留 YAML 填写顺序。
-        if isinstance(raw_candidates, list):
-            raw_values.extend(raw_candidates)
+        # 旧字符串备选继承槽位约束；新对象备选只使用自己的规则。
+        for candidate in candidates:
+            option = cls._normalize_option(
+                candidate,
+                inherited=slot if isinstance(candidate, str) else None,
+            )
+            if option is None:
+                continue
+            option['relaxed_constraints'] = True
+            options.append(option)
+        return {'options': options} if options else None
 
-        # candidates 保存去空格后的原始舰名，交给选船页面使用。
-        candidates: list[str] = []
+    @staticmethod
+    def _rule_field(rule: object, field: str) -> object:
+        """同时读取字典规则和 Pydantic 请求对象。"""
+        if isinstance(rule, dict):
+            return rule.get(field)
+        return getattr(rule, field, None)
 
-        # seen 保存舰船组身份，防止同一艘船的不同名称重复。
-        seen: set[str] = set()
-        for value in raw_values:
-            candidate = str(value).strip()
-            normalized = cls._normalize_ship_name(candidate)
-            identity = cls._ship_identity(normalized)
-            if candidate and normalized and identity and identity not in seen:
-                candidates.append(candidate)
-                seen.add(identity)
-
-        # 没有舰名候选时无法形成有效选船规则。
-        if not candidates:
+    @classmethod
+    def _normalize_option(
+        cls,
+        raw: object,
+        *,
+        inherited: object | None = None,
+        inherit_search: bool = False,
+    ) -> FleetShipOption | None:
+        """整理一艘舰船规则，旧字符串可继承槽位公共约束。"""
+        raw_name = raw if isinstance(raw, str) else cls._rule_field(raw, 'name')
+        if not isinstance(raw_name, str) or not raw_name.strip():
             return None
 
-        # selector 是最终传给选船页面的规则。
-        selector: dict[str, object] = {'candidates': candidates}
-        if isinstance(raw_search_name, str) and raw_search_name.strip():
-            selector['search_name'] = raw_search_name.strip()
-        if isinstance(raw_ship_type, str) and raw_ship_type.strip():
-            selector['ship_type'] = raw_ship_type.strip().lower()
+        option: FleetShipOption = {'name': raw_name.strip()}
+        source = raw if not isinstance(raw, str) else inherited
+        if source is None:
+            return option
+
+        if not isinstance(raw, str) or inherit_search:
+            raw_search_name = cls._rule_field(source, 'search_name')
+            if isinstance(raw_search_name, str) and raw_search_name.strip():
+                option['search_name'] = raw_search_name.strip()
+
+        raw_ship_types = cls._rule_field(source, 'ship_type')
+        values = [raw_ship_types] if isinstance(raw_ship_types, str) else raw_ship_types
+        if isinstance(values, list):
+            ship_types = list(
+                dict.fromkeys(
+                    value.strip().lower()
+                    for value in values
+                    if isinstance(value, str) and value.strip()
+                ),
+            )
+            if ship_types:
+                option['ship_type'] = ship_types
+
+        raw_min = cls._rule_field(source, 'min_level')
+        raw_max = cls._rule_field(source, 'max_level')
         if isinstance(raw_min, int) and raw_min > 0:
-            selector['min_level'] = raw_min
+            option['min_level'] = raw_min
         if isinstance(raw_max, int) and raw_max > 0:
-            selector['max_level'] = raw_max
-        return selector
+            option['max_level'] = raw_max
+        if cls._rule_field(source, 'relaxed_constraints') is True:
+            option['relaxed_constraints'] = True
+        return option
 
-    # 按“已分配舰名优先、原候选随后”的顺序生成本槽候选列表。
+    # 按“已分配舰名优先、其余规则随后”的顺序生成本槽完整规则。
     @classmethod
-    def _slot_candidates(cls, name: str | None, selector: dict | None) -> list[str]:
-        out: list[str] = []
-        seen: set[str] = set()
+    def _slot_options(
+        cls,
+        name: str | None,
+        selector: FleetSlotSelector | dict | None,
+    ) -> list[FleetShipOption]:
         normalized_name = cls._normalize_ship_name(name)
-        name_identity = cls._ship_identity(normalized_name)
+        if selector is None:
+            return [{'name': normalized_name}] if normalized_name else []
 
-        # 已分配舰名存在时，将它放在候选列表第一位。
-        if normalized_name and name_identity:
-            out.append(normalized_name)
-            seen.add(name_identity)
+        raw_options = selector.get('options')
+        if not isinstance(raw_options, list):
+            legacy_selector = cls._extract_selector(selector)
+            raw_options = legacy_selector['options'] if legacy_selector is not None else []
 
-        # 有 selector 时，继续补充本槽位的原始候选。
-        if selector is not None:
-            raw = selector.get('candidates')
+        options = [
+            option
+            for raw_option in raw_options
+            if (option := cls._normalize_option(raw_option)) is not None
+        ]
+        target_identity = cls._ship_identity(normalized_name)
+        options.sort(
+            key=lambda option: cls._ship_identity(option['name']) != target_identity,
+        )
 
-            # candidates 必须是列表才逐项读取。
-            if isinstance(raw, list):
-                for value in raw:
-                    normalized = cls._normalize_ship_name(value)
-                    identity = cls._ship_identity(normalized)
-                    if normalized and identity and identity not in seen:
-                        out.append(normalized)
-                        seen.add(identity)
-        return out
+        return options
+
+    @classmethod
+    def _slot_candidates(
+        cls,
+        name: str | None,
+        selector: FleetSlotSelector | dict | None,
+    ) -> list[str]:
+        """返回本槽按尝试顺序排列的标准舰名。"""
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for option in cls._slot_options(name, selector):
+            normalized = cls._normalize_ship_name(option['name'])
+            identity = cls._ship_identity(normalized)
+            if normalized is not None and identity is not None and identity not in seen:
+                candidates.append(normalized)
+                seen.add(identity)
+        return candidates
 
     # 为六个槽位挑选互不重复的目标舰名，冲突时自动尝试备选。
     @classmethod
     def _assign_unique_targets(
         cls,
         names: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
     ) -> list[str | None] | None:
         """为每个非空槽位分配唯一舰名，候选重叠时按优先级回溯。"""
         # options 保存六个槽位各自按优先级排列的候选舰名。
@@ -330,45 +393,60 @@ class FleetChangeMixin(FleetDetectMixin):
 
         return cls._ship_identity(current_name) == cls._ship_identity(search_name)
 
+    @classmethod
+    def _option_for_name(
+        cls,
+        name: str | None,
+        selector: FleetSlotSelector | dict | None,
+    ) -> FleetShipOption | None:
+        """返回与实际舰名对应的独立规则。"""
+        identity = cls._ship_identity(name)
+        return next(
+            (
+                option
+                for option in cls._slot_options(name, selector)
+                if cls._ship_identity(option['name']) == identity
+            ),
+            None,
+        )
+
     # 从本槽候选中排除队内同名舰，并返回实际可用于选船的规则。
     @classmethod
     def _select_available_candidate(
         cls,
         current: list[str | None],
         name: str | None,
-        selector: dict | None,
+        selector: FleetSlotSelector | dict | None,
         *,
         slot_to_replace: int | None = None,
-    ) -> tuple[str | None, dict | None]:
+    ) -> tuple[str | None, FleetSlotSelector | None]:
         """返回第一个未被其他槽位占用的候选舰名。"""
         # 目标舰名为空时，本槽不需要选船。
         if name is None:
             return None, None
 
-        # candidates 是本槽位按优先级排列的标准舰名。
-        candidates = cls._slot_candidates(name, selector)
+        # options 是本槽位按优先级排列的完整选船规则。
+        options = cls._slot_options(name, selector)
         # occupied 保存队内其他槽位已经占用的舰船组身份。
         occupied = {
             cls._ship_identity(ship)
             for idx, ship in enumerate(current)
             if ship is not None and idx != slot_to_replace
         }
-        # available 保留当前舰队中尚未占用的候选。
+        # available 保留当前舰队中尚未占用的完整规则。
         available = [
-            candidate for candidate in candidates if cls._ship_identity(candidate) not in occupied
+            option for option in options if cls._ship_identity(option['name']) not in occupied
         ]
 
         if len(available) == 0:
             return None, None
 
-        chosen = available[0]
+        chosen = cls._normalize_ship_name(available[0]['name'])
         if selector is None:
             return chosen, None
 
-        # narrowed_selector 只把未占用候选交给选船页面。
-        narrowed_selector = dict(selector)
-        narrowed_selector['candidates'] = available
-        return chosen, narrowed_selector
+        # 选船页面按顺序尝试未占用规则，各备选使用自己的约束。
+        return chosen, {'options': available}
 
     # 将当前舰队成员与目标槽位一对一匹配，找出可以直接保留的舰船。
     @classmethod
@@ -376,7 +454,7 @@ class FleetChangeMixin(FleetDetectMixin):
         cls,
         current: list[str | None],
         desired: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
     ) -> tuple[list[bool], set[int]]:
         """在当前舰队与目标槽位之间做一对一匹配。
 
@@ -396,8 +474,9 @@ class FleetChangeMixin(FleetDetectMixin):
         # 判断一艘当前舰船能否满足指定目标槽位。
         def matches(slot: int, ship: str | None) -> bool:
             selector = selectors[slot]
+            option = cls._option_for_name(desired[slot], selector)
             return cls._ship_identity(ship) == cls._ship_identity(desired[slot]) and (
-                selector is None or cls._matches_search_name(ship, selector.get('search_name'))
+                option is None or cls._matches_search_name(ship, option.get('search_name'))
             )
 
         # 第一轮优先保留已经位于正确槽位的舰船。
@@ -432,22 +511,19 @@ class FleetChangeMixin(FleetDetectMixin):
         cls,
         current_name: str | None,
         target: str | None,
-        selector: dict | None,
+        selector: FleetSlotSelector | dict | None,
     ) -> bool:
         # 目标为空时，只有当前槽也为空才算匹配。
         if target is None:
             return current_name is None
         if selector is None:
             return cls._ship_identity(current_name) == cls._ship_identity(target)
-        candidate_identities = {
-            cls._ship_identity(candidate) for candidate in cls._slot_candidates(target, selector)
-        }
-        return (
-            cls._matches_search_name(
-                current_name,
-                selector.get('search_name'),
-            )
-            and cls._ship_identity(current_name) in candidate_identities
+        option = cls._option_for_name(current_name, selector)
+        if option is None:
+            return False
+        return cls._matches_search_name(
+            current_name,
+            option.get('search_name'),
         )
 
     # 验证当前六个槽位是否完整满足目标，并拒绝队内同名舰。
@@ -456,7 +532,7 @@ class FleetChangeMixin(FleetDetectMixin):
         cls,
         current: list[str | None],
         desired: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
     ) -> bool:
         members = [cls._ship_identity(name) for name in current if name is not None]
         if len(members) != len(set(members)):
@@ -470,7 +546,7 @@ class FleetChangeMixin(FleetDetectMixin):
         cls,
         current: list[str | None],
         names: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
     ) -> list[int]:
         """返回所有不符合目标规则的槽位下标。"""
         return [i for i in range(6) if not cls._slot_matches(current[i], names[i], selectors[i])]
@@ -480,7 +556,7 @@ class FleetChangeMixin(FleetDetectMixin):
         self,
         current: list[str | None],
         names: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
         target_slot: int,
         ship_slot: int | None = None,
     ) -> None:
@@ -520,7 +596,7 @@ class FleetChangeMixin(FleetDetectMixin):
         self,
         current: list[str | None],
         names: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
     ) -> None:
         """首次将当前成员调整成目标成员集合。"""
         # ok 标记当前可保留位置，matched_slots 标记已满足的目标槽位。
@@ -571,7 +647,7 @@ class FleetChangeMixin(FleetDetectMixin):
         self,
         current: list[str | None],
         names: list[str | None],
-        selectors: list[dict | None],
+        selectors: list[FleetSlotSelector | dict | None],
     ) -> None:
         """只修正本轮识别出的错误槽位。"""
         # wrong 保存所有需要替换、补充或移除的槽位。

@@ -15,6 +15,8 @@
 from .main import app
 from .schemas import (
     CombatPlanRequest,
+    FleetRuleRequest,
+    FleetShipRuleRequest,
     NodeDecisionRequest,
     TaskStartRequest,
     TaskStatusResponse,
@@ -24,6 +26,8 @@ from .task_manager import TaskManager, TaskStatus
 
 __all__ = [
     'CombatPlanRequest',
+    'FleetRuleRequest',
+    'FleetShipRuleRequest',
     'NodeDecisionRequest',
     'TaskManager',
     'TaskStartRequest',

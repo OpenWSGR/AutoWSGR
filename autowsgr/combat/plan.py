@@ -321,7 +321,7 @@ class CombatPlan:
 
     @classmethod
     def _normalize_preset_slot(cls, raw_slot: Any) -> Any:
-        """整理一个舰队槽位，并按填写顺序去除重复候选。"""
+        """整理主选和位置级备选，并兼容旧字符串候选。"""
         if isinstance(raw_slot, str):
             return raw_slot.strip()
         if not isinstance(raw_slot, dict):
@@ -331,14 +331,78 @@ class CombatPlan:
             key: cls._trim_text(value)
             for key, value in raw_slot.items()
         }
-        candidates = result.get('candidates')
-        if isinstance(candidates, list):
-            candidates = [
-                cls._trim_text(candidate)
-                for candidate in candidates
-            ]
-            result['candidates'] = list(dict.fromkeys(candidates))
+        ship_types = cls._normalize_ship_types(result.get('ship_type'))
+        if ship_types is not None:
+            result['ship_type'] = ship_types
+
+        raw_candidates = result.get('candidates')
+        if not isinstance(raw_candidates, list):
+            return result
+
+        candidates = list(raw_candidates)
+        if not isinstance(result.get('name'), str) or not result['name']:
+            primary_index = next(
+                (
+                    index
+                    for index, candidate in enumerate(candidates)
+                    if isinstance(candidate, str) and candidate.strip()
+                ),
+                None,
+            )
+            if primary_index is not None:
+                result['name'] = candidates.pop(primary_index).strip()
+
+        shared = {
+            key: result[key]
+            for key in ('ship_type', 'min_level', 'max_level')
+            if result.get(key) is not None
+        }
+        normalized_candidates: list[dict[str, Any]] = []
+        # 同名主选和备选分别承担严格、宽泛规则，只去除备选队列内部的重复项。
+        seen: set[str] = set()
+        for candidate in candidates:
+            if isinstance(candidate, str):
+                rule = {'name': candidate.strip(), **copy.deepcopy(shared)}
+            else:
+                rule = cls._normalize_ship_rule(candidate)
+            if not isinstance(rule, dict):
+                continue
+            name = rule.get('name')
+            if not isinstance(name, str) or not name or name in seen:
+                continue
+            normalized_candidates.append(rule)
+            seen.add(name)
+        result['candidates'] = normalized_candidates
         return result
+
+    @classmethod
+    def _normalize_ship_rule(cls, raw_rule: Any) -> Any:
+        """整理一艘备选舰船自己的规则。"""
+        if not isinstance(raw_rule, dict):
+            return raw_rule
+
+        result = {
+            key: cls._trim_text(value)
+            for key, value in raw_rule.items()
+        }
+        ship_types = cls._normalize_ship_types(result.get('ship_type'))
+        if ship_types is not None:
+            result['ship_type'] = ship_types
+        return result
+
+    @classmethod
+    def _normalize_ship_types(cls, raw: Any) -> list[str] | None:
+        """把旧单舰种字符串和新舰种列表统一为小写字符串列表。"""
+        values = [raw] if isinstance(raw, str) else raw
+        if not isinstance(values, list):
+            return None
+
+        normalized = [
+            value.strip().lower()
+            for value in values
+            if isinstance(value, str) and value.strip()
+        ]
+        return list(dict.fromkeys(normalized)) or None
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> CombatPlan:
