@@ -53,9 +53,7 @@ class NormalFightRunner:
         self._fleet_id = fleet_id if fleet_id is not None else plan.fleet_id
         self._fleet = fleet if fleet is not None else plan.fleet
         self._fleet_rules = (
-            fleet_rules
-            if fleet_rules is not None
-            else self._fleet_rules_from_plan(plan)
+            fleet_rules if fleet_rules is not None else self._fleet_rules_from_plan(plan)
         )
 
         # 从 config 读取拆船配置

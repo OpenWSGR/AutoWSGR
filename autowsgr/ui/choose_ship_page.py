@@ -574,10 +574,7 @@ class ChooseShipPage:
             return False
         rules = [expected] if isinstance(expected, str) else expected
         normalized = {rule.strip().lower() for rule in rules}
-        return detected in normalized or (
-            'ss_or_ssg' in normalized
-            and detected in {'ss', 'ssg'}
-        )
+        return detected in normalized or ('ss_or_ssg' in normalized and detected in {'ss', 'ssg'})
 
     @staticmethod
     def _normalize_search_keyword(name: str) -> str:

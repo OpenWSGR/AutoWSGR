@@ -308,8 +308,7 @@ class CombatPlan:
         for raw_preset in raw:
             name = cls._trim_text(raw_preset.get('name', ''))
             ships = [
-                cls._normalize_preset_slot(raw_slot)
-                for raw_slot in raw_preset.get('ships', [])
+                cls._normalize_preset_slot(raw_slot) for raw_slot in raw_preset.get('ships', [])
             ]
             presets.append({'name': name, 'ships': ships})
         return presets
@@ -327,10 +326,7 @@ class CombatPlan:
         if not isinstance(raw_slot, dict):
             return raw_slot
 
-        result = {
-            key: cls._trim_text(value)
-            for key, value in raw_slot.items()
-        }
+        result = {key: cls._trim_text(value) for key, value in raw_slot.items()}
         ship_types = cls._normalize_ship_types(result.get('ship_type'))
         if ship_types is not None:
             result['ship_type'] = ship_types
@@ -381,10 +377,7 @@ class CombatPlan:
         if not isinstance(raw_rule, dict):
             return raw_rule
 
-        result = {
-            key: cls._trim_text(value)
-            for key, value in raw_rule.items()
-        }
+        result = {key: cls._trim_text(value) for key, value in raw_rule.items()}
         ship_types = cls._normalize_ship_types(result.get('ship_type'))
         if ship_types is not None:
             result['ship_type'] = ship_types
@@ -398,9 +391,7 @@ class CombatPlan:
             return None
 
         normalized = [
-            value.strip().lower()
-            for value in values
-            if isinstance(value, str) and value.strip()
+            value.strip().lower() for value in values if isinstance(value, str) and value.strip()
         ]
         return list(dict.fromkeys(normalized)) or None
 
