@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import threading
+import types
 
 import pytest
 from fastapi import HTTPException
@@ -57,6 +59,63 @@ class _StoppingTaskManager:
         self.is_running = False
         self.worker_terminal.set()
         return self.release_wait.wait(timeout=timeout)
+
+
+def test_system_start_publishes_launched_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A successful start publishes the launched context exactly once."""
+    launched_context = object()
+    launch_calls: list[str] = []
+    scheduler_module = types.ModuleType('autowsgr.scheduler')
+
+    def launch(config_path: str) -> object:
+        launch_calls.append(config_path)
+        return launched_context
+
+    scheduler_module.launch = launch  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, 'autowsgr.scheduler', scheduler_module)
+    monkeypatch.setattr(server_main, '_ctx', None)
+
+    response = asyncio.run(system.system_start(system.SystemStartRequest(config_path='test.yaml')))
+
+    assert response.success is True
+    assert launch_calls == ['test.yaml']
+    assert server_main._ctx is launched_context
+
+
+def test_system_start_is_idempotent_when_context_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An already published context is not launched again."""
+    ctx = object()
+    monkeypatch.setattr(server_main, '_ctx', ctx)
+
+    response = asyncio.run(system.system_start(system.SystemStartRequest()))
+
+    assert response.success is True
+    assert response.message == '系统已启动'
+    assert server_main._ctx is ctx
+
+
+def test_system_start_reports_launch_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Launch errors leave the global context unpublished."""
+    scheduler_module = types.ModuleType('autowsgr.scheduler')
+
+    def launch(_config_path: str) -> object:
+        raise RuntimeError('launch failed')
+
+    scheduler_module.launch = launch  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, 'autowsgr.scheduler', scheduler_module)
+    monkeypatch.setattr(server_main, '_ctx', None)
+
+    response = asyncio.run(system.system_start(system.SystemStartRequest()))
+
+    assert response.success is False
+    assert response.error == 'launch failed'
+    assert server_main._ctx is None
 
 
 def test_system_stop_keeps_context_when_worker_does_not_finish(
