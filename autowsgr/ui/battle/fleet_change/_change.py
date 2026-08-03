@@ -355,9 +355,7 @@ class FleetChangeMixin(FleetDetectMixin):
         }
         # available 保留当前舰队中尚未占用的候选。
         available = [
-            candidate
-            for candidate in candidates
-            if cls._ship_identity(candidate) not in occupied
+            candidate for candidate in candidates if cls._ship_identity(candidate) not in occupied
         ]
 
         if len(available) == 0:
@@ -442,13 +440,15 @@ class FleetChangeMixin(FleetDetectMixin):
         if selector is None:
             return cls._ship_identity(current_name) == cls._ship_identity(target)
         candidate_identities = {
-            cls._ship_identity(candidate)
-            for candidate in cls._slot_candidates(target, selector)
+            cls._ship_identity(candidate) for candidate in cls._slot_candidates(target, selector)
         }
-        return cls._matches_search_name(
-            current_name,
-            selector.get('search_name'),
-        ) and cls._ship_identity(current_name) in candidate_identities
+        return (
+            cls._matches_search_name(
+                current_name,
+                selector.get('search_name'),
+            )
+            and cls._ship_identity(current_name) in candidate_identities
+        )
 
     # 验证当前六个槽位是否完整满足目标，并拒绝队内同名舰。
     @classmethod

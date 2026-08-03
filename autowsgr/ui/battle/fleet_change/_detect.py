@@ -101,9 +101,7 @@ class FleetDetectMixin(BaseBattlePreparation):
         )
         expected_slots = (
             [
-                normalize_ship_name_suffix(name)
-                if isinstance(name, str) and name.strip()
-                else None
+                normalize_ship_name_suffix(name) if isinstance(name, str) and name.strip() else None
                 for name in list(expected_names)[:6]
             ]
             if expected_names is not None
