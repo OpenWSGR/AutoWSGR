@@ -17,7 +17,7 @@ from autowsgr.server.schemas import (
     NormalFightRequest,
 )
 from autowsgr.server.serializers import build_combat_plan, convert_combat_result
-from autowsgr.server.task_manager import task_manager
+from autowsgr.server.task_manager import TaskOutcome, task_manager
 
 from ..main import get_context
 
@@ -97,7 +97,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
     from autowsgr.combat import CombatPlan
     from autowsgr.ops import run_normal_fight
 
-    def executor(_task_info: Any) -> list[dict[str, Any]]:
+    def executor(_task_info: Any) -> TaskOutcome:
         results = []
 
         if request.plan_id:
@@ -135,7 +135,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
                 _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
                 results.append({'round': i + 1, 'success': False, 'error': str(e)})
 
-        return results
+        return TaskOutcome.from_results(results)
 
     task_id = task_manager.start_task(
         task_type='normal_fight',
@@ -155,7 +155,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
     from autowsgr.combat import CombatPlan
     from autowsgr.ops import run_event_fight
 
-    def executor(_task_info: Any) -> list[dict[str, Any]]:
+    def executor(_task_info: Any) -> TaskOutcome:
         results = []
 
         if request.plan_id:
@@ -198,7 +198,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
                 _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
                 results.append({'round': i + 1, 'success': False, 'error': str(e)})
 
-        return results
+        return TaskOutcome.from_results(results)
 
     task_id = task_manager.start_task(
         task_type='event_fight',
@@ -217,7 +217,7 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
     """启动战役任务。"""
     from autowsgr.ops import CampaignRunner
 
-    def executor(_task_info: Any) -> list[dict[str, Any]]:
+    def executor(_task_info: Any) -> TaskOutcome:
         runner = CampaignRunner(
             ctx,
             campaign_name=request.campaign_name,
@@ -242,7 +242,7 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
                 _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
                 results.append({'round': i + 1, 'success': False, 'error': str(e)})
 
-        return results
+        return TaskOutcome.from_results(results)
 
     task_id = task_manager.start_task(
         task_type='campaign',
@@ -261,15 +261,17 @@ async def _start_exercise(ctx: Any, request: ExerciseRequest) -> ApiResponse:
     """启动演习任务。"""
     from autowsgr.ops import ExerciseRunner
 
-    def executor(_task_info: Any) -> list[dict[str, Any]]:
+    def executor(_task_info: Any) -> TaskOutcome:
         runner = ExerciseRunner(ctx, fleet_id=request.fleet_id)
         task_manager.update_progress(current_round=1, current_node='演习')
 
         try:
             results = runner.run()
-            return [convert_combat_result(r, i + 1) for i, r in enumerate(results)]
+            return TaskOutcome.from_results(
+                [convert_combat_result(r, i + 1) for i, r in enumerate(results)]
+            )
         except Exception as e:
-            return [{'round': 1, 'success': False, 'error': str(e)}]
+            return TaskOutcome.from_results([{'round': 1, 'success': False, 'error': str(e)}])
 
     task_id = task_manager.start_task(
         task_type='exercise',
@@ -289,7 +291,7 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
     from autowsgr.infra import DecisiveConfig
     from autowsgr.ops import DecisiveController
 
-    def executor(_task_info: Any) -> list[dict[str, Any]]:
+    def executor(_task_info: Any) -> TaskOutcome:
         config = DecisiveConfig(
             chapter=request.chapter,
             decisive_rounds=request.decisive_rounds,
@@ -321,7 +323,7 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
         except Exception as e:
             results.append({'round': len(results) + 1, 'success': False, 'error': str(e)})
 
-        return results
+        return TaskOutcome.from_results(results)
 
     task_id = task_manager.start_task(
         task_type='decisive',

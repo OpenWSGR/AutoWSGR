@@ -31,6 +31,33 @@ class TaskStatus(Enum):
     STOPPED = 'stopped'
 
 
+@dataclass(frozen=True)
+class TaskOutcome:
+    """任务执行器的最终结果。
+
+    执行器应当把每轮结果完整返回，并显式表达任务整体是否成功。这样
+    ``TaskManager`` 无须根据“executor 是否抛异常”猜测业务结果。
+    """
+
+    results: list[dict[str, Any]]
+    success: bool
+    error: str | None = None
+
+    @classmethod
+    def from_results(cls, results: list[dict[str, Any]]) -> TaskOutcome:
+        """根据逐轮结果构建任务结果。"""
+        failed_results = [result for result in results if not result.get('success', False)]
+        if failed_results:
+            error = next(
+                (str(result['error']) for result in failed_results if result.get('error')),
+                '一个或多个任务轮次失败',
+            )
+            return cls(results=results, success=False, error=error)
+        if not results:
+            return cls(results=[], success=False, error='任务未执行任何轮次')
+        return cls(results=results, success=True)
+
+
 @dataclass
 class TaskInfo:
     """任务信息。"""
@@ -105,7 +132,7 @@ class TaskManager:
         self,
         task_type: str,
         total_rounds: int,
-        executor: Callable[[TaskInfo], list[dict[str, Any]]],
+        executor: Callable[[TaskInfo], TaskOutcome],
     ) -> str:
         """启动新任务。
 
@@ -116,7 +143,7 @@ class TaskManager:
         total_rounds:
             总轮次
         executor:
-            执行函数，接收 TaskInfo，返回结果列表
+            执行函数，接收 TaskInfo，返回显式任务结果
 
         Returns
         -------
@@ -150,21 +177,24 @@ class TaskManager:
 
     def _run_in_thread(
         self,
-        executor: Callable[[TaskInfo], list[dict[str, Any]]],
+        executor: Callable[[TaskInfo], TaskOutcome],
     ) -> None:
         """在后台线程中执行任务。"""
         assert self._current_task is not None
         task = self._current_task
 
         try:
-            results = executor(task)
+            outcome = executor(task)
+            task.results = outcome.results
 
             # 检查是否被请求停止
             if task.stop_requested:
                 task.status = TaskStatus.STOPPED
-            else:
+            elif outcome.success:
                 task.status = TaskStatus.COMPLETED
-                task.results = results
+            else:
+                task.status = TaskStatus.FAILED
+                task.error = outcome.error
 
             task.finished_at = datetime.now(UTC).isoformat()
             _log.info('[Task] 任务完成: {} ({})', task.task_id, task.status.value)
@@ -186,7 +216,11 @@ class TaskManager:
     async def _notify_completion(self, task: TaskInfo) -> None:
         """发送任务完成通知。"""
         success = task.status == TaskStatus.COMPLETED
-        result = task.result_summary if success else None
+        result = (
+            task.result_summary
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)
+            else None
+        )
         await ws_manager.send_task_completed(
             task_id=task.task_id,
             success=success,
@@ -254,8 +288,8 @@ class TaskManager:
 
         task = self._current_task
         result = None
-        if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED):
-            result = task.result_summary if task.status == TaskStatus.COMPLETED else None
+        if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            result = task.result_summary
 
         return {
             'task_id': task.task_id,
