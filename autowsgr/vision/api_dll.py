@@ -1,19 +1,19 @@
 from functools import lru_cache
 
-import autowsgr_native
 import cv2
 import numpy as np
+from autowsgr_native.recognition import locate, recognize_enemy, recognize_map
 
 
 _TARGET_H = 720
 
 
 class ApiDll:
-    def locate(self, image: np.ndarray) -> list[tuple[float, float]]:
-        return autowsgr_native.locate(image)
+    def locate(self, image: np.ndarray) -> list[list[int]]:
+        return locate(image)
 
     def recognize_enemy(self, images: list[np.ndarray]) -> str:
-        return autowsgr_native.recognize_enemy(images)
+        return recognize_enemy(images)
 
     def recognize_map(self, image: np.ndarray) -> str:
         h, w = image.shape[:2]
@@ -24,7 +24,7 @@ class ApiDll:
                 (int(w * scale), _TARGET_H),
                 interpolation=cv2.INTER_LINEAR if scale > 1 else cv2.INTER_AREA,
             )
-        return autowsgr_native.recognize_map(image)
+        return recognize_map(image)
 
 
 @lru_cache(maxsize=1)
