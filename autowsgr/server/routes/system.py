@@ -29,32 +29,35 @@ class SystemStartRequest(BaseModel):
 @router.post('/start', response_model=ApiResponse)
 async def system_start(request: SystemStartRequest) -> ApiResponse:
     """启动系统 (连接模拟器、启动游戏)。"""
-    if _main._ctx is not None:
-        return ApiResponse(success=True, message='系统已启动')
+    async with _main.lifecycle_lock:
+        if _main._ctx is not None:
+            return ApiResponse(success=True, message='系统已启动')
 
-    try:
-        from autowsgr.scheduler import launch
+        try:
+            from autowsgr.scheduler import launch
 
-        config_path = request.config_path or 'usersettings.yaml'
-        _log.info('[System] 正在启动, 配置: {}', config_path)
-        _main._ctx = launch(config_path)
-        _log.info('[System] 启动成功')
+            config_path = request.config_path or 'usersettings.yaml'
+            _log.info('[System] 正在启动, 配置: {}', config_path)
+            _main._ctx = launch(config_path)
+            _log.info('[System] 启动成功')
 
-        return ApiResponse(success=True, message='系统启动成功')
+            return ApiResponse(success=True, message='系统启动成功')
 
-    except Exception as e:
-        _log.error('[System] 启动失败: {}', e)
-        return ApiResponse(success=False, error=str(e))
+        except Exception as e:
+            _log.error('[System] 启动失败: {}', e)
+            return ApiResponse(success=False, error=str(e))
 
 
 @router.post('/stop', response_model=ApiResponse)
 async def system_stop() -> ApiResponse:
     """停止系统。"""
-    if _main._ctx is None:
-        return ApiResponse(success=True, message='系统未运行')
+    async with _main.lifecycle_lock:
+        if _main._ctx is None:
+            return ApiResponse(success=True, message='系统未运行')
 
-    if task_manager.is_running:
-        task_manager.stop_task()
+        if task_manager.is_running:
+            task_manager.stop_task()
+
         completed = await asyncio.to_thread(
             task_manager.wait_for_completion,
             _TASK_STOP_TIMEOUT_SECONDS,
@@ -66,9 +69,9 @@ async def system_stop() -> ApiResponse:
                 error='任务未在超时前停止，系统上下文仍保持活动状态',
             )
 
-    _main._ctx = None
-    _log.info('[System] 系统已停止')
-    return ApiResponse(success=True, message='系统已停止')
+        _main._ctx = None
+        _log.info('[System] 系统已停止')
+        return ApiResponse(success=True, message='系统已停止')
 
 
 @router.get('/status', response_model=ApiResponse)

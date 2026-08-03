@@ -40,6 +40,9 @@ _log = get_logger('server')
 # GameContext 全局引用 (启动后设置)
 _ctx: Any = None
 
+# 序列化系统上下文的发布、任务准入和回收。
+lifecycle_lock = asyncio.Lock()
+
 
 def get_context() -> Any:
     """获取全局 GameContext。"""

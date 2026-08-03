@@ -19,7 +19,7 @@ from autowsgr.server.schemas import (
 from autowsgr.server.serializers import build_combat_plan, convert_combat_result
 from autowsgr.server.task_manager import TaskOutcome, task_manager
 
-from ..main import get_context
+from ..main import get_context, lifecycle_lock
 
 
 _log = get_logger('server')
@@ -36,28 +36,29 @@ TaskRequestUnion = Annotated[
 @router.post('/start', response_model=ApiResponse)
 async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[arg-type]
     """启动任务 (异步执行，立即返回)。"""
-    if task_manager.is_running:
-        raise HTTPException(status_code=409, detail='已有任务正在运行')
+    async with lifecycle_lock:
+        if task_manager.is_running:
+            raise HTTPException(status_code=409, detail='已有任务正在运行')
 
-    try:
-        ctx = get_context()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+        try:
+            ctx = get_context()
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
 
-    ctx.stop_event = task_manager.stop_event
+        ctx.stop_event = task_manager.stop_event
 
-    if isinstance(request, NormalFightRequest):
-        return await _start_normal_fight(ctx, request)
-    elif isinstance(request, EventFightRequest):
-        return await _start_event_fight(ctx, request)
-    elif isinstance(request, CampaignRequest):
-        return await _start_campaign(ctx, request)
-    elif isinstance(request, ExerciseRequest):
-        return await _start_exercise(ctx, request)
-    elif isinstance(request, DecisiveRequest):
-        return await _start_decisive(ctx, request)
-    else:
-        raise HTTPException(status_code=400, detail='未知的任务类型')
+        if isinstance(request, NormalFightRequest):
+            return await _start_normal_fight(ctx, request)
+        elif isinstance(request, EventFightRequest):
+            return await _start_event_fight(ctx, request)
+        elif isinstance(request, CampaignRequest):
+            return await _start_campaign(ctx, request)
+        elif isinstance(request, ExerciseRequest):
+            return await _start_exercise(ctx, request)
+        elif isinstance(request, DecisiveRequest):
+            return await _start_decisive(ctx, request)
+        else:
+            raise HTTPException(status_code=400, detail='未知的任务类型')
 
 
 @router.post('/stop', response_model=ApiResponse)
