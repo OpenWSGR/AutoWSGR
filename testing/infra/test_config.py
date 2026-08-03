@@ -118,7 +118,15 @@ class TestDecisiveConfig:
 
 class TestUserConfig:
     def test_unused_bathroom_feature_count_is_removed(self):
-        assert not hasattr(UserConfig(), 'bathroom_feature_count')
+        config = UserConfig(
+            emulator=EmulatorConfig(
+                serial='127.0.0.1:5555',
+                path='/tmp/emulator',
+            ),
+            os_type=OSType.linux,
+        )
+
+        assert not hasattr(config, 'bathroom_feature_count')
 
     def test_from_yaml(self, tmp_yaml: Callable[[str, str], Path]):
         content = """\
