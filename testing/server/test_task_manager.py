@@ -79,6 +79,14 @@ def test_empty_outcome_is_not_synthetic_success() -> None:
     assert manager.current_task.error == '任务未执行任何轮次'
 
 
+def test_stop_event_is_exposed_as_read_only_execution_token() -> None:
+    """Callers can inject cancellation without reaching into private manager state."""
+    manager = TaskManager()
+
+    assert manager.stop_event is manager.stop_event
+    assert manager.stop_event.is_set() is False
+
+
 def test_wait_for_completion_does_not_acknowledge_a_running_worker() -> None:
     """Shutdown callers can distinguish a stop request from actual worker termination."""
     manager = TaskManager()

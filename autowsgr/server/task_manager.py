@@ -124,6 +124,11 @@ class TaskManager:
         """是否有任务正在运行。"""
         return self._current_task is not None and self._current_task.status == TaskStatus.RUNNING
 
+    @property
+    def stop_event(self) -> threading.Event:
+        """任务执行使用的协作式停止信号。"""
+        return self._stop_event
+
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """设置事件循环引用，用于从线程中调用 async 函数。"""
         self._loop = loop

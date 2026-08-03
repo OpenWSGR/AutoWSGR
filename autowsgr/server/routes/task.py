@@ -44,7 +44,7 @@ async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
-    ctx.stop_event = task_manager._stop_event
+    ctx.stop_event = task_manager.stop_event
 
     if isinstance(request, NormalFightRequest):
         return await _start_normal_fight(ctx, request)
