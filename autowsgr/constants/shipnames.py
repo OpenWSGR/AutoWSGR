@@ -42,9 +42,7 @@ SHIPNAME_GROUPS: dict[str, list[str]] = {
 }
 _EXTRA_SHIPNAMES: list[str] = []
 _SHIPNAME_TO_GROUP: dict[str, str] = {
-    name: group_id
-    for group_id, names in SHIPNAME_GROUPS.items()
-    for name in names
+    name: group_id for group_id, names in SHIPNAME_GROUPS.items() for name in names
 }
 SHIPNAMES: list[str] = process_dict(SHIPNAME_GROUPS)
 
@@ -107,10 +105,7 @@ def set_ship_name_aliases(aliases: Mapping[str, str]) -> None:
     """重置用户自定义名，并追加到目标标准舰名所在的舰船组。"""
     SHIPNAME_GROUPS.clear()
     SHIPNAME_GROUPS.update(
-        {
-            group_id: list(names)
-            for group_id, names in _BASE_SHIPNAME_GROUPS.items()
-        },
+        {group_id: list(names) for group_id, names in _BASE_SHIPNAME_GROUPS.items()},
     )
     _rebuild_shipnames()
 
@@ -125,11 +120,7 @@ def _rebuild_shipnames() -> None:
     """原地刷新扁平舰名列表和舰名到分组的索引。"""
     _SHIPNAME_TO_GROUP.clear()
     _SHIPNAME_TO_GROUP.update(
-        {
-            name: group_id
-            for group_id, names in SHIPNAME_GROUPS.items()
-            for name in names
-        },
+        {name: group_id for group_id, names in SHIPNAME_GROUPS.items() for name in names},
     )
     grouped_names = process_dict(SHIPNAME_GROUPS)
     SHIPNAMES[:] = list(dict.fromkeys([*_EXTRA_SHIPNAMES, *grouped_names]))

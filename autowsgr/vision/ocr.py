@@ -456,9 +456,7 @@ def _fuzzy_match(text: str, candidates: list[str], threshold: int = 3) -> str | 
     best_dist = min(distance for _, distance in distances)
     nearest = list(
         dict.fromkeys(
-            resolve_ship_name_alias(name)
-            for name, distance in distances
-            if distance == best_dist
+            resolve_ship_name_alias(name) for name, distance in distances if distance == best_dist
         ),
     )
     best_name = nearest[0] if len(nearest) == 1 and best_dist <= effective_threshold else None
