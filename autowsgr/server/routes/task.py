@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import Discriminator
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.server.device_lease import DeviceOperationBusyError
 from autowsgr.server.schemas import (
     ApiResponse,
     CampaignRequest,
@@ -47,18 +48,21 @@ async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[
 
         ctx.stop_event = task_manager.stop_event
 
-        if isinstance(request, NormalFightRequest):
-            return await _start_normal_fight(ctx, request)
-        elif isinstance(request, EventFightRequest):
-            return await _start_event_fight(ctx, request)
-        elif isinstance(request, CampaignRequest):
-            return await _start_campaign(ctx, request)
-        elif isinstance(request, ExerciseRequest):
-            return await _start_exercise(ctx, request)
-        elif isinstance(request, DecisiveRequest):
-            return await _start_decisive(ctx, request)
-        else:
-            raise HTTPException(status_code=400, detail='未知的任务类型')
+        try:
+            if isinstance(request, NormalFightRequest):
+                return await _start_normal_fight(ctx, request)
+            elif isinstance(request, EventFightRequest):
+                return await _start_event_fight(ctx, request)
+            elif isinstance(request, CampaignRequest):
+                return await _start_campaign(ctx, request)
+            elif isinstance(request, ExerciseRequest):
+                return await _start_exercise(ctx, request)
+            elif isinstance(request, DecisiveRequest):
+                return await _start_decisive(ctx, request)
+            else:
+                raise HTTPException(status_code=400, detail='未知的任务类型')
+        except DeviceOperationBusyError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @router.post('/stop', response_model=ApiResponse)

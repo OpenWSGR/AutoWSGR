@@ -7,6 +7,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.server.device_lease import exclusive_device_operation
 from autowsgr.server.schemas import ApiResponse
 from autowsgr.server.serializers import (
     serialize_build_queue,
@@ -14,7 +15,6 @@ from autowsgr.server.serializers import (
     serialize_fleet,
     serialize_resources,
 )
-from autowsgr.server.task_manager import task_manager
 
 from ..main import get_context
 
@@ -25,6 +25,7 @@ router = APIRouter(tags=['game'])
 
 
 @router.get('/api/game/acquisition', response_model=ApiResponse)
+@exclusive_device_operation('api:game-acquisition')
 async def game_acquisition() -> ApiResponse:
     """从出征面板截图 OCR 识别今日舰船 (X/500) 与战利品 (X/50) 获取数量。
 
@@ -34,9 +35,6 @@ async def game_acquisition() -> ApiResponse:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    if task_manager.is_running:
-        raise HTTPException(status_code=409, detail='任务执行中，无法查询获取数量')
 
     from autowsgr.ops.navigate import goto_page
     from autowsgr.ui.map.page import MapPage

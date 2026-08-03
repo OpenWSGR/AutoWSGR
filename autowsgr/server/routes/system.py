@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.server.device_lease import (
+    DeviceOperationBusyError,
+    device_operation_lease,
+    exclusive_device_operation,
+)
 from autowsgr.server.schemas import ApiResponse
 from autowsgr.server.task_manager import task_manager
 
@@ -27,6 +32,7 @@ class SystemStartRequest(BaseModel):
 
 
 @router.post('/start', response_model=ApiResponse)
+@exclusive_device_operation('api:system-start')
 async def system_start(request: SystemStartRequest) -> ApiResponse:
     """启动系统 (连接模拟器、启动游戏)。"""
     async with _main.lifecycle_lock:
@@ -69,9 +75,16 @@ async def system_stop() -> ApiResponse:
                 error='任务未在超时前停止，系统上下文仍保持活动状态',
             )
 
-        _main._ctx = None
-        _log.info('[System] 系统已停止')
-        return ApiResponse(success=True, message='系统已停止')
+        try:
+            lease_token = device_operation_lease.acquire('api:system-stop')
+        except DeviceOperationBusyError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        try:
+            _main._ctx = None
+            _log.info('[System] 系统已停止')
+            return ApiResponse(success=True, message='系统已停止')
+        finally:
+            device_operation_lease.release(lease_token)
 
 
 @router.get('/status', response_model=ApiResponse)

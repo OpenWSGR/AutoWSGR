@@ -11,6 +11,7 @@ import pytest
 from fastapi import HTTPException
 
 from autowsgr.server import main as server_main
+from autowsgr.server.device_lease import device_operation_lease
 from autowsgr.server.routes import system, task
 from autowsgr.server.schemas import ExerciseRequest
 
@@ -118,6 +119,22 @@ def test_system_start_reports_launch_failure(
     assert server_main._ctx is None
 
 
+def test_system_start_rejects_active_device_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """System launch cannot connect or navigate while another operation owns the device."""
+    monkeypatch.setattr(server_main, '_ctx', None)
+    token = device_operation_lease.acquire('api:repair')
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(system.system_start(system.SystemStartRequest()))
+    finally:
+        device_operation_lease.release(token)
+
+    assert exc_info.value.status_code == 409
+    assert server_main._ctx is None
+
+
 def test_system_stop_keeps_context_when_worker_does_not_finish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -207,3 +224,22 @@ def test_task_start_cannot_reuse_context_being_stopped(
 
     assert server_main._ctx is None
     assert started_contexts == []
+
+
+def test_system_stop_rejects_non_task_device_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context teardown cannot race an active direct device operation."""
+    ctx = object()
+    manager = _TerminalTaskManager(completed=True)
+    monkeypatch.setattr(server_main, '_ctx', ctx)
+    monkeypatch.setattr(system, 'task_manager', manager)
+    token = device_operation_lease.acquire('api:repair')
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(system.system_stop())
+    finally:
+        device_operation_lease.release(token)
+
+    assert exc_info.value.status_code == 409
+    assert server_main._ctx is ctx

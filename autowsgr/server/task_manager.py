@@ -11,6 +11,11 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.server.device_lease import (
+    DeviceOperationLease,
+    DeviceOperationToken,
+    device_operation_lease,
+)
 from autowsgr.server.ws_manager import ws_manager
 
 
@@ -107,12 +112,13 @@ class TaskManager:
     所有战斗操作在后台线程执行，避免阻塞事件循环。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, device_lease: DeviceOperationLease | None = None) -> None:
         self._current_task: TaskInfo | None = None
         self._executor_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._device_lease = device_lease or device_operation_lease
 
     @property
     def current_task(self) -> TaskInfo | None:
@@ -160,6 +166,7 @@ class TaskManager:
                 raise RuntimeError('已有任务正在运行')
 
             task_id = f'task_{uuid.uuid4().hex[:8]}'
+            lease_token = self._device_lease.acquire(f'task:{task_id}')
             self._current_task = TaskInfo(
                 task_id=task_id,
                 task_type=task_type,
@@ -172,10 +179,16 @@ class TaskManager:
             # 启动后台线程执行
             self._executor_thread = threading.Thread(
                 target=self._run_in_thread,
-                args=(executor,),
+                args=(executor, lease_token),
                 daemon=True,
             )
-            self._executor_thread.start()
+            try:
+                self._executor_thread.start()
+            except Exception:
+                self._current_task = None
+                self._executor_thread = None
+                self._device_lease.release(lease_token)
+                raise
 
             _log.info('[Task] 启动任务: {} ({})', task_id, task_type)
             return task_id
@@ -183,6 +196,7 @@ class TaskManager:
     def _run_in_thread(
         self,
         executor: Callable[[TaskInfo], TaskOutcome],
+        lease_token: DeviceOperationToken,
     ) -> None:
         """在后台线程中执行任务。"""
         assert self._current_task is not None
@@ -211,6 +225,7 @@ class TaskManager:
             _log.error('[Task] 任务失败: {} - {}', task.task_id, e)
 
         finally:
+            self._device_lease.release(lease_token)
             # 通过事件循环发送 WebSocket 通知
             if self._loop:
                 asyncio.run_coroutine_threadsafe(

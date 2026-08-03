@@ -9,6 +9,7 @@ import pytest
 from fastapi import HTTPException
 
 from autowsgr.server import main as server_main
+from autowsgr.server.device_lease import DeviceOperationBusyError
 from autowsgr.server.routes import task
 from autowsgr.server.schemas import (
     CampaignRequest,
@@ -44,6 +45,24 @@ def test_task_start_requires_system_context(monkeypatch: pytest.MonkeyPatch) -> 
         asyncio.run(task.task_start(ExerciseRequest()))
 
     assert exc_info.value.status_code == 503
+
+
+def test_task_start_reports_device_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task lease conflicts are returned synchronously as HTTP 409."""
+    manager = _TaskManager()
+    ctx = type('Context', (), {'stop_event': None})()
+
+    async def busy_start(_ctx: object, _request: ExerciseRequest) -> object:
+        raise DeviceOperationBusyError('设备正由 api:repair 使用')
+
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(server_main, '_ctx', ctx)
+    monkeypatch.setattr(task, '_start_exercise', busy_start)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(task.task_start(ExerciseRequest()))
+
+    assert exc_info.value.status_code == 409
 
 
 @pytest.mark.parametrize(

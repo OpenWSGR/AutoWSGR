@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.server.device_lease import exclusive_device_operation
 from autowsgr.server.schemas import ApiResponse
-from autowsgr.server.task_manager import task_manager
 
 from ..main import get_context
 
@@ -20,24 +20,17 @@ _log = get_logger('server')
 router = APIRouter(tags=['ops'])
 
 
-def _require_idle() -> None:
-    """检查是否有任务正在运行。"""
-    if task_manager.is_running:
-        raise HTTPException(status_code=409, detail='任务执行中，无法操作')
-
-
 # ── 远征收取 ──
 
 
 @router.post('/api/expedition/check', response_model=ApiResponse)
+@exclusive_device_operation('api:expedition-check')
 async def expedition_check() -> ApiResponse:
     """检查并收取已完成的远征。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops.expedition import collect_expedition
 
@@ -61,10 +54,11 @@ class ExpeditionAutoCheckRequest(BaseModel):
 
 
 @router.post('/api/expedition/auto_check', response_model=ApiResponse)
+@exclusive_device_operation('api:expedition-auto-check')
 async def expedition_auto_check(request: ExpeditionAutoCheckRequest) -> ApiResponse:
     """自动远征检查（挂机专用）。
 
-    不受 _require_idle 限制，顺带领取任务奖励并根据战斗任务状态智能执行浴室维修。
+    顺带领取任务奖励并根据调用方配置决定是否执行浴室维修。
     """
     try:
         ctx = get_context()
@@ -92,11 +86,7 @@ async def expedition_auto_check(request: ExpeditionAutoCheckRequest) -> ApiRespo
         results['rewards_error'] = str(e)
 
     # 3. 浴室维修
-    if task_manager.is_running:
-        _log.info('[API] 自动远征检查: 战斗任务进行中，跳过浴室维修')
-        results['repair_skipped'] = True
-        results['repair_reason'] = '战斗任务进行中'
-    elif not request.allow_repair:
+    if not request.allow_repair:
         _log.info('[API] 自动远征检查: 前端禁止维修（队列中还有后续任务），跳过浴室维修')
         results['repair_skipped'] = True
         results['repair_reason'] = '队列中有后续战斗任务'
@@ -130,14 +120,13 @@ class BuildStartRequest(BaseModel):
 
 
 @router.post('/api/build/collect', response_model=ApiResponse)
+@exclusive_device_operation('api:build-collect')
 async def build_collect() -> ApiResponse:
     """收取已完成的建造。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops import collect_built_ships
 
@@ -150,14 +139,13 @@ async def build_collect() -> ApiResponse:
 
 
 @router.post('/api/build/start', response_model=ApiResponse)
+@exclusive_device_operation('api:build-start')
 async def build_start(request: BuildStartRequest) -> ApiResponse:
     """开始建造。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops import BuildRecipe, build_ship
 
@@ -186,14 +174,13 @@ async def build_start(request: BuildStartRequest) -> ApiResponse:
 
 
 @router.post('/api/reward/collect', response_model=ApiResponse)
+@exclusive_device_operation('api:reward-collect')
 async def reward_collect() -> ApiResponse:
     """收取任务奖励。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops import collect_rewards
 
@@ -216,14 +203,13 @@ class CookRequest(BaseModel):
 
 
 @router.post('/api/cook', response_model=ApiResponse)
+@exclusive_device_operation('api:cook')
 async def cook_action(request: CookRequest) -> ApiResponse:
     """食堂烹饪。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops import cook
 
@@ -241,14 +227,13 @@ async def cook_action(request: CookRequest) -> ApiResponse:
 
 
 @router.post('/api/repair/bath', response_model=ApiResponse)
+@exclusive_device_operation('api:repair-bath')
 async def repair_bath() -> ApiResponse:
     """浴室修理。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops import repair_in_bath
 
@@ -267,6 +252,7 @@ class RepairShipRequest(BaseModel):
 
 
 @router.post('/api/repair/ship', response_model=ApiResponse)
+@exclusive_device_operation('api:repair-ship')
 async def repair_ship(request: RepairShipRequest) -> ApiResponse:
     """使用浴室修理指定名称的舰船。
 
@@ -277,8 +263,6 @@ async def repair_ship(request: RepairShipRequest) -> ApiResponse:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops.repair import repair_ship_by_name
 
@@ -310,14 +294,13 @@ class DestroyRequest(BaseModel):
 
 
 @router.post('/api/destroy', response_model=ApiResponse)
+@exclusive_device_operation('api:destroy')
 async def destroy_action(request: DestroyRequest) -> ApiResponse:
     """解装/解体舰船。"""
     try:
         ctx = get_context()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-
-    _require_idle()
 
     from autowsgr.ops import destroy_ships
     from autowsgr.types import ShipType
