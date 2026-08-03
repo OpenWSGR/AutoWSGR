@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -15,6 +17,7 @@ from .. import main as _main
 _log = get_logger('server')
 
 router = APIRouter(prefix='/api/system', tags=['system'])
+_TASK_STOP_TIMEOUT_SECONDS = 30.0
 
 
 class SystemStartRequest(BaseModel):
@@ -52,6 +55,16 @@ async def system_stop() -> ApiResponse:
 
     if task_manager.is_running:
         task_manager.stop_task()
+        completed = await asyncio.to_thread(
+            task_manager.wait_for_completion,
+            _TASK_STOP_TIMEOUT_SECONDS,
+        )
+        if not completed:
+            _log.error('[System] 任务未在超时前停止, 保留当前系统上下文')
+            return ApiResponse(
+                success=False,
+                error='任务未在超时前停止，系统上下文仍保持活动状态',
+            )
 
     _main._ctx = None
     _log.info('[System] 系统已停止')
@@ -82,8 +95,6 @@ async def emulator_devices() -> ApiResponse:
 
     会先对已知 TCP serial（MuMu 等）执行 adb connect，再列出设备。
     """
-    import asyncio
-
     try:
         from autowsgr.emulator.detector import connect_and_list_devices
 

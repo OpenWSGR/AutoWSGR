@@ -239,6 +239,20 @@ class TaskManager:
             _log.info('[Task] 请求停止任务: {}', self._current_task.task_id)
             return True
 
+    def wait_for_completion(self, timeout: float | None = None) -> bool:
+        """等待当前 worker 实际退出。
+
+        ``stop_task()`` 只发出协作式停止信号。生命周期调用方必须使用本方法
+        确认 worker 已结束后，才能释放或替换其持有的 ``GameContext``。
+        """
+        thread = self._executor_thread
+        if thread is None:
+            return True
+        if thread is threading.current_thread():
+            return False
+        thread.join(timeout=timeout)
+        return not thread.is_alive()
+
     def update_progress(
         self,
         current_round: int | None = None,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 from autowsgr.server.task_manager import TaskManager, TaskOutcome, TaskStatus
@@ -76,3 +77,27 @@ def test_empty_outcome_is_not_synthetic_success() -> None:
     assert manager.current_task is not None
     assert manager.current_task.status is TaskStatus.FAILED
     assert manager.current_task.error == '任务未执行任何轮次'
+
+
+def test_wait_for_completion_does_not_acknowledge_a_running_worker() -> None:
+    """Shutdown callers can distinguish a stop request from actual worker termination."""
+    manager = TaskManager()
+    worker_started = threading.Event()
+    release_worker = threading.Event()
+
+    def executor(_task: object) -> TaskOutcome:
+        worker_started.set()
+        release_worker.wait(timeout=1)
+        return TaskOutcome.from_results([{'round': 1, 'success': True}])
+
+    manager.start_task(task_type='normal_fight', total_rounds=1, executor=executor)
+    assert worker_started.wait(timeout=1)
+    assert manager.stop_task() is True
+
+    assert manager.wait_for_completion(timeout=0.01) is False
+    assert manager.current_task is not None
+    assert manager.current_task.status is TaskStatus.RUNNING
+
+    release_worker.set()
+    assert manager.wait_for_completion(timeout=1) is True
+    assert manager.current_task.status is TaskStatus.STOPPED
