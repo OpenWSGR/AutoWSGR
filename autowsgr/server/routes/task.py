@@ -16,6 +16,7 @@ from autowsgr.server.schemas import (
     EventFightRequest,
     ExerciseRequest,
     NormalFightRequest,
+    TaskStatusResponse,
 )
 from autowsgr.server.serializers import build_combat_plan, convert_combat_result
 from autowsgr.server.task_manager import TaskOutcome, task_manager
@@ -85,11 +86,15 @@ async def task_stop() -> ApiResponse:
         return ApiResponse(success=False, error='停止失败')
 
 
-@router.get('/status', response_model=ApiResponse)
-async def task_status() -> ApiResponse:
+@router.get(
+    '/status',
+    response_model=ApiResponse[TaskStatusResponse],
+    response_model_exclude_unset=True,
+)
+async def task_status() -> ApiResponse[TaskStatusResponse]:
     """查询当前任务状态。"""
     status = task_manager.get_status()
-    return ApiResponse(success=True, data=status)
+    return ApiResponse[TaskStatusResponse](success=True, data=status)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

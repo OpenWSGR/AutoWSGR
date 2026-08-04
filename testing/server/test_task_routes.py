@@ -13,11 +13,14 @@ from autowsgr.server import main as server_main
 from autowsgr.server.device_lease import DeviceOperationBusyError
 from autowsgr.server.routes import task
 from autowsgr.server.schemas import (
+    ApiResponse,
     CampaignRequest,
     DecisiveRequest,
     EventFightRequest,
     ExerciseRequest,
     NormalFightRequest,
+    RoundResult,
+    TaskStatusResponse,
 )
 
 
@@ -189,3 +192,85 @@ def test_decisive_leave_result_remains_successful(
     assert manager.outcome.success is True
     assert manager.outcome.error is None
     assert manager.outcome.results == [{'round': 1, 'success': True, 'result': 'leave'}]
+
+
+@pytest.mark.parametrize(
+    'detail',
+    [
+        {
+            'round': 1,
+            'success': True,
+            'nodes': ['A', 'B'],
+            'mvp': '位置1',
+            'grade': 'S',
+            'ship_damage': [0, 1],
+            'node_count': 2,
+            'enemies': {'B': {'DD': 2}},
+            'events': [{'type': 'FIGHT', 'node': 'B', 'custom': 'kept'}],
+        },
+        {'round': 2, 'success': False, 'error': 'fleet change failed'},
+        {'round': 3, 'success': True, 'result': 'leave'},
+    ],
+)
+def test_round_result_schema_preserves_existing_detail_shapes(
+    detail: dict[str, Any],
+) -> None:
+    """Typed task results must not strip or synthesize detail fields."""
+    assert RoundResult.model_validate(detail).model_dump(exclude_unset=True) == detail
+
+
+def test_task_status_openapi_exposes_typed_data() -> None:
+    """The status endpoint documents TaskStatusResponse instead of untyped Any."""
+    schema = server_main.app.openapi()
+    response_schema = schema['paths']['/api/task/status']['get']['responses']['200']['content'][
+        'application/json'
+    ]['schema']
+    response_model_name = response_schema['$ref'].rsplit('/', 1)[-1]
+    data_schema = schema['components']['schemas'][response_model_name]['properties']['data']
+
+    assert 'TaskStatusResponse' in str(data_schema)
+
+
+def test_typed_task_status_preserves_terminal_wire_payload() -> None:
+    """Typed envelope round-trips terminal details without adding absent fields."""
+    payload = {
+        'success': True,
+        'data': {
+            'task_id': 'task_1234',
+            'status': 'failed',
+            'progress': None,
+            'result': {
+                'total_runs': 2,
+                'success_runs': 1,
+                'details': [
+                    {'round': 1, 'success': True, 'result': 'leave'},
+                    {'round': 2, 'success': False, 'error': 'fleet change failed'},
+                ],
+            },
+            'error': 'fleet change failed',
+        },
+    }
+
+    response = ApiResponse[TaskStatusResponse].model_validate(payload)
+
+    assert response.model_dump(mode='json', exclude_unset=True) == payload
+
+
+def test_task_status_returns_typed_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The route validates manager status through its typed response contract."""
+    status = {
+        'task_id': None,
+        'status': 'idle',
+        'progress': None,
+        'result': None,
+    }
+    monkeypatch.setattr(task.task_manager, 'get_status', lambda: status)
+
+    response = asyncio.run(task.task_status())
+
+    assert isinstance(response, ApiResponse)
+    assert isinstance(response.data, TaskStatusResponse)
+    assert response.model_dump(mode='json', exclude_unset=True) == {
+        'success': True,
+        'data': status,
+    }

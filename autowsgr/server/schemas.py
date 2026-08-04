@@ -285,6 +285,7 @@ class RoundResult(BaseModel):
     """单轮战斗结果。"""
 
     round: int = Field(description='轮次')
+    success: bool = Field(description='本轮是否成功')
     nodes: list[str] = Field(default_factory=list, description='经过的节点')
     mvp: str | None = Field(default=None, description='MVP 舰船')
     ship_damage: list[int] = Field(
@@ -292,6 +293,13 @@ class RoundResult(BaseModel):
         description='舰船破损状态',
     )
     grade: str | None = Field(default=None, description='战果等级')
+    node_count: int | None = Field(default=None, description='经过的节点数量')
+    enemies: dict[str, dict[str, int]] | None = Field(default=None, description='各节点敌舰')
+    events: list[dict[str, Any]] | None = Field(default=None, description='战斗事件')
+    result: str | None = Field(default=None, description='任务专用结果')
+    error: str | None = Field(default=None, description='本轮错误信息')
+
+    model_config = {'extra': 'allow'}
 
 
 class TaskResult(BaseModel):
@@ -330,11 +338,11 @@ class LogMessage(BaseModel):
     message: str = Field(description='日志内容')
 
 
-class ApiResponse(BaseModel):
+class ApiResponse[ResponseDataT](BaseModel):
     """通用 API 响应。"""
 
     success: bool = Field(description='是否成功')
-    data: Any | None = Field(default=None, description='响应数据')
+    data: ResponseDataT | None = Field(default=None, description='响应数据')
     message: str | None = Field(default=None, description='消息')
     error: str | None = Field(default=None, description='错误信息')
 
