@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -44,6 +44,10 @@ class LogLevel(StrEnum):
     ERROR = 'ERROR'
 
 
+RuleSpec: TypeAlias = tuple[str, Literal['retreat', 'detour'] | int]
+"""HTTP rule item: condition expression plus retreat/detour/formation action."""
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 节点决策模型
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -68,11 +72,11 @@ class NodeDecisionRequest(BaseModel):
         default=True,
         description='迂回失败时是否 SL',
     )
-    enemy_rules: list[str | list] | None = Field(
+    enemy_rules: list[RuleSpec] | None = Field(
         default=None,
         description='索敌规则',
     )
-    enemy_formation_rules: list[str | list] | None = Field(
+    enemy_formation_rules: list[RuleSpec] | None = Field(
         default=None,
         description='敌方阵型规则',
     )

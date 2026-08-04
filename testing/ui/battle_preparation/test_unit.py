@@ -701,7 +701,7 @@ class TestSmartFleetChange:
 
         assert select_option.call_args == call(
             1,
-            ShipSelector(name='契卡洛夫', relaxed_constraints=True),
+            ShipSelector(name='契卡洛夫'),
         )
         change_ship.assert_called_once_with(0, None, slot_occupied=True)
 
@@ -726,7 +726,11 @@ class TestSmartFleetChange:
                     _snapshot(target_fleet),
                 ],
             ),
-            patch.object(page, '_try_select_option') as select_option,
+            patch.object(
+                page,
+                '_try_select_option',
+                return_value=None,
+            ) as select_option,
             patch.object(page, '_change_single_ship') as change_ship,
             patch.object(page, '_circular_move', side_effect=move_ship) as circular_move,
             patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
@@ -940,14 +944,12 @@ class TestFleetSlotRules:
                 ship_types=(ShipType.BC,),
                 min_level=90,
                 max_level=105,
-                relaxed_constraints=True,
             ),
             ShipSelector(
                 name='密苏里',
                 ship_types=(ShipType.BB,),
                 min_level=80,
                 max_level=110,
-                relaxed_constraints=True,
             ),
         )
 
@@ -975,13 +977,11 @@ class TestFleetSlotRules:
                 name='胡德',
                 ship_types=(ShipType.BC,),
                 min_level=90,
-                relaxed_constraints=True,
             ),
             ShipSelector(
                 name='扶桑',
                 ship_types=(ShipType.BB,),
                 max_level=110,
-                relaxed_constraints=True,
             ),
         )
 
@@ -1026,7 +1026,7 @@ class TestFleetSlotRules:
         )
         change_ship.assert_not_called()
 
-    def test_existing_candidate_only_ship_keeps_relaxed_constraints(self):
+    def test_existing_candidate_only_ship_requires_its_constraints(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
         rule = _rule(
             {
@@ -1047,12 +1047,16 @@ class TestFleetSlotRules:
                 'detect_fleet_snapshot',
                 return_value=_snapshot(current),
             ),
-            patch.object(page, '_try_select_option') as select_option,
+            patch.object(
+                page,
+                '_try_select_option',
+                return_value=_ShipSelection('胡德', rule.candidates[0]),
+            ) as select_option,
             patch.object(page, '_change_single_ship') as change_ship,
         ):
             assert page.change_fleet(None, [rule])
 
-        select_option.assert_not_called()
+        select_option.assert_called_once_with(0, rule.candidates[0])
         change_ship.assert_not_called()
 
     def test_existing_candidate_does_not_replace_available_strict_primary(self):
@@ -1174,7 +1178,7 @@ class TestFleetSlotRules:
             None,
         ]
 
-    def test_same_name_fallback_keeps_exact_relaxed_rule(self):
+    def test_same_name_fallback_keeps_exact_candidate_rule(self):
         rule = _rule(
             {
                 'name': '密苏里',
@@ -1193,7 +1197,7 @@ class TestFleetSlotRules:
         assert assigned is not None
         assert assigned[0] == ShipSelector(
             name='密苏里',
-            relaxed_constraints=True,
+            relaxed_constraints=False,
         )
 
     def test_candidate_only_slots_use_backtracking(self):

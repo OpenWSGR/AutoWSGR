@@ -28,14 +28,38 @@ if TYPE_CHECKING:
 NATIVE_FLEET_VESSEL_TYPES = tuple(vessel_type.native for vessel_type in FLEET_VESSEL_TYPES)
 """由公共 native 契约提供的普通舰种。"""
 
+_NATIVE_CODE_TO_SHIP_TYPE: Mapping[str, ShipType] = MappingProxyType(
+    {
+        'cv': ShipType.CV,
+        'cvl': ShipType.CVL,
+        'av': ShipType.AV,
+        'bb': ShipType.BB,
+        'bbv': ShipType.BBV,
+        'bc': ShipType.BC,
+        'ca': ShipType.CA,
+        'cav': ShipType.CAV,
+        'clt': ShipType.CLT,
+        'cl': ShipType.CL,
+        'bm': ShipType.BM,
+        'dd': ShipType.DD,
+        'ssg': ShipType.SSG,
+        'ss': ShipType.SS,
+        'sc': ShipType.SC,
+        'ap': ShipType.NAP,
+        'asdg': ShipType.ASDG,
+        'aadg': ShipType.AADG,
+        'kp': ShipType.KP,
+        'cg': ShipType.CG,
+        'bbg': ShipType.BG,
+        'bg': ShipType.CBG,
+    },
+)
+"""native 0.3 舰种代码到 AutoWSGR 领域枚举的显式映射。"""
+
 VESSEL_TYPE_TO_SHIP_TYPE: tuple[tuple[VesselType, ShipType], ...] = tuple(
-    (
-        vessel_type.native,
-        ShipType[vessel_type.code.upper()],
-    )
+    (vessel_type.native, _NATIVE_CODE_TO_SHIP_TYPE[vessel_type.code])
     for vessel_type in FLEET_VESSEL_TYPES
 )
-"""native 0.3 普通舰种到同名 AutoWSGR 领域枚举的映射。"""
 
 for _native_type, _ship_type in VESSEL_TYPE_TO_SHIP_TYPE:
     if _native_type.as_chinese() != _ship_type.value:
@@ -216,9 +240,10 @@ def _selector_from_mapping(
     if name is None:
         raise ValueError('name 不能为空')
     source = raw if inherited is None else inherited
+    inherited_search_name = inherited.get('search_name') if inherited is not None else None
     return ShipSelector(
         name=name,
-        search_name=_optional_text(raw.get('search_name')),
+        search_name=_optional_text(raw.get('search_name', inherited_search_name)),
         ship_types=parse_ship_type_codes(source.get('ship_type')),
         min_level=_optional_level(source, 'min_level'),
         max_level=_optional_level(source, 'max_level'),
@@ -239,7 +264,7 @@ def fleet_slot_from_api(raw: str | Mapping[str, Any]) -> FleetSlotRule:
     if not isinstance(raw_candidates, Sequence) or isinstance(raw_candidates, str):
         raise TypeError('candidates 必须是规则对象列表')
     candidates = tuple(
-        _selector_from_mapping(candidate, relaxed=True)
+        _selector_from_mapping(candidate, relaxed=False)
         for candidate in raw_candidates
         if isinstance(candidate, Mapping)
     )
@@ -263,37 +288,17 @@ def fleet_slot_from_yaml(raw: object) -> FleetSlotRule:
     primary: ShipSelector | None = None
     if _optional_text(raw.get('name')) is not None:
         primary = _selector_from_mapping(raw, relaxed=False)
-    else:
-        primary_index = next(
-            (
-                index
-                for index, candidate in enumerate(candidates)
-                if isinstance(candidate, str) and candidate.strip()
-            ),
-            None,
-        )
-        if primary_index is not None:
-            primary_name = candidates.pop(primary_index)
-            primary = _selector_from_mapping(
-                {
-                    'name': primary_name,
-                    'search_name': raw.get('search_name'),
-                },
-                relaxed=False,
-                inherited=raw,
-            )
-
     normalized_candidates: list[ShipSelector] = []
     seen: set[str] = set()
     for candidate in candidates:
         if isinstance(candidate, str):
             selector = _selector_from_mapping(
                 {'name': candidate},
-                relaxed=True,
+                relaxed=False,
                 inherited=raw,
             )
         elif isinstance(candidate, Mapping):
-            selector = _selector_from_mapping(candidate, relaxed=True)
+            selector = _selector_from_mapping(candidate, relaxed=False)
         else:
             raise TypeError('candidates 只能包含舰名字符串或规则对象')
         if selector.name in seen:
@@ -315,9 +320,11 @@ def fleet_presets_from_yaml(raw: object) -> tuple[FleetPreset, ...] | None:
         if not isinstance(raw_preset, Mapping):
             raise TypeError('fleet_presets 每一项必须是对象')
         name = _optional_text(raw_preset.get('name')) or ''
-        raw_slots = raw_preset.get('ships', [])
+        raw_slots = raw_preset.get('ships')
         if not isinstance(raw_slots, list):
-            raise TypeError('fleet_presets.ships 必须是列表')
+            raise ValueError('fleet_presets.ships 必须是非空列表')
+        if not raw_slots:
+            raise ValueError('fleet_presets 不能包含空 ships')
         presets.append(
             FleetPreset(
                 name=name,

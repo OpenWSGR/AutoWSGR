@@ -455,7 +455,7 @@ class TestFleetPresetsParsing:
         assert plan.fleet_presets == ()
 
     def test_preset_content_is_normalized(self):
-        """旧字符串候选迁移为显式主选和完整备选规则。"""
+        """旧字符串候选保留为有序候选规则。"""
         plan = CombatPlan.from_dict(
             {
                 'fleet_presets': [
@@ -479,24 +479,9 @@ class TestFleetPresetsParsing:
         assert preset.name == '测试舰队'
         assert preset.slots[0] == FleetSlotRule(primary=ShipSelector(name='飞龙·改'))
         assert preset.slots[1] == FleetSlotRule(
-            primary=ShipSelector(
-                name='岛风',
-                ship_types=(ShipType.DD,),
-                min_level=100,
-            ),
             candidates=(
-                ShipSelector(
-                    name='黑潮',
-                    ship_types=(ShipType.DD,),
-                    min_level=100,
-                    relaxed_constraints=True,
-                ),
-                ShipSelector(
-                    name='岛风',
-                    ship_types=(ShipType.DD,),
-                    min_level=100,
-                    relaxed_constraints=True,
-                ),
+                ShipSelector(name='岛风', ship_types=(ShipType.DD,), min_level=100),
+                ShipSelector(name='黑潮', ship_types=(ShipType.DD,), min_level=100),
             ),
         )
 
@@ -548,14 +533,12 @@ class TestFleetPresetsParsing:
                 ship_types=(ShipType.SS,),
                 min_level=90,
                 max_level=105,
-                relaxed_constraints=True,
             ),
             ShipSelector(
                 name='U-47',
                 ship_types=(ShipType.SS,),
                 min_level=100,
                 max_level=110,
-                relaxed_constraints=True,
             ),
         )
 
@@ -591,14 +574,12 @@ class TestFleetPresetsParsing:
             ShipSelector(
                 name='胡德',
                 ship_types=(ShipType.BC,),
-                relaxed_constraints=True,
             ),
             ShipSelector(
                 name='扶桑',
                 ship_types=(ShipType.BB,),
                 min_level=80,
                 max_level=110,
-                relaxed_constraints=True,
             ),
         )
 
@@ -622,8 +603,8 @@ class TestFleetPresetsParsing:
             ),
         )
 
-    def test_legacy_primary_keeps_search_name(self):
-        """旧字符串主选迁移时保留顶层搜索名。"""
+    def test_legacy_candidate_only_keeps_search_name_on_each_candidate(self):
+        """旧字符串候选不提升主选，槽位搜索名不改变候选身份。"""
         plan = CombatPlan.from_dict(
             {
                 'fleet_presets': [
@@ -641,7 +622,8 @@ class TestFleetPresetsParsing:
 
         assert plan.fleet_presets is not None
         slot = plan.fleet_presets[0].slots[0]
-        assert slot.primary == ShipSelector(name='85工程', search_name='契卡洛夫')
+        assert slot.primary is None
+        assert [candidate.name for candidate in slot.candidates] == ['85工程', '岛风']
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
