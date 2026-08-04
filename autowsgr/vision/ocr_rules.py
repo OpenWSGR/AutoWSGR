@@ -15,8 +15,8 @@
    ``No.xxx`` 同船名称列表。
 4. 特殊分隔符：只在有实机日志证明某个符号被稳定误读时，
    增加一个范围明确的正则；不要统一删除 ``/``、``-``、``·``。
-5. 舰名后缀：在 ``SHIP_NAME_SUFFIXES`` 中增加完整后缀，
-   或增加只匹配末尾的正则，同时补充真实舰名不受影响的测试。
+5. 舰名后缀：统一由 ``autowsgr.constants.normalize_ship_name`` 处理。
+   修改规则时必须补充真实舰名不受影响的测试。
 6. 等级字符：在 ``LEVEL_DIGIT_TRANSLATION`` 中增加
    ``'OCR 字符': '数字'``；右侧必须是单个十进制数字。
 7. 舰船等级范围固定为 1-110，不通过新增规则放宽上限。
@@ -28,13 +28,9 @@ import re
 from typing import TYPE_CHECKING
 
 from autowsgr.constants import (
-    canonical_ship_name,
-    get_ship_name_group_id,
-    set_ship_name_aliases,
-)
-from autowsgr.constants import (
     expand_ship_name_candidates as expand_group_candidates,
 )
+from autowsgr.constants import get_ship_name_group_id, set_ship_name_aliases
 from autowsgr.infra.logger import get_logger
 
 
@@ -56,12 +52,6 @@ SHIP_NAME_CORRECTIONS: dict[str, str] = {
 # 用户规则在启动时从 OCRConfig 加载，不修改系统规则。
 _USER_SHIP_NAME_CORRECTIONS: dict[str, str] = {}
 _USER_SHIP_NAME_ALIASES: dict[str, str] = {}
-
-# 只处理已确认的完整后缀，不删除舰名中间的间隔号。
-SHIP_NAME_SUFFIXES: tuple[str, ...] = ('·改',)
-
-# 处理舰名末尾由括号包围的别名，例如“岛风（苍青幻影）”。
-SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
 # EasyOCR 会把中文舰名中的间隔号识别成冒号，只修正两个汉字之间的冒号。
 _CJK_COLON_SEPARATOR_RE = re.compile(r'(?<=[\u3400-\u9fff]):(?=[\u3400-\u9fff])')
@@ -134,11 +124,6 @@ def set_user_ship_name_aliases(aliases: Mapping[str, str]) -> int:
     return len(loaded)
 
 
-def resolve_ship_name_alias(text: str) -> str:
-    """将用户补充的显示名转换为 SHIPNAMES 标准舰名。"""
-    return canonical_ship_name(text.strip())
-
-
 def expand_ship_name_candidates(candidates: list[str]) -> list[str]:
     """将当前舰名候选扩展为同组全部名称。"""
     return expand_group_candidates(candidates)
@@ -157,14 +142,6 @@ def apply_ship_name_rules(text: str) -> str:
 
     text = _CJK_COLON_SEPARATOR_RE.sub('·', text)
     return text
-
-
-def normalize_ship_name_suffix(text: str) -> str:
-    """去掉明确登记的舰名尾部标记，保留舰名内部特殊字符。"""
-    normalized = resolve_ship_name_alias(text)
-    for suffix in SHIP_NAME_SUFFIXES:
-        normalized = normalized.removesuffix(suffix)
-    return SHIP_ALIAS_SUFFIX_RE.sub('', normalized).strip()
 
 
 def normalize_level_digits(raw_digits: str) -> str | None:

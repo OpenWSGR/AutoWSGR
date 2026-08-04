@@ -10,15 +10,18 @@ from types import SimpleNamespace
 
 import pytest
 
+import autowsgr.ops.normal_fight as normal_fight_module
 from autowsgr.combat import CombatMode, CombatPlan
 from autowsgr.combat.fleet import (
     FleetSelectionSource,
     FleetSlotRule,
     ShipSelector,
+    exact_fleet_rules,
     resolve_fleet_selection,
 )
 from autowsgr.infra import ActionFailedError
 from autowsgr.ops.normal_fight import NormalFightRunner, _require_fleet_change
+from autowsgr.types import ShipDamageState, ShipType
 
 
 def _make_ctx() -> SimpleNamespace:
@@ -147,6 +150,126 @@ class TestFleetPresetRules:
         selection = resolve_fleet_selection(plan)
 
         assert selection.source is FleetSelectionSource.PLAN_PRESET
+
+
+class _FleetInfo:
+    def __init__(self) -> None:
+        self.ship_damage: dict[int, ShipDamageState] = {}
+
+    @staticmethod
+    def to_ships(_names: list[str | None] | None) -> list[object]:
+        return []
+
+
+class _BattlePreparationPage:
+    def __init__(self) -> None:
+        self.changed_fleet_id: int | None = None
+        self.changed_rules: tuple[FleetSlotRule, ...] | None = None
+        self.last_changed_fleet: list[str | None] | None = ['导巡测试舰']
+
+    @staticmethod
+    def select_fleet(_fleet_id: int) -> None:
+        return None
+
+    def change_fleet(
+        self,
+        fleet_id: int,
+        rules: tuple[FleetSlotRule, ...],
+    ) -> bool:
+        self.changed_fleet_id = fleet_id
+        self.changed_rules = rules
+        return True
+
+    @staticmethod
+    def detect_fleet() -> list[str]:
+        raise AssertionError('runner 不应在换船成功后重复识别舰队')
+
+    @staticmethod
+    def apply_supply() -> None:
+        return None
+
+    @staticmethod
+    def apply_repair(_strategy: object) -> None:
+        return None
+
+    @staticmethod
+    def detect_fleet_info() -> _FleetInfo:
+        return _FleetInfo()
+
+    @staticmethod
+    def start_battle() -> None:
+        return None
+
+
+class TestFleetSelectionCallChain:
+    def _prepare(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        plan: CombatPlan,
+    ) -> tuple[object, _BattlePreparationPage]:
+        selection = resolve_fleet_selection(plan)
+        page = _BattlePreparationPage()
+        monkeypatch.setattr(
+            normal_fight_module,
+            'BattlePreparationPage',
+            lambda _ctx: page,
+        )
+        monkeypatch.setattr(normal_fight_module.time, 'sleep', lambda _seconds: None)
+
+        runner = NormalFightRunner(_make_ctx(), plan, selection)
+        runner._prepare_for_battle()
+        return selection, page
+
+    def test_yaml_preset_rules_reach_battle_preparation_unchanged(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_id': 4,
+                'fleet': ['被预设覆盖的舰船'],
+                'fleet_presets': [
+                    {
+                        'ships': [
+                            {
+                                'name': '导巡测试舰',
+                                'ship_type': ['kp'],
+                                'min_level': 90,
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+
+        selection, page = self._prepare(monkeypatch, plan)
+
+        assert selection.source is FleetSelectionSource.PLAN_PRESET
+        assert selection.slot_rules is not None
+        assert page.changed_fleet_id == 4
+        assert page.changed_rules is selection.slot_rules
+        assert page.changed_rules[0].primary == ShipSelector(
+            name='导巡测试舰',
+            ship_types=(ShipType.KP,),
+            min_level=90,
+        )
+
+    def test_plain_plan_fleet_is_converted_once_at_battle_preparation(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_id': 2,
+                'fleet': ['岛风', '雪风'],
+            },
+        )
+
+        selection, page = self._prepare(monkeypatch, plan)
+
+        assert selection.source is FleetSelectionSource.PLAN_FLEET
+        assert page.changed_fleet_id == 2
+        assert page.changed_rules == exact_fleet_rules(['岛风', '雪风'])
 
 
 class TestEventNormalMerge:

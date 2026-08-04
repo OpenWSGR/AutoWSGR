@@ -23,8 +23,9 @@ OCR 结果必须结合 YAML 槽位目标，保证最终进入战斗的舰队逐�
 
 ## 特殊规则
 
-系统规则集中在 `autowsgr/vision/ocr_rules.py`。每条规则必须有实机证据，
-并补充对应测试。
+OCR 误识别修正规则集中在 `autowsgr/vision/ocr_rules.py`。舰名文本归一化和
+同舰身份判断唯一由 `autowsgr/constants/shipnames.py` 负责。每条规则必须有
+实机证据，并补充对应测试。
 
 用户可在 YAML 中维护自己的舰名修正规则：
 

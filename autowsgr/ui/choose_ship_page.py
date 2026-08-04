@@ -16,7 +16,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from autowsgr.constants import SHIPNAMES
+from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipType
 from autowsgr.vision import (
@@ -26,7 +26,6 @@ from autowsgr.vision import (
     PixelSignature,
 )
 from autowsgr.vision.ocr import _fuzzy_match
-from autowsgr.vision.ocr_rules import normalize_ship_name_suffix
 
 from .utils import wait_for_page, wait_leave_page
 from .utils.ship_list import LevelOCRRetryNeededError, locate_ship_rows, read_ship_levels
@@ -348,12 +347,16 @@ class ChooseShipPage:
             level_map: dict[float, dict[str, list[int | None]]] = {}
             for entry in raw_levels:
                 level_name, level, row_key = self._normalize_level_entry(entry)
-                normalized_level_name = self._normalize_ship_name(level_name)
+                normalized_level_name = normalize_ship_name(level_name)
+                if normalized_level_name is None:
+                    continue
                 row_levels = level_map.setdefault(row_key, {})
                 row_levels.setdefault(normalized_level_name, []).append(level)
 
             for matched, cx, cy, row_key in hits:
-                normalized_matched = self._normalize_ship_name(matched)
+                normalized_matched = normalize_ship_name(matched)
+                if normalized_matched is None:
+                    continue
                 if not self._matches_ship_name(name, matched):
                     continue
 
@@ -471,19 +474,13 @@ class ChooseShipPage:
         """保留用户在游戏内使用的自定义舰名作为搜索条件。"""
         return name.strip()
 
-    @staticmethod
-    def _normalize_ship_name(name: str) -> str:
-        return normalize_ship_name_suffix(name)
-
     @classmethod
     def _matches_ship_name(cls, target: str, matched: str) -> bool:
         """比较目标名与 OCR 船池结果，不修改任一原始文本。"""
-        normalized_target = cls._normalize_ship_name(target)
-        normalized_matched = cls._normalize_ship_name(matched)
+        normalized_target = normalize_ship_name(target)
+        normalized_matched = normalize_ship_name(matched)
         if normalized_target == normalized_matched:
             return True
 
         pool_target = _fuzzy_match(target, SHIPNAMES, threshold=0)
-        return (
-            pool_target is not None and cls._normalize_ship_name(pool_target) == normalized_matched
-        )
+        return pool_target is not None and normalize_ship_name(pool_target) == normalized_matched

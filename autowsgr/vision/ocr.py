@@ -19,12 +19,11 @@ from typing import TYPE_CHECKING, ClassVar
 
 import easyocr
 
-from autowsgr.constants import SHIPNAMES
+from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision.ocr_rules import (
     apply_ship_name_rules,
     expand_ship_name_candidates,
-    resolve_ship_name_alias,
 )
 
 
@@ -446,7 +445,7 @@ def _fuzzy_match(text: str, candidates: list[str], threshold: int = 3) -> str | 
             _ship_name_match_confidence,
         )
         if handled:
-            return resolve_ship_name_alias(pool_name) if pool_name is not None else None
+            return normalize_ship_name(pool_name)
 
     # 单字只接受精确匹配，二至三字最多允许一个字符识别错误。
     effective_threshold = (
@@ -456,7 +455,7 @@ def _fuzzy_match(text: str, candidates: list[str], threshold: int = 3) -> str | 
     best_dist = min(distance for _, distance in distances)
     nearest = list(
         dict.fromkeys(
-            resolve_ship_name_alias(name) for name, distance in distances if distance == best_dist
+            normalize_ship_name(name) for name, distance in distances if distance == best_dist
         ),
     )
     best_name = nearest[0] if len(nearest) == 1 and best_dist <= effective_threshold else None
@@ -492,7 +491,7 @@ def _fuzzy_match_pool_aware(  # noqa: PLR0911
     """处理精确名称、明确自定义后缀和唯一长舰名片段。"""
     exact = [name for name in candidates if name == text]
     if exact:
-        name = resolve_ship_name_alias(exact[0])
+        name = normalize_ship_name(exact[0])
         _log.debug("[OCR] pool_match: '{}' -> '{}' (exact)", text, name)
         return name, True
 
@@ -521,7 +520,7 @@ def _fuzzy_match_pool_aware(  # noqa: PLR0911
     )
     if relation_count > 1:
         related_names = {
-            resolve_ship_name_alias(name)
+            normalize_ship_name(name)
             for matches in (custom_suffix_matches, truncated_matches, fragment_matches)
             for name in matches
         }
@@ -548,7 +547,7 @@ def _fuzzy_match_pool_aware(  # noqa: PLR0911
     else:
         return None, False
 
-    standard_names = list(dict.fromkeys(resolve_ship_name_alias(name) for name in matches))
+    standard_names = list(dict.fromkeys(normalize_ship_name(name) for name in matches))
     if len(standard_names) != 1:
         if standard_names:
             _log.warning("[OCR] pool_match: '{}' 前缀候选不唯一: {}", text, standard_names)

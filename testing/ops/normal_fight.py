@@ -201,6 +201,7 @@ def main() -> None:
 
         # 导航到出征地图页 → 选择地图 → 进入准备页
         result = runner.run()
+        results.append(result)
 
         logger.info(
             '  战斗结果: {} 血量={}',

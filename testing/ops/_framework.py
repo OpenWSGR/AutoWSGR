@@ -70,7 +70,7 @@ def launch_for_test(
     if with_ocr:
         ctx = launcher.build_context()
     else:
-        ctx = GameContext(ctrl=launcher.ctrl, config=launcher.config)
+        ctx = GameContext(ctrl=launcher.ctrl, config=launcher.config, ocr=None)
         launcher.ensure_ready(ctx)
 
     return ctx

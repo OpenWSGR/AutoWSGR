@@ -15,7 +15,6 @@ import time
 from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import FleetSelection

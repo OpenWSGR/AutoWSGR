@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
+from autowsgr.contracts.vessel_types import FLEET_VESSEL_TYPES
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import Formation
 
@@ -40,8 +41,7 @@ from autowsgr.types import Formation
 _log = get_logger('combat.recognition')
 
 _SHIP_TYPE_PATTERN = re.compile(
-    r'\b(CV|CVL|AV|BB|BBV|BC|CA|CAV|CLT|CL|BM|DD|SSG|SS|SC|NAP|'
-    r'ASDG|AADG|KP|CG|CBG|BG)\b'
+    rf'\b({"|".join(re.escape(vessel_type.native.as_english()) for vessel_type in FLEET_VESSEL_TYPES)})\b',
 )
 
 

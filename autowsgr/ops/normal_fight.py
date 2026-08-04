@@ -355,13 +355,14 @@ class NormalFightRunner:
                 'fleet_rules',
             )
             time.sleep(0.5)
-            resolved_ship_names = page.detect_fleet()
+            resolved_ship_names = page.last_changed_fleet
         elif plain_fleet is not None:
             _require_fleet_change(
                 page.change_fleet(self._fleet_id, exact_fleet_rules(plain_fleet)),
                 'fleet',
             )
             time.sleep(0.5)
+            resolved_ship_names = page.last_changed_fleet
 
         # 补给
         page.apply_supply()

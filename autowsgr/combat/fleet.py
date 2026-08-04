@@ -12,41 +12,63 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
+from autowsgr.contracts.vessel_types import (
+    FLEET_VESSEL_TYPE_BY_CODE,
+    FLEET_VESSEL_TYPES,
+)
 from autowsgr.types import ShipType
 
 
 if TYPE_CHECKING:
+    from autowsgr_native.vessel_type import VesselType
+
     from autowsgr.combat.plan import CombatPlan
 
 
-SHIP_TYPE_BY_CODE = MappingProxyType(
+NATIVE_FLEET_VESSEL_TYPES = tuple(vessel_type.native for vessel_type in FLEET_VESSEL_TYPES)
+"""由公共 native 契约提供的普通舰种。"""
+
+VESSEL_TYPE_TO_SHIP_TYPE: tuple[tuple[VesselType, ShipType], ...] = tuple(
+    (
+        vessel_type.native,
+        ShipType[vessel_type.code.upper()],
+    )
+    for vessel_type in FLEET_VESSEL_TYPES
+)
+"""native 0.3 普通舰种到同名 AutoWSGR 领域枚举的映射。"""
+
+for _native_type, _ship_type in VESSEL_TYPE_TO_SHIP_TYPE:
+    if _native_type.as_chinese() != _ship_type.value:
+        raise RuntimeError(
+            f'native 舰种中文语义不一致: {_native_type.as_english()}',
+        )
+
+
+def ship_type_from_native(vessel_type: VesselType) -> ShipType:
+    """把 native 普通舰种转换为 AutoWSGR 领域枚举。"""
+    for native_type, ship_type in VESSEL_TYPE_TO_SHIP_TYPE:
+        if vessel_type == native_type:
+            return ship_type
+    message = f'不支持的 native 舰种: {vessel_type!r}'
+    raise ValueError(message)
+
+
+NATIVE_VESSEL_TYPE_BY_CODE: Mapping[str, VesselType] = MappingProxyType(
+    {code: vessel_type.native for code, vessel_type in FLEET_VESSEL_TYPE_BY_CODE.items()},
+)
+"""API 使用的 native 0.3 canonical 舰种代码。"""
+
+
+SHIP_TYPE_BY_CODE: Mapping[str, tuple[ShipType, ...]] = MappingProxyType(
     {
-        'dd': (ShipType.DD,),
-        'cl': (ShipType.CL,),
-        'ca': (ShipType.CA,),
-        'cav': (ShipType.CAV,),
-        'clt': (ShipType.CLT,),
-        'bb': (ShipType.BB,),
-        'bc': (ShipType.BC,),
-        'bbv': (ShipType.BBV,),
-        'cv': (ShipType.CV,),
-        'cvl': (ShipType.CVL,),
-        'av': (ShipType.AV,),
-        'ss': (ShipType.SS,),
-        'ssg': (ShipType.SSG,),
-        'cg': (ShipType.KP,),
-        'cgaa': (ShipType.CG,),
-        'ddg': (ShipType.ASDG,),
-        'ddgaa': (ShipType.AADG,),
-        'bm': (ShipType.BM,),
-        'cbg': (ShipType.CBG,),
+        **{
+            code: (ship_type_from_native(vessel_type),)
+            for code, vessel_type in NATIVE_VESSEL_TYPE_BY_CODE.items()
+        },
         'ss_or_ssg': (ShipType.SS, ShipType.SSG),
-        'ap': (ShipType.NAP,),
-        'bbg': (ShipType.BG,),
-        'sc': (ShipType.SC,),
     },
 )
-"""API 舰种缩写到后端领域枚举的唯一映射。"""
+"""API 舰种代码到后端领域枚举的唯一映射。"""
 
 ALLOWED_SHIP_TYPE_CODES = frozenset(SHIP_TYPE_BY_CODE)
 

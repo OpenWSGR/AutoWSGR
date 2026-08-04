@@ -11,6 +11,7 @@ from autowsgr.constants import (
     SHIPNAME_GROUPS,
     SHIPNAMES,
     get_ship_name_variants,
+    normalize_ship_name,
     ship_name_identity,
 )
 from autowsgr.vision import OCREngine, OCRResult, ShipNameMismatchError
@@ -341,6 +342,25 @@ class TestPoolAwareMatch:
         set_ship_name_match_confidence(0.0)
         set_user_ship_name_aliases({})
         set_user_ship_name_corrections({})
+
+    @pytest.mark.parametrize(
+        ('raw', 'expected'),
+        [
+            (None, None),
+            ('', None),
+            ('  岛风  ', '岛风'),
+            ('岛风·改', '岛风'),
+            ('飞龙（苍青幻影）', '飞龙'),
+        ],
+    )
+    def test_ship_name_normalization(self, raw: object, expected: str | None):
+        assert normalize_ship_name(raw) == expected
+
+    def test_ship_name_normalization_resolves_registered_alias(self):
+        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
+
+        assert normalize_ship_name(' 契卡洛夫·改 ') == '85工程'
+        assert ship_name_identity('契卡洛夫（自定义）') == ship_name_identity('85工程')
 
     def test_only_confirmed_cjk_separator_is_corrected(self):
         assert apply_ship_patches('安德烈亚:多利亚') == '安德烈亚·多利亚'

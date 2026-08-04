@@ -150,12 +150,25 @@ def build_combat_plan(request: Any) -> Any:
     from autowsgr.combat.plan import parse_map_value
     from autowsgr.types import RepairMode
 
-    def _build_node_decision(node_req: Any) -> NodeDecision:
-        return NodeDecision.from_dict(
-            node_req.model_dump(exclude_none=True),
-        )
+    node_defaults = request.node_defaults.model_dump(exclude_none=True)
 
-    node_args = {k: _build_node_decision(v) for k, v in request.node_args.items()}
+    def _build_node_decision(
+        node_req: Any,
+        *,
+        defaults: dict[str, Any] | None = None,
+    ) -> NodeDecision:
+        data = {} if defaults is None else dict(defaults)
+        data.update(
+            node_req.model_dump(
+                exclude_none=True,
+                exclude_unset=defaults is not None,
+            ),
+        )
+        return NodeDecision.from_dict(data)
+
+    node_args = {
+        k: _build_node_decision(v, defaults=node_defaults) for k, v in request.node_args.items()
+    }
     map_id, entrance = parse_map_value(request.map)
 
     return CombatPlan(
@@ -169,7 +182,7 @@ def build_combat_plan(request: Any) -> Any:
         repair_mode=[RepairMode(r) for r in request.repair_mode],
         fight_condition=request.fight_condition,
         selected_nodes=request.selected_nodes,
-        default_node=_build_node_decision(request.node_defaults),
+        default_node=NodeDecision.from_dict(node_defaults),
         nodes=node_args,
         event_name=request.event_name,
     )

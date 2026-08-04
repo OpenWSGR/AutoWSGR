@@ -1,36 +1,40 @@
 """智能换船算法。
 
-1. 读取 YAML 传入的前六个舰队槽位。
-2. 整理每个槽位的优选、备选和筛选条件。
-3. 使用回溯算法为六个槽位分配不同舰名。
-4. OCR 识别当前舰队，已经正确时直接结束。
-5. 首次调整时保留可复用舰船并补齐缺少舰船。
-6. 先替换目标舰船，再删除多余舰船，避免一队为空。
-7. 删除舰船造成槽位压缩后，再检查并补齐缺员。
-8. 拖拽舰船，将现有成员调整到目标槽位。
-9. OCR 再次验证舰名、顺序和空槽。
-10. 验证失败后只修正错误槽位，最多修正两次。
+1. 保留所有可用主选，并为 candidate-only 槽位分配唯一备选。
+2. 使用全部主选和备选作为全局 OCR 补救上下文。
+3. 结合血条探针区分空槽和有舰船但舰名未识别的槽位。
+4. OCR 当前舰队，candidate-only 优先复用未被主选占用的已有舰船。
+5. 保留已有目标成员，优先补齐主选，再处理 fallback 和 candidate-only。
+6. 主选失败后重新执行全局唯一分配，不能局部抢占其他主选。
+7. 先替换目标舰船，再删除多余舰船，避免一队为空。
+8. 删除舰船造成槽位压缩后，再检查并补齐缺员。
+9. 成员集合完整后拖拽舰船，将现有成员调整到目标槽位。
+10. OCR 再次验证舰名、顺序、空槽和同舰唯一性。
+11. 验证失败后只修正错误槽位，最多修正两次。
 一个 YAML 只执行一套舰队，不会切换其他 preset。
 常规出征使用搜索框，决战可通过开关选择是否使用本算法。
 """
 
 from __future__ import annotations
 
-import re
 import time
+from dataclasses import dataclass
+from functools import cache
 from typing import TYPE_CHECKING
 
 from autowsgr.combat.fleet import FleetSlotRule, ShipSelector
-from autowsgr.constants import ship_name_identity
+from autowsgr.constants import normalize_ship_name, ship_name_identity
 from autowsgr.infra.logger import get_logger
-from autowsgr.ui.battle.constants import CLICK_SHIP_SLOT
+from autowsgr.ui.battle.constants import CLICK_BACK, CLICK_SHIP_SLOT
 
-from ._detect import FleetDetectMixin
+from ._detect import FleetDetectMixin, FleetSnapshot
 
 
 # 仅在类型检查时导入 Sequence，运行时不产生额外依赖。
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from autowsgr.ui.choose_ship_page import ChooseShipPage
 
 
 # 记录智能换船过程中的关键步骤和失败原因。
@@ -42,8 +46,13 @@ _MAX_SET_RETRIES: int = 2
 # 等待选船页面出现的超时 (秒)
 _CHOOSE_PAGE_TIMEOUT: float = 5.0
 
-# 舰名尾部别名后缀，如“(苍青幻影)”
-_SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
+
+@dataclass(frozen=True, slots=True)
+class _ShipSelection:
+    """选船页实际命中的舰名和精确规则。"""
+
+    name: str | None
+    option: ShipSelector | None
 
 
 # 为普通出征和决战准备页提供同一套智能换船流程。
@@ -52,6 +61,14 @@ class FleetChangeMixin(FleetDetectMixin):
 
     # True 使用搜索框选船，False 直接通过 OCR 列表选船。
     _use_search: bool = True
+    _last_changed_fleet: list[str | None] | None = None
+
+    @property
+    def last_changed_fleet(self) -> list[str | None] | None:
+        """返回最近一次换船成功时已验证的实际舰队。"""
+        if self._last_changed_fleet is None:
+            return None
+        return list(self._last_changed_fleet)
 
     # 执行一套六槽舰队的完整换船、排序和验证流程。
     def change_fleet(
@@ -60,62 +77,107 @@ class FleetChangeMixin(FleetDetectMixin):
         ship_names: Sequence[FleetSlotRule],
     ) -> bool:
         """返回最终舰队是否符合六个目标槽位。"""
+        self._last_changed_fleet = None
         # Step 1：切换到 YAML 指定的舰队。
         # 当前舰队已经正确时，不重复点击舰队按钮。
         if fleet_id and self.get_selected_fleet(self._ctrl.screenshot()) != fleet_id:
             self.select_fleet(fleet_id)
             time.sleep(0.5)
 
-        # Step 2：分别保存六个槽位的目标舰名和选船规则。
-        names: list[str | None] = []
-        selectors: list[FleetSlotRule | None] = []
-        for slot_rule in list(ship_names)[:6]:
-            selectors.append(slot_rule)
-            names.append(self._normalize_ship_name(slot_rule.preferred_name))
-
-        # Step 3：不足六槽时补空，并为所有槽位分配互不重复的舰名。
-        names += [None] * (6 - len(names))
+        # Step 2：保存六个槽位的规则，不足六槽时补空。
+        selectors: list[FleetSlotRule | None] = list(ship_names[:6])
         selectors += [None] * (6 - len(selectors))
-        # unique_names 是处理候选冲突后的最终目标舰名。
-        unique_names = self._assign_unique_targets(names, selectors)
-        # 无法找到不重名组合时，停止换船，避免组成非法舰队。
-        if unique_names is None:
-            _log.error('[准备页] 目标编成无法满足同名舰唯一约束: {}', names)
+
+        # Step 3：主选全部保留，candidate-only 通过全局回溯分配唯一备选。
+        assigned = self._plan_target_options(selectors)
+        if assigned is None:
+            _log.error('[准备页] 目标编成无法满足主选和同舰唯一约束')
             return False
-        names = unique_names
         # 第一舰队最后一艘舰船不能移除，但第一舰队本身允许更换编成。
-        if fleet_id == 1 and names[0] is None:
+        if fleet_id == 1 and assigned[0] is None:
             raise ValueError('1 队槽位 0 不能为空')
-        _log.info('[准备页] 目标编成: {}', names)
+
+        expected_pool = self._ocr_target_pool(selectors)
+        snapshot = self._detect_initial_snapshot(expected_pool)
+        current = snapshot.names
+        occupied = snapshot.occupied
+        assigned = self._plan_target_options(
+            selectors,
+            current,
+        )
+        if assigned is None:
+            _log.error('[准备页] 当前舰队无法分配为主选优先的不重名编成')
+            return False
+        _log.info(
+            '[准备页] 根据主选优先规则确定目标编成: {}',
+            self._target_names(assigned),
+        )
 
         # Step 4：首次完整调整，后续最多进行两次局部修正。
+        # verified_slots 记录本轮已通过选船页校验舰种和等级的逻辑目标槽位。
+        verified_slots: set[int] = set()
+        unavailable: set[tuple[int, ShipSelector]] = set()
+        locked: dict[int, ShipSelector] = {}
         for attempt in range(_MAX_SET_RETRIES + 1):
-            # current 保存本轮开始时 OCR 识别到的六个槽位。
-            current = self.detect_fleet()
-
+            names = self._target_names(assigned)
             # 当前舰队已经满足目标时，直接结束本次换船。
-            if self._validate_with_selector(current, names, selectors):
+            if self._validate_assignment(
+                current,
+                occupied,
+                assigned,
+                verified_slots,
+            ):
                 _log.info('[准备页] 舰队已满足目标, 跳过换船')
+                self._last_changed_fleet = list(current)
                 return True
 
             # Step 5：第一轮执行完整对齐，重试轮只处理错误槽位。
             # 第一次调整需要补船、删船并处理槽位压缩。
             if attempt == 0:
-                self._full_align(current, names, selectors)
+                self._full_align(
+                    current,
+                    occupied,
+                    assigned,
+                    selectors,
+                    verified_slots,
+                    unavailable,
+                    locked,
+                    expected_pool,
+                )
             # 后续调整只修正 OCR 验证失败的槽位。
             else:
                 _log.info('[准备页] 第 {} 次重试: 局部修正', attempt)
-                self._local_fix(current, names, selectors)
+                self._local_fix(
+                    current,
+                    occupied,
+                    assigned,
+                    selectors,
+                    verified_slots,
+                    unavailable,
+                    locked,
+                    expected_pool,
+                )
 
             # Step 6：重新识别成员，再通过拖拽调整舰船顺序。
-            current = self.detect_fleet(expected_names=names)
+            names = self._target_names(assigned)
+            snapshot = self.detect_fleet_snapshot(expected_pool=expected_pool)
+            current = snapshot.names
+            occupied = snapshot.occupied
             self._reorder(current, names)
 
             # Step 7：最终 OCR 验证舰名、顺序、空槽和重名情况。
-            current = self.detect_fleet(expected_names=names)
+            snapshot = self.detect_fleet_snapshot(expected_names=names)
+            current = snapshot.names
+            occupied = snapshot.occupied
             # 最终舰队符合目标时，返回成功。
-            if self._validate_with_selector(current, names, selectors):
+            if self._validate_assignment(
+                current,
+                occupied,
+                assigned,
+                verified_slots,
+            ):
                 _log.info('[准备页] 编成更换完成: {}', current)
+                self._last_changed_fleet = list(current)
                 return True
 
             # 仍有重试次数时，等待页面稳定后进入下一轮局部修正。
@@ -126,6 +188,9 @@ class FleetChangeMixin(FleetDetectMixin):
                     _MAX_SET_RETRIES + 1,
                 )
                 time.sleep(0.5)
+                snapshot = self.detect_fleet_snapshot(expected_names=names)
+                current = snapshot.names
+                occupied = snapshot.occupied
 
             # 所有重试都失败时，记录当前舰队并退出。
             else:
@@ -137,24 +202,182 @@ class FleetChangeMixin(FleetDetectMixin):
 
         return False
 
-    # 清理 OCR、YAML 和选船结果中的明确后缀，保留用户自定义舰名。
-    @staticmethod
-    def _normalize_ship_name(value: object) -> str | None:
-        if value is None:
-            return None
-
-        # normalized 依次去掉空格、“·改”和尾部括号别名。
-        normalized = str(value).strip()
-        normalized = normalized.removesuffix('·改')
-        normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized)
-        normalized = normalized.strip()
-        return normalized or None
-
-    # 将同一 No.xxx 舰船组中的标准名和用户自定义名统一为同一身份。
     @classmethod
-    def _ship_identity(cls, value: object) -> str | None:
-        normalized = cls._normalize_ship_name(value)
-        return ship_name_identity(normalized) if normalized is not None else None
+    def _plan_target_options(
+        cls,
+        selectors: list[FleetSlotRule | None],
+        current: Sequence[str | None] = (),
+        unavailable: (
+            set[tuple[int, ShipSelector]] | frozenset[tuple[int, ShipSelector]]
+        ) = frozenset(),
+        locked: dict[int, ShipSelector] | None = None,
+    ) -> list[ShipSelector | None] | None:
+        """按主选优先级规划全局唯一的精确选船规则。"""
+        locked = locked or {}
+        current_identities = {
+            identity for name in current if (identity := ship_name_identity(name)) is not None
+        }
+        slot_options: list[tuple[ShipSelector | None, ...]] = []
+
+        for slot, selector in enumerate(selectors):
+            if selector is None:
+                if slot in locked:
+                    return None
+                slot_options.append((None,))
+                continue
+
+            locked_option = locked.get(slot)
+            if locked_option is not None:
+                if locked_option not in selector.options or (slot, locked_option) in unavailable:
+                    return None
+                slot_options.append((locked_option,))
+                continue
+
+            if selector.primary is not None and (slot, selector.primary) not in unavailable:
+                slot_options.append((selector.primary,))
+                continue
+
+            ranked = [
+                (index, option)
+                for index, option in enumerate(selector.candidates)
+                if (slot, option) not in unavailable
+            ]
+            ranked.sort(
+                key=lambda item: (
+                    ship_name_identity(item[1].name) not in current_identities,
+                    item[0],
+                ),
+            )
+            slot_options.append(tuple(option for _, option in ranked))
+
+        @cache
+        def assign(
+            slot: int,
+            used: tuple[str, ...],
+        ) -> tuple[int, tuple[int, ...], tuple[ShipSelector | None, ...]] | None:
+            if slot >= len(slot_options):
+                return 0, (), ()
+
+            best: tuple[int, tuple[int, ...], tuple[ShipSelector | None, ...]] | None = None
+            used_set = set(used)
+            for rank, option in enumerate(slot_options[slot]):
+                if option is None:
+                    result = assign(slot + 1, used)
+                    identity = None
+                else:
+                    identity = ship_name_identity(option.name)
+                    if identity is None or identity in used_set:
+                        continue
+                    result = assign(slot + 1, tuple(sorted((*used, identity))))
+                if result is None:
+                    continue
+
+                rest_cost, rest_priority, rest_assignment = result
+                replacement_cost = 0 if option is None or identity in current_identities else 1
+                candidate = (
+                    replacement_cost + rest_cost,
+                    (rank, *rest_priority),
+                    (option, *rest_assignment),
+                )
+                if best is None or candidate[:2] < best[:2]:
+                    best = candidate
+            return best
+
+        result = assign(0, ())
+        return list(result[2]) if result is not None else None
+
+    @classmethod
+    def _ocr_target_pool(
+        cls,
+        selectors: Sequence[FleetSlotRule | None],
+    ) -> list[str]:
+        """返回全部主选和备选组成的位置无关 OCR 上下文池。"""
+        pool: list[str] = []
+        seen: set[str] = set()
+        for selector in selectors:
+            if selector is None:
+                continue
+            for option in selector.options:
+                normalized = normalize_ship_name(option.name)
+                identity = ship_name_identity(normalized)
+                if normalized is not None and identity is not None and identity not in seen:
+                    pool.append(normalized)
+                    seen.add(identity)
+        return pool
+
+    @classmethod
+    def _target_names(
+        cls,
+        assigned: Sequence[ShipSelector | None],
+    ) -> list[str | None]:
+        """把精确规则转换为最终逐槽 OCR 使用的标准舰名。"""
+        return [
+            normalize_ship_name(option.name) if option is not None else None for option in assigned
+        ]
+
+    def _detect_initial_snapshot(self, expected_pool: Sequence[str]) -> FleetSnapshot:
+        """初次识别舰队；存在未知占用槽位时再识别一次并保守合并。"""
+        first = self.detect_fleet_snapshot(expected_pool=expected_pool)
+        if not first.unknown_slots:
+            return first
+
+        second = self.detect_fleet_snapshot(expected_pool=expected_pool)
+        names = list(first.names)
+        for slot, second_name in enumerate(second.names):
+            if names[slot] is None and second_name is not None:
+                names[slot] = second_name
+            elif (
+                names[slot] is not None
+                and second_name is not None
+                and ship_name_identity(names[slot]) != ship_name_identity(second_name)
+            ):
+                names[slot] = None
+        occupied = [
+            first_occupied or second_occupied
+            for first_occupied, second_occupied in zip(
+                first.occupied,
+                second.occupied,
+                strict=True,
+            )
+        ]
+        return FleetSnapshot(names=names, occupied=occupied)
+
+    @classmethod
+    def _option_matches_name(
+        cls,
+        current_name: str | None,
+        option: ShipSelector,
+    ) -> bool:
+        """判断准备页舰名是否与一条精确规则属于同一舰船身份。"""
+        return ship_name_identity(current_name) == ship_name_identity(
+            option.name
+        ) and cls._matches_search_name(current_name, option.search_name)
+
+    @classmethod
+    def _validate_assignment(
+        cls,
+        current: Sequence[str | None],
+        occupied: Sequence[bool],
+        assigned: Sequence[ShipSelector | None],
+        verified_slots: set[int] | frozenset[int] = frozenset(),
+    ) -> bool:
+        """验证舰名、占用、位置、唯一性和 strict 选船记录。"""
+        identities = [
+            identity for name in current if (identity := ship_name_identity(name)) is not None
+        ]
+        if len(identities) != len(set(identities)):
+            return False
+
+        for slot, option in enumerate(assigned):
+            if option is None:
+                if occupied[slot] or current[slot] is not None:
+                    return False
+                continue
+            if not occupied[slot] or not cls._option_matches_name(current[slot], option):
+                return False
+            if cls._requires_selection_validation(option) and slot not in verified_slots:
+                return False
+        return True
 
     # 按“已分配舰名优先、其余规则随后”的顺序生成本槽完整规则。
     @classmethod
@@ -163,14 +386,14 @@ class FleetChangeMixin(FleetDetectMixin):
         name: str | None,
         selector: FleetSlotRule | None,
     ) -> list[ShipSelector]:
-        normalized_name = cls._normalize_ship_name(name)
+        normalized_name = normalize_ship_name(name)
         if selector is None:
             return [ShipSelector(name=normalized_name)] if normalized_name else []
 
         options = list(selector.options)
-        target_identity = cls._ship_identity(normalized_name)
+        target_identity = ship_name_identity(normalized_name)
         options.sort(
-            key=lambda option: cls._ship_identity(option.name) != target_identity,
+            key=lambda option: ship_name_identity(option.name) != target_identity,
         )
         return options
 
@@ -184,12 +407,47 @@ class FleetChangeMixin(FleetDetectMixin):
         candidates: list[str] = []
         seen: set[str] = set()
         for option in cls._slot_options(name, selector):
-            normalized = cls._normalize_ship_name(option.name)
-            identity = cls._ship_identity(normalized)
+            normalized = normalize_ship_name(option.name)
+            identity = ship_name_identity(normalized)
             if normalized is not None and identity is not None and identity not in seen:
                 candidates.append(normalized)
                 seen.add(identity)
         return candidates
+
+    @classmethod
+    def _prefer_existing_targets(
+        cls,
+        names: list[str | None],
+        selectors: list[FleetSlotRule | None],
+        current: list[str | None],
+    ) -> list[str | None]:
+        """从每个槽位的候选集合中优先选择当前舰队已有成员。"""
+        preferred = list(names)
+        reused: set[str] = set()
+
+        for slot, selector in enumerate(selectors):
+            if selector is None or names[slot] is None:
+                continue
+
+            for option in selector.options:
+                identity = ship_name_identity(option.name)
+                if identity is None or identity in reused:
+                    continue
+                # strict 舰种/等级条件不能仅凭准备页舰名 OCR 判定满足。
+                if cls._requires_selection_validation(option):
+                    continue
+                if not any(
+                    ship_name_identity(ship) == identity
+                    and cls._matches_search_name(ship, option.search_name)
+                    for ship in current
+                ):
+                    continue
+
+                preferred[slot] = normalize_ship_name(option.name)
+                reused.add(identity)
+                break
+
+        return preferred
 
     # 为六个槽位挑选互不重复的目标舰名，冲突时自动尝试备选。
     @classmethod
@@ -214,7 +472,7 @@ class FleetChangeMixin(FleetDetectMixin):
             if names[slot] is None:
                 return assign(slot + 1, used)
             for candidate in options[slot]:
-                identity = cls._ship_identity(candidate)
+                identity = ship_name_identity(candidate)
                 if identity is None or identity in used:
                     continue
                 assigned[slot] = candidate
@@ -242,7 +500,7 @@ class FleetChangeMixin(FleetDetectMixin):
         if current_name == search_name:
             return True
 
-        return cls._ship_identity(current_name) == cls._ship_identity(search_name)
+        return ship_name_identity(current_name) == ship_name_identity(search_name)
 
     @classmethod
     def _option_for_name(
@@ -251,14 +509,23 @@ class FleetChangeMixin(FleetDetectMixin):
         selector: FleetSlotRule | None,
     ) -> ShipSelector | None:
         """返回与实际舰名对应的独立规则。"""
-        identity = cls._ship_identity(name)
+        identity = ship_name_identity(name)
         return next(
             (
                 option
                 for option in cls._slot_options(name, selector)
-                if cls._ship_identity(option.name) == identity
+                if ship_name_identity(option.name) == identity
             ),
             None,
+        )
+
+    @staticmethod
+    def _requires_selection_validation(option: ShipSelector | None) -> bool:
+        """返回规则是否必须通过选船页校验舰种或等级。"""
+        return bool(
+            option is not None
+            and not option.relaxed_constraints
+            and (option.ship_types or option.min_level is not None or option.max_level is not None)
         )
 
     # 从本槽候选中排除队内同名舰，并返回实际可用于选船的规则。
@@ -280,19 +547,19 @@ class FleetChangeMixin(FleetDetectMixin):
         options = cls._slot_options(name, selector)
         # occupied 保存队内其他槽位已经占用的舰船组身份。
         occupied = {
-            cls._ship_identity(ship)
+            ship_name_identity(ship)
             for idx, ship in enumerate(current)
             if ship is not None and idx != slot_to_replace
         }
         # available 保留当前舰队中尚未占用的完整规则。
         available = [
-            option for option in options if cls._ship_identity(option.name) not in occupied
+            option for option in options if ship_name_identity(option.name) not in occupied
         ]
 
         if len(available) == 0:
             return None, None
 
-        chosen = cls._normalize_ship_name(available[0].name)
+        chosen = normalize_ship_name(available[0].name)
         # 选船页面按顺序尝试未占用规则，各备选使用自己的约束。
         return chosen, tuple(available)
 
@@ -303,6 +570,7 @@ class FleetChangeMixin(FleetDetectMixin):
         current: list[str | None],
         desired: list[str | None],
         selectors: list[FleetSlotRule | None],
+        verified_slots: set[int] | frozenset[int] = frozenset(),
     ) -> tuple[list[bool], set[int]]:
         """在当前舰队与目标槽位之间做一对一匹配。
 
@@ -323,8 +591,10 @@ class FleetChangeMixin(FleetDetectMixin):
         def matches(slot: int, ship: str | None) -> bool:
             selector = selectors[slot]
             option = cls._option_for_name(desired[slot], selector)
-            return cls._ship_identity(ship) == cls._ship_identity(desired[slot]) and (
-                option is None or cls._matches_search_name(ship, option.search_name)
+            return (
+                ship_name_identity(ship) == ship_name_identity(desired[slot])
+                and (option is None or cls._matches_search_name(ship, option.search_name))
+                and (not cls._requires_selection_validation(option) or slot in verified_slots)
             )
 
         # 第一轮优先保留已经位于正确槽位的舰船。
@@ -360,14 +630,18 @@ class FleetChangeMixin(FleetDetectMixin):
         current_name: str | None,
         target: str | None,
         selector: FleetSlotRule | None,
+        *,
+        selection_verified: bool = False,
     ) -> bool:
         # 目标为空时，只有当前槽也为空才算匹配。
         if target is None:
             return current_name is None
         if selector is None:
-            return cls._ship_identity(current_name) == cls._ship_identity(target)
+            return ship_name_identity(current_name) == ship_name_identity(target)
         option = cls._option_for_name(current_name, selector)
         if option is None:
+            return False
+        if cls._requires_selection_validation(option) and not selection_verified:
             return False
         return cls._matches_search_name(
             current_name,
@@ -381,12 +655,21 @@ class FleetChangeMixin(FleetDetectMixin):
         current: list[str | None],
         desired: list[str | None],
         selectors: list[FleetSlotRule | None],
+        verified_slots: set[int] | frozenset[int] = frozenset(),
     ) -> bool:
-        members = [cls._ship_identity(name) for name in current if name is not None]
+        members = [ship_name_identity(name) for name in current if name is not None]
         if len(members) != len(set(members)):
             return False
 
-        return all(cls._slot_matches(current[i], desired[i], selectors[i]) for i in range(6))
+        return all(
+            cls._slot_matches(
+                current[i],
+                desired[i],
+                selectors[i],
+                selection_verified=i in verified_slots,
+            )
+            for i in range(6)
+        )
 
     # 找出当前舰队中需要替换、补充或移除的槽位。
     @classmethod
@@ -395,134 +678,300 @@ class FleetChangeMixin(FleetDetectMixin):
         current: list[str | None],
         names: list[str | None],
         selectors: list[FleetSlotRule | None],
+        verified_slots: set[int] | frozenset[int] = frozenset(),
     ) -> list[int]:
         """返回所有不符合目标规则的槽位下标。"""
-        return [i for i in range(6) if not cls._slot_matches(current[i], names[i], selectors[i])]
+        return [
+            i
+            for i in range(6)
+            if not cls._slot_matches(
+                current[i],
+                names[i],
+                selectors[i],
+                selection_verified=i in verified_slots,
+            )
+        ]
 
-    # 为一个目标槽位选择舰船，并同步更新当前舰队和目标舰名。
-    def _replace_target(
+    @classmethod
+    def _assignment_locations(
+        cls,
+        current: Sequence[str | None],
+        occupied: Sequence[bool],
+        assigned: Sequence[ShipSelector | None],
+        verified_slots: set[int] | frozenset[int],
+    ) -> tuple[set[int], set[int], dict[int, int]]:
+        """定位当前成员对应的逻辑目标，并标记已满足目标。"""
+        protected: set[int] = set()
+        satisfied: set[int] = set()
+        target_positions: dict[int, int] = {}
+
+        for target_slot, option in enumerate(assigned):
+            if option is None:
+                continue
+            positions = [target_slot, *[slot for slot in range(6) if slot != target_slot]]
+            position = next(
+                (
+                    slot
+                    for slot in positions
+                    if slot not in protected
+                    and occupied[slot]
+                    and cls._option_matches_name(current[slot], option)
+                ),
+                None,
+            )
+            if position is None:
+                continue
+            protected.add(position)
+            target_positions[target_slot] = position
+            if not cls._requires_selection_validation(option) or target_slot in verified_slots:
+                satisfied.add(target_slot)
+
+        return protected, satisfied, target_positions
+
+    @classmethod
+    def _target_order(
+        cls,
+        assigned: Sequence[ShipSelector | None],
+        selectors: Sequence[FleetSlotRule | None],
+    ) -> list[int]:
+        """主选目标优先，其余目标按逻辑槽位顺序处理。"""
+        slots = [slot for slot, option in enumerate(assigned) if option is not None]
+        return sorted(
+            slots,
+            key=lambda slot: (
+                selectors[slot] is None
+                or selectors[slot].primary is None
+                or assigned[slot] != selectors[slot].primary,
+                slot,
+            ),
+        )
+
+    @classmethod
+    def _replacement_slot(
+        cls,
+        current: Sequence[str | None],
+        occupied: Sequence[bool],
+        option: ShipSelector,
+        protected: set[int],
+        target_position: int | None,
+        attempted: set[tuple[int, ShipSelector, int]],
+        target_slot: int,
+    ) -> int | None:
+        """选择补船位置：原舰、空槽、多余舰、未知占用。"""
+        if target_position is not None:
+            key = (target_slot, option, target_position)
+            return target_position if key not in attempted else None
+
+        empty_slots = [slot for slot in range(6) if slot not in protected and not occupied[slot]]
+        extra_slots = [
+            slot
+            for slot in range(6)
+            if slot not in protected and occupied[slot] and current[slot] is not None
+        ]
+        normal_slots = [*empty_slots, *extra_slots]
+        if normal_slots and not any(
+            (target_slot, option, slot) in attempted for slot in normal_slots
+        ):
+            return normal_slots[0]
+
+        return next(
+            (
+                slot
+                for slot in range(6)
+                if slot not in protected
+                and occupied[slot]
+                and current[slot] is None
+                and (target_slot, option, slot) not in attempted
+            ),
+            None,
+        )
+
+    def _align_member_set(
         self,
         current: list[str | None],
-        names: list[str | None],
+        occupied: list[bool],
+        assigned: list[ShipSelector | None],
         selectors: list[FleetSlotRule | None],
-        target_slot: int,
-        ship_slot: int | None = None,
+        verified_slots: set[int],
+        unavailable: set[tuple[int, ShipSelector]],
+        locked: dict[int, ShipSelector],
     ) -> None:
-        """选择目标舰船，并更新当前舰队和目标舰名。"""
-        target = names[target_slot]
-        assert target is not None
-        slot = target_slot if ship_slot is None else ship_slot
-        selected_name, selected_selector = self._select_available_candidate(
-            current,
-            target,
-            selectors[target_slot],
-            slot_to_replace=slot,
-        )
-        # 本槽所有候选都被占用时，无法组成目标舰队。
-        if selected_name is None:
-            raise RuntimeError(f'目标槽位 {target_slot} 没有未被占用的候选舰船')
+        """只处理成员集合；不拖拽最终顺序，也不删除多余舰船。"""
+        attempted: set[tuple[int, ShipSelector, int]] = set()
+        for _ in range(48):
+            protected, satisfied, target_positions = self._assignment_locations(
+                current,
+                occupied,
+                assigned,
+                verified_slots,
+            )
+            missing = [
+                slot for slot in self._target_order(assigned, selectors) if slot not in satisfied
+            ]
+            if not missing:
+                return
 
-        _log.info(
-            "[准备页] 更换槽位 {} <- '{}' (原: '{}')",
-            slot,
-            selected_name,
-            current[slot],
+            target_slot = missing[0]
+            option = assigned[target_slot]
+            assert option is not None
+            ship_slot = self._replacement_slot(
+                current,
+                occupied,
+                option,
+                protected,
+                target_positions.get(target_slot),
+                attempted,
+                target_slot,
+            )
+            if ship_slot is None:
+                _log.warning(
+                    "[准备页] 目标槽位 {} 的规则 '{}' 不可用，重新规划备选",
+                    target_slot,
+                    option.name,
+                )
+                unavailable.add((target_slot, option))
+                locked.pop(target_slot, None)
+                verified_slots.discard(target_slot)
+                previous = list(assigned)
+                replanned = self._plan_target_options(
+                    selectors,
+                    current,
+                    unavailable,
+                    locked,
+                )
+                if replanned is None:
+                    raise RuntimeError(
+                        f'目标槽位 {target_slot} 的主选和备选均不可用',
+                    )
+                assigned[:] = replanned
+                for slot, (old, new) in enumerate(
+                    zip(previous, replanned, strict=True),
+                ):
+                    if old != new:
+                        verified_slots.discard(slot)
+                continue
+
+            _log.info(
+                "[准备页] 更换物理槽位 {} <- '{}' (逻辑槽位 {}, 原: '{}')",
+                ship_slot,
+                option.name,
+                target_slot,
+                current[ship_slot],
+            )
+            selection = self._try_select_option(
+                ship_slot,
+                option,
+            )
+            attempted.add((target_slot, option, ship_slot))
+            if selection.name is None:
+                continue
+            if not self._option_matches_name(selection.name, option):
+                raise RuntimeError(
+                    f'选船结果 {selection.name!r} 与规则 {option.name!r} 不一致',
+                )
+
+            current[ship_slot] = selection.name
+            occupied[ship_slot] = True
+            locked[target_slot] = option
+            verified_slots.discard(target_slot)
+            if self._requires_selection_validation(option):
+                verified_slots.add(target_slot)
+            time.sleep(0.3)
+
+        raise RuntimeError('成员集合调整次数超过安全上限')
+
+    def _remove_extra_members(
+        self,
+        current: list[str | None],
+        occupied: list[bool],
+        assigned: Sequence[ShipSelector | None],
+        verified_slots: set[int],
+    ) -> None:
+        """目标成员齐全后，从后往前删除所有多余或未知成员。"""
+        protected, _, _ = self._assignment_locations(
+            current,
+            occupied,
+            assigned,
+            verified_slots,
         )
-        selected = self._change_single_ship(
-            slot,
-            selected_name,
-            selector=selected_selector,
-            slot_occupied=current[slot] is not None,
-        )
-        actual = selected if selected is not None else selected_name
-        current[slot] = actual
-        names[target_slot] = actual
-        time.sleep(0.3)
+        for slot in range(5, -1, -1):
+            if slot in protected or not occupied[slot]:
+                continue
+            _log.info("[准备页] 移除多余槽位 {} 的 '{}'", slot, current[slot])
+            self._change_single_ship(slot, None, slot_occupied=True)
+            current[slot] = None
+            occupied[slot] = False
+            time.sleep(0.3)
+
+    def _refresh_members(
+        self,
+        current: list[str | None],
+        occupied: list[bool],
+        expected_pool: Sequence[str],
+    ) -> None:
+        """删除或替换后重新获取成员集合和占用状态。"""
+        snapshot = self.detect_fleet_snapshot(expected_pool=expected_pool)
+        current[:] = snapshot.names
+        occupied[:] = snapshot.occupied
 
     # 首次调整时完成成员复用、缺员补充、多余成员移除和压缩后补位。
     def _full_align(
         self,
         current: list[str | None],
-        names: list[str | None],
+        occupied: list[bool],
+        assigned: list[ShipSelector | None],
         selectors: list[FleetSlotRule | None],
+        verified_slots: set[int],
+        unavailable: set[tuple[int, ShipSelector]],
+        locked: dict[int, ShipSelector],
+        expected_pool: Sequence[str],
     ) -> None:
-        """首次将当前成员调整成目标成员集合。"""
-        # ok 标记当前可保留位置，matched_slots 标记已满足的目标槽位。
-        ok, matched_slots = self._match_existing_members(current, names, selectors)
+        """首次将当前舰队调整为目标成员集合。"""
+        self._align_member_set(
+            current,
+            occupied,
+            assigned,
+            selectors,
+            verified_slots,
+            unavailable,
+            locked,
+        )
+        self._remove_extra_members(current, occupied, assigned, verified_slots)
+        self._refresh_members(current, occupied, expected_pool)
+        self._align_member_set(
+            current,
+            occupied,
+            assigned,
+            selectors,
+            verified_slots,
+            unavailable,
+            locked,
+        )
 
-        # Step 1：把尚未满足的目标舰船放入可替换槽位。
-        for i, name in enumerate(names):
-            if name is None:
-                continue
-            if i in matched_slots:
-                continue
-            # slot 是当前舰队中第一个不能保留、可以用于替换的位置。
-            slot = next((idx for idx in range(6) if not ok[idx]), None)
-            if slot is None:
-                raise RuntimeError(f"无可用槽位放置目标舰船 '{name}'")
-            self._replace_target(current, names, selectors, i, slot)
-            ok[slot] = True
-            matched_slots.add(i)
-
-        # Step 2：从后往前移除剩余多余舰船，减少槽位压缩影响。
-        for i in range(5, -1, -1):
-            # 当前位置不能保留且仍有舰船时，将该舰船移除。
-            if not ok[i] and current[i] is not None:
-                _log.info("[准备页] 移除槽位 {} 的 '{}'", i, current[i])
-                self._change_single_ship(i, None, slot_occupied=True)
-                current[i] = None
-                time.sleep(0.3)
-
-        # Step 3：重新 OCR，检查删除舰船造成的槽位压缩和缺员。
-        current[:] = self.detect_fleet(expected_names=names)
-        target_count = sum(1 for v in names if v is not None)
-        current_count = sum(1 for v in current if v is not None)
-        # 实际舰船少于目标数量时，逐槽补齐缺少成员。
-        if current_count < target_count:
-            for i, name in enumerate(names):
-                if name is None:
-                    continue
-                if current[i] is not None:
-                    continue
-                self._replace_target(current, names, selectors, i)
-
-                current_count = sum(1 for v in current if v is not None)
-                if current_count >= target_count:
-                    break
-
-    # OCR 验证失败后，只替换或移除不符合目标的槽位。
+    # OCR 验证失败后，只修正成员集合，不在此阶段拖拽排序。
     def _local_fix(
         self,
         current: list[str | None],
-        names: list[str | None],
+        occupied: list[bool],
+        assigned: list[ShipSelector | None],
         selectors: list[FleetSlotRule | None],
+        verified_slots: set[int],
+        unavailable: set[tuple[int, ShipSelector]],
+        locked: dict[int, ShipSelector],
+        expected_pool: Sequence[str],
     ) -> None:
-        """只修正本轮识别出的错误槽位。"""
-        # wrong 保存所有需要替换、补充或移除的槽位。
-        wrong = self._find_wrong_slots(current, names, selectors)
-        if not wrong:
-            return
-
-        _log.info('[准备页] 局部修正: 错误槽位 {}', wrong)
-
-        # 先完成替换/补员，再移除多余舰船。1 队只剩最后一艘时，
-        # 这能保证槽位 0 直接替换，不会先进入空队状态。
-        replacement_slots = [i for i in wrong if names[i] is not None]
-        removal_slots = [i for i in wrong if names[i] is None]
-
-        # Step 1：先替换和补船，避免一队在移除时变成空队。
-        for i in replacement_slots:
-            self._replace_target(current, names, selectors, i)
-
-        # Step 2：再从后往前移除目标为空的多余舰船。
-        for i in reversed(removal_slots):
-            # 当前槽位已经为空时，不重复进入选船页面。
-            if current[i] is None:
-                continue
-            _log.info("[准备页] 局部修正: 移除槽位 {} 的 '{}'", i, current[i])
-            self._change_single_ship(i, None, slot_occupied=True)
-            current[i] = None
-            time.sleep(0.3)
+        """重试时重新补齐成员，再清理多余成员。"""
+        self._align_member_set(
+            current,
+            occupied,
+            assigned,
+            selectors,
+            verified_slots,
+            unavailable,
+            locked,
+        )
+        self._remove_extra_members(current, occupied, assigned, verified_slots)
+        self._refresh_members(current, occupied, expected_pool)
 
     # 从左到右拖拽舰船，使当前舰队顺序与目标槽位一致。
     def _reorder(
@@ -535,14 +984,14 @@ class FleetChangeMixin(FleetDetectMixin):
             target = desired[i]
             if target is None:
                 break
-            target_identity = self._ship_identity(target)
-            if self._ship_identity(current[i]) == target_identity:
+            target_identity = ship_name_identity(target)
+            if ship_name_identity(current[i]) == target_identity:
                 continue
             try:
                 src = next(
                     idx
                     for idx, current_name in enumerate(current)
-                    if self._ship_identity(current_name) == target_identity
+                    if ship_name_identity(current_name) == target_identity
                 )
             # 当前舰队中找不到目标舰船时，保留现场交给最终验证处理。
             except StopIteration:
@@ -580,6 +1029,52 @@ class FleetChangeMixin(FleetDetectMixin):
         current.insert(dst, ship)
         time.sleep(0.5)
 
+    def _open_choose_page(self, slot: int) -> ChooseShipPage:
+        """打开指定物理槽位的选船页面。"""
+        from autowsgr.ui.choose_ship_page import ChooseShipPage
+        from autowsgr.ui.utils import wait_for_page
+
+        self.click_ship_slot(slot)
+        wait_for_page(
+            self._ctrl,
+            ChooseShipPage.is_current_page,
+            timeout=_CHOOSE_PAGE_TIMEOUT,
+            source='编队',
+            target='编队选船',
+        )
+        return ChooseShipPage(self._ctx)
+
+    def _cancel_choose_page(self) -> None:
+        """规则未命中时退出选船页，恢复到编队准备页。"""
+        from autowsgr.ui.utils import wait_for_page
+
+        self._ctrl.click(*CLICK_BACK)
+        wait_for_page(
+            self._ctrl,
+            self.is_current_page,
+            timeout=_CHOOSE_PAGE_TIMEOUT,
+            source='编队选船',
+            target='编队',
+        )
+
+    def _try_select_option(
+        self,
+        slot: int,
+        option: ShipSelector,
+    ) -> _ShipSelection:
+        """尝试一条精确规则；未命中返回 None，技术异常直接上抛。"""
+        if self._ctx.ocr is None:
+            raise RuntimeError('智能换船需要 OCR 引擎')
+
+        choose_page = self._open_choose_page(slot)
+        selected = choose_page.change_single_ship(
+            option,
+            use_search=self._use_search,
+        )
+        if selected is None:
+            self._cancel_choose_page()
+        return _ShipSelection(name=selected, option=option)
+
     # 打开指定槽位的选船页面，完成单艘舰船的选择或移除。
     def _change_single_ship(
         self,
@@ -590,24 +1085,12 @@ class FleetChangeMixin(FleetDetectMixin):
         slot_occupied: bool = True,
     ) -> str | None:
         """返回选船页面实际选中的舰名。"""
-        from autowsgr.ui.choose_ship_page import ChooseShipPage
-        from autowsgr.ui.utils import wait_for_page
-
         # 目标为空且当前槽位也为空时，不需要打开选船页面。
         if name is None and not slot_occupied:
             return None
 
-        # 点击目标槽位并等待选船页面加载完成。
-        self.click_ship_slot(slot)
-        wait_for_page(
-            self._ctrl,
-            ChooseShipPage.is_current_page,
-            timeout=_CHOOSE_PAGE_TIMEOUT,
-            source='编队',
-            target='编队选船',
-        )
         # FleetChange 决定候选顺序，页面每次只执行一条明确规则。
-        choose_page = ChooseShipPage(self._ctx)
+        choose_page = self._open_choose_page(slot)
         if name is None:
             return choose_page.change_single_ship(None, use_search=self._use_search)
 
@@ -621,5 +1104,6 @@ class FleetChangeMixin(FleetDetectMixin):
                 return selected
 
         candidates = [option.name for option in options]
+        self._cancel_choose_page()
         _log.error('[准备页] 未在选船列表中找到满足规则的候选: {}', candidates)
         raise RuntimeError(f'未找到满足条件的目标舰船: {candidates}')

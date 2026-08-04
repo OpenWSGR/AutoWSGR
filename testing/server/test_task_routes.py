@@ -9,19 +9,31 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi import HTTPException
 
+from autowsgr import ops
+from autowsgr.combat import CombatResult
+from autowsgr.combat.fleet import FleetSelectionSource, ResolvedFleetSelection
 from autowsgr.server import main as server_main
 from autowsgr.server.device_lease import DeviceOperationBusyError
 from autowsgr.server.routes import task
 from autowsgr.server.schemas import (
     ApiResponse,
     CampaignRequest,
+    CombatPlanRequest,
     DecisiveRequest,
     EventFightRequest,
     ExerciseRequest,
+    FleetRuleRequest,
     NormalFightRequest,
     RoundResult,
     TaskStatusResponse,
 )
+from autowsgr.types import ConditionFlag, ShipType
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from autowsgr.server.task_manager import TaskOutcome
 
 
 if TYPE_CHECKING:
@@ -38,26 +50,35 @@ class _TaskManager:
 
 @dataclass
 class _ExecutingTaskManager:
+    """同步执行 route 创建的 executor，避免测试启动后台线程。"""
+    is_running: bool = False
+    stop_event: object = field(default_factory=object)
     outcome: TaskOutcome | None = None
+    results: list[dict[str, Any]] = field(default_factory=list)
 
-    def should_stop(self) -> bool:
+    @staticmethod
+    def should_stop() -> bool:
         return False
 
-    def update_progress(self, **_progress: object) -> None:
+    @staticmethod
+    def update_progress(**_progress: object) -> None:
         return None
 
-    def add_result(self, _result: dict[str, Any]) -> None:
-        return None
+    def add_result(self, result: dict[str, Any]) -> None:
+        self.results.append(result)
 
     def start_task(
         self,
-        task_type: str,
-        total_rounds: int,
-        executor: Callable[[object], TaskOutcome],
+        *args: object,
+        task_type: str | None = None,
+        total_rounds: int | None = None,
+        executor: Callable[[object], TaskOutcome] | None = None,
     ) -> str:
-        del task_type, total_rounds
+        if args:
+            task_type, total_rounds, executor = args  # type: ignore[misc]
+        assert executor is not None
         self.outcome = executor(object())
-        return 'task_decisive'
+        return 'task_test'
 
 
 def test_task_start_rejects_concurrent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -274,3 +295,134 @@ def test_task_status_returns_typed_envelope(monkeypatch: pytest.MonkeyPatch) -> 
         'success': True,
         'data': status,
     }
+@pytest.mark.parametrize(
+    'route_case',
+    [
+        ('_start_normal_fight', NormalFightRequest, 'run_normal_fight'),
+        ('_start_event_fight', EventFightRequest, 'run_event_fight'),
+    ],
+)
+@pytest.mark.parametrize(
+    ('fleet_source', 'expected_source', 'expected_name'),
+    [
+        ('api_rules', FleetSelectionSource.OVERRIDE_RULES, 'API规则舰'),
+        ('api_fleet', FleetSelectionSource.OVERRIDE_FLEET, 'API普通舰'),
+        ('yaml_preset', FleetSelectionSource.PLAN_PRESET, 'YAML预设舰'),
+        ('yaml_fleet', FleetSelectionSource.PLAN_FLEET, 'YAML普通舰'),
+    ],
+)
+def test_fight_routes_resolve_all_fleet_sources_before_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    route_case: tuple[
+        str,
+        type[NormalFightRequest | EventFightRequest],
+        str,
+    ],
+    fleet_source: str,
+    expected_source: FleetSelectionSource,
+    expected_name: str,
+) -> None:
+    """normal/event route 都只向 runner 传递解析完成的 canonical selection。"""
+    helper_name, request_type, run_name = route_case
+    manager = _ExecutingTaskManager()
+    captured: list[ResolvedFleetSelection] = []
+
+    def run_fight(
+        _ctx: object,
+        _plan: object,
+        *,
+        times: int,
+        fleet_selection: ResolvedFleetSelection,
+    ) -> list[CombatResult]:
+        assert times == 1
+        captured.append(fleet_selection)
+        return [CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)]
+
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, run_name, run_fight)
+
+    if fleet_source == 'api_rules':
+        plan_request = CombatPlanRequest(
+            fleet_id=3,
+            fleet=['被规则覆盖的API舰'],
+            fleet_rules=[
+                FleetRuleRequest(
+                    name=expected_name,
+                    ship_type=['kp'],
+                    min_level=90,
+                ),
+            ],
+        )
+        request = request_type(plan=plan_request)
+    elif fleet_source == 'api_fleet':
+        request = request_type(
+            plan=CombatPlanRequest(
+                fleet_id=3,
+                fleet=[expected_name],
+            ),
+        )
+    else:
+        yaml_path = tmp_path / f'{fleet_source}.yaml'
+        preset = (
+            '\nfleet_presets:\n'
+            '  - name: route测试\n'
+            '    ships:\n'
+            f'      - name: {expected_name}\n'
+            '        ship_type: [cg]\n'
+            if fleet_source == 'yaml_preset'
+            else ''
+        )
+        yaml_path.write_text(
+            f'chapter: 1\nmap: 1\nfleet_id: 2\nfleet:\n  - {expected_name}\n{preset}',
+            encoding='utf-8',
+        )
+        request = request_type(plan_id=str(yaml_path))
+
+    response = asyncio.run(getattr(task, helper_name)(object(), request))
+
+    assert response.success is True
+    assert manager.outcome is not None
+    assert manager.outcome.success is True
+    assert len(captured) == 1
+    selection = captured[0]
+    assert selection.source is expected_source
+    assert selection.fleet_id == (3 if fleet_source.startswith('api_') else 2)
+    assert selection.primary_names == [expected_name]
+    if fleet_source == 'api_rules':
+        assert selection.slot_rules is not None
+        assert selection.slot_rules[0].primary is not None
+        assert selection.slot_rules[0].primary.ship_types == (ShipType.KP,)
+    elif fleet_source == 'yaml_preset':
+        assert selection.slot_rules is not None
+        assert selection.slot_rules[0].primary is not None
+        assert selection.slot_rules[0].primary.ship_types == (ShipType.CG,)
+
+
+def test_event_route_top_level_fleet_id_overrides_api_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = _ExecutingTaskManager()
+    captured: list[ResolvedFleetSelection] = []
+
+    def run_event_fight(
+        _ctx: object,
+        _plan: object,
+        *,
+        times: int,
+        fleet_selection: ResolvedFleetSelection,
+    ) -> list[CombatResult]:
+        assert times == 1
+        captured.append(fleet_selection)
+        return [CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)]
+
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'run_event_fight', run_event_fight)
+    request = EventFightRequest(
+        plan=CombatPlanRequest(fleet_id=3, fleet=['岛风']),
+        fleet_id=5,
+    )
+
+    asyncio.run(task._start_event_fight(object(), request))
+
+    assert captured[0].fleet_id == 5

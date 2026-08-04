@@ -83,7 +83,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "adbutils", specifier = ">=2.0,<3.0" },
-    { name = "autowsgr-native", specifier = ">=0.2.0" },
+    { name = "autowsgr-native", specifier = ">=0.3.0" },
     { name = "av", specifier = ">=12.0" },
     { name = "easyocr", specifier = ">=1.7.1" },
     { name = "fastapi", specifier = ">=0.100.0" },

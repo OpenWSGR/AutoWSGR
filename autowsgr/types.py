@@ -331,13 +331,13 @@ class ShipType(StrEnum):
     SSG = '导潜'
     SS = '潜艇'
     SC = '炮潜'
-    NAP = '补给'
+    AP = '补给'
     ASDG = '导驱'
     AADG = '防驱'
     KP = '导巡'
     CG = '防巡'
-    CBG = '大巡'
-    BG = '导战'
+    BG = '大巡'
+    BBG = '导战'
     Other = '其他'
 
     @property
@@ -359,13 +359,13 @@ class ShipType(StrEnum):
             ShipType.SSG: (0.738, 0.379),
             ShipType.SS: (0.830, 0.379),
             ShipType.SC: (0.922, 0.379),
-            ShipType.NAP: (0.555, 0.470),
+            ShipType.AP: (0.555, 0.470),
             ShipType.ASDG: (0.646, 0.470),
             ShipType.AADG: (0.738, 0.470),
             ShipType.KP: (0.830, 0.470),
             ShipType.CG: (0.922, 0.470),
-            ShipType.CBG: (0.555, 0.561),
-            ShipType.BG: (0.646, 0.561),
+            ShipType.BG: (0.555, 0.561),
+            ShipType.BBG: (0.646, 0.561),
             ShipType.Other: (0.738, 0.561),
         }
         return _map[self]

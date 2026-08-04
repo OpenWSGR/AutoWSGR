@@ -53,7 +53,7 @@ _LEGACY_TOPLEVEL_DROPPED: tuple[str, ...] = (
 def _is_empty_fleet_slot(value: object) -> bool:
     """是否是 fleet 的"空槽位" (``None`` / 空串 / 纯空白)。
 
-    与 :func:`autowsgr.ui.battle.fleet_change._normalize_ship_name` 的
+    与 :func:`autowsgr.constants.normalize_ship_name` 的
     空判定一致: 这些值在运行期都会被归一化为 ``None`` (该槽位留空)。
     """
     if value is None:
@@ -259,7 +259,7 @@ def _migrate_plan_fleet(data: dict[str, Any]) -> None:
     并触发 ``_reorder`` 的 ``break`` 致验证反复重试 ("卡很多次 fleet 验证")。
     本函数剥离所有前导"空槽位", 让经典写法直接生效。
 
-    中间 / 尾部的 ``""`` 原样保留 —— 运行期 ``_normalize_ship_name`` 会把
+    中间 / 尾部的 ``""`` 原样保留 —— 运行期 ``normalize_ship_name`` 会把
     它们归一化为 ``None`` (= 不关心该槽位), 无需在此处理。
     """
     fleet = data.get('fleet')

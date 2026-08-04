@@ -1,12 +1,15 @@
 """后端编队请求契约的定向测试。"""
 
 import pytest
+from autowsgr_native.vessel_type import VesselType
 from pydantic import ValidationError
 
 from autowsgr.combat import CombatPlan
 from autowsgr.combat.fleet import (
+    NATIVE_VESSEL_TYPE_BY_CODE,
     FleetSelectionSource,
     fleet_slot_from_api,
+    ship_type_from_native,
 )
 from autowsgr.server.schemas import (
     CombatPlanRequest,
@@ -135,13 +138,29 @@ def test_invalid_candidate_ship_type_is_rejected():
 @pytest.mark.parametrize(
     ('code', 'expected'),
     [
-        ('ap', (ShipType.NAP,)),
-        ('bbg', (ShipType.BG,)),
+        ('aadg', (ShipType.AADG,)),
+        ('ap', (ShipType.AP,)),
+        ('asdg', (ShipType.ASDG,)),
+        ('av', (ShipType.AV,)),
+        ('bb', (ShipType.BB,)),
+        ('bbg', (ShipType.BBG,)),
+        ('bbv', (ShipType.BBV,)),
+        ('bc', (ShipType.BC,)),
+        ('bg', (ShipType.BG,)),
+        ('bm', (ShipType.BM,)),
+        ('ca', (ShipType.CA,)),
+        ('cav', (ShipType.CAV,)),
+        ('cg', (ShipType.CG,)),
+        ('cl', (ShipType.CL,)),
+        ('clt', (ShipType.CLT,)),
+        ('cv', (ShipType.CV,)),
+        ('cvl', (ShipType.CVL,)),
+        ('dd', (ShipType.DD,)),
+        ('kp', (ShipType.KP,)),
         ('sc', (ShipType.SC,)),
-        ('ddg', (ShipType.ASDG,)),
-        ('ddgaa', (ShipType.AADG,)),
-        ('cg', (ShipType.KP,)),
-        ('cgaa', (ShipType.CG,)),
+        ('ss', (ShipType.SS,)),
+        ('ssg', (ShipType.SSG,)),
+        ('ss_or_ssg', (ShipType.SS, ShipType.SSG)),
     ],
 )
 def test_api_ship_type_code_maps_to_domain_enum(
@@ -155,9 +174,78 @@ def test_api_ship_type_code_maps_to_domain_enum(
     assert slot.primary.ship_types == expected
 
 
-def test_removed_cf_ship_type_is_rejected():
+@pytest.mark.parametrize(
+    ('native_type', 'expected'),
+    [
+        (VesselType.AADG, ShipType.AADG),
+        (VesselType.AP, ShipType.AP),
+        (VesselType.ASDG, ShipType.ASDG),
+        (VesselType.AV, ShipType.AV),
+        (VesselType.BB, ShipType.BB),
+        (VesselType.BBG, ShipType.BBG),
+        (VesselType.BBV, ShipType.BBV),
+        (VesselType.BC, ShipType.BC),
+        (VesselType.BG, ShipType.BG),
+        (VesselType.BM, ShipType.BM),
+        (VesselType.CA, ShipType.CA),
+        (VesselType.CAV, ShipType.CAV),
+        (VesselType.CG, ShipType.CG),
+        (VesselType.CL, ShipType.CL),
+        (VesselType.CLT, ShipType.CLT),
+        (VesselType.CV, ShipType.CV),
+        (VesselType.CVL, ShipType.CVL),
+        (VesselType.DD, ShipType.DD),
+        (VesselType.KP, ShipType.KP),
+        (VesselType.SC, ShipType.SC),
+        (VesselType.SS, ShipType.SS),
+        (VesselType.SSG, ShipType.SSG),
+    ],
+)
+def test_native_vessel_type_maps_to_domain_enum(
+    native_type: VesselType,
+    expected: ShipType,
+):
+    assert ship_type_from_native(native_type) is expected
+    assert native_type.as_english() == expected.name
+    assert native_type.as_chinese() == expected.value
+
+
+def test_native_fleet_codes_are_complete():
+    assert set(NATIVE_VESSEL_TYPE_BY_CODE) == {
+        'cv',
+        'cvl',
+        'av',
+        'bb',
+        'bbv',
+        'bc',
+        'ca',
+        'cav',
+        'clt',
+        'cl',
+        'bm',
+        'dd',
+        'ssg',
+        'ss',
+        'sc',
+        'ap',
+        'asdg',
+        'aadg',
+        'kp',
+        'cg',
+        'bg',
+        'bbg',
+    }
+
+
+def test_non_fleet_native_type_is_rejected():
+    with pytest.raises(ValueError, match='不支持的 native 舰种'):
+        ship_type_from_native(VesselType.Airfield)
+
+
+@pytest.mark.parametrize('code', ['cf', 'cgaa', 'cbg', 'ddg', 'ddgaa'])
+def test_noncanonical_ship_type_is_rejected(code: str):
     with pytest.raises(ValidationError, match='ship_type 不合法'):
-        FleetRuleRequest.model_validate({'name': '测试舰船', 'ship_type': ['cf']})
+        FleetRuleRequest.model_validate({'name': '测试舰船', 'ship_type': [code]})
 
 
 def test_yaml_and_api_candidate_only_rules_share_canonical_model():
@@ -203,11 +291,7 @@ def test_event_fleet_id_priority_is_resolved_at_server_boundary(
 ):
     """活动顶层覆盖、API plan 和 YAML plan 使用统一优先级。"""
     plan = CombatPlan(fleet_id=plan_id)
-    request = (
-        CombatPlanRequest(fleet_id=request_id)
-        if request_id is not None
-        else None
-    )
+    request = CombatPlanRequest(fleet_id=request_id) if request_id is not None else None
 
     selection = build_fleet_selection(
         plan,
@@ -262,4 +346,29 @@ def test_api_combat_plan_parses_event_entrance_and_node_fields():
     assert plan.default_node.SL_when_spot_enemy_fails is True
     assert plan.default_node.formation_when_spot_enemy_fails.value == 3
     assert plan.nodes['A'].formation_rules is not None
+    assert plan.nodes['A'].enemy_rules is not None
+    assert plan.nodes['A'].SL_when_spot_enemy_fails is True
+    assert plan.nodes['A'].formation_when_spot_enemy_fails.value == 3
     assert plan.nodes['A'].SL_when_enter_fight is True
+
+
+def test_api_node_args_inherit_defaults_and_keep_explicit_overrides():
+    request = CombatPlanRequest(
+        node_defaults=NodeDecisionRequest(
+            formation=4,
+            night=True,
+            detour=True,
+        ),
+        node_args={
+            'A': NodeDecisionRequest(
+                formation=3,
+                detour=False,
+            ),
+        },
+    )
+
+    decision = build_combat_plan(request).nodes['A']
+
+    assert decision.formation.value == 3
+    assert decision.night is True
+    assert decision.detour is False

@@ -1,7 +1,12 @@
 import os
+import re
 from collections.abc import Mapping
 
 from autowsgr.infra import load_yaml
+
+
+SHIP_NAME_SUFFIXES: tuple[str, ...] = ('·改',)
+_SHIP_ALIAS_SUFFIX_RE = re.compile(r'\s*[（(][^（）()]*[)）]\s*$')
 
 
 def process_dict(d: dict) -> list[str]:
@@ -86,9 +91,30 @@ def canonical_ship_name(name: str) -> str:
     return get_ship_name_variants(name)[0]
 
 
-def ship_name_identity(name: str) -> str:
+def normalize_ship_name(value: object) -> str | None:
+    """统一舰名文本，处理空值、登记别名和明确的显示后缀。"""
+    if value is None:
+        return None
+
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+
+    normalized = canonical_ship_name(normalized)
+    for suffix in SHIP_NAME_SUFFIXES:
+        normalized = normalized.removesuffix(suffix)
+    normalized = _SHIP_ALIAS_SUFFIX_RE.sub('', normalized).strip()
+    if not normalized:
+        return None
+    return canonical_ship_name(normalized)
+
+
+def ship_name_identity(value: object) -> str | None:
     """返回用于同船唯一性判断的稳定身份。"""
-    return get_ship_name_group_id(name) or name
+    normalized = normalize_ship_name(value)
+    if normalized is None:
+        return None
+    return get_ship_name_group_id(normalized) or normalized
 
 
 def expand_ship_name_candidates(candidates: list[str]) -> list[str]:
