@@ -120,6 +120,8 @@ def test_api_accepts_legacy_candidate_names():
     slot = fleet_slot_from_api(rule.model_dump(exclude_none=True))
     assert slot.primary is None
     assert [candidate.name for candidate in slot.candidates] == ['岛风', '雪风']
+    assert all(candidate.ship_types == (ShipType.DD,) for candidate in slot.candidates)
+    assert all(candidate.min_level == 80 for candidate in slot.candidates)
 
 
 def test_invalid_candidate_ship_type_is_rejected():

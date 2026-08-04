@@ -206,6 +206,22 @@ class _BattlePreparationPage:
 
 
 class TestFleetSelectionCallChain:
+    def test_runner_constructor_keeps_legacy_fleet_arguments(self):
+        plan = CombatPlan.from_dict({'fleet': ['岛风']})
+        runner = NormalFightRunner(_make_ctx(), plan, fleet_id=2)
+
+        assert runner._fleet_id == 2
+        assert runner._fleet_selection.plain_fleet == ('岛风',)
+
+    def test_event_runner_constructor_keeps_legacy_fleet_arguments(self):
+        from autowsgr.ops.event_fight import EventFightRunner
+
+        plan = CombatPlan.from_dict({'chapter': 'H', 'map': '1a', 'fleet': ['岛风']})
+        runner = EventFightRunner(_make_ctx(), plan, fleet_id=2)
+
+        assert runner._fleet_id == 2
+        assert runner._fleet_selection.plain_fleet == ('岛风',)
+
     def _prepare(
         self,
         monkeypatch: pytest.MonkeyPatch,
