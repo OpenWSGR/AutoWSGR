@@ -25,6 +25,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from autowsgr.context import GameContext
@@ -69,6 +70,8 @@ class Launcher:
     def load_config(self) -> UserConfig:
         """从 YAML 加载配置并初始化日志。
 
+        配置文件不存在时使用内置默认配置。
+
         如果构造时未传入 ``config_path``，将由 :class:`ConfigManager`
         自动检测当前目录下的 ``usersettings.yaml``；若也不存在则
         使用内置默认配置。
@@ -82,7 +85,7 @@ class Launcher:
         setup_logger(
             log_cfg.dir,
             log_cfg.level,
-            save_images=False,
+            save_images=os.getenv('AUTOWSGR_SAVE_IMAGES', '').lower() == 'true',
             channels=log_cfg.effective_channels or None,
         )
         ch_summary = log_cfg.effective_channels
@@ -136,7 +139,13 @@ class Launcher:
         """根据配置创建 EasyOCR 引擎。"""
         cfg = self.config
         _log.info('[Launcher] 创建 EasyOCR 引擎')
-        self._ocr = EasyOCREngine.create(gpu=cfg.ocr.gpu, mirror=cfg.ocr.mirror)
+        gpu = cfg.ocr.gpu
+        gpu_override = os.getenv('AUTOWSGR_OCR_GPU_MODE', '').lower()
+        if gpu_override == 'cuda':
+            gpu = True
+        elif gpu_override == 'cpu':
+            gpu = False
+        self._ocr = EasyOCREngine.create(gpu=gpu, mirror=cfg.ocr.mirror)
         # 同步船池感知匹配置信度到 ocr 模块
         from autowsgr.vision.ocr import set_ship_name_match_confidence
         from autowsgr.vision.ocr_rules import (

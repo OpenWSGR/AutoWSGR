@@ -105,7 +105,8 @@ def test_system_start_reports_launch_failure(
     """Launch errors leave the global context unpublished."""
     scheduler_module = types.ModuleType('autowsgr.scheduler')
 
-    def launch(_config_path: str) -> object:
+    def launch(*, config_path: str) -> object:
+        assert config_path == 'usersettings.yaml'
         raise RuntimeError('launch failed')
 
     scheduler_module.launch = launch  # type: ignore[attr-defined]
