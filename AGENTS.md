@@ -98,4 +98,8 @@ uv build
 - 推送最新代码前必须先创建备份，并使用 `git push --force-with-lease` 更新 `ShiinaKuroko`，禁止无条件 `--force`。
 - 任何删除远程分支的操作都必须先列出将被删除的分支、提交和原因；禁止删除 `main`、`ShiinaKuroko` 或未明确授权的分支。
 - 新功能必须在独立分支或 worktree 中开发，完成测试后才能合并或推送到 `ShiinaKuroko`。
+- 本地独立开发分支只能用于编码、测试和审查，禁止直接推送到 Fork 的任何发布分支。
+- 本地独立分支完成后，必须将已验证提交合并、cherry-pick 或 rebase 整理到本地 `ShiinaKuroko` 分支；只有本地 `ShiinaKuroko` 分支允许执行 `git push origin ShiinaKuroko`。
+- 不得执行 `git push origin <local-feature-branch>` 作为发布流程；远程临时分支如确有协作需要，必须获得明确授权，并不得替代 `ShiinaKuroko` 发布入口。
+- 推送前必须确认当前分支为本地 `ShiinaKuroko`，且 `git log origin/ShiinaKuroko..ShiinaKuroko` 只包含本次计划发布的提交。
 - 后端发布至少执行 `pytest -q` 和 `git diff --check`；无法执行的检查必须在交付说明中明确记录。
