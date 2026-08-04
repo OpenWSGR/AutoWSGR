@@ -20,14 +20,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from autowsgr.combat import CombatPlan, CombatResult
+from autowsgr.combat.fleet import (
+    FleetSlotRule,
+    ResolvedFleetSelection,
+    resolve_fleet_selection,
+)
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.normal_fight import NormalFightRunner
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from autowsgr.context import GameContext
 
 _log = get_logger('ops')
@@ -63,13 +70,11 @@ class EventFightRunner(NormalFightRunner):
         self,
         ctx: GameContext,
         plan: CombatPlan,
+        fleet_selection: ResolvedFleetSelection,
         *,
         map_code: str | None = None,  # noqa: ARG002 - 已废弃, 仅为兼容旧签名保留
         entrance: Literal['alpha', 'beta'] | None = None,
         event_name: str | None = None,
-        fleet_id: int | None = None,
-        fleet: list[str] | None = None,
-        fleet_rules: list[Any] | None = None,
     ) -> None:
         # entrance override: 覆盖 plan.entrance (UI 层 a/b ↔ α/β)
         if entrance is not None:
@@ -80,9 +85,7 @@ class EventFightRunner(NormalFightRunner):
         super().__init__(
             ctx,
             plan,
-            fleet_id=fleet_id,
-            fleet=fleet,
-            fleet_rules=fleet_rules,
+            fleet_selection,
         )
 
 
@@ -100,8 +103,9 @@ def run_event_fight(
     times: int = 1,
     gap: float = 0.0,
     fleet_id: int | None = None,
-    fleet: list[str] | None = None,
-    fleet_rules: list[Any] | None = None,
+    fleet: Sequence[str] | None = None,
+    fleet_rules: Sequence[FleetSlotRule] | None = None,
+    fleet_selection: ResolvedFleetSelection | None = None,
 ) -> list[CombatResult]:
     """执行活动战的便捷函数 (兼容入口, 委托 :class:`NormalFightRunner`)。
 
@@ -127,14 +131,18 @@ def run_event_fight(
     -------
     list[CombatResult]
     """
+    resolved_selection = fleet_selection or resolve_fleet_selection(
+        plan,
+        fleet_id=fleet_id,
+        fleet=fleet,
+        slot_rules=fleet_rules,
+    )
     runner = EventFightRunner(
         ctx,
         plan,
+        resolved_selection,
         map_code=map_code,
         entrance=entrance,
-        fleet_id=fleet_id,
-        fleet=fleet,
-        fleet_rules=fleet_rules,
     )
     return runner.run_for_times(times, gap=gap)
 
@@ -147,8 +155,8 @@ def run_event_fight_from_yaml(
     entrance: Literal['alpha', 'beta'] | None = None,
     times: int = 1,
     fleet_id: int | None = None,
-    fleet: list[str] | None = None,
-    fleet_rules: list[Any] | None = None,
+    fleet: Sequence[str] | None = None,
+    fleet_rules: Sequence[FleetSlotRule] | None = None,
 ) -> list[CombatResult]:
     """从 YAML 文件加载计划并执行活动战 (兼容入口)。
 

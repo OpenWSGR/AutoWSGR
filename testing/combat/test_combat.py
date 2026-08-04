@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from autowsgr.combat.actions import check_blood
+from autowsgr.combat.fleet import FleetSlotRule, ShipSelector
 from autowsgr.combat.history import (
     CombatEvent,
     CombatHistory,
@@ -36,7 +37,7 @@ from autowsgr.combat.state import (
     build_transitions,
     resolve_successors,
 )
-from autowsgr.types import Formation, RepairMode, ShipDamageState
+from autowsgr.types import Formation, RepairMode, ShipDamageState, ShipType
 
 
 if TYPE_CHECKING:
@@ -451,7 +452,7 @@ class TestFleetPresetsParsing:
     def test_empty_presets_is_preserved(self):
         """空列表由上层决定业务含义。"""
         plan = CombatPlan.from_dict({'fleet_presets': []})
-        assert plan.fleet_presets == []
+        assert plan.fleet_presets == ()
 
     def test_preset_content_is_normalized(self):
         """旧字符串候选迁移为显式主选和完整备选规则。"""
@@ -473,31 +474,31 @@ class TestFleetPresetsParsing:
             },
         )
 
-        assert plan.fleet_presets == [
-            {
-                'name': '测试舰队',
-                'ships': [
-                    '飞龙·改',
-                    {
-                        'name': '岛风',
-                        'candidates': [
-                            {
-                                'name': '黑潮',
-                                'ship_type': ['dd'],
-                                'min_level': 100,
-                            },
-                            {
-                                'name': '岛风',
-                                'ship_type': ['dd'],
-                                'min_level': 100,
-                            },
-                        ],
-                        'ship_type': ['dd'],
-                        'min_level': 100,
-                    },
-                ],
-            },
-        ]
+        assert plan.fleet_presets is not None
+        preset = plan.fleet_presets[0]
+        assert preset.name == '测试舰队'
+        assert preset.slots[0] == FleetSlotRule(primary=ShipSelector(name='飞龙·改'))
+        assert preset.slots[1] == FleetSlotRule(
+            primary=ShipSelector(
+                name='岛风',
+                ship_types=(ShipType.DD,),
+                min_level=100,
+            ),
+            candidates=(
+                ShipSelector(
+                    name='黑潮',
+                    ship_types=(ShipType.DD,),
+                    min_level=100,
+                    relaxed_constraints=True,
+                ),
+                ShipSelector(
+                    name='岛风',
+                    ship_types=(ShipType.DD,),
+                    min_level=100,
+                    relaxed_constraints=True,
+                ),
+            ),
+        )
 
     def test_independent_candidate_rules_are_preserved(self):
         """主选和每个备选分别保留自己的舰种及等级范围。"""
@@ -533,33 +534,30 @@ class TestFleetPresetsParsing:
             },
         )
 
-        assert plan.fleet_presets == [
-            {
-                'name': '潜艇队',
-                'ships': [
-                    {
-                        'name': 'U-47',
-                        'ship_type': ['ss', 'ssg'],
-                        'min_level': 100,
-                        'max_level': 110,
-                        'candidates': [
-                            {
-                                'name': 'U-96',
-                                'ship_type': ['ss'],
-                                'min_level': 90,
-                                'max_level': 105,
-                            },
-                            {
-                                'name': 'U-47',
-                                'ship_type': ['ss'],
-                                'min_level': 100,
-                                'max_level': 110,
-                            },
-                        ],
-                    },
-                ],
-            },
-        ]
+        assert plan.fleet_presets is not None
+        slot = plan.fleet_presets[0].slots[0]
+        assert slot.primary == ShipSelector(
+            name='U-47',
+            ship_types=(ShipType.SS, ShipType.SSG),
+            min_level=100,
+            max_level=110,
+        )
+        assert slot.candidates == (
+            ShipSelector(
+                name='U-96',
+                ship_types=(ShipType.SS,),
+                min_level=90,
+                max_level=105,
+                relaxed_constraints=True,
+            ),
+            ShipSelector(
+                name='U-47',
+                ship_types=(ShipType.SS,),
+                min_level=100,
+                max_level=110,
+                relaxed_constraints=True,
+            ),
+        )
 
     def test_candidate_only_slots_are_preserved(self):
         """结构化纯备选位置不把第一候选提升为严格主选。"""
@@ -586,27 +584,26 @@ class TestFleetPresetsParsing:
             },
         )
 
-        assert plan.fleet_presets == [
-            {
-                'name': '纯备选',
-                'ships': [
-                    {
-                        'candidates': [
-                            {'name': '胡德', 'ship_type': ['bc']},
-                            {
-                                'name': '扶桑',
-                                'ship_type': ['bb'],
-                                'min_level': 80,
-                                'max_level': 110,
-                            },
-                        ],
-                    },
-                ],
-            },
-        ]
+        assert plan.fleet_presets is not None
+        slot = plan.fleet_presets[0].slots[0]
+        assert slot.primary is None
+        assert slot.candidates == (
+            ShipSelector(
+                name='胡德',
+                ship_types=(ShipType.BC,),
+                relaxed_constraints=True,
+            ),
+            ShipSelector(
+                name='扶桑',
+                ship_types=(ShipType.BB,),
+                min_level=80,
+                max_level=110,
+                relaxed_constraints=True,
+            ),
+        )
 
-    def test_unknown_slot_fields_are_preserved(self):
-        """解析阶段不删除槽位中的其他字段。"""
+    def test_slot_fields_are_converted_to_domain_model(self):
+        """解析阶段把槽位字段转换成 canonical model。"""
         plan = CombatPlan.from_dict(
             {
                 'fleet_presets': [
@@ -618,12 +615,33 @@ class TestFleetPresetsParsing:
                 ],
             },
         )
-        assert plan.fleet_presets == [
+        assert plan.fleet_presets is not None
+        assert plan.fleet_presets[0].slots == (
+            FleetSlotRule(
+                primary=ShipSelector(name='契卡洛夫', max_level=110),
+            ),
+        )
+
+    def test_legacy_primary_keeps_search_name(self):
+        """旧字符串主选迁移时保留顶层搜索名。"""
+        plan = CombatPlan.from_dict(
             {
-                'name': '',
-                'ships': [{'name': '契卡洛夫', 'max_level': 110}],
+                'fleet_presets': [
+                    {
+                        'ships': [
+                            {
+                                'search_name': '契卡洛夫',
+                                'candidates': ['85工程', '岛风'],
+                            },
+                        ],
+                    },
+                ],
             },
-        ]
+        )
+
+        assert plan.fleet_presets is not None
+        slot = plan.fleet_presets[0].slots[0]
+        assert slot.primary == ShipSelector(name='85工程', search_name='契卡洛夫')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

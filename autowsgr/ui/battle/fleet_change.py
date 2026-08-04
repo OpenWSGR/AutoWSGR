@@ -11,6 +11,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.combat.fleet import ShipSelector
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 
@@ -46,8 +47,7 @@ class FleetChangeMixin(BaseBattlePreparation):
         Parameters
         ----------
         fleet_id:
-            舰队编号 (2-4)。1 队不支持更换。
-            ``None`` 代表不指定舰队，仅更换舰船。
+            舰队编号 (1-4)。``None`` 代表不指定舰队，仅更换舰船。
         ship_names:
             舰船名列表 (按槽位 0-5)。``None`` 或 ``""`` 表示该位留空。
 
@@ -56,9 +56,6 @@ class FleetChangeMixin(BaseBattlePreparation):
         bool
             始终返回 ``True``（子类可覆盖以返回失败状态）。
         """
-        if fleet_id == 1:
-            raise ValueError('不支持更换 1 队舰船编成')
-
         if fleet_id and self.get_selected_fleet(self._ctrl.screenshot()) != fleet_id:
             self.select_fleet(fleet_id)
             time.sleep(0.5)
@@ -112,4 +109,5 @@ class FleetChangeMixin(BaseBattlePreparation):
             timeout=5.0,
         )
         choose_page = ChooseShipPage(self._ctx)
-        choose_page.change_single_ship(name)
+        selector = ShipSelector(name=name) if name is not None else None
+        choose_page.change_single_ship(selector)

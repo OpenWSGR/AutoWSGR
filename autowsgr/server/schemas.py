@@ -7,30 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
-_ALLOWED_SHIP_TYPE_CODES = {
-    'dd',
-    'cl',
-    'ca',
-    'cav',
-    'clt',
-    'bb',
-    'bc',
-    'bbv',
-    'cv',
-    'cvl',
-    'av',
-    'ss',
-    'ssg',
-    'cg',
-    'cgaa',
-    'ddg',
-    'ddgaa',
-    'bm',
-    'cbg',
-    'cf',
-    'ss_or_ssg',
-}
+from autowsgr.combat.fleet import ALLOWED_SHIP_TYPE_CODES
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -91,9 +68,27 @@ class NodeDecisionRequest(BaseModel):
         default=True,
         description='迂回失败时是否 SL',
     )
-    enemy_rules: list[list[str]] | None = Field(
+    enemy_rules: list[str | list] | None = Field(
         default=None,
         description='索敌规则',
+    )
+    enemy_formation_rules: list[str | list] | None = Field(
+        default=None,
+        description='敌方阵型规则',
+    )
+    SL_when_spot_enemy_fails: bool = Field(
+        default=False,
+        description='索敌失败时是否 SL',
+    )
+    SL_when_enter_fight: bool = Field(
+        default=False,
+        description='进入战斗时是否 SL',
+    )
+    formation_when_spot_enemy_fails: int | None = Field(
+        default=None,
+        ge=1,
+        le=5,
+        description='索敌失败时使用的替代阵型',
     )
 
     model_config = {'extra': 'forbid'}
@@ -138,8 +133,8 @@ class FleetShipRuleRequest(BaseModel):
             if not isinstance(ship_type, str) or not ship_type.strip():
                 raise ValueError('ship_type 必须是非空字符串列表')
             code = ship_type.strip().lower()
-            if code not in _ALLOWED_SHIP_TYPE_CODES:
-                allowed = ', '.join(sorted(_ALLOWED_SHIP_TYPE_CODES))
+            if code not in ALLOWED_SHIP_TYPE_CODES:
+                allowed = ', '.join(sorted(ALLOWED_SHIP_TYPE_CODES))
                 raise ValueError(f'ship_type 不合法: {ship_type!r}, 可选值: {allowed}')
             if code not in normalized:
                 normalized.append(code)
@@ -173,45 +168,6 @@ class FleetRuleRequest(FleetShipRuleRequest):
         if value is None:
             return None
         return value.strip() or None
-
-    @model_validator(mode='before')
-    @classmethod
-    def _upgrade_legacy_candidates(cls, value: Any) -> Any:
-        """兼容旧 candidates 字符串列表，主选迁移到 name。"""
-        if not isinstance(value, dict):
-            return value
-
-        result = dict(value)
-        raw_candidates = result.get('candidates')
-        if not isinstance(raw_candidates, list):
-            return result
-
-        candidates = list(raw_candidates)
-        if not isinstance(result.get('name'), str) or not result['name'].strip():
-            first_name = next(
-                (
-                    candidate
-                    for candidate in candidates
-                    if isinstance(candidate, str) and candidate.strip()
-                ),
-                None,
-            )
-            if first_name is None:
-                return result
-            result['name'] = first_name
-            candidates.remove(first_name)
-
-        shared = {
-            key: result[key]
-            for key in ('ship_type', 'min_level', 'max_level')
-            if result.get(key) is not None
-        }
-        result['candidates'] = [
-            {'name': candidate, **shared} if isinstance(candidate, str) else candidate
-            for candidate in candidates
-            if not isinstance(candidate, str) or candidate.strip()
-        ]
-        return result
 
     @model_validator(mode='after')
     def _validate_slot(self) -> FleetRuleRequest:

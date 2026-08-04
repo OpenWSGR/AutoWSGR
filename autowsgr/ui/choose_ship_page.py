@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import ShipType
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
@@ -34,6 +35,7 @@ from .utils.ship_list import LevelOCRRetryNeededError, locate_ship_rows, read_sh
 if TYPE_CHECKING:
     import numpy as np
 
+    from autowsgr.combat.fleet import ShipSelector
     from autowsgr.context import GameContext
 
 
@@ -59,29 +61,6 @@ CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
 _SCROLL_FROM_Y: float = 0.55
 _SCROLL_TO_Y: float = 0.30
 _OCR_MAX_ATTEMPTS: int = 3
-
-_SHIP_TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
-    'dd': ('驱逐',),
-    'cl': ('轻巡',),
-    'ca': ('重巡',),
-    'cav': ('航巡',),
-    'clt': ('雷巡',),
-    'bb': ('战列',),
-    'bc': ('战巡',),
-    'bbv': ('航战',),
-    'cv': ('航母',),
-    'cvl': ('轻母',),
-    'av': ('装母',),
-    'ss': ('潜艇',),
-    'ssg': ('导潜',),
-    'cg': ('导巡',),
-    'cgaa': ('防巡',),
-    'ddg': ('导驱',),
-    'ddgaa': ('防驱',),
-    'bm': ('重炮',),
-    'cbg': ('大巡',),
-    'cf': ('旗舰',),
-}
 
 PAGE_SIGNATURE = PixelSignature(
     name='choose_ship_page',
@@ -197,104 +176,32 @@ class ChooseShipPage:
         _log.debug('[UI] 选船 → 移除舰船')
         self._ctrl.click(*CLICK_REMOVE_SHIP)
 
-    @classmethod
-    def _selection_options(  # noqa: PLR0912
-        cls,
-        name: str,
-        selector: dict | None,
-    ) -> list[dict[str, object]]:
-        """整理智能换船传入的独立主选和备选规则。"""
-        if selector is None:
-            return [{'name': name}]
-
-        raw_options = selector.get('options')
-        if not isinstance(raw_options, list):
-            raw_candidates = selector.get('candidates')
-            raw_options = raw_candidates if isinstance(raw_candidates, list) else [name]
-
-        target_identity = cls._normalize_ship_name(name)
-        options: list[dict[str, object]] = []
-        for raw_option in raw_options:
-            if isinstance(raw_option, str):
-                option: dict[str, object] = {'name': raw_option.strip()}
-                source = selector
-            elif isinstance(raw_option, dict):
-                raw_name = raw_option.get('name')
-                if not isinstance(raw_name, str):
-                    continue
-                option = {'name': raw_name.strip()}
-                source = raw_option
-            else:
-                continue
-
-            if not option['name']:
-                continue
-
-            if (
-                not isinstance(raw_option, str)
-                or cls._normalize_ship_name(raw_option) == target_identity
-            ):
-                raw_search = source.get('search_name')
-                if isinstance(raw_search, str) and raw_search.strip():
-                    option['search_name'] = raw_search.strip()
-
-            raw_ship_types = source.get('ship_type')
-            values = [raw_ship_types] if isinstance(raw_ship_types, str) else raw_ship_types
-            if isinstance(values, list):
-                ship_types = list(
-                    dict.fromkeys(
-                        value.strip().lower()
-                        for value in values
-                        if isinstance(value, str) and value.strip()
-                    ),
-                )
-                if ship_types:
-                    option['ship_type'] = ship_types
-
-            for field in ('min_level', 'max_level'):
-                value = source.get(field)
-                if isinstance(value, int) and value > 0:
-                    option[field] = value
-            if source.get('relaxed_constraints') is True:
-                option['relaxed_constraints'] = True
-            options.append(option)
-
-        options.sort(
-            key=lambda option: cls._normalize_ship_name(str(option['name'])) != target_identity,
-        )
-        return options or [{'name': name}]
-
     def change_single_ship(
         self,
-        name: str | None,
+        selector: ShipSelector | None,
         *,
         use_search: bool = True,
-        selector: dict | None = None,
     ) -> str | None:
-        """更换/移除当前槽位的舰船。
+        """按一条明确规则更换舰船，或移除当前槽位舰船。
 
         使用 DLL 行定位 + OCR 在选船列表中查找目标舰船并点击。
         最多重试 ``_OCR_MAX_ATTEMPTS`` 次, 每次失败后向上滚动列表。
 
         Parameters
         ----------
-        name:
-            目标舰船名; ``None`` 表示移除当前槽位舰船。
+        selector:
+            FleetChange 已决定好的单条舰船选择规则；``None`` 表示移除。
         use_search:
             是否使用搜索框输入舰船名来过滤列表。
             常规出征为 ``True`` (默认), 决战为 ``False``
             (决战选船界面没有搜索框)。
-        selector:
-            智能换船内部规则。``options`` 中每一项分别保存舰名、
-            搜索名、允许舰种和等级范围；旧 ``candidates`` 字符串
-            列表仍兼容读取。
 
         Returns
         -------
         str | None
             实际选中的舰船名；移除操作返回 ``None``。
         """
-        if name is None:
+        if selector is None:
             self.click_remove()
             self._wait_leave_current_page()
             return None
@@ -303,36 +210,23 @@ class ChooseShipPage:
             _log.warning('[UI] 未提供 OCR 引擎, 无法识别选船列表')
             return None
 
-        options = self._selection_options(name, selector)
-        for option in options:
-            candidate = str(option['name'])
-            raw_search_name = option.get('search_name', candidate)
-            search_name = self._normalize_search_keyword(str(raw_search_name))
-            ship_types = option.get('ship_type')
-            min_level = option.get('min_level')
-            max_level = option.get('max_level')
-            relaxed_constraints = option.get('relaxed_constraints') is True
-            if use_search:
-                self.ensure_search_box()
-                self.input_ship_name(search_name)
-                self.ensure_dismiss_keyboard()
-            matched = self._click_ship_in_list(
-                candidate,
-                ship_type=ship_types if isinstance(ship_types, list) else None,
-                min_level=min_level if isinstance(min_level, int) else None,
-                max_level=max_level if isinstance(max_level, int) else None,
-                relaxed_constraints=relaxed_constraints,
-            )
-            if matched is not None:
-                self._wait_leave_current_page()
-                return matched
-
-        candidates = [option['name'] for option in options]
-        _log.error(
-            '[UI] 未在选船列表中找到满足独立规则的候选: {}',
-            candidates,
+        search_name = self._normalize_search_keyword(
+            selector.search_name or selector.name,
         )
-        raise RuntimeError(f'未找到满足条件的目标舰船: {candidates}')
+        if use_search:
+            self.ensure_search_box()
+            self.input_ship_name(search_name)
+            self.ensure_dismiss_keyboard()
+        matched = self._click_ship_in_list(
+            selector.name,
+            ship_type=selector.ship_types or None,
+            min_level=selector.min_level,
+            max_level=selector.max_level,
+            relaxed_constraints=selector.relaxed_constraints,
+        )
+        if matched is not None:
+            self._wait_leave_current_page()
+        return matched
 
     @staticmethod
     def _normalize_hit_entry(hit: object) -> tuple[str, float, float, float]:
@@ -385,7 +279,7 @@ class ChooseShipPage:
         self,
         name: str,
         *,
-        ship_type: list[str] | None = None,
+        ship_type: tuple[ShipType, ...] | None = None,
         min_level: int | None = None,
         max_level: int | None = None,
         relaxed_constraints: bool = False,
@@ -528,7 +422,7 @@ class ChooseShipPage:
         cx: float,
         cy: float,
         row_key: float,
-    ) -> str | None:
+    ) -> ShipType | None:
         """在命中卡片附近 OCR 识别舰种。"""
         assert self._ctx.ocr is not None
 
@@ -556,25 +450,21 @@ class ChooseShipPage:
         return None
 
     @staticmethod
-    def _extract_ship_type_from_text(text: str) -> str | None:
+    def _extract_ship_type_from_text(text: str) -> ShipType | None:
         if not text:
             return None
         normalized = text.replace(' ', '')
-        for ship_type, keywords in _SHIP_TYPE_KEYWORDS.items():
-            if any(keyword in normalized for keyword in keywords):
+        for ship_type in ShipType:
+            if ship_type is not ShipType.Other and ship_type.value in normalized:
                 return ship_type
         return None
 
     @staticmethod
     def _is_ship_type_in_rule(
-        detected: str | None,
-        expected: str | list[str],
+        detected: ShipType | None,
+        expected: tuple[ShipType, ...],
     ) -> bool:
-        if detected is None:
-            return False
-        rules = [expected] if isinstance(expected, str) else expected
-        normalized = {rule.strip().lower() for rule in rules}
-        return detected in normalized or ('ss_or_ssg' in normalized and detected in {'ss', 'ssg'})
+        return detected is not None and detected in expected
 
     @staticmethod
     def _normalize_search_keyword(name: str) -> str:

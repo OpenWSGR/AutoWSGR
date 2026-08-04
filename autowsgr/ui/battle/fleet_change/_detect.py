@@ -120,6 +120,7 @@ class FleetDetectMixin(BaseBattlePreparation):
             prepared_results.append((result, raw_text, patched_text, pool_match))
 
         ships: list[str | None] = [None] * 6
+        recognized_ocr: list[dict[str, object]] = []
 
         for r, raw_text, text, pool_match in prepared_results:
             # 空文字或没有坐标的 OCR 结果无法对应舰队槽位。
@@ -140,6 +141,14 @@ class FleetDetectMixin(BaseBattlePreparation):
                 context_match = self._match_context_ship_name(text, [expected_name])
                 if context_match is not None:
                     matched = context_match
+            recognized_ocr.append(
+                {
+                    'slot': slot,
+                    'raw': raw_text,
+                    'patched': text,
+                    'matched': matched,
+                }
+            )
             # 完整船池和目标上下文都无法识别时跳过该文字。
             if matched is None:
                 _log.debug("[准备页] OCR '{}' -> 无匹配, 跳过", raw_text)
@@ -147,6 +156,10 @@ class FleetDetectMixin(BaseBattlePreparation):
             ships[slot] = matched
             _log.debug("[准备页] 槽位 {} OCR -> '{}'", slot, matched)
 
+        _log.info(
+            '[准备页] 编队 OCR 识别: {}',
+            recognized_ocr,
+        )
         _log.info('[准备页] 当前舰队: {}', ships)
         return ships
 

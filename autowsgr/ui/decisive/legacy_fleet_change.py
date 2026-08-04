@@ -15,6 +15,7 @@ from autowsgr.infra.logger import get_logger
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from autowsgr.combat.fleet import FleetSlotRule
     from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 
 
@@ -28,19 +29,19 @@ def change_fleet_legacy(
     ship_names: Sequence[str | None],
 ) -> bool:
     """使用原有的完整对齐流程更换决战舰队。"""
-    if fleet_id == 1:
-        raise ValueError('不支持更换 1 队舰船编成')
-
-    if fleet_id and page.get_selected_fleet(page._ctrl.screenshot()) != fleet_id:
-        page.select_fleet(fleet_id)
-        time.sleep(0.5)
-
     names = [
         name.strip() if isinstance(name, str) and name.strip() else None
         for name in list(ship_names)[:6]
     ]
     names += [None] * (6 - len(names))
-    selectors: list[dict | None] = [None] * 6
+    if fleet_id == 1 and names[0] is None:
+        raise ValueError('1 队槽位 0 不能为空')
+
+    if fleet_id and page.get_selected_fleet(page._ctrl.screenshot()) != fleet_id:
+        page.select_fleet(fleet_id)
+        time.sleep(0.5)
+
+    selectors: list[FleetSlotRule | None] = [None] * 6
     _log.info('[决战] 使用原有换船流程，目标编成: {}', names)
 
     for attempt in range(_MAX_SET_RETRIES + 1):

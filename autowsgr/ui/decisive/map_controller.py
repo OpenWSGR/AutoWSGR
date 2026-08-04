@@ -705,7 +705,8 @@ class DecisiveMapController:
         Parameters
         ----------
         fleet_id:
-            舰队编号 (2-4)；``None`` 代表不指定舰队。1 队不支持更换。
+            舰队编号 (1-4)；``None`` 代表不指定舰队。
+            更换 1 队时槽位 0 必须保留目标舰船。
         ship_names:
             目标舰船名列表 (按槽位 0-5)；``None``/``""`` 表示该位留空。
         """

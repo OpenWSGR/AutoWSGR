@@ -8,10 +8,16 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult
 from autowsgr.combat.engine import run_combat
+from autowsgr.combat.fleet import (
+    FleetSlotRule,
+    ResolvedFleetSelection,
+    exact_fleet_rules,
+    resolve_fleet_selection,
+)
 from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
@@ -21,6 +27,7 @@ from autowsgr.ui.utils import NavigationError
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     from autowsgr.context import GameContext
@@ -43,18 +50,13 @@ class NormalFightRunner:
         self,
         ctx: GameContext,
         plan: CombatPlan,
-        fleet_id: int | None = None,
-        fleet: list[str] | None = None,
-        fleet_rules: list[Any] | None = None,
+        fleet_selection: ResolvedFleetSelection,
     ) -> None:
         self._ctx = ctx
         self._ctrl = ctx.ctrl
         self._plan = plan
-        self._fleet_id = fleet_id if fleet_id is not None else plan.fleet_id
-        self._fleet = fleet if fleet is not None else plan.fleet
-        self._fleet_rules = (
-            fleet_rules if fleet_rules is not None else self._fleet_rules_from_plan(plan)
-        )
+        self._fleet_selection = fleet_selection
+        self._fleet_id = fleet_selection.fleet_id
 
         # 从 config 读取拆船配置
         self._dock_full_destroy = ctx.config.dock_full_destroy
@@ -93,53 +95,6 @@ class NormalFightRunner:
         self._ship_acquired_count: int | None = None
         self._fleet_ships: list[Ship] | None = None
 
-    @staticmethod
-    def _fleet_rules_from_plan(plan: CombatPlan) -> list[Any] | None:
-        """未传接口覆盖值时，使用计划中第一套舰队预设。"""
-        if not plan.fleet_presets:
-            return None
-        ships = plan.fleet_presets[0].get('ships')
-        return ships if isinstance(ships, list) else None
-
-    @staticmethod
-    def _primary_names_from_rules(fleet_rules: list[Any] | None) -> list[str | None] | None:
-        """读取每个槽位显式声明的主选舰名。"""
-        if not fleet_rules:
-            return None
-
-        def _normalize_name(value: object) -> str | None:
-            if value is None:
-                return None
-            name = str(value).strip()
-            return name or None
-
-        names: list[str | None] = []
-        for slot in fleet_rules[:6]:
-            if isinstance(slot, str):
-                names.append(_normalize_name(slot))
-                continue
-
-            if isinstance(slot, dict):
-                name = slot.get('name')
-                candidates = slot.get('candidates')
-            else:
-                name = getattr(slot, 'name', None)
-                candidates = getattr(slot, 'candidates', None)
-
-            normalized_name = _normalize_name(name)
-            if normalized_name is not None:
-                names.append(normalized_name)
-                continue
-
-            # 旧规则没有 name，candidates 的第一个字符串才是主选。
-            if isinstance(candidates, list) and len(candidates) > 0:
-                legacy_name = candidates[0]
-                if isinstance(legacy_name, str):
-                    names.append(_normalize_name(legacy_name))
-                    continue
-            names.append(None)
-        return names
-
     # ── 公共接口 ──
 
     def run(self) -> CombatResult:
@@ -155,12 +110,11 @@ class NormalFightRunner:
         CombatResult
         """
         _log.info(
-            '[OPS] 常规战: {}-{} ({})',
+            '[OPS] 常规战: {}-{} ({}), 舰队来源: {}',
             self._plan.chapter,
             self._plan.map_id,
             self._plan.name,
-            self._fleet_id,
-            self._fleet,
+            self._fleet_selection.source,
         )
 
         # 1. 进入战斗地图
@@ -392,17 +346,19 @@ class NormalFightRunner:
 
         resolved_ship_names: list[str | None] | None = None
 
-        # 换船 (若提供了规则则优先按规则执行)
-        if self._fleet_rules is not None:
+        # 换船规则已经在 runner 启动前完成优先级解析和入口转换。
+        slot_rules = self._fleet_selection.slot_rules
+        plain_fleet = self._fleet_selection.plain_fleet
+        if slot_rules is not None:
             _require_fleet_change(
-                page.change_fleet(self._fleet_id, self._fleet_rules),
-                '外部 fleet_rules',
+                page.change_fleet(self._fleet_id, slot_rules),
+                'fleet_rules',
             )
             time.sleep(0.5)
             resolved_ship_names = page.detect_fleet()
-        elif self._fleet is not None:
+        elif plain_fleet is not None:
             _require_fleet_change(
-                page.change_fleet(self._fleet_id, self._fleet),
+                page.change_fleet(self._fleet_id, exact_fleet_rules(plain_fleet)),
                 'fleet',
             )
             time.sleep(0.5)
@@ -431,11 +387,7 @@ class NormalFightRunner:
             raise ActionFailedError('出征前检测到大破舰船，退出程序')
         ship_names = resolved_ship_names
         if ship_names is None:
-            ship_names = (
-                self._primary_names_from_rules(self._fleet_rules)
-                if self._fleet_rules is not None
-                else self._fleet
-            )
+            ship_names = self._fleet_selection.primary_names
         self._fleet_ships = fleet_info.to_ships(ship_names)
 
         # 出征
@@ -528,16 +480,21 @@ def run_normal_fight(
     times: int = 1,
     gap: float = 0.0,
     fleet_id: int | None = None,
-    fleet: list[str] | None = None,
-    fleet_rules: list[Any] | None = None,
+    fleet: Sequence[str] | None = None,
+    fleet_rules: Sequence[FleetSlotRule] | None = None,
+    fleet_selection: ResolvedFleetSelection | None = None,
 ) -> list[CombatResult]:
     """执行常规战的便捷函数。"""
-    runner = NormalFightRunner(
-        ctx,
+    resolved_selection = fleet_selection or resolve_fleet_selection(
         plan,
         fleet_id=fleet_id,
         fleet=fleet,
-        fleet_rules=fleet_rules,
+        slot_rules=fleet_rules,
+    )
+    runner = NormalFightRunner(
+        ctx,
+        plan,
+        resolved_selection,
     )
     return runner.run_for_times(times, gap=gap)
 
@@ -548,8 +505,8 @@ def run_normal_fight_from_yaml(
     *,
     times: int = 1,
     fleet_id: int | None = None,
-    fleet: list[str] | None = None,
-    fleet_rules: list[Any] | None = None,
+    fleet: Sequence[str] | None = None,
+    fleet_rules: Sequence[FleetSlotRule] | None = None,
     plan_root: str | Path | None = None,
 ) -> list[CombatResult]:
     """从 YAML 文件加载计划并执行常规战。

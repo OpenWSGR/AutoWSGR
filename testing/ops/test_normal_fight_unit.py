@@ -11,6 +11,12 @@ from types import SimpleNamespace
 import pytest
 
 from autowsgr.combat import CombatMode, CombatPlan
+from autowsgr.combat.fleet import (
+    FleetSelectionSource,
+    FleetSlotRule,
+    ShipSelector,
+    resolve_fleet_selection,
+)
 from autowsgr.infra import ActionFailedError
 from autowsgr.ops.normal_fight import NormalFightRunner, _require_fleet_change
 
@@ -54,10 +60,14 @@ class TestFleetPresetRules:
             },
         )
 
-        runner = NormalFightRunner(_make_ctx(), plan)
+        selection = resolve_fleet_selection(plan)
+        runner = NormalFightRunner(_make_ctx(), plan, selection)
 
-        assert runner._fleet_rules == ships
-        assert runner._primary_names_from_rules(ships) == ['U-47']
+        assert runner._fleet_selection is selection
+        assert selection.source is FleetSelectionSource.PLAN_PRESET
+        assert selection.slot_rules is not None
+        assert selection.slot_rules[0].primary == ShipSelector(name='U-47')
+        assert selection.primary_names == ['U-47']
 
     def test_api_rules_override_plan_preset(self):
         plan = CombatPlan.from_dict(
@@ -70,23 +80,73 @@ class TestFleetPresetRules:
                 ],
             },
         )
-        override = [{'name': '岛风'}]
+        override = (FleetSlotRule(primary=ShipSelector(name='岛风')),)
+        selection = resolve_fleet_selection(plan, slot_rules=override)
 
-        runner = NormalFightRunner(_make_ctx(), plan, fleet_rules=override)
+        runner = NormalFightRunner(_make_ctx(), plan, selection)
 
-        assert runner._fleet_rules == override
+        assert runner._fleet_selection.slot_rules == override
+        assert runner._fleet_selection.source is FleetSelectionSource.OVERRIDE_RULES
 
     def test_candidate_only_slot_has_no_fixed_primary_name(self):
-        rules = [
-            {
-                'candidates': [
-                    {'name': '胡德'},
-                    {'name': '扶桑'},
-                ],
-            },
-        ]
+        rules = (
+            FleetSlotRule(
+                candidates=(
+                    ShipSelector(name='胡德', relaxed_constraints=True),
+                    ShipSelector(name='扶桑', relaxed_constraints=True),
+                ),
+            ),
+        )
+        selection = resolve_fleet_selection(
+            CombatPlan(),
+            slot_rules=rules,
+        )
 
-        assert NormalFightRunner._primary_names_from_rules(rules) == [None]
+        assert selection.primary_names == [None]
+
+    @pytest.mark.parametrize(
+        ('fleet', 'slot_rules', 'expected_source'),
+        [
+            (['岛风'], None, FleetSelectionSource.OVERRIDE_FLEET),
+            (
+                ['岛风'],
+                (FleetSlotRule(primary=ShipSelector(name='雪风')),),
+                FleetSelectionSource.OVERRIDE_RULES,
+            ),
+        ],
+    )
+    def test_override_priority_is_centralized(
+        self,
+        fleet: list[str],
+        slot_rules: tuple[FleetSlotRule, ...] | None,
+        expected_source: FleetSelectionSource,
+    ):
+        plan = CombatPlan.from_dict(
+            {
+                'fleet': ['飞龙'],
+                'fleet_presets': [{'ships': [{'name': 'U-47'}]}],
+            },
+        )
+
+        selection = resolve_fleet_selection(
+            plan,
+            fleet=fleet,
+            slot_rules=slot_rules,
+        )
+
+        assert selection.source is expected_source
+
+    def test_plan_preset_has_priority_over_plain_plan_fleet(self):
+        plan = CombatPlan.from_dict(
+            {
+                'fleet': ['飞龙'],
+                'fleet_presets': [{'ships': [{'name': 'U-47'}]}],
+            },
+        )
+
+        selection = resolve_fleet_selection(plan)
+
+        assert selection.source is FleetSelectionSource.PLAN_PRESET
 
 
 class TestEventNormalMerge:
@@ -94,7 +154,7 @@ class TestEventNormalMerge:
 
     def test_event_branch_hard(self):
         plan = CombatPlan.from_dict({'event': '20260730', 'chapter': 'H', 'map': '1a'})
-        runner = NormalFightRunner(_make_ctx(), plan)
+        runner = NormalFightRunner(_make_ctx(), plan, resolve_fleet_selection(plan))
         assert runner._is_event is True
         assert plan.mode == CombatMode.EVENT
         assert runner._map_code == 'H1'
@@ -102,21 +162,21 @@ class TestEventNormalMerge:
 
     def test_event_branch_easy(self):
         plan = CombatPlan.from_dict({'event': '20260730', 'chapter': 'E', 'map': '3b'})
-        runner = NormalFightRunner(_make_ctx(), plan)
+        runner = NormalFightRunner(_make_ctx(), plan, resolve_fleet_selection(plan))
         assert runner._is_event is True
         assert runner._map_code == 'E3'
         assert runner._entrance == 'beta'
 
     def test_event_no_entrance(self):
         plan = CombatPlan.from_dict({'event': '20260212', 'chapter': 'H', 'map': 5})
-        runner = NormalFightRunner(_make_ctx(), plan)
+        runner = NormalFightRunner(_make_ctx(), plan, resolve_fleet_selection(plan))
         assert runner._is_event is True
         assert runner._entrance is None
         assert runner._map_code == 'H5'
 
     def test_normal_branch(self):
         plan = CombatPlan.from_dict({'chapter': 2, 'map': 1})
-        runner = NormalFightRunner(_make_ctx(), plan)
+        runner = NormalFightRunner(_make_ctx(), plan, resolve_fleet_selection(plan))
         assert runner._is_event is False
         assert plan.mode == CombatMode.NORMAL
         assert runner._entrance is None
@@ -130,7 +190,7 @@ class TestEventFightRunnerCompat:
         from autowsgr.ops.event_fight import EventFightRunner
 
         plan = CombatPlan.from_dict({'event': '20260730', 'chapter': 'H', 'map': '1a'})
-        runner = EventFightRunner(_make_ctx(), plan)
+        runner = EventFightRunner(_make_ctx(), plan, resolve_fleet_selection(plan))
         assert isinstance(runner, NormalFightRunner)
         assert runner._is_event is True
         assert runner._map_code == 'H1'
@@ -139,7 +199,12 @@ class TestEventFightRunnerCompat:
         from autowsgr.ops.event_fight import EventFightRunner
 
         plan = CombatPlan.from_dict({'event': '20260730', 'chapter': 'H', 'map': '1a'})
-        runner = EventFightRunner(_make_ctx(), plan, entrance='beta')
+        runner = EventFightRunner(
+            _make_ctx(),
+            plan,
+            resolve_fleet_selection(plan),
+            entrance='beta',
+        )
         # override 回填 plan.entrance (alpha→'a', beta→'b')
         assert plan.entrance == 'b'
         assert runner._entrance == 'beta'

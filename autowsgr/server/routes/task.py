@@ -18,7 +18,11 @@ from autowsgr.server.schemas import (
     NormalFightRequest,
     TaskStatusResponse,
 )
-from autowsgr.server.serializers import build_combat_plan, convert_combat_result
+from autowsgr.server.serializers import (
+    build_combat_plan,
+    build_fleet_selection,
+    convert_combat_result,
+)
 from autowsgr.server.task_manager import TaskOutcome, task_manager
 
 from ..main import get_context, lifecycle_lock
@@ -117,11 +121,8 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
         else:
             raise ValueError('必须提供 plan 或 plan_id')
 
-        # 允许 plan_id + plan 覆盖: 前端可在不改 YAML 的情况下动态指定舰队与舰船名单。
-        request_plan = request.plan
-        override_fleet_id = request_plan.fleet_id if request_plan is not None else None
-        override_fleet = request_plan.fleet if request_plan is not None else None
-        override_fleet_rules = request_plan.fleet_rules if request_plan is not None else None
+        # API plan 覆盖 YAML 舰队；DTO 在 runner 启动前转换成领域模型。
+        fleet_selection = build_fleet_selection(plan, request.plan)
 
         for i in range(request.times):
             if task_manager.should_stop():
@@ -135,9 +136,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
                     ctx,
                     plan,
                     times=1,
-                    fleet_id=override_fleet_id,
-                    fleet=override_fleet,
-                    fleet_rules=override_fleet_rules,
+                    fleet_selection=fleet_selection,
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
@@ -175,16 +174,12 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
         else:
             raise ValueError('必须提供 plan 或 plan_id')
 
-        request_plan = request.plan
-        override_fleet = request_plan.fleet if request_plan is not None else None
-        override_fleet_rules = request_plan.fleet_rules if request_plan is not None else None
-        # 优先级: 顶层 fleet_id > plan 覆盖 fleet_id > YAML 内 fleet_id
-        if request.fleet_id is not None:
-            fleet_id = request.fleet_id
-        elif request_plan is not None and request_plan.fleet_id is not None:
-            fleet_id = request_plan.fleet_id
-        else:
-            fleet_id = plan.fleet_id
+        # 活动战顶层 fleet_id 优先，其余覆盖规则与普通战完全一致。
+        fleet_selection = build_fleet_selection(
+            plan,
+            request.plan,
+            fleet_id=request.fleet_id,
+        )
 
         for i in range(request.times):
             if task_manager.should_stop():
@@ -198,9 +193,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
                     ctx,
                     plan,
                     times=1,
-                    fleet_id=fleet_id,
-                    fleet=override_fleet,
-                    fleet_rules=override_fleet_rules,
+                    fleet_selection=fleet_selection,
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])

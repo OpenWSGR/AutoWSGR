@@ -42,6 +42,7 @@ except Exception:
 from loguru import logger
 
 from autowsgr.combat import CombatPlan
+from autowsgr.combat.fleet import resolve_fleet_selection
 from autowsgr.ops.event_fight import EventFightRunner
 from autowsgr.scheduler import FightTask, TaskScheduler
 from autowsgr.types import ConditionFlag
@@ -138,7 +139,12 @@ def main() -> None:
     logger.info('已加载计划: {} ({})', plan.name, args.plan)
 
     # ── 构建 Runner ──
-    runner = EventFightRunner(ctx, plan, map_code=args.map_code, fleet_id=2)
+    runner = EventFightRunner(
+        ctx,
+        plan,
+        resolve_fleet_selection(plan, fleet_id=2),
+        map_code=args.map_code,
+    )
 
     # ── 构建调度器 ──
     scheduler = TaskScheduler(

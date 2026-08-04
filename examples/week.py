@@ -1,5 +1,6 @@
 import sys
 
+from autowsgr.combat.fleet import resolve_fleet_selection
 from autowsgr.ops.normal_fight import NormalFightRunner, get_normal_fight_plan
 from autowsgr.scheduler import launch
 
@@ -13,6 +14,6 @@ plan = get_normal_fight_plan('./week/' + sys.argv[1] + '.yaml')
 runner = NormalFightRunner(
     ctx,
     plan,
-    fleet_id=2,
+    resolve_fleet_selection(plan, fleet_id=2),
 )
 runner.run_for_times_condition(1, last_point[i])

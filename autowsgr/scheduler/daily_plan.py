@@ -228,6 +228,7 @@ def _register_normal_fight(
 
     *plan_root* 透传给 :func:`get_normal_fight_plan`, 用户自定义目录优先。
     """
+    from autowsgr.combat.fleet import resolve_fleet_selection
     from autowsgr.ops.normal_fight import NormalFightRunner, get_normal_fight_plan
 
     plans: list[NormalFightPlan] = []
@@ -245,7 +246,11 @@ def _register_normal_fight(
         plans.append(
             NormalFightPlan(
                 # 默认参数捕获 plan/fleet, 避免闭包晚绑定
-                factory=lambda c, p=plan, f=fleet_id: NormalFightRunner(c, p, fleet_id=f),
+                factory=lambda c, p=plan, f=fleet_id: NormalFightRunner(
+                    c,
+                    p,
+                    resolve_fleet_selection(p, fleet_id=f),
+                ),
                 name=task.name,
                 fleet_id=fleet_id,
                 target=task.times,  # None = 无限 (空闲填充)

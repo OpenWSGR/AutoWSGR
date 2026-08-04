@@ -19,6 +19,7 @@ from autowsgr.infra import NodeConfig, load_yaml
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import FightCondition, Formation, RepairMode
 
+from .fleet import FleetPreset, fleet_presets_from_yaml
 from .rules import RuleEngine
 from .state import (
     CombatPhase,
@@ -261,7 +262,7 @@ class CombatPlan:
     """
     fleet_id: int = 1
     fleet: list[str] | None = None
-    fleet_presets: list[dict[str, Any]] | None = None
+    fleet_presets: tuple[FleetPreset, ...] | None = None
     repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
     fight_condition: FightCondition = FightCondition.aim
     selected_nodes: list[str] = field(default_factory=list)
@@ -297,105 +298,6 @@ class CombatPlan:
         return node in self.selected_nodes
 
     @classmethod
-    def _parse_fleet_presets(cls, raw: Any) -> list[dict[str, Any]] | None:
-        """解析舰队预设，并整理名称、舰名和候选列表。"""
-        if raw is None:
-            return None
-        if not isinstance(raw, list):
-            raise TypeError('fleet_presets 必须是列表')
-
-        presets: list[dict[str, Any]] = []
-        for raw_preset in raw:
-            name = cls._trim_text(raw_preset.get('name', ''))
-            ships = [
-                cls._normalize_preset_slot(raw_slot) for raw_slot in raw_preset.get('ships', [])
-            ]
-            presets.append({'name': name, 'ships': ships})
-        return presets
-
-    @staticmethod
-    def _trim_text(value: Any) -> Any:
-        """删除字符串首尾空格，其他类型保持不变。"""
-        return value.strip() if isinstance(value, str) else value
-
-    @classmethod
-    def _normalize_preset_slot(cls, raw_slot: Any) -> Any:
-        """整理主选和位置级备选，并兼容旧字符串候选。"""
-        if isinstance(raw_slot, str):
-            return raw_slot.strip()
-        if not isinstance(raw_slot, dict):
-            return raw_slot
-
-        result = {key: cls._trim_text(value) for key, value in raw_slot.items()}
-        ship_types = cls._normalize_ship_types(result.get('ship_type'))
-        if ship_types is not None:
-            result['ship_type'] = ship_types
-
-        raw_candidates = result.get('candidates')
-        if not isinstance(raw_candidates, list):
-            return result
-
-        candidates = list(raw_candidates)
-        if not isinstance(result.get('name'), str) or not result['name']:
-            primary_index = next(
-                (
-                    index
-                    for index, candidate in enumerate(candidates)
-                    if isinstance(candidate, str) and candidate.strip()
-                ),
-                None,
-            )
-            if primary_index is not None:
-                result['name'] = candidates.pop(primary_index).strip()
-
-        shared = {
-            key: result[key]
-            for key in ('ship_type', 'min_level', 'max_level')
-            if result.get(key) is not None
-        }
-        normalized_candidates: list[dict[str, Any]] = []
-        # 同名主选和备选分别承担严格、宽泛规则，只去除备选队列内部的重复项。
-        seen: set[str] = set()
-        for candidate in candidates:
-            if isinstance(candidate, str):
-                rule = {'name': candidate.strip(), **copy.deepcopy(shared)}
-            else:
-                rule = cls._normalize_ship_rule(candidate)
-            if not isinstance(rule, dict):
-                continue
-            name = rule.get('name')
-            if not isinstance(name, str) or not name or name in seen:
-                continue
-            normalized_candidates.append(rule)
-            seen.add(name)
-        result['candidates'] = normalized_candidates
-        return result
-
-    @classmethod
-    def _normalize_ship_rule(cls, raw_rule: Any) -> Any:
-        """整理一艘备选舰船自己的规则。"""
-        if not isinstance(raw_rule, dict):
-            return raw_rule
-
-        result = {key: cls._trim_text(value) for key, value in raw_rule.items()}
-        ship_types = cls._normalize_ship_types(result.get('ship_type'))
-        if ship_types is not None:
-            result['ship_type'] = ship_types
-        return result
-
-    @classmethod
-    def _normalize_ship_types(cls, raw: Any) -> list[str] | None:
-        """把旧单舰种字符串和新舰种列表统一为小写字符串列表。"""
-        values = [raw] if isinstance(raw, str) else raw
-        if not isinstance(values, list):
-            return None
-
-        normalized = [
-            value.strip().lower() for value in values if isinstance(value, str) and value.strip()
-        ]
-        return list(dict.fromkeys(normalized)) or None
-
-    @classmethod
     def from_yaml(cls, path: str | Path) -> CombatPlan:
         from autowsgr.infra.config_compat import (
             LegacyConfigError,
@@ -422,7 +324,7 @@ class CombatPlan:
         map_id, entrance = parse_map_value(data.get('map', 1))
         fleet_id = data.get('fleet_id', 1)
         fleet = data.get('fleet')
-        fleet_presets = cls._parse_fleet_presets(data.get('fleet_presets'))
+        fleet_presets = fleet_presets_from_yaml(data.get('fleet_presets'))
         fight_condition = FightCondition(data.get('fight_condition', 4))
         selected_nodes = data.get('selected_nodes', [])
 

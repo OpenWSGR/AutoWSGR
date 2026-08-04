@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from autowsgr.combat.fleet import exact_fleet_rules
 from autowsgr.ui.battle.preparation import BattlePreparationPage
 from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
 
@@ -67,5 +68,6 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
     ) -> bool:
         """按配置选择决战原有流程或新的换船算法。"""
         if self._config.use_new_fleet_change_algorithm:
-            return super().change_fleet(fleet_id, ship_names)
+            rules = exact_fleet_rules([name for name in ship_names if name])
+            return super().change_fleet(fleet_id, rules)
         return change_fleet_legacy(self, fleet_id, ship_names)

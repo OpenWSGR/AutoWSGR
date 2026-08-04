@@ -3,6 +3,7 @@
 修改第 2 舰队的舰船配置。
 """
 
+from autowsgr.combat.fleet import exact_fleet_rules
 from autowsgr.ops import goto_page
 from autowsgr.scheduler import launch
 from autowsgr.ui import BattlePreparationPage, PageName
@@ -15,4 +16,4 @@ goto_page(ctx, PageName.BATTLE_PREP)
 
 page = BattlePreparationPage(ctx)
 
-page.change_fleet(2, ['U-47', 'U-96'])
+page.change_fleet(2, exact_fleet_rules(['U-47', 'U-96']))

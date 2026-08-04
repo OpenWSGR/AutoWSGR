@@ -1,8 +1,10 @@
 """测试选船页的舰名比较逻辑。"""
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
+from autowsgr.combat.fleet import ShipSelector
+from autowsgr.types import ShipType
 from autowsgr.ui.choose_ship_page import ChooseShipPage
 from autowsgr.ui.utils.ship_list import LevelOCRRetryNeededError
 from autowsgr.vision.ocr import set_ship_name_match_confidence
@@ -41,28 +43,16 @@ class TestShipNameMatching:
 
 
 class TestIndependentShipRules:
-    def test_each_option_uses_its_own_constraints(self):
+    def test_single_rule_uses_its_own_constraints(self):
         ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object())
         page = ChooseShipPage(ctx)
-        selector = {
-            'options': [
-                {
-                    'name': 'U-47',
-                    'search_name': 'U47',
-                    'ship_type': ['ss', 'ssg'],
-                    'min_level': 100,
-                    'max_level': 110,
-                },
-                {
-                    'name': 'U-96',
-                    'search_name': 'U96',
-                    'ship_type': ['ss'],
-                    'min_level': 90,
-                    'max_level': 105,
-                    'relaxed_constraints': True,
-                },
-            ],
-        }
+        selector = ShipSelector(
+            name='U-47',
+            search_name='U47',
+            ship_types=(ShipType.SS, ShipType.SSG),
+            min_level=100,
+            max_level=110,
+        )
 
         with (
             patch.object(page, 'ensure_search_box'),
@@ -71,34 +61,26 @@ class TestIndependentShipRules:
             patch.object(
                 page,
                 '_click_ship_in_list',
-                side_effect=[None, 'U-96'],
+                return_value='U-47',
             ) as click_ship,
             patch.object(page, '_wait_leave_current_page'),
         ):
-            assert page.change_single_ship('U-47', selector=selector) == 'U-96'
+            assert page.change_single_ship(selector) == 'U-47'
 
-        assert input_name.call_args_list == [call('U47'), call('U96')]
-        assert click_ship.call_args_list == [
-            call(
-                'U-47',
-                ship_type=['ss', 'ssg'],
-                min_level=100,
-                max_level=110,
-                relaxed_constraints=False,
-            ),
-            call(
-                'U-96',
-                ship_type=['ss'],
-                min_level=90,
-                max_level=105,
-                relaxed_constraints=True,
-            ),
-        ]
+        input_name.assert_called_once_with('U47')
+        click_ship.assert_called_once_with(
+            'U-47',
+            ship_type=(ShipType.SS, ShipType.SSG),
+            min_level=100,
+            max_level=110,
+            relaxed_constraints=False,
+        )
 
     def test_multiple_ship_types_are_supported(self):
-        assert ChooseShipPage._is_ship_type_in_rule('ss', ['ss', 'ssg'])
-        assert ChooseShipPage._is_ship_type_in_rule('ssg', ['ss_or_ssg'])
-        assert not ChooseShipPage._is_ship_type_in_rule('bb', ['ss', 'ssg'])
+        expected = (ShipType.SS, ShipType.SSG)
+        assert ChooseShipPage._is_ship_type_in_rule(ShipType.SS, expected)
+        assert ChooseShipPage._is_ship_type_in_rule(ShipType.SSG, expected)
+        assert not ChooseShipPage._is_ship_type_in_rule(ShipType.BB, expected)
 
     def test_primary_rejects_failed_level_constraint(self):
         ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object())
@@ -159,13 +141,13 @@ class TestIndependentShipRules:
             patch.object(
                 page,
                 '_detect_ship_type_near_hit',
-                return_value='bb',
+                return_value=ShipType.BB,
             ) as detect_ship_type,
             patch('autowsgr.ui.choose_ship_page.time.sleep'),
         ):
             matched = page._click_ship_in_list(
                 'U-96',
-                ship_type=['ss'],
+                ship_type=(ShipType.SS,),
                 relaxed_constraints=True,
             )
 
