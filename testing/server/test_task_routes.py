@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import HTTPException
@@ -20,10 +21,40 @@ from autowsgr.server.schemas import (
 )
 
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from autowsgr.server.task_manager import TaskOutcome
+
+
 @dataclass
 class _TaskManager:
     is_running: bool = False
     stop_event: object = field(default_factory=object)
+
+
+@dataclass
+class _ExecutingTaskManager:
+    outcome: TaskOutcome | None = None
+
+    def should_stop(self) -> bool:
+        return False
+
+    def update_progress(self, **_progress: object) -> None:
+        return None
+
+    def add_result(self, _result: dict[str, Any]) -> None:
+        return None
+
+    def start_task(
+        self,
+        task_type: str,
+        total_rounds: int,
+        executor: Callable[[object], TaskOutcome],
+    ) -> str:
+        del task_type, total_rounds
+        self.outcome = executor(object())
+        return 'task_decisive'
 
 
 def test_task_start_rejects_concurrent_task(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,3 +130,62 @@ def test_task_start_dispatches_request_with_shared_context(
     assert result is response
     assert calls == [(ctx, task_request)]
     assert ctx.stop_event is manager.stop_event
+
+
+def test_decisive_error_result_marks_task_failed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A decisive ERROR is a task failure, not a successful completed round."""
+    from autowsgr import ops
+    from autowsgr.ops import DecisiveResult
+
+    class ErrorController:
+        def __init__(self, _ctx: object, _config: object) -> None:
+            pass
+
+        def run(self) -> DecisiveResult:
+            return DecisiveResult.ERROR
+
+    manager = _ExecutingTaskManager()
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'DecisiveController', ErrorController)
+
+    asyncio.run(task._start_decisive(object(), DecisiveRequest()))
+
+    assert manager.outcome is not None
+    assert manager.outcome.success is False
+    assert manager.outcome.error == '决战异常退出'
+    assert manager.outcome.results == [
+        {
+            'round': 1,
+            'success': False,
+            'result': 'error',
+            'error': '决战异常退出',
+        }
+    ]
+
+
+def test_decisive_leave_result_remains_successful(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An intentional decisive leave remains a successful terminal result."""
+    from autowsgr import ops
+    from autowsgr.ops import DecisiveResult
+
+    class LeaveController:
+        def __init__(self, _ctx: object, _config: object) -> None:
+            pass
+
+        def run(self) -> DecisiveResult:
+            return DecisiveResult.LEAVE
+
+    manager = _ExecutingTaskManager()
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'DecisiveController', LeaveController)
+
+    asyncio.run(task._start_decisive(object(), DecisiveRequest()))
+
+    assert manager.outcome is not None
+    assert manager.outcome.success is True
+    assert manager.outcome.error is None
+    assert manager.outcome.results == [{'round': 1, 'success': True, 'result': 'leave'}]

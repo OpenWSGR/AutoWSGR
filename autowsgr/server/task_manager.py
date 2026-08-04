@@ -49,8 +49,15 @@ class TaskOutcome:
     error: str | None = None
 
     @classmethod
-    def from_results(cls, results: list[dict[str, Any]]) -> TaskOutcome:
-        """根据逐轮结果构建任务结果。"""
+    def from_results(
+        cls,
+        results: list[dict[str, Any]],
+        error: str | None = None,
+    ) -> TaskOutcome:
+        """根据逐轮结果构建任务结果，优先保留显式任务级错误。"""
+        if error is not None:
+            return cls(results=results, success=False, error=error)
+
         failed_results = [result for result in results if not result.get('success', False)]
         if failed_results:
             error = next(

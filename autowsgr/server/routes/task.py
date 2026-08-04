@@ -309,6 +309,7 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
 
         controller = DecisiveController(ctx, config)
         results: list[dict[str, Any]] = []
+        task_error: str | None = None
 
         try:
             for i in range(request.decisive_rounds):
@@ -318,7 +319,15 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
                 task_manager.update_progress(current_round=i + 1, current_node='决战')
                 _log.info('[Task] 决战第 {}/{} 轮', i + 1, request.decisive_rounds)
                 result = controller.run()
-                converted = {'round': i + 1, 'success': True, 'result': result.value}
+                is_error = result.value == 'error'
+                converted = {
+                    'round': i + 1,
+                    'success': not is_error,
+                    'result': result.value,
+                }
+                if is_error:
+                    task_error = '决战异常退出'
+                    converted['error'] = task_error
                 results.append(converted)
                 task_manager.add_result(converted)
 
@@ -328,7 +337,7 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
         except Exception as e:
             results.append({'round': len(results) + 1, 'success': False, 'error': str(e)})
 
-        return TaskOutcome.from_results(results)
+        return TaskOutcome.from_results(results, error=task_error)
 
     task_id = task_manager.start_task(
         task_type='decisive',

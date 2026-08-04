@@ -85,6 +85,42 @@ def test_empty_outcome_is_not_synthetic_success() -> None:
     assert manager.current_task.error == '任务未执行任何轮次'
 
 
+def test_explicit_task_error_overrides_failed_round_error() -> None:
+    """An aggregate failure reason must outrank an incidental round error."""
+    failed_round = {'round': 1, 'success': False, 'error': 'low-level OCR failure'}
+
+    outcome = TaskOutcome.from_results(
+        [failed_round],
+        error='决战异常退出',
+    )
+
+    assert outcome.results == [failed_round]
+    assert outcome.success is False
+    assert outcome.error == '决战异常退出'
+
+
+def test_failed_round_error_is_inferred_without_explicit_task_error() -> None:
+    """Existing callers retain first-specific-round error inference."""
+    results = [
+        {'round': 1, 'success': False},
+        {'round': 2, 'success': False, 'error': 'fleet change failed'},
+    ]
+
+    outcome = TaskOutcome.from_results(results)
+
+    assert outcome.success is False
+    assert outcome.error == 'fleet change failed'
+
+
+def test_explicit_task_error_explains_empty_result_failure() -> None:
+    """An executor can explain why it terminated before producing a round."""
+    outcome = TaskOutcome.from_results([], error='决战初始化失败')
+
+    assert outcome.results == []
+    assert outcome.success is False
+    assert outcome.error == '决战初始化失败'
+
+
 def test_stop_event_is_exposed_as_read_only_execution_token() -> None:
     """Callers can inject cancellation without reaching into private manager state."""
     manager = TaskManager()
