@@ -238,7 +238,7 @@ class TaskManager:
         success = task.status == TaskStatus.COMPLETED
         result = (
             task.result_summary
-            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED)
             else None
         )
         await ws_manager.send_task_completed(
@@ -322,7 +322,7 @@ class TaskManager:
 
         task = self._current_task
         result = None
-        if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+        if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED):
             result = task.result_summary
 
         return {

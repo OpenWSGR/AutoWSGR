@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
+from typing import Any
 
 import pytest
 
+from autowsgr.server import task_manager as task_manager_module
 from autowsgr.server.device_lease import DeviceOperationBusyError, DeviceOperationLease
 from autowsgr.server.task_manager import TaskManager, TaskOutcome, TaskStatus
 
@@ -227,3 +230,152 @@ def test_thread_start_failure_rolls_back_task_and_device(
 
     assert manager.current_task is None
     assert lease.owner is None
+
+
+def test_stopped_task_exposes_completed_results_in_status_and_notification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancellation preserves completed rounds for polling and WebSocket clients."""
+    completed_results = [
+        {'round': 1, 'success': True},
+        {'round': 2, 'success': True},
+    ]
+    completion_calls: list[dict[str, Any]] = []
+    worker_ready = threading.Event()
+    release_worker = threading.Event()
+
+    async def run_scenario() -> tuple[TaskManager, str]:
+        notification_sent = asyncio.Event()
+
+        async def record_completion(
+            task_id: str,
+            success: bool,
+            result: dict[str, Any] | None = None,
+            error: str | None = None,
+        ) -> None:
+            completion_calls.append(
+                {
+                    'task_id': task_id,
+                    'success': success,
+                    'result': result,
+                    'error': error,
+                }
+            )
+            notification_sent.set()
+
+        monkeypatch.setattr(
+            task_manager_module.ws_manager,
+            'send_task_completed',
+            record_completion,
+        )
+        manager = TaskManager()
+        manager.set_loop(asyncio.get_running_loop())
+
+        def executor(_task: object) -> TaskOutcome:
+            worker_ready.set()
+            release_worker.wait(timeout=1)
+            return TaskOutcome.from_results(completed_results)
+
+        task_id = manager.start_task(
+            task_type='normal_fight',
+            total_rounds=3,
+            executor=executor,
+        )
+        assert await asyncio.to_thread(worker_ready.wait, 1)
+        assert manager.stop_task() is True
+        assert completion_calls == []
+
+        release_worker.set()
+        assert await asyncio.to_thread(manager.wait_for_completion, 1) is True
+        await asyncio.wait_for(notification_sent.wait(), timeout=1)
+        return manager, task_id
+
+    manager, task_id = asyncio.run(run_scenario())
+    expected_result = {
+        'total_runs': 3,
+        'success_runs': 2,
+        'details': completed_results,
+    }
+
+    assert manager.get_status()['result'] == expected_result
+    assert completion_calls == [
+        {
+            'task_id': task_id,
+            'success': False,
+            'result': expected_result,
+            'error': None,
+        }
+    ]
+
+
+def test_stopped_task_before_first_round_exposes_empty_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancellation before work starts reports an empty result summary, not null."""
+    completion_calls: list[dict[str, Any]] = []
+    worker_ready = threading.Event()
+    release_worker = threading.Event()
+
+    async def run_scenario() -> tuple[TaskManager, str]:
+        notification_sent = asyncio.Event()
+
+        async def record_completion(
+            task_id: str,
+            success: bool,
+            result: dict[str, Any] | None = None,
+            error: str | None = None,
+        ) -> None:
+            completion_calls.append(
+                {
+                    'task_id': task_id,
+                    'success': success,
+                    'result': result,
+                    'error': error,
+                }
+            )
+            notification_sent.set()
+
+        monkeypatch.setattr(
+            task_manager_module.ws_manager,
+            'send_task_completed',
+            record_completion,
+        )
+        manager = TaskManager()
+        manager.set_loop(asyncio.get_running_loop())
+
+        def executor(_task: object) -> TaskOutcome:
+            worker_ready.set()
+            release_worker.wait(timeout=1)
+            return TaskOutcome.from_results([])
+
+        task_id = manager.start_task(
+            task_type='normal_fight',
+            total_rounds=3,
+            executor=executor,
+        )
+        assert await asyncio.to_thread(worker_ready.wait, 1)
+        assert manager.stop_task() is True
+        release_worker.set()
+        assert await asyncio.to_thread(manager.wait_for_completion, 1) is True
+        await asyncio.wait_for(notification_sent.wait(), timeout=1)
+        return manager, task_id
+
+    manager, task_id = asyncio.run(run_scenario())
+    expected_result = {
+        'total_runs': 3,
+        'success_runs': 0,
+        'details': [],
+    }
+
+    assert manager.current_task is not None
+    assert manager.current_task.status is TaskStatus.STOPPED
+    assert manager.current_task.error is None
+    assert manager.get_status()['result'] == expected_result
+    assert completion_calls == [
+        {
+            'task_id': task_id,
+            'success': False,
+            'result': expected_result,
+            'error': None,
+        }
+    ]
