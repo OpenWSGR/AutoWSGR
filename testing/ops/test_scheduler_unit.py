@@ -44,20 +44,19 @@ class _SingleRunner:
 # ── BatchRunnerAdapter 行为 ──
 
 
-def test_batch_adapter_list_takes_last():
+def test_batch_adapter_preserves_all_results():
     r1 = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
     r2 = CombatResult(flag=ConditionFlag.BATTLE_TIMES_EXCEED)
-    assert BatchRunnerAdapter(_ListRunner([r1, r2])).run() is r2
+    assert BatchRunnerAdapter(_ListRunner([r1, r2])).run() == [r1, r2]
 
 
 def test_batch_adapter_single_passthrough():
     r = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
-    assert BatchRunnerAdapter(_SingleRunner(r)).run() is r
+    assert BatchRunnerAdapter(_SingleRunner(r)).run() == [r]
 
 
-def test_batch_adapter_empty_list_defaults_success():
-    out = BatchRunnerAdapter(_ListRunner([])).run()
-    assert out.flag == ConditionFlag.OPERATION_SUCCESS
+def test_batch_adapter_preserves_empty_batch():
+    assert BatchRunnerAdapter(_ListRunner([])).run() == []
 
 
 # ── _run_task 端到端 (list runner 不再崩溃) ──
@@ -72,28 +71,29 @@ class _FakeCtx:
 
 
 def test_run_task_handles_list_runner(monkeypatch: pytest.MonkeyPatch):
-    """返回 list 的 runner 经调度器后, on_done 收到单个 CombatResult (回归崩溃)。"""
+    """返回 list 的 runner 经调度器后保留并通知每个结果。"""
     ctx = _FakeCtx()
     sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
     monkeypatch.setattr(sched, '_maybe_collect_expedition', lambda: None)
 
     received: list[CombatResult] = []
-    result = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    first = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    second = CombatResult(flag=ConditionFlag.ACTION_FAILED)
     task = FightTask(
-        runner=_ListRunner([result]),
+        runner=_ListRunner([first, second]),
         times=1,
         on_done=received.append,
     )
 
     sched._run_task(task)  # 不应抛 AttributeError
 
-    assert received == [result]  # on_done 收到单个, 不是 list
-    assert task.results == [result]
+    assert received == [first, second]
+    assert task.results == [first, second]
     assert task.completed == 1
 
 
 def test_run_task_list_runner_exceed_flag(monkeypatch: pytest.MonkeyPatch):
-    """list runner 最后一场为 BATTLE_TIMES_EXCEED 时, 该 flag 正确传递给 on_done。"""
+    """list runner 的每场 flag 都按顺序传递给 on_done。"""
     ctx = _FakeCtx()
     sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
     monkeypatch.setattr(sched, '_maybe_collect_expedition', lambda: None)
@@ -109,7 +109,7 @@ def test_run_task_list_runner_exceed_flag(monkeypatch: pytest.MonkeyPatch):
 
     sched._run_task(task)
 
-    assert seen == [ConditionFlag.BATTLE_TIMES_EXCEED]  # 取最后一场
+    assert seen == [ConditionFlag.OPERATION_SUCCESS, ConditionFlag.BATTLE_TIMES_EXCEED]
 
 
 def test_run_task_single_runner_still_works(monkeypatch: pytest.MonkeyPatch):
@@ -126,6 +126,70 @@ def test_run_task_single_runner_still_works(monkeypatch: pytest.MonkeyPatch):
 
     assert received == [result]
     assert task.results == [result]
+
+
+def test_run_task_empty_batch_is_explicit_failure(monkeypatch: pytest.MonkeyPatch):
+    """未执行任何战斗不能伪造成成功。"""
+    ctx = _FakeCtx()
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    monkeypatch.setattr(sched, '_maybe_collect_expedition', lambda: None)
+    received: list[CombatResult] = []
+    task = FightTask(runner=_ListRunner([]), times=1, on_done=received.append)
+
+    sched._run_task(task)
+
+    assert len(task.results) == 1
+    assert task.results[0].flag == ConditionFlag.ACTION_FAILED
+    assert received == task.results
+    assert task.completed == 1
+
+
+def test_run_task_dock_full_batch_stops_outer_repetition(monkeypatch: pytest.MonkeyPatch):
+    """批次内船坞满保留已返回结果，并阻止下一次 runner 调用。"""
+    ctx = _FakeCtx()
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    monkeypatch.setattr(sched, '_maybe_collect_expedition', lambda: None)
+    ok = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    full = CombatResult(flag=ConditionFlag.DOCK_FULL)
+    runner = _ListRunner([ok, full])
+    calls = 0
+
+    def run() -> list[CombatResult]:
+        nonlocal calls
+        calls += 1
+        return [ok, full]
+
+    runner.run = run  # type: ignore[method-assign]
+    task = FightTask(runner=runner, times=3)
+
+    sched._run_task(task)
+
+    assert calls == 1
+    assert task.results == [ok, full]
+    assert task.completed == 1
+
+
+def test_run_task_concatenates_results_from_repeated_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """多次 runner 调用的批量结果按实际执行顺序完整保留。"""
+    ctx = _FakeCtx()
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    monkeypatch.setattr(sched, '_maybe_collect_expedition', lambda: None)
+    first = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    second = CombatResult(flag=ConditionFlag.ACTION_FAILED)
+    third = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    batches = iter([[first, second], [third]])
+    runner = _ListRunner([])
+    runner.run = lambda: next(batches)  # type: ignore[method-assign]
+    received: list[CombatResult] = []
+    task = FightTask(runner=runner, times=2, on_done=received.append)
+
+    sched._run_task(task)
+
+    assert task.results == [first, second, third]
+    assert received == task.results
+    assert task.completed == 2
 
 
 # ── 浴室修理优先级 (空闲修船: 所有战斗完成后才执行) ──

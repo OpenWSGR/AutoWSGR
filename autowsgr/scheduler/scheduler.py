@@ -60,12 +60,10 @@ class FightRunnerProtocol(Protocol):
 
 
 class BatchRunnerAdapter:
-    """将 ``run() → list[CombatResult]`` 的 runner 适配为单次协议。
+    """将 runner 输出规范化为完整的 ``list[CombatResult]``。
 
     适用于 :class:`CampaignRunner` (内部自带循环，每次 ``run()`` 已执行多场)
     和 :class:`ExerciseRunner`。
-
-    每次 ``.run()`` 返回最后一场结果；若列表为空，返回默认成功。
     """
 
     def __init__(self, inner: object) -> None:
@@ -73,17 +71,11 @@ class BatchRunnerAdapter:
             raise TypeError(f'{type(inner).__name__} 没有 run() 方法')
         self._inner = inner
 
-    def run(self) -> CombatResult:
+    def run(self) -> list[CombatResult]:
         results = self._inner.run()  # type: ignore[union-attr]
         if isinstance(results, list):
-            return (
-                results[-1]
-                if results
-                else CombatResult(
-                    flag=ConditionFlag.OPERATION_SUCCESS,
-                )
-            )
-        return results  # type: ignore[return-value]
+            return results
+        return [results]  # type: ignore[list-item]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -213,8 +205,8 @@ class TaskScheduler:
 
     def _run_task(self, task: FightTask) -> None:
         """执行单个任务的全部轮次。"""
-        # 统一用 BatchRunnerAdapter 包装: 对 run()→list[CombatResult] 取最后一场,
-        # 对 run()→单个 CombatResult 直接 passthrough, 兼容两类 runner
+        # 统一用 BatchRunnerAdapter 包装: 完整保留 run()→list[CombatResult],
+        # 对 run()→单个 CombatResult 规范化为单元素列表, 兼容两类 runner
         # (CampaignRunner / ExerciseRunner 返回 list, 其余返回单个)。
         # 不能靠 isinstance(FightRunnerProtocol) 判断: @runtime_checkable 不检查
         # 返回类型, CampaignRunner 有 run() 方法即被误判满足协议而跳过适配
@@ -239,7 +231,7 @@ class TaskScheduler:
                 self._maybe_collect_expedition()
 
                 try:
-                    result = runner.run()
+                    results = runner.run()
                 except Exception as exc:
                     # 子任务异常: 结束本子任务, 不崩溃主循环。ACTION_FAILED 不属
                     # 于任何触发器的成功/耗尽标志, 故 on_done 不会计入战斗次数、
@@ -250,32 +242,37 @@ class TaskScheduler:
                         j + 1,
                         exc,
                     )
-                    result = CombatResult(flag=ConditionFlag.ACTION_FAILED)
+                    results = [CombatResult(flag=ConditionFlag.ACTION_FAILED)]
 
-                task.results.append(result)
+                if not results:
+                    _log.error('[Scheduler] {} 第 {} 次未执行任何战斗', task.name, j + 1)
+                    results = [CombatResult(flag=ConditionFlag.ACTION_FAILED)]
+
+                task.results.extend(results)
                 task.completed += 1
 
                 # 通知触发器更新状态 (auto_daily 触发器调度用)
-                if task.on_done is not None:
-                    try:
-                        task.on_done(result)
-                    except Exception as exc:
-                        _log.opt(exception=True).warning(
-                            '[Scheduler] {} on_done 回调异常: {}',
-                            task.name,
-                            exc,
-                        )
+                for result in results:
+                    if task.on_done is not None:
+                        try:
+                            task.on_done(result)
+                        except Exception as exc:
+                            _log.opt(exception=True).warning(
+                                '[Scheduler] {} on_done 回调异常: {}',
+                                task.name,
+                                exc,
+                            )
 
-                _log.info(
-                    '[Scheduler] {} [{}/{}] → {}',
-                    task.name,
-                    task.completed,
-                    task.times,
-                    result.flag.value if result.flag else 'N/A',
-                )
+                    _log.info(
+                        '[Scheduler] {} [{}/{}] → {}',
+                        task.name,
+                        task.completed,
+                        task.times,
+                        result.flag.value if result.flag else 'N/A',
+                    )
 
                 # 船坞满则停止当前任务
-                if result.flag == ConditionFlag.DOCK_FULL:
+                if any(result.flag == ConditionFlag.DOCK_FULL for result in results):
                     _log.warning(
                         '[Scheduler] {} 船坞已满, 跳过剩余 {} 次',
                         task.name,
@@ -493,13 +490,14 @@ class TaskScheduler:
 
         for task in self._tasks:
             success = sum(1 for r in task.results if r.flag == ConditionFlag.OPERATION_SUCCESS)
-            total_fights += task.completed
+            total_fights += len(task.results)
             total_success += success
             _log.info(
-                '[Scheduler]   {} : {}/{} 完成, {} 成功',
+                '[Scheduler]   {} : {}/{} 次执行, {} 场结果, {} 成功',
                 task.name,
                 task.completed,
                 task.times,
+                len(task.results),
                 success,
             )
 
