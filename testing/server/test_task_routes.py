@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi import HTTPException
 
+import autowsgr.ops.normal_fight as normal_fight_module
 from autowsgr import ops
 from autowsgr.combat import CombatResult
 from autowsgr.combat.fleet import FleetSelectionSource, ResolvedFleetSelection
@@ -29,7 +30,6 @@ from autowsgr.server.schemas import (
     TaskStatusResponse,
 )
 from autowsgr.types import ConditionFlag, ShipType
-import autowsgr.ops.normal_fight as normal_fight_module
 
 
 if TYPE_CHECKING:
@@ -53,6 +53,7 @@ class _TaskManager:
 @dataclass
 class _ExecutingTaskManager:
     """同步执行 route 创建的 executor，避免测试启动后台线程。"""
+
     is_running: bool = False
     stop_event: object = field(default_factory=object)
     outcome: TaskOutcome | None = None
@@ -298,6 +299,8 @@ def test_task_status_returns_typed_envelope(monkeypatch: pytest.MonkeyPatch) -> 
         'success': True,
         'data': status,
     }
+
+
 @pytest.mark.parametrize(
     'route_case',
     [

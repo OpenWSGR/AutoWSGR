@@ -412,7 +412,6 @@ class TestContextShipNameMatch:
     def test_swapped_close_names_keep_clear_pool_matches(self):
         ctrl = MagicMock(spec=AndroidController)
         ocr = MagicMock()
-        expected = ['峰风', '雪风', None, None, None, None]
         centers = [147, 293]
         ocr.recognize.return_value = [
             OCRResult(text=text, confidence=0.95, bbox=(x - 20, 2, x + 20, 24))

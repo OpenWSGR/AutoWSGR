@@ -195,12 +195,7 @@ class FleetRuleRequest(FleetShipRuleRequest):
             return self
         if len(self.candidates) == 0:
             raise ValueError('位置至少需要一艘主选或备选舰船')
-        if any(
-            value is not None
-            for value in (
-                self.search_name,
-            )
-        ):
+        if any(value is not None for value in (self.search_name,)):
             raise ValueError('没有主选 name 时不能填写主选规则')
         return self
 

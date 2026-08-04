@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
-
 import pytest
 
 import autowsgr.ops.normal_fight as normal_fight_module
@@ -22,10 +21,10 @@ from autowsgr.combat.fleet import (
     exact_fleet_rules,
     resolve_fleet_selection,
 )
-from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
 from autowsgr.infra import ActionFailedError
 from autowsgr.ops.normal_fight import NormalFightRunner, _require_fleet_change
 from autowsgr.types import ShipDamageState, ShipType
+from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
 
 
 def _make_ctx() -> SimpleNamespace:
@@ -311,7 +310,12 @@ class TestFleetSelectionCallChain:
         monkeypatch.setattr(normal_fight_module, 'BattlePreparationPage', lambda _ctx: page)
 
         class FakeChooseShipPage:
-            def change_single_ship(self, selector, *, use_search):
+            def change_single_ship(
+                self,
+                selector: ShipSelector | None,
+                *,
+                use_search: bool,
+            ) -> str | None:
                 assert use_search is True
                 return selector.name if selector is not None else None
 
@@ -334,7 +338,7 @@ class TestFleetSelectionCallChain:
         monkeypatch.setattr(page, 'detect_ship_damage', lambda _screen: {})
         monkeypatch.setattr(page, 'apply_supply', lambda: None)
         monkeypatch.setattr(page, 'apply_repair', lambda _strategy: None)
-        monkeypatch.setattr(page, 'detect_fleet_info', lambda: _FleetInfo())
+        monkeypatch.setattr(page, 'detect_fleet_info', _FleetInfo)
         monkeypatch.setattr(page, 'start_battle', MagicMock())
         monkeypatch.setattr(page, '_open_choose_page', lambda _slot: FakeChooseShipPage())
         monkeypatch.setattr(normal_fight_module.time, 'sleep', lambda _seconds: None)
