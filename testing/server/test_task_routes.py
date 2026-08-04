@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -28,6 +29,7 @@ from autowsgr.server.schemas import (
     TaskStatusResponse,
 )
 from autowsgr.types import ConditionFlag, ShipType
+import autowsgr.ops.normal_fight as normal_fight_module
 
 
 if TYPE_CHECKING:
@@ -426,3 +428,48 @@ def test_event_route_top_level_fleet_id_overrides_api_plan(
     asyncio.run(task._start_event_fight(object(), request))
 
     assert captured[0].fleet_id == 5
+
+
+def test_normal_route_enters_real_runner_with_resolved_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HTTP route reaches the public ops entry and constructs the real runner."""
+    manager = _ExecutingTaskManager()
+    captured: list[ResolvedFleetSelection] = []
+
+    def run_for_times(
+        runner: object,
+        times: int,
+        *,
+        gap: float = 0.0,
+        **_kwargs: object,
+    ) -> list[CombatResult]:
+        assert times == 1
+        assert gap == 0.0
+        assert isinstance(runner, normal_fight_module.NormalFightRunner)
+        captured.append(runner._fleet_selection)
+        return [CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)]
+
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(normal_fight_module.NormalFightRunner, 'run_for_times', run_for_times)
+
+    request = NormalFightRequest(
+        plan=CombatPlanRequest(
+            fleet_id=4,
+            fleet_rules=[FleetRuleRequest(name='真实 runner 舰', ship_type=['kp'])],
+        ),
+    )
+
+    ctx = SimpleNamespace(
+        ctrl=None,
+        config=SimpleNamespace(dock_full_destroy=False, destroy_ship_types=None),
+    )
+    response = asyncio.run(task._start_normal_fight(ctx, request))
+
+    assert response.success is True
+    assert manager.outcome is not None
+    assert manager.outcome.success is True
+    assert len(captured) == 1
+    assert captured[0].source is FleetSelectionSource.OVERRIDE_RULES
+    assert captured[0].fleet_id == 4
+    assert captured[0].primary_names == ['真实 runner 舰']
