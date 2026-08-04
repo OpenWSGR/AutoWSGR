@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Literal, TypeAlias
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -44,7 +44,8 @@ class LogLevel(StrEnum):
     ERROR = 'ERROR'
 
 
-RuleSpec: TypeAlias = tuple[str, Literal['retreat', 'detour'] | int]
+type FormationAction = Annotated[int, Field(strict=True, ge=1, le=5)]
+type RuleSpec = tuple[str, Literal['retreat', 'detour'] | FormationAction]
 """HTTP rule item: condition expression plus retreat/detour/formation action."""
 
 

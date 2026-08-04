@@ -241,10 +241,27 @@ def test_non_fleet_native_type_is_rejected():
         ship_type_from_native(VesselType.Airfield)
 
 
-@pytest.mark.parametrize('code', ['cf', 'cgaa', 'cbg', 'ddg', 'ddgaa'])
-def test_noncanonical_ship_type_is_rejected(code: str):
-    with pytest.raises(ValidationError, match='ship_type 不合法'):
-        FleetRuleRequest.model_validate({'name': '测试舰船', 'ship_type': [code]})
+@pytest.mark.parametrize(
+    ('code', 'expected'),
+    [
+        ('cf', ShipType.CV),
+        ('cgaa', ShipType.CG),
+        ('cbg', ShipType.CBG),
+        ('ddg', ShipType.ASDG),
+        ('ddgaa', ShipType.AADG),
+    ],
+)
+def test_legacy_ship_type_aliases_are_accepted(code: str, expected: ShipType):
+    rule = FleetRuleRequest.model_validate({'name': '测试舰船', 'ship_type': [code]})
+    slot = fleet_slot_from_api(rule.model_dump(exclude_none=True))
+    assert slot.primary is not None
+    assert slot.primary.ship_types == (expected,)
+
+
+@pytest.mark.parametrize('action', [0, 6, True])
+def test_invalid_rule_formation_action_is_rejected_at_http_boundary(action: object):
+    with pytest.raises(ValidationError):
+        NodeDecisionRequest.model_validate({'enemy_rules': [['BB > 0', action]]})
 
 
 def test_yaml_and_api_candidate_only_rules_share_canonical_model():

@@ -94,7 +94,23 @@ SHIP_TYPE_BY_CODE: Mapping[str, tuple[ShipType, ...]] = MappingProxyType(
 )
 """API 舰种代码到后端领域枚举的唯一映射。"""
 
-ALLOWED_SHIP_TYPE_CODES = frozenset(SHIP_TYPE_BY_CODE)
+LEGACY_SHIP_TYPE_ALIASES: Mapping[str, str] = MappingProxyType(
+    {
+        'cf': 'cv',
+        'cgaa': 'cg',
+        'cbg': 'bg',
+        'ddg': 'asdg',
+        'ddgaa': 'aadg',
+    },
+)
+"""旧版 API/GUI 舰种代码到 canonical code 的兼容映射。"""
+
+_ALL_SHIP_TYPE_CODES = {
+    *SHIP_TYPE_BY_CODE,
+    *LEGACY_SHIP_TYPE_ALIASES,
+}
+
+ALLOWED_SHIP_TYPE_CODES = frozenset(_ALL_SHIP_TYPE_CODES)
 
 
 def parse_ship_type_codes(raw: object) -> tuple[ShipType, ...]:
@@ -110,7 +126,8 @@ def parse_ship_type_codes(raw: object) -> tuple[ShipType, ...]:
         if not isinstance(value, str) or not value.strip():
             raise ValueError('ship_type 必须是非空字符串列表')
         code = value.strip().lower()
-        ship_types = SHIP_TYPE_BY_CODE.get(code)
+        canonical_code = LEGACY_SHIP_TYPE_ALIASES.get(code, code)
+        ship_types = SHIP_TYPE_BY_CODE.get(canonical_code)
         if ship_types is None:
             allowed = ', '.join(sorted(ALLOWED_SHIP_TYPE_CODES))
             raise ValueError(f'ship_type 不合法: {value!r}, 可选值: {allowed}')
@@ -322,7 +339,7 @@ def fleet_presets_from_yaml(raw: object) -> tuple[FleetPreset, ...] | None:
         name = _optional_text(raw_preset.get('name')) or ''
         raw_slots = raw_preset.get('ships')
         if not isinstance(raw_slots, list):
-            raise ValueError('fleet_presets.ships 必须是非空列表')
+            raise TypeError('fleet_presets.ships 必须是非空列表')
         if not raw_slots:
             raise ValueError('fleet_presets 不能包含空 ships')
         presets.append(
