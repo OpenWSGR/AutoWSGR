@@ -77,7 +77,8 @@ class _ExecutingTaskManager:
         executor: Callable[[object], TaskOutcome] | None = None,
     ) -> str:
         if args:
-            task_type, total_rounds, executor = args  # type: ignore[misc]
+            _task_type, _total_rounds, executor = args
+        del task_type, total_rounds
         assert executor is not None
         self.outcome = executor(object())
         return 'task_test'

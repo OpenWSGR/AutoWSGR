@@ -96,6 +96,20 @@ class NodeDecisionRequest(BaseModel):
         description='索敌失败时使用的替代阵型',
     )
 
+    @field_validator('enemy_rules')
+    @classmethod
+    def _validate_enemy_rules(
+        cls,
+        value: list[RuleSpec] | None,
+    ) -> list[RuleSpec] | None:
+        if value is None:
+            return None
+        from autowsgr.combat.rules import _parse_legacy_condition
+
+        for condition, _action in value:
+            _parse_legacy_condition(condition)
+        return value
+
     model_config = {'extra': 'forbid'}
 
 

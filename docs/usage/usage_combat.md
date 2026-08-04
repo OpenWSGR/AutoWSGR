@@ -320,7 +320,7 @@ class SmartExerciseRunner(ExerciseRunner):
 enemy_rules:
   - [CV > 0, retreat]         # 有航母 → 撤退
   - [SS == 5, retreat]        # 5 艘潜艇 → 撤退
-  - [SAP != 1, retreat]       # 轻母不等于 1 → 撤退
+  - [CVL != 1, retreat]       # 轻母不等于 1 → 撤退
   - [BB >= 2, detour]         # 战列 >= 2 → 迂回
 ```
 
@@ -337,7 +337,7 @@ enemy_rules:
 | CLT | 重雷装巡洋舰（雷巡） | CL | 轻巡洋舰（轻巡） |
 | BM | 浅水重炮舰（重炮） | DD | 驱逐舰（驱逐） |
 | SSG | 导弹潜艇（导潜） | SS | 潜水艇（潜艇） |
-| SC | 重炮潜艇（炮潜） | AP | 补给舰（补给） |
+| SC | 重炮潜艇（炮潜） | NAP | 补给舰（补给） |
 | ASDG | 反舰导弹驱逐舰（导驱） | AADG | 防空导弹驱逐舰（防驱） |
 | KP | 反舰导弹巡洋舰（导巡） | CG | 防空导弹巡洋舰（防巡） |
 | BG | 导弹大型巡洋舰（大巡） | BBG | 导弹战列舰（导战） |
@@ -503,7 +503,7 @@ selected_nodes: [C, E, F]
 repair_mode: 1
 node_defaults:
   enemy_rules:
-    - [SAP != 1, retreat]
+    - [CVL != 1, retreat]
   SL_when_spot_enemy_fails: True
   formation: 4
   night: False

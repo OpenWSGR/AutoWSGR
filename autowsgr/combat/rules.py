@@ -281,8 +281,10 @@ class RuleEngine:
 
 # 匹配 "BB >= 2" 或 "CL + DD >= 1" 形式的条件片段
 _CONDITION_PIECE_RE = re.compile(
-    r'([A-Z]{2,4}(?:\s*\+\s*[A-Z]{2,4})*)\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)'
+    r'\(?\s*([A-Z]{2,4}(?:\s*\+\s*[A-Z]{2,4})*)\s*'
+    r'(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)\s*\)?'
 )
+_CONDITION_SEPARATOR_RE = re.compile(r'\s+and\s+', re.IGNORECASE)
 
 
 def _parse_legacy_condition(condition_str: str) -> list[Condition]:
@@ -296,12 +298,15 @@ def _parse_legacy_condition(condition_str: str) -> list[Condition]:
 
     支持 ``+`` 运算符将多个舰种求和，如 ``CL + DD >= 1``。
     """
-    matches = _CONDITION_PIECE_RE.findall(condition_str)
-    if not matches:
-        raise ValueError(f"无法解析规则条件: '{condition_str}'")
-
     conditions: list[Condition] = []
-    for field_expr, op, value_str in matches:
+    parts = _CONDITION_SEPARATOR_RE.split(condition_str.strip())
+    if not parts or any(not part.strip() for part in parts):
+        raise ValueError(f"无法解析规则条件: '{condition_str}'")
+    for part in parts:
+        match = _CONDITION_PIECE_RE.fullmatch(part.strip())
+        if match is None:
+            raise ValueError(f"无法解析规则条件: '{condition_str}'")
+        field_expr, op, value_str = match.groups()
         value = float(value_str) if '.' in value_str else int(value_str)
         # 规范化字段表达式：去除空格，如 'CL + DD' -> 'CL+DD'
         field_key = '+'.join(p.strip() for p in field_expr.split('+'))

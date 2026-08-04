@@ -266,6 +266,24 @@ class TestParseLegacyCondition:
         with pytest.raises(ValueError, match='无法解析'):
             _parse_legacy_condition('hello world')
 
+    @pytest.mark.parametrize(
+        'condition',
+        [
+            'BB > 0 trailing garbage',
+            'BB > 0 or CV > 0',
+            '',
+            '   ',
+            'BB > 0 and',
+        ],
+    )
+    def test_rejects_unsupported_or_trailing_tokens(self, condition: str):
+        with pytest.raises(ValueError, match='无法解析'):
+            _parse_legacy_condition(condition)
+
+    def test_rejects_or_instead_of_changing_to_and(self):
+        with pytest.raises(ValueError, match='无法解析'):
+            RuleEngine.from_legacy_rules([['BB > 0 or CV > 0', 'retreat']])
+
 
 class TestConditionSumEvaluation:
     """Condition '+' sum evaluation tests."""
