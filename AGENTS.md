@@ -89,6 +89,14 @@ uv build
 本仓库的个人 Fork 为 `https://github.com/ShiinaKuroko/AutoWSGR.git`。后续 Agent
 必须遵守以下分支职责，不得自行改变分支用途：
 
+### 本机仓库与 GitHub 网络路径
+
+- 后端仓库固定为 `C:\ShiinaKuroko\01.Project\AutoWSGR`，GUI 仓库固定为 `C:\ShiinaKuroko\01.Project\AutoWSGR-GUI`。
+- 后端个人远端为 `https://github.com/ShiinaKuroko/AutoWSGR.git`，GUI 个人远端为 `https://github.com/ShiinaKuroko/AutoWSGR-GUI.git`，发布分支均为 `ShiinaKuroko`。
+- 本机 Git CLI 不会自动继承 Windows 系统代理，直接连接 GitHub 会在 443 端口超时。执行 GitHub `fetch`、`pull` 或 `push` 前，必须读取 `HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyServer`；当前正确代理为 `127.0.0.1:7897`。
+- GitHub 命令必须通过临时参数使用代理，例如 `git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 push origin ShiinaKuroko`。不得先尝试无代理直连，也不得为此修改全局 Git 配置。
+- 如果 `127.0.0.1:7897` 未监听，必须先报告本机代理不可用，不得把网络超时误判为认证失败、远端冲突或仓库错误。
+
 - `main` 只用于同步 `OpenWSGR/AutoWSGR:main`，禁止在该分支直接开发、提交或推送功能代码。
 - `ShiinaKuroko` 是个人 Fork 的最新开发分支，经过验证的最新代码才允许推送到这里。
 - `backup/YYYYMMDD-<short-sha>` 是版本备份分支。每次更新 `ShiinaKuroko` 前，先创建一个指向更新前稳定提交的备份；完成更新后，再创建一个指向新稳定提交的备份，最多保留两个备份分支。
