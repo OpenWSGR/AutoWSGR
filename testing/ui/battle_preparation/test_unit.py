@@ -388,7 +388,7 @@ class TestContextShipNameMatch:
 
         assert detected == ['可怖', '胡德', '雪风', None, None, None]
 
-    def test_unexpected_pool_match_uses_context_target(self):
+    def test_clear_pool_match_is_not_overwritten_by_context_target(self):
         ctrl = MagicMock(spec=AndroidController)
         ocr = MagicMock()
         expected = ['峰风', 'Z16', 'Z17', 'Z21', '克劳塞维茨', '契卡洛夫']
@@ -405,7 +405,27 @@ class TestContextShipNameMatch:
             expected_names=expected,
         )
 
-        assert detected == expected
+        assert detected[0:5] == ['峰风', 'Z16', 'Z17', 'Z21', '克劳塞维茨']
+        assert detected[5] is not None
+        assert detected[5] != expected[5]
+
+    def test_swapped_close_names_keep_clear_pool_matches(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        expected = ['峰风', '雪风', None, None, None, None]
+        centers = [147, 293]
+        ocr.recognize.return_value = [
+            OCRResult(text=text, confidence=0.95, bbox=(x - 20, 2, x + 20, 24))
+            for text, x in zip(['峰风', '雪风'], centers, strict=True)
+        ]
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+
+        detected = page.detect_fleet(
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            expected_names=['雪风', '峰风', None, None, None, None],
+        )
+
+        assert detected[:2] == ['峰风', '雪风']
 
     def test_unrelated_ocr_does_not_force_slot_target(self):
         ctrl = MagicMock(spec=AndroidController)

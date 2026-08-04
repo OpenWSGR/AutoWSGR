@@ -50,13 +50,24 @@ class NormalFightRunner:
         self,
         ctx: GameContext,
         plan: CombatPlan,
-        fleet_selection: ResolvedFleetSelection,
+        fleet_selection: ResolvedFleetSelection | None = None,
+        *,
+        fleet_id: int | None = None,
+        fleet: Sequence[str] | None = None,
+        fleet_rules: Sequence[FleetSlotRule] | None = None,
     ) -> None:
+        from autowsgr.combat.fleet import resolve_fleet_selection
+
         self._ctx = ctx
         self._ctrl = ctx.ctrl
         self._plan = plan
-        self._fleet_selection = fleet_selection
-        self._fleet_id = fleet_selection.fleet_id
+        self._fleet_selection = fleet_selection or resolve_fleet_selection(
+            plan,
+            fleet_id=fleet_id,
+            fleet=fleet,
+            slot_rules=fleet_rules,
+        )
+        self._fleet_id = self._fleet_selection.fleet_id
 
         # 从 config 读取拆船配置
         self._dock_full_destroy = ctx.config.dock_full_destroy

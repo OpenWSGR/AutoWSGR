@@ -159,7 +159,7 @@ class FleetDetectMixin(BaseBattlePreparation):
             matched = pool_match
             expected_name = expected_slots[slot]
             # 船池结果与本槽目标不一致时，只允许本槽目标参与消歧。
-            if expected_name is not None and matched != expected_name:
+            if expected_name is not None and matched is None:
                 context_match = self._match_context_ship_name(text, [expected_name])
                 if context_match is not None:
                     matched = context_match

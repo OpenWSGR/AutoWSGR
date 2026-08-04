@@ -281,12 +281,17 @@ def fleet_slot_from_api(raw: str | Mapping[str, Any]) -> FleetSlotRule:
     if not isinstance(raw_candidates, Sequence) or isinstance(raw_candidates, str):
         raise TypeError('candidates 必须是规则对象列表')
     candidates = tuple(
-        _selector_from_mapping(candidate, relaxed=False)
+        ShipSelector(
+            name=candidate,
+            search_name=_optional_text(raw.get('search_name')),
+            ship_types=parse_ship_type_codes(raw.get('ship_type')),
+            min_level=_optional_level(raw, 'min_level'),
+            max_level=_optional_level(raw, 'max_level'),
+        )
+        if isinstance(candidate, str)
+        else _selector_from_mapping(candidate, relaxed=False)
         for candidate in raw_candidates
-        if isinstance(candidate, Mapping)
     )
-    if len(candidates) != len(raw_candidates):
-        raise TypeError('HTTP candidates 只接受规则对象')
     return FleetSlotRule(primary=primary, candidates=candidates)
 
 

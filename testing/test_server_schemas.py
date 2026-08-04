@@ -96,28 +96,30 @@ def test_empty_fleet_slot_is_rejected():
         FleetRuleRequest.model_validate({})
 
 
-def test_candidate_only_slot_rejects_primary_constraints():
+def test_candidate_only_slot_rejects_primary_search_name():
     with pytest.raises(
         ValidationError,
         match='没有主选 name 时不能填写主选规则',
     ):
         FleetRuleRequest.model_validate(
             {
-                'ship_type': ['BB'],
+                'search_name': '别名',
                 'candidates': [{'name': '胡德'}],
             },
         )
 
 
-def test_api_rejects_legacy_candidate_names():
-    with pytest.raises(ValidationError):
-        FleetRuleRequest.model_validate(
-            {
-                'candidates': [' 岛风 ', '雪风'],
-                'ship_type': 'DD',
-                'min_level': 80,
-            },
-        )
+def test_api_accepts_legacy_candidate_names():
+    rule = FleetRuleRequest.model_validate(
+        {
+            'candidates': [' 岛风 ', '雪风'],
+            'ship_type': 'DD',
+            'min_level': 80,
+        },
+    )
+    slot = fleet_slot_from_api(rule.model_dump(exclude_none=True))
+    assert slot.primary is None
+    assert [candidate.name for candidate in slot.candidates] == ['岛风', '雪风']
 
 
 def test_invalid_candidate_ship_type_is_rejected():

@@ -176,7 +176,7 @@ class FleetRuleRequest(FleetShipRuleRequest):
     """一个槽位的主选规则及其位置级备选规则。"""
 
     name: str | None = Field(default=None, description='主选舰船名')
-    candidates: list[FleetShipRuleRequest] = Field(
+    candidates: list[str | FleetShipRuleRequest] = Field(
         default_factory=list,
         description='位置级备选舰船规则（按填写顺序尝试）',
     )
@@ -199,9 +199,6 @@ class FleetRuleRequest(FleetShipRuleRequest):
             value is not None
             for value in (
                 self.search_name,
-                self.ship_type,
-                self.min_level,
-                self.max_level,
             )
         ):
             raise ValueError('没有主选 name 时不能填写主选规则')

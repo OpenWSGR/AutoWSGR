@@ -70,8 +70,11 @@ class EventFightRunner(NormalFightRunner):
         self,
         ctx: GameContext,
         plan: CombatPlan,
-        fleet_selection: ResolvedFleetSelection,
+        fleet_selection: ResolvedFleetSelection | None = None,
         *,
+        fleet_id: int | None = None,
+        fleet: Sequence[str] | None = None,
+        fleet_rules: Sequence[FleetSlotRule] | None = None,
         map_code: str | None = None,  # noqa: ARG002 - 已废弃, 仅为兼容旧签名保留
         entrance: Literal['alpha', 'beta'] | None = None,
         event_name: str | None = None,
@@ -86,6 +89,9 @@ class EventFightRunner(NormalFightRunner):
             ctx,
             plan,
             fleet_selection,
+            fleet_id=fleet_id,
+            fleet=fleet,
+            fleet_rules=fleet_rules,
         )
 
 
