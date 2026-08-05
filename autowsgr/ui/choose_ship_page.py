@@ -16,6 +16,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+import cv2
+
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipType
@@ -60,6 +62,14 @@ CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
 _SCROLL_FROM_Y: float = 0.55
 _SCROLL_TO_Y: float = 0.30
 _OCR_MAX_ATTEMPTS: int = 3
+
+#: 船池卡片信息区域，以 1280x720 截图为校准基准。
+_CARD_REFERENCE_WIDTH = 1280
+_CARD_REFERENCE_HEIGHT = 720
+_SHIP_TYPE_HALF_WIDTH = 68
+_SHIP_TYPE_TOP_OFFSET = 72
+_SHIP_TYPE_BOTTOM_OFFSET = 24
+_SHIP_TYPE_OCR_SCALES = (2, 3)
 
 PAGE_SIGNATURE = PixelSignature(
     name='choose_ship_page',
@@ -426,7 +436,7 @@ class ChooseShipPage:
         cy: float,
         row_key: float,
     ) -> ShipType | None:
-        """在命中卡片附近 OCR 识别舰种。"""
+        """使用旧 OCR 流程在命中卡片附近识别舰种。"""
         assert self._ctx.ocr is not None
 
         h, w = screen.shape[:2]
@@ -450,6 +460,61 @@ class ChooseShipPage:
                 ship_type = self._extract_ship_type_from_text(text)
                 if ship_type is not None:
                     return ship_type
+        return None
+
+    def detect_ship_type_in_single_card(
+        self,
+        screen: np.ndarray,
+        cx: float,
+        cy: float,
+        row_key: float,
+    ) -> ShipType | None:
+        """新 OCR 的单卡舰种识别入口，旧 OCR 流程不会调用此方法。"""
+        assert self._ctx.ocr is not None
+
+        h, w = screen.shape[:2]
+        x_px = max(0, min(w - 1, round(cx * w)))
+        y_px = max(0, min(h - 1, round(cy * h)))
+        row_y = max(0, min(h - 1, round(row_key * h))) if row_key >= 0 else y_px
+
+        half_width = max(1, round(_SHIP_TYPE_HALF_WIDTH * w / _CARD_REFERENCE_WIDTH))
+        top_offset = max(1, round(_SHIP_TYPE_TOP_OFFSET * h / _CARD_REFERENCE_HEIGHT))
+        bottom_offset = max(1, round(_SHIP_TYPE_BOTTOM_OFFSET * h / _CARD_REFERENCE_HEIGHT))
+
+        x1 = max(0, x_px - half_width)
+        x2 = min(w, x_px + half_width)
+        y1 = max(0, row_y - top_offset)
+        y2 = max(0, min(h, row_y - bottom_offset))
+        if x2 - x1 < 16 or y2 - y1 < 16:
+            return None
+
+        crop = screen[y1:y2, x1:x2]
+        for scale in _SHIP_TYPE_OCR_SCALES:
+            enlarged = cv2.resize(
+                crop,
+                None,
+                fx=scale,
+                fy=scale,
+                interpolation=cv2.INTER_CUBIC,
+            )
+            detected_types: set[ShipType] = set()
+            results = self._ctx.ocr.recognize(enlarged)
+            for result in results:
+                text = str(getattr(result, 'text', '')).strip()
+                normalized = text.replace(' ', '')
+                detected_types.update(
+                    ship_type
+                    for ship_type in ShipType
+                    if ship_type is not ShipType.Other and ship_type.value in normalized
+                )
+            if len(detected_types) == 1:
+                return next(iter(detected_types))
+            if len(detected_types) > 1:
+                _log.warning(
+                    '[UI] 单卡舰种 OCR 得到多个结果: {}',
+                    sorted(ship_type.value for ship_type in detected_types),
+                )
+                return None
         return None
 
     @staticmethod
