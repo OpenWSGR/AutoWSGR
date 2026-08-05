@@ -105,6 +105,9 @@ class GameContext:
     quick_repair_used: int = 0
     """本次会话已消耗快修数。"""
 
+    daily_overlay_date: date | None = None
+    """最近一次完成主页面浮层处理的日期 (时间戳 gate: 每日 0 点后首次处理, 跨日失效)。"""
+
     active_fight_tasks: int = 0
     """当前正在执行的战斗任务数。由 TaskScheduler 维护，用于判断是否可以安全执行浴室维修等会占用舰队的操作。"""
 

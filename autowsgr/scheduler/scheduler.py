@@ -198,10 +198,29 @@ class TaskScheduler:
                 task.name,
                 task.times,
             )
+            self._ensure_main_page_clean()
             self._run_task(task)
 
         self._print_summary()
         return list(self._tasks)
+
+    def _ensure_main_page_clean(self) -> None:
+        """常驻弹窗检查: 每日首次消除主页面浮层 (新闻公告 / 每日签到 / 活动预约)。
+
+        在任务执行前、挂机等待时调用; 内部由
+        :func:`autowsgr.ops.startup.handle_daily_overlays` 的时间戳 gate 短路:
+        每天 0 点后第一次调用才真正截图检测并消除, 当天已处理过则直接返回,
+        不干扰正常流程。
+        """
+        try:
+            from autowsgr.ops.startup import handle_daily_overlays
+
+            handle_daily_overlays(self._ctx)
+        except Exception as exc:
+            _log.opt(exception=True).warning(
+                '[Scheduler] 主页面浮层检查失败: {}',
+                exc,
+            )
 
     def _run_task(self, task: FightTask) -> None:
         """执行单个任务的全部轮次。"""
@@ -356,6 +375,8 @@ class TaskScheduler:
                             pass
             else:
                 # 队列空:所有触发器暂无任务 (常规战打满 / 只等远征定时) → 挂机等待
+                # 挂机期间顺带做常驻弹窗检查, 保证回到主页面时浮层不残留
+                self._ensure_main_page_clean()
                 time.sleep(self._idle_sleep)
 
         _log.info('[Scheduler] 收到停止信号, 调度结束')
