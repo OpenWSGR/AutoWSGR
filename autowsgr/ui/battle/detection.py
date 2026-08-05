@@ -13,14 +13,16 @@ from typing import TYPE_CHECKING
 import cv2
 
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import ShipDamageState
+from autowsgr.types import ShipDamageState, ShipType
 from autowsgr.ui.battle.base import BaseBattlePreparation
+from autowsgr.ui.utils.ship_list import extract_ship_type_from_text
 from autowsgr.vision import PixelChecker
 
 from .blood import classify_blood
 from .constants import (
     BLOOD_BAR_PROBE,
     SHIP_LEVEL_CROP,
+    SHIP_TYPE_CROP,
 )
 
 
@@ -137,7 +139,7 @@ class DetectionMixin(BaseBattlePreparation):
             槽位号 (0-5) → 等级。无法识别或无舰船则为 ``None``。
         """
         levels: dict[int, int | None] = {}
-        ocr = self._ocr
+        ocr = self._preferred_ocr
         if ocr is None:
             _log.warning('[UI] 未提供 OCR 引擎，无法识别舰船等级')
             return dict.fromkeys(range(6))
@@ -181,6 +183,75 @@ class DetectionMixin(BaseBattlePreparation):
             ),
         )
         return levels
+
+    # ── 舰种 OCR ─────────────────────────────────────────────────────────
+
+    def _recognize_fleet_ship_types(
+        self,
+        screen: np.ndarray,
+    ) -> dict[int, ShipType | None]:
+        """从准备页截图中 OCR 识别每艘舰船的舰种。
+
+        读取各舰船卡片上的舰种文本 (如 ``轻巡(J国)``)，用于首次换船快照，
+        使已就位的目标舰船可以跳过船池二次确认。
+        """
+        ship_types: dict[int, ShipType | None] = {}
+        ocr = self._preferred_ocr
+        if ocr is None:
+            _log.warning('[UI] 未提供 OCR 引擎，无法识别舰种')
+            return dict.fromkeys(range(6))
+
+        # 先检测哪些槽位有舰船
+        damage = self.detect_ship_damage(screen)
+
+        for slot in range(6):
+            if damage.get(slot) == ShipDamageState.NO_SHIP:
+                ship_types[slot] = None
+                continue
+
+            crop_region = SHIP_TYPE_CROP.get(slot)
+            if crop_region is None:
+                ship_types[slot] = None
+                continue
+
+            cropped = PixelChecker.crop(screen, *crop_region)
+            # 4x 上采样提升小字 OCR 准确率 (对齐等级识别)
+            upscaled = cv2.resize(
+                cropped,
+                (cropped.shape[1] * 4, cropped.shape[0] * 4),
+            )
+            ship_type = self._best_ship_type_from_results(ocr.recognize(upscaled))
+            ship_types[slot] = ship_type
+
+            if ship_type is not None:
+                _log.debug('[UI] 槽位{} 舰种: {}', slot, ship_type.value)
+            else:
+                _log.debug('[UI] 槽位{} 舰种识别失败', slot)
+
+        _log.info(
+            '[准备页] 舰种检测: {}',
+            ' | '.join(
+                f'槽{i}={ship_types[i].value if ship_types[i] is not None else "未知"}'
+                for i in range(6)
+            ),
+        )
+        return ship_types
+
+    @staticmethod
+    def _best_ship_type_from_results(results: list) -> ShipType | None:
+        """从多个 OCR 结果中提取唯一舰种；歧义或无法识别返回 None。"""
+        detected: ShipType | None = None
+        for r in results:
+            text = str(getattr(r, 'text', '')).strip()
+            if not text:
+                continue
+            ship_type = extract_ship_type_from_text(text)
+            if ship_type is None:
+                continue
+            if detected is not None and detected != ship_type:
+                return None
+            detected = ship_type
+        return detected
 
     # ── 舰队信息聚合 ─────────────────────────────────────────────────────
 

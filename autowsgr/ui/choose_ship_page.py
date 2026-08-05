@@ -20,7 +20,6 @@ import cv2
 
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import ShipType
 from autowsgr.vision import (
     MatchStrategy,
     PixelChecker,
@@ -30,7 +29,12 @@ from autowsgr.vision import (
 from autowsgr.vision.ocr import _fuzzy_match
 
 from .utils import wait_for_page, wait_leave_page
-from .utils.ship_list import LevelOCRRetryNeededError, locate_ship_rows, read_ship_levels
+from .utils.ship_list import (
+    LevelOCRRetryNeededError,
+    extract_ship_type_from_text,
+    locate_ship_rows,
+    read_ship_levels,
+)
 
 
 if TYPE_CHECKING:
@@ -38,6 +42,8 @@ if TYPE_CHECKING:
 
     from autowsgr.combat.fleet import ShipSelector
     from autowsgr.context import GameContext
+    from autowsgr.types import ShipType
+    from autowsgr.vision import OCREngine
 
 
 _log = get_logger('ui')
@@ -113,6 +119,24 @@ class ChooseShipPage:
     def __init__(self, ctx: GameContext) -> None:
         self._ctx = ctx
         self._ctrl = ctx.ctrl
+        self._ship_ocr = getattr(ctx, 'ship_ocr', None)
+
+    @property
+    def _preferred_ocr(self) -> OCREngine | None:
+        """返回选船识别优先使用的 OCR 引擎 (增强识别开启时用 RapidOCR)。"""
+        return self._ship_ocr or self._ctx.ocr
+
+    def _detect_hit_ship_type(
+        self,
+        screen: np.ndarray,
+        cx: float,
+        cy: float,
+        row_key: float,
+    ) -> ShipType | None:
+        """按链路选择舰种识别入口：新链路用单卡固定坐标，旧链路用命中点探测。"""
+        if self._ship_ocr is not None:
+            return self._detect_ship_type_in_single_card(screen, cx, cy, row_key)
+        return self._detect_ship_type_near_hit(screen, cx, cy, row_key)
 
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
@@ -312,20 +336,21 @@ class ChooseShipPage:
             匹配并点击成功时返回舰船名；失败返回 ``None``。
         """
         assert self._ctx.ocr is not None
+        ocr = self._preferred_ocr
 
         for attempt in range(_OCR_MAX_ATTEMPTS):
             screen = self._ctrl.screenshot()
             use_level_filter = min_level is not None or max_level is not None
             if use_level_filter:
                 raw_hits = locate_ship_rows(
-                    self._ctx.ocr,
+                    ocr,
                     screen,
                     deduplicate_by_name=False,
                     include_row_key=True,
                 )
                 try:
                     raw_levels = read_ship_levels(
-                        self._ctx.ocr,
+                        ocr,
                         screen,
                         deduplicate_by_name=False,
                         include_row_key=True,
@@ -350,7 +375,7 @@ class ChooseShipPage:
                         time.sleep(0.3)
                         continue
             else:
-                raw_hits = locate_ship_rows(self._ctx.ocr, screen)
+                raw_hits = locate_ship_rows(ocr, screen)
                 raw_levels = []
 
             hits = [self._normalize_hit_entry(hit) for hit in raw_hits]
@@ -389,7 +414,7 @@ class ChooseShipPage:
                         continue
 
                 if ship_type is not None:
-                    detected_ship_type = self._detect_ship_type_near_hit(
+                    detected_ship_type = self._detect_hit_ship_type(
                         screen,
                         cx,
                         cy,
@@ -462,7 +487,7 @@ class ChooseShipPage:
                     return ship_type
         return None
 
-    def detect_ship_type_in_single_card(
+    def _detect_ship_type_in_single_card(
         self,
         screen: np.ndarray,
         cx: float,
@@ -470,7 +495,8 @@ class ChooseShipPage:
         row_key: float,
     ) -> ShipType | None:
         """新 OCR 的单卡舰种识别入口，旧 OCR 流程不会调用此方法。"""
-        assert self._ctx.ocr is not None
+        ocr = self._preferred_ocr
+        assert ocr is not None
 
         h, w = screen.shape[:2]
         x_px = max(0, min(w - 1, round(cx * w)))
@@ -498,15 +524,12 @@ class ChooseShipPage:
                 interpolation=cv2.INTER_CUBIC,
             )
             detected_types: set[ShipType] = set()
-            results = self._ctx.ocr.recognize(enlarged)
+            results = ocr.recognize(enlarged)
             for result in results:
                 text = str(getattr(result, 'text', '')).strip()
-                normalized = text.replace(' ', '')
-                detected_types.update(
-                    ship_type
-                    for ship_type in ShipType
-                    if ship_type is not ShipType.Other and ship_type.value in normalized
-                )
+                ship_type = self._extract_ship_type_from_text(text)
+                if ship_type is not None:
+                    detected_types.add(ship_type)
             if len(detected_types) == 1:
                 return next(iter(detected_types))
             if len(detected_types) > 1:
@@ -519,13 +542,8 @@ class ChooseShipPage:
 
     @staticmethod
     def _extract_ship_type_from_text(text: str) -> ShipType | None:
-        if not text:
-            return None
-        normalized = text.replace(' ', '')
-        for ship_type in ShipType:
-            if ship_type is not ShipType.Other and ship_type.value in normalized:
-                return ship_type
-        return None
+        """从 OCR 文本中提取舰种 (共享实现见 :func:`extract_ship_type_from_text`)。"""
+        return extract_ship_type_from_text(text)
 
     @staticmethod
     def _is_ship_type_in_rule(

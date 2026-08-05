@@ -19,6 +19,7 @@ dependencies = [
     "loguru",
     "keyboard",
     "easyocr>=1.7.1",
+    "rapidocr>=3.0",
     "adbutils>=2.0,<3.0",
     "autowsgr_native==0.3.0",
     "av>=12.0",
@@ -179,6 +180,10 @@ extend-safe-fixes = [
 ]
 "examples/**" = [
     "T201",    # print
+]
+"scripts/**" = [
+    "T201",    # print
+    "INP001",  # implicit-namespace-package (运行时工具脚本, 无需 __init__.py)
 ]
 
 [tool.ruff.lint.mccabe]

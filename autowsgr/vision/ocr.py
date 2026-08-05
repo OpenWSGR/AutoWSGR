@@ -1,6 +1,6 @@
 """OCR 引擎抽象层。
 
-提供统一的文字识别接口，支持 EasyOCR 和 PaddleOCR 后端。
+提供统一的文字识别接口，支持 EasyOCR 和 RapidOCR 后端。
 
 使用方式::
 
@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+import cv2
 import easyocr
 
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
@@ -370,11 +371,11 @@ class OCREngine(ABC):
         Parameters
         ----------
         engine:
-            引擎名称: ``"easyocr"`` 或 ``"paddleocr"``。
+            引擎名称: ``"easyocr"`` 或 ``"rapidocr"``。
         gpu:
             是否使用 GPU 加速。
         mirror:
-            模型下载镜像源: ``"origin"`` / ``"github"`` / ``"tencent"`` / ``"modelscope"``。
+            EasyOCR 模型下载镜像源: ``"origin"`` / ``"github"`` / ``"tencent"`` / ``"modelscope"``。
 
         Returns
         -------
@@ -386,11 +387,16 @@ class OCREngine(ABC):
             return cls._instances[cache_key]
 
         if engine == 'easyocr':
-            _log.info('[OCR] 初始化 EasyOCR（gpu={}, mirror={}）', gpu, mirror)
+            _log.info('[OCR] 初始化 EasyOCR 引擎（gpu={}, mirror={}）', gpu, mirror)
             instance = EasyOCREngine(gpu=gpu, mirror=mirror)
             cls._instances[cache_key] = instance
             return instance
-        raise ValueError(f'不支持的 OCR 引擎: {engine}，可选: easyocr, paddleocr')
+        if engine == 'rapidocr':
+            _log.info('[OCR] 初始化 RapidOCR 引擎 (PP-OCR, gpu={})', gpu)
+            instance = RapidOCREngine()
+            cls._instances[cache_key] = instance
+            return instance
+        raise ValueError(f'不支持的 OCR 引擎: {engine}，可选: easyocr, rapidocr')
 
 
 # ── 具体实现 ──
@@ -427,6 +433,65 @@ class EasyOCREngine(OCREngine):
             )
             for box, text, conf in raw
         ]
+
+
+class RapidOCREngine(OCREngine):
+    """基于 RapidOCR (PP-OCRv6, onnxruntime) 的识别引擎。
+
+    模型内嵌于 pip 包，无需联网下载；采用 lazy import，
+    未启用增强识别时不会加载任何额外依赖。
+
+    .. note::
+        onnx 引擎不支持 EasyOCR 式的动态 ``allowlist``，
+        这里通过识别后字符过滤近似实现（实测 PP-OCRv6 对数字/字母已很准）。
+    """
+
+    def __init__(self) -> None:
+        from rapidocr import RapidOCR
+
+        self._reader = RapidOCR()
+
+    def recognize(
+        self,
+        image: np.ndarray,
+        allowlist: str = '',
+    ) -> list[OCRResult]:
+        # RapidOCR 遵循 OpenCV 惯例使用 BGR；本项目的截图均为 RGB。
+        bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        output = self._reader(bgr)
+        if output.txts is None:
+            return []
+
+        results: list[OCRResult] = []
+        for idx, raw_text in enumerate(output.txts):
+            text = str(raw_text)
+            if allowlist:
+                filtered = ''.join(ch for ch in text if ch in allowlist)
+                if not filtered:
+                    continue
+                text = filtered
+            bbox = None
+            if output.boxes is not None and idx < len(output.boxes):
+                box = output.boxes[idx]
+                bbox = (
+                    int(box[0][0]),
+                    int(box[0][1]),
+                    int(box[2][0]),
+                    int(box[2][1]),
+                )
+            confidence = (
+                float(output.scores[idx])
+                if output.scores is not None and idx < len(output.scores)
+                else 0.0
+            )
+            results.append(
+                OCRResult(
+                    text=text,
+                    confidence=confidence,
+                    bbox=bbox,
+                )
+            )
+        return results
 
 
 # ── 辅助函数 ──

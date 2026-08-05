@@ -541,11 +541,86 @@ class TestContextShipNameMatch:
         ) as detect:
             snapshot = page._detect_initial_snapshot(['岛风'])
 
-        assert snapshot == second
+        assert snapshot.names == second.names
+        assert snapshot.occupied == second.occupied
         assert detect.call_args_list == [
-            call(expected_pool=['岛风']),
-            call(expected_pool=['岛风']),
+            call(expected_pool=['岛风'], recognize_ship_details=True),
+            call(expected_pool=['岛风'], recognize_ship_details=True),
         ]
+
+    def test_initial_snapshot_recognizes_ship_types(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        first = FleetSnapshot(
+            names=['岛风', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+        )
+
+        with patch.object(
+            page,
+            'detect_fleet_snapshot',
+            return_value=first,
+        ):
+            snapshot = page._detect_initial_snapshot(['岛风'])
+
+        assert snapshot.ship_types == [ShipType.DD, None, None, None, None, None]
+
+    def test_initial_snapshot_merges_conflicting_ship_types_to_unknown(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        first = FleetSnapshot(
+            names=[None] * 6,
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+        )
+        second = FleetSnapshot(
+            names=['岛风', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.CL, None, None, None, None, None],
+        )
+
+        with patch.object(
+            page,
+            'detect_fleet_snapshot',
+            side_effect=[first, second],
+        ):
+            snapshot = page._detect_initial_snapshot(['岛风'])
+
+        assert snapshot.names == ['岛风', None, None, None, None, None]
+        assert snapshot.ship_types == [None, None, None, None, None, None]
+
+    def test_recognize_fleet_ship_types_on_preparation_screen(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        ocr.recognize.return_value = [OCRResult(text='轻巡(J国)', confidence=0.99)]
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+
+        with patch(
+            'autowsgr.ui.battle.fleet_change._detect.DetectionMixin.detect_ship_damage',
+            return_value=dict.fromkeys(range(6), ShipDamageState.NORMAL),
+        ):
+            ship_types = page._recognize_fleet_ship_types(screen)
+
+        assert ship_types[0] is ShipType.CL
+        assert ocr.recognize.call_count == 6
+
+    def test_best_ship_type_rejects_conflicting_results(self):
+        assert (
+            BattlePreparationPage._best_ship_type_from_results(
+                [OCRResult(text='航母', confidence=0.99)],
+            )
+            is ShipType.CV
+        )
+        assert (
+            BattlePreparationPage._best_ship_type_from_results(
+                [
+                    OCRResult(text='航母', confidence=0.99),
+                    OCRResult(text='轻母', confidence=0.99),
+                ],
+            )
+            is None
+        )
+        assert BattlePreparationPage._best_ship_type_from_results([]) is None
 
     def test_user_ship_name_alias_is_used_for_final_fleet_detection(self):
         ctrl = MagicMock(spec=AndroidController)
@@ -870,7 +945,7 @@ class TestSmartFleetChange:
         ) as detect:
             assert page.change_fleet(None, exact_fleet_rules([*target, 'G']))
 
-        detect.assert_called_once_with(expected_pool=target)
+        detect.assert_called_once_with(expected_pool=target, recognize_ship_details=True)
 
     def test_duplicate_fixed_names_fail_before_ocr(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
@@ -901,7 +976,7 @@ class TestSmartFleetChange:
         assert local_fix.call_count == 2
         expected_names = ['A', None, None, None, None, None]
         assert detect.call_args_list == [
-            call(expected_pool=['A']),
+            call(expected_pool=['A'], recognize_ship_details=True),
             call(expected_pool=['A']),
             call(expected_names=expected_names),
             call(expected_names=expected_names),
@@ -911,6 +986,172 @@ class TestSmartFleetChange:
             call(expected_pool=['A']),
             call(expected_names=expected_names),
         ]
+
+    def test_snapshot_marks_in_place_strict_slot_as_verified(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        option = ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100)
+        snapshot = FleetSnapshot(
+            names=['A', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+            ship_levels=[105, None, None, None, None, None],
+        )
+        verified: set[int] = set()
+
+        page._mark_snapshot_verified_slots(
+            snapshot,
+            [option, None, None, None, None, None],
+            verified,
+        )
+
+        assert verified == {0}
+
+    def test_snapshot_rejects_wrong_ship_type(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        option = ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100)
+        snapshot = FleetSnapshot(
+            names=['A', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.CL, None, None, None, None, None],
+            ship_levels=[105, None, None, None, None, None],
+        )
+        verified: set[int] = set()
+
+        page._mark_snapshot_verified_slots(
+            snapshot,
+            [option, None, None, None, None, None],
+            verified,
+        )
+
+        assert verified == set()
+
+    def test_snapshot_rejects_level_below_min(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        option = ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100)
+        snapshot = FleetSnapshot(
+            names=['A', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+            ship_levels=[95, None, None, None, None, None],
+        )
+        verified: set[int] = set()
+
+        page._mark_snapshot_verified_slots(
+            snapshot,
+            [option, None, None, None, None, None],
+            verified,
+        )
+
+        assert verified == set()
+
+    def test_snapshot_rejects_missing_level(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        option = ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100)
+        snapshot = FleetSnapshot(
+            names=['A', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+            ship_levels=[None, None, None, None, None, None],
+        )
+        verified: set[int] = set()
+
+        page._mark_snapshot_verified_slots(
+            snapshot,
+            [option, None, None, None, None, None],
+            verified,
+        )
+
+        assert verified == set()
+
+    def test_snapshot_ignores_relaxed_rules(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        option = ShipSelector(
+            name='A',
+            ship_types=(ShipType.DD,),
+            min_level=100,
+            relaxed_constraints=True,
+        )
+        snapshot = FleetSnapshot(
+            names=['A', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+            ship_levels=[105, None, None, None, None, None],
+        )
+        verified: set[int] = set()
+
+        page._mark_snapshot_verified_slots(
+            snapshot,
+            [option, None, None, None, None, None],
+            verified,
+        )
+
+        assert verified == set()
+
+    def test_snapshot_marks_mispositioned_target_as_verified(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        option = ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100)
+        snapshot = FleetSnapshot(
+            names=[None, None, 'A', None, None, None],
+            occupied=[False, False, True, False, False, False],
+            ship_types=[None, None, ShipType.DD, None, None, None],
+            ship_levels=[None, None, 105, None, None, None],
+        )
+        verified: set[int] = set()
+
+        page._mark_snapshot_verified_slots(
+            snapshot,
+            [option, None, None, None, None, None],
+            verified,
+        )
+
+        assert verified == {0}
+
+    def test_snapshot_reverifies_in_place_candidate_after_replan(self):
+        """主选不在船池时重规划到已就位的备选，直接用首次快照标记为已验证。"""
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        rule = FleetSlotRule(
+            primary=ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100),
+            candidates=(ShipSelector(name='B', ship_types=(ShipType.DD,), min_level=100),),
+        )
+        selectors: list[FleetSlotRule | None] = [rule, None, None, None, None, None]
+        current = ['B', None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+        # 首次快照确认槽位 0 的 B 已就位且满足 DD/100 约束。
+        page._initial_snapshot = FleetSnapshot(
+            names=['B', None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+            ship_types=[ShipType.DD, None, None, None, None, None],
+            ship_levels=[100, None, None, None, None, None],
+        )
+        assigned = BattlePreparationPage._plan_target_options(selectors)
+        assert assigned is not None
+        assert assigned[0].name == 'A'
+        verified: set[int] = set()
+        selected: list[str] = []
+
+        def select_option(_slot: int, option: ShipSelector) -> _ShipSelection:
+            selected.append(option.name)
+            # 主选 A 不在船池，选择失败；已就位的备选 B 不应再被尝试。
+            return _ShipSelection(None, option)
+
+        with (
+            patch.object(page, '_try_select_option', side_effect=select_option),
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._align_member_set(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                verified,
+                set(),
+                {},
+            )
+
+        # 主选失败后改派已就位备选 B，且直接用首次快照标记为已验证。
+        assert selected == ['A']
+        assert assigned[0].name == 'B'
+        assert 0 in verified
 
 
 class TestFleetSlotRules:

@@ -6,12 +6,14 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import cv2
 
 from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import ShipType
 from autowsgr.vision import apply_ship_patches, get_api_dll
 from autowsgr.vision.ocr import OCRResult, _fuzzy_match
 from autowsgr.vision.ocr_rules import (
@@ -44,6 +46,22 @@ LEGACY_LIST_WIDTH: int = 1048
 _MAX_LEVEL_NOISE_CHARS = 2
 _MAX_NOISY_LEVEL_HITS_BEFORE_RETRY = 5
 _MIN_SPLIT_LEVEL_CONFIDENCE = 0.85
+
+
+def extract_ship_type_from_text(text: str) -> ShipType | None:
+    """从 OCR 文本中提取舰种。
+
+    游戏内舰种文字常带阵营括号，如 ``轻巡(J国)`` / ``潜艇(G国)``，
+    先剔除括号及括号内内容 (国家缩写) 再匹配，避免干扰。
+    准备页快照与选船页单卡识别共用此函数。
+    """
+    if not text:
+        return None
+    normalized = re.sub(r'[（(][^（()）]*[)）]', '', text).replace(' ', '')
+    for ship_type in ShipType:
+        if ship_type is not ShipType.Other and ship_type.value in normalized:
+            return ship_type
+    return None
 
 
 class LevelOCRRetryNeededError(RuntimeError):

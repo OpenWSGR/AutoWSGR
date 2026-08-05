@@ -73,7 +73,7 @@ class TestShipTypeProbeRoutes:
         ocr.recognize.return_value = [OCRResult(text='航母', confidence=0.99)]
         screen = np.zeros((720, 1280, 3), dtype=np.uint8)
 
-        ship_type = page.detect_ship_type_in_single_card(
+        ship_type = page._detect_ship_type_in_single_card(
             screen,
             cx=403 / 1280,
             cy=650 / 720,
@@ -89,7 +89,7 @@ class TestShipTypeProbeRoutes:
         ocr.recognize.return_value = [OCRResult(text='轻母', confidence=0.99)]
         screen = np.zeros((1080, 1920, 3), dtype=np.uint8)
 
-        ship_type = page.detect_ship_type_in_single_card(
+        ship_type = page._detect_ship_type_in_single_card(
             screen,
             cx=403 / 1280,
             cy=650 / 720,
@@ -107,7 +107,7 @@ class TestShipTypeProbeRoutes:
         ]
         screen = np.zeros((720, 1280, 3), dtype=np.uint8)
 
-        ship_type = page.detect_ship_type_in_single_card(
+        ship_type = page._detect_ship_type_in_single_card(
             screen,
             cx=403 / 1280,
             cy=650 / 720,
@@ -129,7 +129,7 @@ class TestShipTypeProbeRoutes:
         ]
         screen = np.zeros((720, 1280, 3), dtype=np.uint8)
 
-        ship_type = page.detect_ship_type_in_single_card(
+        ship_type = page._detect_ship_type_in_single_card(
             screen,
             cx=403 / 1280,
             cy=650 / 720,
@@ -138,6 +138,26 @@ class TestShipTypeProbeRoutes:
 
         assert ship_type is None
         assert ocr.recognize.call_count == 1
+
+    def test_ignores_faction_parens_in_ship_type_text(self):
+        page, ocr = self._build_page()
+        ocr.recognize.return_value = [OCRResult(text='轻巡(J国)', confidence=0.99)]
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        ship_type = page._detect_ship_type_in_single_card(
+            screen,
+            cx=403 / 1280,
+            cy=650 / 720,
+            row_key=648 / 720,
+        )
+
+        assert ship_type is ShipType.CL
+
+    def test_extract_ship_type_strips_faction_parens(self):
+        assert ChooseShipPage._extract_ship_type_from_text('轻巡(J国)') is ShipType.CL
+        assert ChooseShipPage._extract_ship_type_from_text('(E国)战列') is ShipType.BB
+        assert ChooseShipPage._extract_ship_type_from_text('潜艇 G国') is ShipType.SS
+        assert ChooseShipPage._extract_ship_type_from_text('(J国)') is None
 
 
 class TestIndependentShipRules:
