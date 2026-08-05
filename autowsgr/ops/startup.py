@@ -25,6 +25,7 @@ TODO: 处理游戏更新提示
 from __future__ import annotations
 
 import time
+from datetime import date
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
@@ -59,6 +60,15 @@ _OVERLAY_DISMISS_TIMEOUT: float = 10.0
 
 _OVERLAY_DISMISS_DELAY: float = 1.0
 """消除浮层后的等待时间 (秒)。"""
+
+_OVERLAY_DISMISS_MAX: int = 5
+"""每日浮层消除的最大尝试次数 (新闻 → 签到 → 确认 → 二次确认 → 兜底)。"""
+
+_OVERLAY_DISMISS_WAIT: float = 1.5
+"""消除每个浮层后的等待时间 (秒) — 弹窗按顺序逐个出现, 需要间隔等待。"""
+
+_OVERLAY_CONFIRM_TIMEOUT: float = 3.0
+"""确认弹窗兜底的最大等待时限 (秒) — 用于检测不到浮层签名但存在确认按钮的弹窗。"""
 
 _RECOVERY_TO_MAIN_TIMEOUT: float = 20.0
 """页面异常恢复时，尝试回到主界面的超时 (秒)。"""
@@ -223,21 +233,72 @@ def restart_game(
     start_game(ctrl, package, startup_timeout=startup_timeout)
 
 
-def go_main_page(ctx: GameContext, *, dismiss_overlays: bool = True) -> None:  # noqa: ARG001
+def handle_daily_overlays(ctx: GameContext) -> None:
+    """每日首次主页面浮层处理 (新闻公告 → 每日签到 → 活动预约)。
+
+    时间戳 gate: 每天 0 点后第一次调用才真正截图检测并消除浮层,
+    当天已处理过则直接返回 (零开销), 避免每次回主页都重复检测。
+
+    触发时机 (启动 / 任务执行前 / 挂机等待) 均可安全调用:
+    - 登录后弹出「新闻公告」→ 勾选「不再显示」+ 点左上角 X
+    - 接着弹出「每日签到」→ 点领取 + 确认操作
+    - 可能再弹出「活动预约」→ 点关闭 + 二次确认
+
+    按弹窗出现顺序逐个消除, 最多尝试 :data:`_OVERLAY_DISMISS_MAX` 次,
+    直到画面干净或无浮层可关为止。
+    """
+    today = date.today()  # noqa: DTZ011  # 本地墙上时钟 (游戏 0 点刷新)
+    if ctx.daily_overlay_date == today:
+        return
+    # 先标记再执行: 即使本次消除中断, 当天也不会反复重试
+    ctx.daily_overlay_date = today
+
+    page = MainPage(ctx)
+    for attempt in range(_OVERLAY_DISMISS_MAX):
+        # ① 已知浮层 (新闻 / 签到 / 预约) 直接消除
+        if page.dismiss_current_overlay():
+            _log.info(
+                '[Startup] 主页面浮层已消除 ({}/{})',
+                attempt + 1,
+                _OVERLAY_DISMISS_MAX,
+            )
+            time.sleep(_OVERLAY_DISMISS_WAIT)
+            continue
+
+        # ② 确认弹窗兜底: 检测不到浮层签名, 但可能有「确认」按钮
+        #    (如签到奖励确认、二次确认) — 用确认模板轮子点掉
+        from autowsgr.ui.utils import confirm_operation
+
+        if confirm_operation(
+            ctx.ctrl,
+            must_confirm=False,
+            timeout=_OVERLAY_CONFIRM_TIMEOUT,
+        ):
+            _log.info('[Startup] 确认弹窗兜底: 点击确认 ({}/{})', attempt + 1, _OVERLAY_DISMISS_MAX)
+            time.sleep(_OVERLAY_DISMISS_WAIT)
+            continue
+
+        # ③ 既无浮层又无确认按钮 → 主页干净, 流程完成
+        return
+
+
+def go_main_page(ctx: GameContext, *, dismiss_overlays: bool = True) -> None:
     """确保当前处于游戏主页面。
 
-    1. 若设置了 ``dismiss_overlays``，先消除登录浮层
-    2. 调用 :func:`~autowsgr.ops.navigate.goto_page` 导航到主页面
+    1. 调用 :func:`~autowsgr.ops.navigate.goto_page` 导航到主页面
+    2. 若设置了 ``dismiss_overlays``，导航后消除登录浮层
 
     Parameters
     ----------
     ctx:
         游戏上下文。
     dismiss_overlays:
-        是否先消除登录浮层，默认 ``True``。
+        是否消除登录浮层，默认 ``True``。
     """
     _log.info('[Startup] 导航到主页面')
     goto_page(ctx, PageName.MAIN)
+    if dismiss_overlays:
+        handle_daily_overlays(ctx)
 
 
 def recover_to_main_or_restart(
@@ -278,7 +339,7 @@ def ensure_game_ready(
     app: GameAPP | str = GameAPP.official,
     *,
     startup_timeout: float = _STARTUP_TIMEOUT,
-    dismiss_overlays: bool = True,  # noqa: ARG001
+    dismiss_overlays: bool = True,
 ) -> None:
     """确保游戏已启动并处于可识别页面。
 
@@ -320,3 +381,5 @@ def ensure_game_ready(
         _log.info('[Startup] 游戏已在运行')
 
     _log.info('[Startup] 游戏就绪')
+    if dismiss_overlays:
+        handle_daily_overlays(ctx)

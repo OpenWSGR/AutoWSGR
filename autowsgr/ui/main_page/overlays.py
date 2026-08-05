@@ -33,6 +33,15 @@ if TYPE_CHECKING:
 
 _log = get_logger('ui')
 
+_SIGN_CONFIRM_MAX: int = 2
+"""每日签到最多处理的确认弹窗段数 (领取确认 + 可能的奖励确认)。"""
+
+_SIGN_CONFIRM_WAIT: float = 1.0
+"""两段确认之间的等待时间 (秒) — 奖励确认弹窗需几秒才出现。"""
+
+_SIGN_CONFIRM_TIMEOUT: float = 8.0
+"""等待确认弹窗出现的最大时限 (秒)。"""
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 检测
@@ -82,12 +91,26 @@ def dismiss_news(ctrl: AndroidController, screen: np.ndarray | None = None) -> N
 
 
 def dismiss_sign(ctrl: AndroidController) -> None:
-    """关闭每日签到浮层。"""
+    """关闭每日签到浮层 (领取奖励 + 处理确认弹窗)。
+
+    签到奖励流程可能包含连续两段确认弹窗:
+    1. 点「领取奖励」后弹出「获得 xx」确认弹窗 → 点确认
+    2. 部分版本点确认后还有「奖励确认」二级弹窗 → 有则再点
+
+    第一次确认必须点击 (领取后必有), 第二次确认可选 (等不到就直接收尾)。
+    """
     from autowsgr.ui.utils import confirm_operation
 
-    _log.info('[UI] 每日签到: 关闭')
+    _log.info('[UI] 每日签到: 领取奖励')
     ctrl.click(*DismissCoord.SIGN_CONFIRM.xy)
-    confirm_operation(ctrl, must_confirm=True, timeout=5.0)
+    # 第一段确认: 领取后必有, 等待出现并点击 (超时未出现则视为异常)
+    confirm_operation(ctrl, must_confirm=True, timeout=_SIGN_CONFIRM_TIMEOUT)
+    # 第二段确认: 等待几秒, 若还有「奖励确认」弹窗则继续点, 直到画面干净
+    for _ in range(_SIGN_CONFIRM_MAX - 1):
+        time.sleep(_SIGN_CONFIRM_WAIT)
+        if not confirm_operation(ctrl, must_confirm=False, timeout=_SIGN_CONFIRM_TIMEOUT):
+            return
+        _log.info('[UI] 每日签到: 二次确认已点击')
 
 
 def dismiss_booking(ctrl: AndroidController) -> None:

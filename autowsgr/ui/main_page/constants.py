@@ -89,11 +89,11 @@ class ProbePoint(enum.Enum):
 class DismissCoord(enum.Enum):
     """浮层 / 弹窗消除点击坐标。"""
 
-    NEWS_NOT_SHOW = (0.0729, 0.8981)
-    """新闻「不再显示」复选框 — (70, 485)。"""
+    NEWS_NOT_SHOW = (0.0664, 0.9000)
+    """新闻「不再显示」复选框 — 5.6.0 版式 (85, 648)。"""
 
-    NEWS_CLOSE = (0.0313, 0.0556)
-    """新闻关闭按钮 — (30, 30)。"""
+    NEWS_CLOSE = (0.0352, 0.0625)
+    """新闻关闭按钮 — 5.6.0 版式 (45, 45)。"""
 
     SIGN_CONFIRM = (0.4938, 0.6611)
     """签到领取/关闭按钮 — (474, 357)。"""
@@ -176,18 +176,23 @@ _SIGNATURES: dict[Sig, PixelSignature] = {
         name='news_overlay',
         strategy=MatchStrategy.ALL,
         rules=[
-            PixelRule.of(0.6523, 0.8292, (148, 88, 86), tolerance=30.0),
-            PixelRule.of(0.7008, 0.8306, (119, 67, 62), tolerance=30.0),
-            PixelRule.of(0.7844, 0.8278, (135, 79, 73), tolerance=30.0),
-            PixelRule.of(0.8516, 0.8278, (126, 72, 65), tolerance=30.0),
+            # 5.6.0 版式: 左上角关闭按钮 X 笔画 (45, 40)
+            PixelRule.of(0.0352, 0.0556, (193, 195, 196), tolerance=30.0),
+            # 5.6.0 版式: 底部米色横条 (结构特征, 与横幅画面无关)
+            PixelRule.of(0.2375, 0.8194, (209, 202, 191), tolerance=30.0),
+            PixelRule.of(0.7500, 0.8194, (209, 202, 191), tolerance=30.0),
+            # 5.6.0 版式: 红色标题栏
+            PixelRule.of(0.5188, 0.7500, (180, 126, 119), tolerance=30.0),
         ],
     ),
     Sig.NEWS_NOT_SHOW: PixelSignature(
         name='news_not_show',
         strategy=MatchStrategy.ALL,
         rules=[
-            PixelRule.of(0.0714, 0.9065, (49, 130, 211), tolerance=40.0),
-            PixelRule.of(0.0620, 0.9130, (52, 130, 205), tolerance=40.0),
+            # 5.6.0 版式: 「不再显示」勾选框已勾选 (蓝色, 86, 649)
+            PixelRule.of(0.0672, 0.9014, (54, 129, 201), tolerance=40.0),
+            # 5.6.0 版式: 「不再显示」勾选框已勾选 (蓝色, 89, 649)
+            PixelRule.of(0.0696, 0.9014, (54, 129, 201), tolerance=40.0),
         ],
     ),
     Sig.SIGN: PixelSignature(
