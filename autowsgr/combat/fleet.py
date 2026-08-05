@@ -247,10 +247,19 @@ def _optional_level(rule: Mapping[str, Any], field: str) -> int | None:
     return value
 
 
+def _optional_relaxed(rule: Mapping[str, Any]) -> bool:
+    """读取宽松校验开关；缺省为 False（严格校验）。"""
+    value = rule.get('relaxed')
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        raise TypeError('relaxed 必须是布尔值')
+    return value
+
+
 def _selector_from_mapping(
     raw: Mapping[str, Any],
     *,
-    relaxed: bool,
     inherited: Mapping[str, Any] | None = None,
 ) -> ShipSelector:
     name = _optional_text(raw.get('name'))
@@ -264,7 +273,7 @@ def _selector_from_mapping(
         ship_types=parse_ship_type_codes(source.get('ship_type')),
         min_level=_optional_level(source, 'min_level'),
         max_level=_optional_level(source, 'max_level'),
-        relaxed_constraints=relaxed,
+        relaxed_constraints=_optional_relaxed(raw),
     )
 
 
@@ -285,7 +294,7 @@ def fleet_slot_from_api(raw: str | Mapping[str, Any]) -> FleetSlotRule:
         raise TypeError('舰队槽位必须是字符串或规则对象')
 
     name = _optional_text(raw.get('name'))
-    primary = _selector_from_mapping(raw, relaxed=False) if name is not None else None
+    primary = _selector_from_mapping(raw) if name is not None else None
     raw_candidates = raw.get('candidates', [])
     if not isinstance(raw_candidates, Sequence) or isinstance(raw_candidates, str):
         raise TypeError('candidates 必须是规则对象列表')
@@ -299,7 +308,7 @@ def fleet_slot_from_api(raw: str | Mapping[str, Any]) -> FleetSlotRule:
                 max_level=_optional_level(raw, 'max_level'),
             )
             if isinstance(candidate, str)
-            else _selector_from_mapping(candidate, relaxed=False)
+            else _selector_from_mapping(candidate)
             for candidate in raw_candidates
         )
     )
@@ -320,17 +329,16 @@ def fleet_slot_from_yaml(raw: object) -> FleetSlotRule:
 
     primary: ShipSelector | None = None
     if _optional_text(raw.get('name')) is not None:
-        primary = _selector_from_mapping(raw, relaxed=False)
+        primary = _selector_from_mapping(raw)
     normalized_candidates: list[ShipSelector] = []
     for candidate in candidates:
         if isinstance(candidate, str):
             selector = _selector_from_mapping(
                 {'name': candidate},
-                relaxed=False,
                 inherited=raw,
             )
         elif isinstance(candidate, Mapping):
-            selector = _selector_from_mapping(candidate, relaxed=False)
+            selector = _selector_from_mapping(candidate)
         else:
             raise TypeError('candidates 只能包含舰名字符串或规则对象')
         normalized_candidates.append(selector)

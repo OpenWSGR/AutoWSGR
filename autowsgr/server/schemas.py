@@ -121,6 +121,10 @@ class FleetShipRuleRequest(BaseModel):
     ship_type: list[str] | None = Field(default=None, description='允许的舰种列表（如 [ss, ssg]）')
     min_level: int | None = Field(default=None, ge=1, description='等级下限（含）')
     max_level: int | None = Field(default=None, ge=1, description='等级上限（含）')
+    relaxed: bool = Field(
+        default=False,
+        description='宽松校验：舰名必须命中，等级/舰种尽力而为（识别失败或不匹配也放行）',
+    )
 
     @field_validator('name')
     @classmethod
