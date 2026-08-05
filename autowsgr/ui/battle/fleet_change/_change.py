@@ -62,6 +62,8 @@ class FleetChangeMixin(FleetDetectMixin):
     # True 使用搜索框选船，False 直接通过 OCR 列表选船。
     _use_search: bool = True
     _last_changed_fleet: list[str | None] | None = None
+    # 首次快照 (含舰种/等级)，供重规划备选后重新标记已验证槽位。
+    _initial_snapshot: FleetSnapshot | None = None
 
     @property
     def last_changed_fleet(self) -> list[str | None] | None:
@@ -114,8 +116,10 @@ class FleetChangeMixin(FleetDetectMixin):
         )
 
         # Step 4：首次完整调整，后续最多进行两次局部修正。
-        # verified_slots 记录本轮已通过选船页校验舰种和等级的逻辑目标槽位。
+        # verified_slots 记录本轮已通过选船页 (或首次快照) 校验舰种和等级的逻辑目标槽位。
         verified_slots: set[int] = set()
+        self._initial_snapshot = snapshot
+        self._mark_snapshot_verified_slots(snapshot, assigned, verified_slots)
         unavailable: set[tuple[int, ShipSelector]] = set()
         locked: dict[int, ShipSelector] = {}
         for attempt in range(_MAX_SET_RETRIES + 1):
@@ -316,12 +320,22 @@ class FleetChangeMixin(FleetDetectMixin):
         ]
 
     def _detect_initial_snapshot(self, expected_pool: Sequence[str]) -> FleetSnapshot:
-        """初次识别舰队；存在未知占用槽位时再识别一次并保守合并。"""
-        first = self.detect_fleet_snapshot(expected_pool=expected_pool)
+        """初次识别舰队 (名称+舰种+等级)；存在未知占用槽位时再识别一次并保守合并。
+
+        首次快照额外识别各槽位舰种和等级，作为换船流程的上下文，
+        供后续跳过已就位目标舰船的二次确认。
+        """
+        first = self.detect_fleet_snapshot(
+            expected_pool=expected_pool,
+            recognize_ship_details=True,
+        )
         if not first.unknown_slots:
             return first
 
-        second = self.detect_fleet_snapshot(expected_pool=expected_pool)
+        second = self.detect_fleet_snapshot(
+            expected_pool=expected_pool,
+            recognize_ship_details=True,
+        )
         names = list(first.names)
         for slot, second_name in enumerate(second.names):
             if names[slot] is None and second_name is not None:
@@ -340,7 +354,34 @@ class FleetChangeMixin(FleetDetectMixin):
                 strict=True,
             )
         ]
-        return FleetSnapshot(names=names, occupied=occupied)
+        ship_types = list(first.ship_types or [None] * 6)
+        second_types = second.ship_types or [None] * 6
+        for slot, second_type in enumerate(second_types):
+            if ship_types[slot] is None and second_type is not None:
+                ship_types[slot] = second_type
+            elif (
+                ship_types[slot] is not None
+                and second_type is not None
+                and ship_types[slot] != second_type
+            ):
+                ship_types[slot] = None
+        ship_levels = list(first.ship_levels or [None] * 6)
+        second_levels = second.ship_levels or [None] * 6
+        for slot, second_level in enumerate(second_levels):
+            if ship_levels[slot] is None and second_level is not None:
+                ship_levels[slot] = second_level
+            elif (
+                ship_levels[slot] is not None
+                and second_level is not None
+                and ship_levels[slot] != second_level
+            ):
+                ship_levels[slot] = None
+        return FleetSnapshot(
+            names=names,
+            occupied=occupied,
+            ship_types=ship_types,
+            ship_levels=ship_levels,
+        )
 
     @classmethod
     def _option_matches_name(
@@ -527,6 +568,84 @@ class FleetChangeMixin(FleetDetectMixin):
             and not option.relaxed_constraints
             and (option.ship_types or option.min_level is not None or option.max_level is not None)
         )
+
+    @classmethod
+    def _snapshot_satisfies_option(
+        cls,
+        snapshot: FleetSnapshot,
+        slot: int,
+        option: ShipSelector,
+    ) -> bool:
+        """强校验: 首次快照是否已从舰种/等级确认该槽位满足规则。
+
+        名称匹配由调用方保证；这里只做约束校验。relaxed (弱校验) 规则
+        不要求选船校验，无需调用本函数，名称匹配即视为放行。
+        """
+        ship_type = snapshot.ship_types[slot] if snapshot.ship_types else None
+        ship_level = snapshot.ship_levels[slot] if snapshot.ship_levels else None
+
+        if option.ship_types and ship_type not in option.ship_types:
+            return False
+        if option.min_level is not None or option.max_level is not None:
+            if ship_level is None:
+                return False
+            if option.min_level is not None and ship_level < option.min_level:
+                return False
+            if option.max_level is not None and ship_level > option.max_level:
+                return False
+        return True
+
+    def _mark_snapshot_verified_slots(
+        self,
+        snapshot: FleetSnapshot,
+        assigned: Sequence[ShipSelector | None],
+        verified_slots: set[int],
+    ) -> None:
+        """用首次快照标记已就位且满足规则的逻辑槽位，跳过选船二次确认。
+
+        已确认无需更换的舰船不再进入点对点选船页更换，避免已就位舰船
+        不在船池中导致选不到 → 重选 → 选不到的无限循环。
+        最终舰队 check 仍由流程末尾的验证兜底。
+
+        assigned 中既包含主选也包含备选；备选同样按自身约束参与校验，
+        重规划改派备选后再次调用本函数即可覆盖备选链路。
+
+        强校验 (strict): 名称匹配后，舰种/等级必须全部符合 YAML 规定才标记，
+        任一约束因 OCR 数据缺失而无法确认时也不标记，落入选船页权威校验；
+        弱校验 (relaxed): 规则本就不要求选船校验，由赋值匹配直接放行。
+        """
+        if snapshot.ship_types is None or snapshot.ship_levels is None:
+            return
+        for target_slot, option in enumerate(assigned):
+            if option is None or not self._requires_selection_validation(option):
+                continue
+            if target_slot in verified_slots:
+                continue
+            # 位置无关匹配: 与 _assignment_locations 一致，先找已就位位置再校验。
+            position = next(
+                (
+                    slot
+                    for slot in range(6)
+                    if snapshot.occupied[slot]
+                    and self._option_matches_name(snapshot.names[slot], option)
+                ),
+                None,
+            )
+            if position is None:
+                continue
+            if not self._snapshot_satisfies_option(snapshot, position, option):
+                _log.info(
+                    '[准备页] 快照校验未通过: 逻辑槽位 {} ({}), 进入选船二次确认',
+                    target_slot,
+                    snapshot.names[position],
+                )
+                continue
+            verified_slots.add(target_slot)
+            _log.info(
+                '[准备页] 快照确认逻辑槽位 {} 已就位 ({}), 跳过选船二次确认',
+                target_slot,
+                snapshot.names[position],
+            )
 
     # 从本槽候选中排除队内同名舰，并返回实际可用于选船的规则。
     @classmethod
@@ -849,6 +968,14 @@ class FleetChangeMixin(FleetDetectMixin):
                 ):
                     if old != new:
                         verified_slots.discard(slot)
+                # 重规划后新分配的备选若已在队内且满足约束，直接用首次快照
+                # 标记为已验证，避免已就位备选不在船池时反复进选船页重选。
+                if self._initial_snapshot is not None:
+                    self._mark_snapshot_verified_slots(
+                        self._initial_snapshot,
+                        assigned,
+                        verified_slots,
+                    )
                 continue
 
             _log.info(

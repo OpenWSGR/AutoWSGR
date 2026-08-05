@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import ShipDamageState
+from autowsgr.types import ShipDamageState, ShipType
 from autowsgr.ui.battle.base import BaseBattlePreparation
 from autowsgr.ui.battle.detection import DetectionMixin
 from autowsgr.vision.ocr import (
@@ -59,6 +59,10 @@ class FleetSnapshot:
 
     names: list[str | None]
     occupied: list[bool]
+    ship_types: list[ShipType | None] | None = None
+    """槽位号 (0-5) → 舰种；仅在首次快照识别时填充，否则为 ``None``。"""
+    ship_levels: list[int | None] | None = None
+    """槽位号 (0-5) → 等级；仅在首次快照识别时填充，否则为 ``None``。"""
 
     @property
     def unknown_slots(self) -> list[int]:
@@ -114,7 +118,7 @@ class FleetDetectMixin(BaseBattlePreparation):
         strip = screen[y1:y2, :]
 
         results = sorted(
-            self._ocr.recognize(strip),
+            self._preferred_ocr.recognize(strip),
             key=lambda result: (
                 (result.bbox[0] + result.bbox[2]) / 2 if result.bbox is not None else float('inf')
             ),
@@ -193,8 +197,16 @@ class FleetDetectMixin(BaseBattlePreparation):
         *,
         expected_names: Sequence[str | None] | None = None,
         expected_pool: Sequence[str] | None = None,
+        recognize_ship_details: bool = False,
     ) -> FleetSnapshot:
-        """使用同一截图识别舰名和槽位占用状态。"""
+        """使用同一截图识别舰名和槽位占用状态。
+
+        Parameters
+        ----------
+        recognize_ship_details:
+            是否额外识别各槽位舰种和等级。仅首次换船快照需要开启，
+            避免每次重新截图都做 6 个舰种/等级区域的 OCR。
+        """
         screen = self._ctrl.screenshot()
         names = self.detect_fleet(
             screen,
@@ -207,7 +219,14 @@ class FleetDetectMixin(BaseBattlePreparation):
             or damage.get(slot, ShipDamageState.NO_SHIP) != ShipDamageState.NO_SHIP
             for slot in range(6)
         ]
-        return FleetSnapshot(names=names, occupied=occupied)
+        ship_types = self._recognize_fleet_ship_types(screen) if recognize_ship_details else None
+        ship_levels = self._recognize_fleet_levels(screen) if recognize_ship_details else None
+        return FleetSnapshot(
+            names=names,
+            occupied=occupied,
+            ship_types=ship_types,
+            ship_levels=ship_levels,
+        )
 
     @staticmethod
     def _validate_fleet(
