@@ -55,14 +55,17 @@ def test_new_fleet_rule_keeps_independent_candidates():
                 'ship_type': ['ss'],
                 'min_level': 90,
                 'max_level': 105,
+                'relaxed': False,
             },
             {
                 'name': 'U-47',
                 'ship_type': ['ss'],
                 'min_level': 100,
                 'max_level': 110,
+                'relaxed': False,
             },
         ],
+        'relaxed': False,
     }
 
 
@@ -78,14 +81,35 @@ def test_candidate_only_fleet_rule_is_valid():
 
     assert rule.model_dump(exclude_none=True) == {
         'candidates': [
-            {'name': '胡德', 'ship_type': ['bc']},
-            {'name': '扶桑', 'min_level': 80, 'max_level': 110},
+            {'name': '胡德', 'ship_type': ['bc'], 'relaxed': False},
+            {'name': '扶桑', 'min_level': 80, 'max_level': 110, 'relaxed': False},
         ],
+        'relaxed': False,
     }
     slot = fleet_slot_from_api(rule.model_dump(exclude_none=True))
     assert slot.primary is None
     assert [candidate.name for candidate in slot.candidates] == ['胡德', '扶桑']
     assert all(not candidate.relaxed_constraints for candidate in slot.candidates)
+
+
+def test_api_relaxed_flags_apply_per_rule():
+    """API 的 relaxed 开关按规则各自生效，不互相继承。"""
+    rule = FleetRuleRequest.model_validate(
+        {
+            'name': 'U-47',
+            'relaxed': True,
+            'min_level': 100,
+            'candidates': [
+                {'name': 'U-96', 'relaxed': True, 'min_level': 90},
+                {'name': 'U-81', 'min_level': 95},
+            ],
+        },
+    )
+    slot = fleet_slot_from_api(rule.model_dump(exclude_none=True))
+
+    assert slot.primary is not None
+    assert slot.primary.relaxed_constraints is True
+    assert [candidate.relaxed_constraints for candidate in slot.candidates] == [True, False]
 
 
 def test_empty_fleet_slot_is_rejected():
@@ -305,6 +329,41 @@ def test_legacy_candidate_only_does_not_promote_first_candidate():
     slot = plan.fleet_presets[0].slots[0]
     assert slot.primary is None
     assert [candidate.name for candidate in slot.candidates] == ['A', 'B']
+
+
+def test_yaml_relaxed_parsing_keeps_strict_default():
+    """YAML 的 relaxed 只作用于写它的规则；缺省保持严格，字符串备选不继承槽位开关。"""
+    plan = CombatPlan.from_dict(
+        {
+            'fleet_presets': [
+                {
+                    'ships': [
+                        {
+                            'name': 'U-47',
+                            'relaxed': True,
+                            'min_level': 100,
+                            'candidates': [
+                                'U-96',
+                                {'name': 'U-81', 'relaxed': True, 'min_level': 95},
+                            ],
+                        },
+                    ],
+                },
+            ],
+        },
+    )
+    slot = plan.fleet_presets[0].slots[0]
+    assert slot.primary is not None
+    assert slot.primary.relaxed_constraints is True
+    assert [candidate.relaxed_constraints for candidate in slot.candidates] == [False, True]
+
+
+def test_yaml_relaxed_must_be_boolean():
+    """YAML 的 relaxed 必须是布尔值，字符串不静默转换。"""
+    with pytest.raises(TypeError, match='relaxed'):
+        CombatPlan.from_dict(
+            {'fleet_presets': [{'ships': [{'name': 'U-47', 'relaxed': 'yes'}]}]},
+        )
 
 
 def test_empty_fleet_preset_is_rejected():
