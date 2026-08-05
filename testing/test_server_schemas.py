@@ -96,17 +96,16 @@ def test_empty_fleet_slot_is_rejected():
         FleetRuleRequest.model_validate({})
 
 
-def test_candidate_only_slot_rejects_primary_search_name():
-    with pytest.raises(
-        ValidationError,
-        match='没有主选 name 时不能填写主选规则',
-    ):
-        FleetRuleRequest.model_validate(
-            {
-                'search_name': '别名',
-                'candidates': [{'name': '胡德'}],
-            },
-        )
+def test_legacy_candidate_names_inherit_slot_search_name():
+    rule = FleetRuleRequest.model_validate(
+        {
+            'search_name': '大淀',
+            'candidates': ['大淀', '大淀·改'],
+        },
+    )
+    slot = fleet_slot_from_api(rule.model_dump(exclude_none=True))
+
+    assert [candidate.search_name for candidate in slot.candidates] == ['大淀', '大淀']
 
 
 def test_api_accepts_legacy_candidate_names():
@@ -313,6 +312,12 @@ def test_empty_fleet_preset_is_rejected():
         CombatPlan.from_dict({'fleet_presets': [{}]})
     with pytest.raises(ValueError, match='不能包含空 ships'):
         CombatPlan.from_dict({'fleet_presets': [{'ships': []}]})
+
+
+@pytest.mark.parametrize('field', ['fleet', 'fleet_rules'])
+def test_http_rejects_empty_explicit_fleet_overrides(field: str):
+    with pytest.raises(ValidationError):
+        CombatPlanRequest.model_validate({field: []})
 
 
 @pytest.mark.parametrize(

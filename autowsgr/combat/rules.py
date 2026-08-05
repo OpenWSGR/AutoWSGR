@@ -43,6 +43,10 @@ _log = get_logger('combat.recognition')
 _SHIP_TYPE_PATTERN = re.compile(
     rf'\b({"|".join(re.escape(vessel_type.native.as_english()) for vessel_type in FLEET_VESSEL_TYPES)})\b',
 )
+_RULE_FIELD_CODES = {vessel_type.native.as_english() for vessel_type in FLEET_VESSEL_TYPES} | {
+    'ALL'
+}
+_LEGACY_RULE_FIELD_ALIASES = {'NAP': 'AP', 'CBG': 'BG'}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -281,10 +285,13 @@ class RuleEngine:
 
 # 匹配 "BB >= 2" 或 "CL + DD >= 1" 形式的条件片段
 _CONDITION_PIECE_RE = re.compile(
-    r'\(?\s*([A-Z]{2,4}(?:\s*\+\s*[A-Z]{2,4})*)\s*'
-    r'(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)\s*\)?'
+    r'([A-Z]{2,4}(?:\s*\+\s*[A-Z]{2,4})*)\s*'
+    r'(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)'
 )
 _CONDITION_SEPARATOR_RE = re.compile(r'\s+and\s+', re.IGNORECASE)
+_CONDITION_ATOM_RE = re.compile(
+    rf'(?:{_CONDITION_PIECE_RE.pattern}|\(\s*{_CONDITION_PIECE_RE.pattern}\s*\))'
+)
 
 
 def _parse_legacy_condition(condition_str: str) -> list[Condition]:
@@ -303,13 +310,25 @@ def _parse_legacy_condition(condition_str: str) -> list[Condition]:
     if not parts or any(not part.strip() for part in parts):
         raise ValueError(f"无法解析规则条件: '{condition_str}'")
     for part in parts:
-        match = _CONDITION_PIECE_RE.fullmatch(part.strip())
+        atom = part.strip()
+        if _CONDITION_ATOM_RE.fullmatch(atom) is None:
+            raise ValueError(f"无法解析规则条件: '{condition_str}'")
+        match = _CONDITION_PIECE_RE.search(atom)
         if match is None:
             raise ValueError(f"无法解析规则条件: '{condition_str}'")
         field_expr, op, value_str = match.groups()
         value = float(value_str) if '.' in value_str else int(value_str)
         # 规范化字段表达式：去除空格，如 'CL + DD' -> 'CL+DD'
-        field_key = '+'.join(p.strip() for p in field_expr.split('+'))
+        field_codes = [
+            _LEGACY_RULE_FIELD_ALIASES.get(part.strip(), part.strip())
+            for part in field_expr.split('+')
+        ]
+        if any(part.strip() == 'BG' for part in field_expr.split('+')):
+            raise ValueError('BG 舰种代码语义有歧义：大巡请使用 CBG，导战请使用 BBG')
+        unknown_codes = [code for code in field_codes if code not in _RULE_FIELD_CODES]
+        if unknown_codes:
+            raise ValueError(f'未知舰种代码: {unknown_codes!r}')
+        field_key = '+'.join(field_codes)
         conditions.append(Condition(field=field_key, op=op, value=value))
     return conditions
 
@@ -321,10 +340,10 @@ def _parse_action_value(action_value: str | int) -> RuleAction:
     - ``"detour"`` → ``RuleAction.detour()``
     - ``4`` (整数) → ``RuleAction.set_formation(Formation(4))``
     """
-    if isinstance(action_value, int):
+    if isinstance(action_value, int) and not isinstance(action_value, bool):
         return RuleAction.set_formation(Formation(action_value))
     if isinstance(action_value, str):
-        action_lower = action_value.lower()
+        action_lower = action_value.strip().lower()
         if action_lower == 'retreat':
             return RuleAction.retreat()
         if action_lower == 'detour':

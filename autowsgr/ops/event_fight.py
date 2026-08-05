@@ -27,6 +27,7 @@ from autowsgr.combat.fleet import (
     FleetSlotRule,
     ResolvedFleetSelection,
     resolve_fleet_selection,
+    validate_fleet_selection_arguments,
 )
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.normal_fight import NormalFightRunner
@@ -137,6 +138,12 @@ def run_event_fight(
     -------
     list[CombatResult]
     """
+    validate_fleet_selection_arguments(
+        fleet_selection,
+        fleet_id=fleet_id,
+        fleet=fleet,
+        slot_rules=fleet_rules,
+    )
     resolved_selection = fleet_selection or resolve_fleet_selection(
         plan,
         fleet_id=fleet_id,

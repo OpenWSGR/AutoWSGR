@@ -284,6 +284,54 @@ class TestParseLegacyCondition:
         with pytest.raises(ValueError, match='无法解析'):
             RuleEngine.from_legacy_rules([['BB > 0 or CV > 0', 'retreat']])
 
+    @pytest.mark.parametrize('condition', ['SAP != 1', 'ZZ > 0'])
+    def test_rejects_unknown_ship_type_codes(self, condition: str):
+        with pytest.raises(ValueError, match='未知舰种代码'):
+            _parse_legacy_condition(condition)
+
+    def test_accepts_total_ship_count_code(self):
+        assert _parse_legacy_condition('ALL == 6') == [
+            Condition(field='ALL', op='==', value=6),
+        ]
+
+    @pytest.mark.parametrize(
+        'condition',
+        [
+            '(BB > 0',
+            'BB > 0)',
+            'BB > 0) and (CV > 0',
+            '(BB > 0 and (CV > 0)',
+            'BB > 0 and CV > 0)',
+        ],
+    )
+    def test_rejects_unbalanced_parentheses(self, condition: str):
+        with pytest.raises(ValueError, match='无法解析'):
+            _parse_legacy_condition(condition)
+
+    @pytest.mark.parametrize(
+        ('condition', 'canonical_field'),
+        [('NAP > 0', 'AP'), ('CBG > 0', 'BG')],
+    )
+    def test_unambiguous_legacy_ship_codes_are_normalized(
+        self,
+        condition: str,
+        canonical_field: str,
+    ):
+        assert _parse_legacy_condition(condition)[0].field == canonical_field
+
+    def test_ambiguous_bg_rule_requires_explicit_migration(self):
+        with pytest.raises(ValueError, match=r'CBG.*BBG'):
+            _parse_legacy_condition('BG > 0')
+
+    def test_rejects_boolean_formation_action(self):
+        with pytest.raises(ValueError, match='无法识别的动作值'):
+            RuleEngine.from_legacy_rules([['BB > 0', True]])
+
+    def test_action_strings_ignore_surrounding_whitespace(self):
+        engine = RuleEngine.from_legacy_rules([['BB > 0', ' retreat ']])
+
+        assert engine.evaluate({'BB': 1}).result is RuleResult.RETREAT
+
 
 class TestConditionSumEvaluation:
     """Condition '+' sum evaluation tests."""
@@ -642,6 +690,30 @@ class TestFleetPresetsParsing:
         slot = plan.fleet_presets[0].slots[0]
         assert slot.primary is None
         assert [candidate.name for candidate in slot.candidates] == ['85工程', '岛风']
+
+    def test_same_name_candidates_keep_distinct_rules_and_order(self):
+        plan = CombatPlan.from_dict(
+            {
+                'fleet_presets': [
+                    {
+                        'ships': [
+                            {
+                                'candidates': [
+                                    {'name': '大淀', 'search_name': '大淀'},
+                                    {'name': '大淀', 'search_name': '大淀·改'},
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        )
+
+        assert plan.fleet_presets is not None
+        assert plan.fleet_presets[0].slots[0].candidates == (
+            ShipSelector(name='大淀', search_name='大淀'),
+            ShipSelector(name='大淀', search_name='大淀·改'),
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

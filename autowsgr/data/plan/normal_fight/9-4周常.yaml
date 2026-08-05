@@ -10,7 +10,8 @@ node_defaults:
   formation: 2
   night: False
   enemy_rules:
-    - [DD + CL <= 1 and ((CVL == 1 and CV == 0) or CVL == 0), 4]
+    - [DD + CL <= 1 and CVL == 1 and CV == 0, 4]
+    - [DD + CL <= 1 and CVL == 0, 4]
 
 node_args:
   O:

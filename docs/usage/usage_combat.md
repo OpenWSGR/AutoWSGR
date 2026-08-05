@@ -104,7 +104,7 @@ node_args:
 | `night` | bool | `False` | 是否追击夜战 |
 | `proceed` | bool | `True` | 是否前进 (NORMAL 模式) |
 | `enemy_rules` | list | `[]` | 索敌规则 (见下文) |
-| `formation_rules` | list | `[]` | 阵型选择规则 |
+| `enemy_formation_rules` | list | `[]` | 按敌方阵型决定撤退或我方阵型 |
 | `SL_when_spot_enemy_fails` | bool | `False` | 索敌失败时 SL |
 | `SL_when_enemy_ship_type` | list | `[]` | 遇到特定舰种 SL |
 | `proceed_stop` | list | `[]` | 中破停止位 (如 `[1,3]`) |
@@ -342,6 +342,9 @@ enemy_rules:
 | KP | 反舰导弹巡洋舰（导巡） | CG | 防空导弹巡洋舰（防巡） |
 | BG | 导弹大型巡洋舰（大巡） | BBG | 导弹战列舰（导战） |
 
+旧规则代码迁移：`NAP` 会兼容归一化为 `AP`，`CBG` 会兼容归一化为 native `BG`。
+规则条件中的裸 `BG` 因新旧版本语义冲突而被拒绝：大巡请写 `CBG`，导战请写 `BBG`。
+
 支持的运算符: `==`, `!=`, `>`, `<`, `>=`, `<=`
 
 支持的动作:
@@ -350,16 +353,24 @@ enemy_rules:
 |------|------|
 | `retreat` | 撤退 |
 | `detour` | 迂回 |
-| `refresh` | 刷新 (暂不支持) |
+| `1` ~ `5` | 选择对应阵型 |
 
-### 阵型规则 (formation_rules)
+### 动态阵型与敌方阵型规则
 
-根据敌方编成动态选择阵型:
+根据敌方舰种数量动态选择阵型应继续使用 `enemy_rules`：
 
 ```yaml
-formation_rules:
+enemy_rules:
   - [SS > 0, 5]              # 有潜艇 → 单横 (5)
   - [CV >= 2, 3]             # 航母 >= 2 → 轮型 (3)
+```
+
+`enemy_formation_rules` 根据识别出的敌方阵型名称执行动作：
+
+```yaml
+enemy_formation_rules:
+  - [单纵阵, retreat]
+  - [复纵阵, 4]
 ```
 
 ### v2 规则引擎 vs v1 eval()

@@ -195,8 +195,6 @@ class FleetRuleRequest(FleetShipRuleRequest):
             return self
         if len(self.candidates) == 0:
             raise ValueError('位置至少需要一艘主选或备选舰船')
-        if any(value is not None for value in (self.search_name,)):
-            raise ValueError('没有主选 name 时不能填写主选规则')
         return self
 
 
@@ -208,9 +206,10 @@ class CombatPlanRequest(BaseModel):
     chapter: int | str = Field(default=1, description='章节号')
     map: int | str = Field(default=1, description='地图号')
     fleet_id: int = Field(default=1, ge=1, le=6, description='舰队编号')
-    fleet: list[str] | None = Field(default=None, description='舰队成员')
+    fleet: list[str] | None = Field(default=None, min_length=1, description='舰队成员')
     fleet_rules: list[str | FleetRuleRequest] | None = Field(
         default=None,
+        min_length=1,
         description='舰队槽位规则（字符串或候选规则）',
     )
     repair_mode: list[int] = Field(

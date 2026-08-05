@@ -268,6 +268,15 @@ def _selector_from_mapping(
     )
 
 
+def _deduplicate_selectors(selectors: Sequence[ShipSelector]) -> tuple[ShipSelector, ...]:
+    """按完整规则去重，保留同名但约束不同的有序候选。"""
+    result: list[ShipSelector] = []
+    for selector in selectors:
+        if selector not in result:
+            result.append(selector)
+    return tuple(result)
+
+
 def fleet_slot_from_api(raw: str | Mapping[str, Any]) -> FleetSlotRule:
     """把已经通过 HTTP schema 的槽位转换成 canonical 规则。"""
     if isinstance(raw, str):
@@ -280,17 +289,19 @@ def fleet_slot_from_api(raw: str | Mapping[str, Any]) -> FleetSlotRule:
     raw_candidates = raw.get('candidates', [])
     if not isinstance(raw_candidates, Sequence) or isinstance(raw_candidates, str):
         raise TypeError('candidates 必须是规则对象列表')
-    candidates = tuple(
-        ShipSelector(
-            name=candidate,
-            search_name=_optional_text(raw.get('search_name')),
-            ship_types=parse_ship_type_codes(raw.get('ship_type')),
-            min_level=_optional_level(raw, 'min_level'),
-            max_level=_optional_level(raw, 'max_level'),
+    candidates = _deduplicate_selectors(
+        tuple(
+            ShipSelector(
+                name=candidate,
+                search_name=_optional_text(raw.get('search_name')),
+                ship_types=parse_ship_type_codes(raw.get('ship_type')),
+                min_level=_optional_level(raw, 'min_level'),
+                max_level=_optional_level(raw, 'max_level'),
+            )
+            if isinstance(candidate, str)
+            else _selector_from_mapping(candidate, relaxed=False)
+            for candidate in raw_candidates
         )
-        if isinstance(candidate, str)
-        else _selector_from_mapping(candidate, relaxed=False)
-        for candidate in raw_candidates
     )
     return FleetSlotRule(primary=primary, candidates=candidates)
 
@@ -311,7 +322,6 @@ def fleet_slot_from_yaml(raw: object) -> FleetSlotRule:
     if _optional_text(raw.get('name')) is not None:
         primary = _selector_from_mapping(raw, relaxed=False)
     normalized_candidates: list[ShipSelector] = []
-    seen: set[str] = set()
     for candidate in candidates:
         if isinstance(candidate, str):
             selector = _selector_from_mapping(
@@ -323,11 +333,11 @@ def fleet_slot_from_yaml(raw: object) -> FleetSlotRule:
             selector = _selector_from_mapping(candidate, relaxed=False)
         else:
             raise TypeError('candidates 只能包含舰名字符串或规则对象')
-        if selector.name in seen:
-            continue
         normalized_candidates.append(selector)
-        seen.add(selector.name)
-    return FleetSlotRule(primary=primary, candidates=tuple(normalized_candidates))
+    return FleetSlotRule(
+        primary=primary,
+        candidates=_deduplicate_selectors(normalized_candidates),
+    )
 
 
 def fleet_presets_from_yaml(raw: object) -> tuple[FleetPreset, ...] | None:
@@ -369,6 +379,10 @@ def resolve_fleet_selection(
     slot_rules: Sequence[FleetSlotRule] | None = None,
 ) -> ResolvedFleetSelection:
     """按 override rules > override fleet > plan preset > plan fleet 集中解析。"""
+    if fleet is not None and len(fleet) == 0:
+        raise ValueError('fleet 不能为空')
+    if slot_rules is not None and len(slot_rules) == 0:
+        raise ValueError('fleet_rules 不能为空')
     resolved_id = fleet_id if fleet_id is not None else plan.fleet_id
     if slot_rules is not None:
         return ResolvedFleetSelection(
@@ -404,3 +418,17 @@ def resolve_fleet_selection(
         plain_fleet=None,
         source=FleetSelectionSource.NONE,
     )
+
+
+def validate_fleet_selection_arguments(
+    fleet_selection: ResolvedFleetSelection | None,
+    *,
+    fleet_id: int | None,
+    fleet: Sequence[str] | None,
+    slot_rules: Sequence[FleetSlotRule] | None,
+) -> None:
+    """拒绝同时提供 canonical selection 和旧式舰队 override。"""
+    if fleet_selection is not None and any(
+        value is not None for value in (fleet_id, fleet, slot_rules)
+    ):
+        raise ValueError('fleet_selection 不能同时传入 fleet_id、fleet 或 fleet_rules')

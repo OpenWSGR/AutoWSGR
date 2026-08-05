@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -25,6 +26,10 @@ from autowsgr.infra import ActionFailedError
 from autowsgr.ops.normal_fight import NormalFightRunner, _require_fleet_change
 from autowsgr.types import ShipDamageState, ShipType
 from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
+
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def _make_ctx() -> SimpleNamespace:
@@ -220,6 +225,36 @@ class TestFleetSelectionCallChain:
 
         assert runner._fleet_id == 2
         assert runner._fleet_selection.plain_fleet == ('岛风',)
+
+    @pytest.mark.parametrize(
+        'legacy_args',
+        [
+            {'fleet_id': 2},
+            {'fleet': ['雪风']},
+            {'fleet_rules': exact_fleet_rules(['雪风'])},
+        ],
+    )
+    def test_runner_rejects_explicit_selection_with_legacy_overrides(
+        self,
+        legacy_args: dict[str, Any],
+    ):
+        plan = CombatPlan.from_dict({'fleet': ['岛风']})
+        selection = resolve_fleet_selection(plan)
+
+        with pytest.raises(ValueError, match='不能同时传入'):
+            NormalFightRunner(_make_ctx(), plan, selection, **legacy_args)
+
+    @pytest.mark.parametrize(
+        ('fleet', 'slot_rules'),
+        [([], None), (None, [])],
+    )
+    def test_resolver_rejects_empty_explicit_overrides(
+        self,
+        fleet: Sequence[str] | None,
+        slot_rules: Sequence[FleetSlotRule] | None,
+    ):
+        with pytest.raises(ValueError, match='不能为空'):
+            resolve_fleet_selection(CombatPlan(), fleet=fleet, slot_rules=slot_rules)
 
     def _prepare(
         self,

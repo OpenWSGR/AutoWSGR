@@ -402,7 +402,7 @@ MapNodeData.load_event(event_name, chapter, map_id) -> MapNodeData | None
 
 **文件**: `autowsgr/combat/rules.py`
 
-作战计划中 `enemy_rules` 和 `formation_rules` 使用规则引擎进行条件判断：
+作战计划中 `enemy_rules` 和 `enemy_formation_rules` 使用规则引擎进行条件判断：
 
 ```python
 class RuleEngine:
@@ -411,11 +411,12 @@ class RuleEngine:
     @classmethod
     def from_formation_rules(cls, rules) -> RuleEngine
 
-    def evaluate(self, enemy_info) -> str | None
-        # 返回匹配的动作 ("retreat"/"formation:1"/...) 或 None
+    def evaluate(self, enemy_info) -> RuleAction
+        # 返回匹配动作，未匹配时返回 RuleAction.no_action()
 ```
 
-规则格式: `"(BB >= 2) and (CV > 0) => retreat"`
+舰种规则支持字符串格式 `"(BB >= 2) and (CV > 0) => retreat"`，
+也支持 YAML 列表格式 `[(BB >= 2) and (CV > 0), retreat]`。
 
 ---
 

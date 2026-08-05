@@ -13,7 +13,8 @@ node_defaults:
   # 夜战选择阶段
   night: False # 是否夜战
   enemy_rules:
-    - [DD + CL <= 1 and ((CVL == 1 and CV == 0) or CVL == 0), 4]
+    - [DD + CL <= 1 and CVL == 1 and CV == 0, 4]
+    - [DD + CL <= 1 and CVL == 0, 4]
   # 前进选择阶段
   proceed: True # 结束后是否继续
   proceed_stop: [2, 2, 2, 2, 2, 2] # 根据我方血量状态选择是否继续前进,一旦对应破损程度达到或超过该值则返回

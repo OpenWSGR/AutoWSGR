@@ -17,6 +17,7 @@ from autowsgr.combat.fleet import (
     ResolvedFleetSelection,
     exact_fleet_rules,
     resolve_fleet_selection,
+    validate_fleet_selection_arguments,
 )
 from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
@@ -56,8 +57,12 @@ class NormalFightRunner:
         fleet: Sequence[str] | None = None,
         fleet_rules: Sequence[FleetSlotRule] | None = None,
     ) -> None:
-        from autowsgr.combat.fleet import resolve_fleet_selection
-
+        validate_fleet_selection_arguments(
+            fleet_selection,
+            fleet_id=fleet_id,
+            fleet=fleet,
+            slot_rules=fleet_rules,
+        )
         self._ctx = ctx
         self._ctrl = ctx.ctrl
         self._plan = plan
@@ -497,6 +502,12 @@ def run_normal_fight(
     fleet_selection: ResolvedFleetSelection | None = None,
 ) -> list[CombatResult]:
     """执行常规战的便捷函数。"""
+    validate_fleet_selection_arguments(
+        fleet_selection,
+        fleet_id=fleet_id,
+        fleet=fleet,
+        slot_rules=fleet_rules,
+    )
     resolved_selection = fleet_selection or resolve_fleet_selection(
         plan,
         fleet_id=fleet_id,
