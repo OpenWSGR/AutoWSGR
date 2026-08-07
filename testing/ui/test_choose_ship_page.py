@@ -223,6 +223,35 @@ class TestIndependentShipRules:
         assert matched is None
         ctx.ctrl.click.assert_not_called()
 
+    def test_same_name_cards_pair_levels_by_card_position(self):
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object())
+        page = ChooseShipPage(ctx)
+
+        with (
+            patch(
+                'autowsgr.ui.choose_ship_page.locate_ship_rows',
+                return_value=[
+                    ('昆西', 0.4, 0.3, 0.4),
+                    ('昆西', 0.2, 0.3, 0.4),
+                ],
+            ),
+            patch(
+                'autowsgr.ui.choose_ship_page.read_ship_levels',
+                return_value=[
+                    ('昆西', 110, 0.2, 0.4),
+                    ('昆西', 1, 0.4, 0.4),
+                ],
+            ),
+            patch('autowsgr.ui.choose_ship_page.time.sleep'),
+        ):
+            matched = page._click_ship_in_list(
+                '昆西',
+                min_level=100,
+            )
+
+        assert matched == '昆西'
+        ctx.ctrl.click.assert_called_once_with(0.2, 0.3)
+
     def test_relaxed_candidate_accepts_failed_level_constraint(self):
         ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object())
         page = ChooseShipPage(ctx)

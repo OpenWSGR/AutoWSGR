@@ -76,6 +76,7 @@ _SHIP_TYPE_HALF_WIDTH = 68
 _SHIP_TYPE_TOP_OFFSET = 72
 _SHIP_TYPE_BOTTOM_OFFSET = 24
 _SHIP_TYPE_OCR_SCALES = (2, 3)
+_MAX_LEVEL_CARD_X_DISTANCE = 80 / _CARD_REFERENCE_WIDTH
 
 PAGE_SIGNATURE = PixelSignature(
     name='choose_ship_page',
@@ -281,8 +282,10 @@ class ChooseShipPage:
         return matched, cx, cy, row_key
 
     @staticmethod
-    def _normalize_level_entry(entry: object) -> tuple[str, int | None, float]:
-        """归一化 read_ship_levels 的返回为 (name, level, row_key)。"""
+    def _normalize_level_entry(
+        entry: object,
+    ) -> tuple[str, int | None, float | None, float]:
+        """归一化等级结果为 (name, level, card_x, row_key)。"""
         if not isinstance(entry, (tuple, list)):
             raise TypeError(f'unsupported level entry: {entry!r}')
 
@@ -291,12 +294,18 @@ class ChooseShipPage:
 
         matched = str(entry[0]).strip()
         level = entry[1] if isinstance(entry[1], int) else None
-        row_key = (
-            round(float(entry[2]), 4)
-            if len(entry) >= 3 and isinstance(entry[2], (int, float))
-            else -1.0
-        )
-        return matched, level, row_key
+        if len(entry) >= 4:
+            card_x = float(entry[2]) if isinstance(entry[2], (int, float)) else None
+            row_key = round(float(entry[3]), 4) if isinstance(entry[3], (int, float)) else -1.0
+        else:
+            # 兼容旧的 (name, level, row_key) 内部结果。
+            card_x = None
+            row_key = (
+                round(float(entry[2]), 4)
+                if len(entry) >= 3 and isinstance(entry[2], (int, float))
+                else -1.0
+            )
+        return matched, level, card_x, row_key
 
     @staticmethod
     def _is_level_in_range(level: int | None, min_level: int | None, max_level: int | None) -> bool:
@@ -307,6 +316,31 @@ class ChooseShipPage:
         if min_level is not None and level < min_level:
             return False
         return not (max_level is not None and level > max_level)
+
+    @staticmethod
+    def _take_level_for_card(
+        candidates: list[tuple[int | None, float | None]],
+        card_x: float,
+    ) -> int | None:
+        """领取横坐标最接近当前卡片的等级结果。"""
+        positioned = [
+            (index, candidate)
+            for index, candidate in enumerate(candidates)
+            if candidate[1] is not None
+        ]
+        if not positioned:
+            level, _level_x = candidates.pop(0)
+            return level
+
+        nearest_index, nearest = min(
+            positioned,
+            key=lambda item: abs(item[1][1] - card_x),
+        )
+        if abs(nearest[1] - card_x) > _MAX_LEVEL_CARD_X_DISTANCE:
+            return None
+
+        level, _level_x = candidates.pop(nearest_index)
+        return level
 
     def _click_ship_in_list(  # noqa: C901, PLR0912
         self,
@@ -379,14 +413,17 @@ class ChooseShipPage:
                 raw_levels = []
 
             hits = [self._normalize_hit_entry(hit) for hit in raw_hits]
-            level_map: dict[float, dict[str, list[int | None]]] = {}
+            level_map: dict[
+                float,
+                dict[str, list[tuple[int | None, float | None]]],
+            ] = {}
             for entry in raw_levels:
-                level_name, level, row_key = self._normalize_level_entry(entry)
+                level_name, level, level_x, row_key = self._normalize_level_entry(entry)
                 normalized_level_name = normalize_ship_name(level_name)
                 if normalized_level_name is None:
                     continue
                 row_levels = level_map.setdefault(row_key, {})
-                row_levels.setdefault(normalized_level_name, []).append(level)
+                row_levels.setdefault(normalized_level_name, []).append((level, level_x))
 
             for matched, cx, cy, row_key in hits:
                 normalized_matched = normalize_ship_name(matched)
@@ -401,7 +438,7 @@ class ChooseShipPage:
                     if row_levels:
                         name_levels = row_levels.get(normalized_matched)
                         if name_levels:
-                            level = name_levels.pop(0)
+                            level = self._take_level_for_card(name_levels, cx)
                 if not self._is_level_in_range(level, min_level, max_level):
                     _log.warning(
                         "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",

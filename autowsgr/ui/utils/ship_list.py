@@ -368,7 +368,7 @@ def read_ship_levels(  # noqa: PLR0912
     *,
     deduplicate_by_name: bool = True,
     include_row_key: bool = False,
-) -> list[tuple[str, int | None] | tuple[str, int | None, float]]:
+) -> list[tuple[str, int | None] | tuple[str, int | None, float, float]]:
     """在选船列表页识别各舰船的名称及等级。
 
     使用与 :func:`locate_ship_rows` 相同的 DLL 行定位 + OCR 流程,
@@ -391,10 +391,11 @@ def read_ship_levels(  # noqa: PLR0912
 
     Returns
     -------
-    list[tuple[str, int | None] | tuple[str, int | None, float]]
+    list[tuple[str, int | None] | tuple[str, int | None, float, float]]
         默认返回 ``(ship_name, level)`` 列表, 按行顺序排列。
         当 ``include_row_key=True`` 时返回
-        ``(ship_name, level, row_key)``。
+        ``(ship_name, level, cx_rel, row_key)``。
+        ``cx_rel`` 用于把等级绑定到同一张卡片，不能依赖 OCR 返回顺序。
         ``level`` 为 ``None`` 表示未识别到等级。
     """
     h, w = screen.shape[:2]
@@ -409,7 +410,7 @@ def read_ship_levels(  # noqa: PLR0912
     list_w_native = int(w * LEGACY_LIST_WIDTH / LEGACY_WIDTH)
     list_area_native = screen[:, :list_w_native]
 
-    found: list[tuple[str, int | None] | tuple[str, int | None, float]] = []
+    found: list[tuple[str, int | None] | tuple[str, int | None, float, float]] = []
     seen: set[str] = set()
     for y_start_720, y_end_720 in rows:
         y_start = max(0, int((y_start_720 - 1) * scale_y))
@@ -463,16 +464,16 @@ def read_ship_levels(  # noqa: PLR0912
 
             row_level: int | None = None
 
-            best_level: int | None = None
+            best_index: int | None = None
             best_dist = float('inf')
-            for candidate_level, candidate_x in local_level_hits:
+            for index, (_candidate_level, candidate_x) in enumerate(local_level_hits):
                 dist = abs(candidate_x - name_x)
                 if dist < best_dist:
                     best_dist = dist
-                    best_level = candidate_level
+                    best_index = index
 
-            if best_level is not None and best_dist <= max_pair_dist:
-                row_level = best_level
+            if best_index is not None and best_dist <= max_pair_dist:
+                row_level, _candidate_x = local_level_hits.pop(best_index)
 
             if row_level is None:
                 probe_level = _probe_level_near_name(
@@ -495,7 +496,7 @@ def read_ship_levels(  # noqa: PLR0912
                 row_key,
             )
             if include_row_key:
-                found.append((row_name, row_level, row_key))
+                found.append((row_name, row_level, name_x / w, row_key))
             else:
                 found.append((row_name, row_level))
 

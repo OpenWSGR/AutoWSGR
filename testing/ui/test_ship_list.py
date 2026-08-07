@@ -172,3 +172,30 @@ def test_read_ship_levels_applies_alias_before_level_pairing(
 
     assert found == [('AIII', 110)]
     assert ocr.recognize.call_count == 1
+
+
+def test_read_ship_levels_includes_card_position_for_binding(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    screen = _single_row_screen(monkeypatch)
+    ocr = MagicMock()
+    ocr.recognize.return_value = [
+        OCRResult(text='昆西', confidence=0.99, bbox=(200, 2, 300, 18)),
+        OCRResult(text='Lv.110', confidence=0.99, bbox=(240, 2, 300, 18)),
+    ]
+
+    found = read_ship_levels(
+        ocr,
+        screen,
+        deduplicate_by_name=False,
+        include_row_key=True,
+    )
+
+    assert found == [
+        (
+            '昆西',
+            110,
+            pytest.approx(250 / 1280),
+            pytest.approx(round(110 / 720, 4)),
+        )
+    ]
