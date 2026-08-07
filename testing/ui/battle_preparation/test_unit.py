@@ -29,6 +29,7 @@ from autowsgr.ui.battle.constants import (
     CLICK_START_BATTLE,
     CLICK_SUPPORT,
     FLEET_PROBE,
+    SHIP_LEVEL_CROP,
 )
 from autowsgr.ui.battle.fleet_change._change import _ShipSelection
 from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
@@ -147,6 +148,22 @@ def _make_screen(
         _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
 
     return screen
+
+
+# ─────────────────────────────────────────────
+# 等级 OCR 坐标
+# ─────────────────────────────────────────────
+
+
+def test_ship_level_crop_uses_calibrated_regions():
+    assert SHIP_LEVEL_CROP == {
+        0: (0.0508, 0.5667, 0.0953, 0.5875),
+        1: (0.1672, 0.5667, 0.2117, 0.5875),
+        2: (0.2836, 0.5667, 0.3281, 0.5875),
+        3: (0.3992, 0.5667, 0.4438, 0.5875),
+        4: (0.5164, 0.5667, 0.5609, 0.5875),
+        5: (0.6328, 0.5667, 0.6773, 0.5875),
+    }
 
 
 # ─────────────────────────────────────────────
