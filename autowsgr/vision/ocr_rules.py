@@ -18,7 +18,8 @@
 5. 舰名后缀：统一由 ``autowsgr.constants.normalize_ship_name`` 处理。
    修改规则时必须补充真实舰名不受影响的测试。
 6. 等级字符：在 ``LEVEL_DIGIT_TRANSLATION`` 中增加
-   ``'OCR 字符': '数字'``；右侧必须是单个十进制数字。
+   ``'OCR 字符': '数字'``，并把该字符加入 ``LEVEL_OCR_ALLOWLIST``；
+   右侧必须是单个十进制数字。
 7. 舰船等级范围固定为 1-110，不通过新增规则放宽上限。
 """
 
@@ -59,6 +60,10 @@ _CJK_COLON_SEPARATOR_RE = re.compile(r'(?<=[\u3400-\u9fff]):(?=[\u3400-\u9fff])'
 SHIP_LEVEL_MIN = 1
 SHIP_LEVEL_MAX = 110
 
+# 两种等级 OCR 引擎共用该字符集，识别后再统一纠错。
+LEVEL_OCR_ALLOWLIST = '0123456789ILilOoDdSsBbVvYy.:'
+LEVEL_DIGIT_CONFUSABLES = 'ILilOoDdSsBb'
+
 # 等级数字的易混淆字符；新增项时右侧只能是一个数字。
 LEVEL_DIGIT_TRANSLATION = str.maketrans(
     {
@@ -68,13 +73,23 @@ LEVEL_DIGIT_TRANSLATION = str.maketrans(
         'L': '1',
         'O': '0',
         'o': '0',
+        'D': '0',
+        'd': '0',
+        'S': '5',
+        's': '5',
+        'B': '8',
+        'b': '8',
     },
 )
 
 # ``Lv.`` 标签和等级数字可能在紧凑区域中被 EasyOCR 拆成两个文本框。
-LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILilOo]{1,6})')
-LEVEL_NOISY_PATTERN = re.compile(r'(?:[LlIi1O0][VvYy])[\.:]?\s*([0-9ILilOo]{1,6})')
-LEVEL_LABEL_PATTERN = re.compile(r'[LlIi1O0][VvYy]')
+LEVEL_PATTERN = re.compile(r'[Ll][Vv]\.?\s*([0-9ILilOoDdSsBb]{1,6})')
+LEVEL_NOISY_PATTERN = re.compile(
+    r'(?:[LlIi1O0][VvYy1Ii])[\.:]?\s*([0-9ILilOoDdSsBb]{1,6})',
+)
+# EasyOCR 在极窄等级区域中偶尔只保留 ``L.``，丢失中间的 ``V``。
+LEVEL_SHORT_PATTERN = re.compile(r'[Ll][\.:]?\s*([0-9ILilOoDdSsBb]{1,6})')
+LEVEL_LABEL_PATTERN = re.compile(r'[LlIi1O0][VvYy1Ii]')
 
 
 def set_user_ship_name_corrections(corrections: Mapping[str, str]) -> int:

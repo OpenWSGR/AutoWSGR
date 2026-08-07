@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, call, patch
 
+import cv2
 import numpy as np
 import pytest
 
@@ -42,7 +43,7 @@ from autowsgr.ui.battle.preparation import (
 from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 from autowsgr.vision import OCRResult
-from autowsgr.vision.ocr_rules import set_user_ship_name_aliases
+from autowsgr.vision.ocr_rules import LEVEL_OCR_ALLOWLIST, set_user_ship_name_aliases
 
 
 if TYPE_CHECKING:
@@ -72,9 +73,18 @@ def _reset_ship_name_aliases():
     set_user_ship_name_aliases({})
 
 
-def _make_ctx(ctrl: AndroidController, ocr: OCREngine | None = None) -> GameContext:
+def _make_ctx(
+    ctrl: AndroidController,
+    ocr: OCREngine | None = None,
+    ship_ocr: OCREngine | None = None,
+) -> GameContext:
     """构造 GameContext，用于 BattlePreparationPage 初始化。"""
-    return GameContext(ctrl=ctrl, config=MagicMock(), ocr=ocr)
+    return GameContext(
+        ctrl=ctrl,
+        config=MagicMock(),
+        ocr=ocr,
+        ship_ocr=ship_ocr,
+    )
 
 
 def _rule(raw: dict[str, object]) -> FleetSlotRule:
@@ -164,6 +174,104 @@ def test_ship_level_crop_uses_calibrated_regions():
         4: (0.5164, 0.5667, 0.5609, 0.5875),
         5: (0.6328, 0.5667, 0.6773, 0.5875),
     }
+
+
+# ─────────────────────────────────────────────
+# 等级 OCR 路由
+# ─────────────────────────────────────────────
+
+
+class TestLevelOCRRouting:
+    @staticmethod
+    def _single_ship_damage() -> dict[int, ShipDamageState]:
+        return {
+            0: ShipDamageState.NORMAL,
+            **dict.fromkeys(range(1, 6), ShipDamageState.NO_SHIP),
+        }
+
+    def test_easyocr_path_applies_otsu_and_shared_rules(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        ocr.recognize_line.return_value = [
+            OCRResult(text='LV.1D3', confidence=0.99),
+        ]
+        page = BattlePreparationPage(_make_ctx(ctrl, ocr))
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        with (
+            patch.object(
+                page,
+                'detect_ship_damage',
+                return_value=self._single_ship_damage(),
+            ),
+            patch(
+                'autowsgr.ui.battle.detection.cv2.threshold',
+                wraps=cv2.threshold,
+            ) as threshold,
+        ):
+            levels = page._recognize_fleet_levels(screen)
+
+        assert levels[0] == 103
+        threshold.assert_called_once()
+        assert threshold.call_args.args[3] == cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        assert ocr.recognize_line.call_args.kwargs == {
+            'allowlist': LEVEL_OCR_ALLOWLIST,
+        }
+
+    def test_fastocr_path_keeps_original_roi_and_shared_rules(self):
+        ctrl = MagicMock(spec=AndroidController)
+        easyocr = MagicMock()
+        fastocr = MagicMock()
+        fastocr.recognize_line.return_value = [
+            OCRResult(text='LV.S', confidence=0.99),
+        ]
+        page = BattlePreparationPage(
+            _make_ctx(
+                ctrl,
+                easyocr,
+                ship_ocr=fastocr,
+            ),
+        )
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        with (
+            patch.object(
+                page,
+                'detect_ship_damage',
+                return_value=self._single_ship_damage(),
+            ),
+            patch('autowsgr.ui.battle.detection.cv2.threshold') as threshold,
+        ):
+            levels = page._recognize_fleet_levels(screen)
+
+        assert levels[0] == 5
+        threshold.assert_not_called()
+        fastocr.recognize_line.assert_called_once()
+        assert fastocr.recognize_line.call_args.kwargs == {
+            'allowlist': LEVEL_OCR_ALLOWLIST,
+        }
+        easyocr.recognize_line.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ('text', 'expected'),
+        [
+            ('LV.1D3', 103),
+            ('LV.S', 5),
+            ('LV.B', 8),
+            ('L.1', 1),
+            ('L.3', 3),
+            ('L.1I0', 110),
+            ('L1.110', 110),
+            ('LV.110', 110),
+            ('LV.111', None),
+        ],
+    )
+    def test_level_parser_uses_shared_rules(
+        self,
+        text: str,
+        expected: int | None,
+    ):
+        assert BattlePreparationPage._parse_level(text) == expected
 
 
 # ─────────────────────────────────────────────

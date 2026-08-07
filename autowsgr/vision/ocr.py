@@ -1,6 +1,6 @@
 """OCR 引擎抽象层。
 
-提供统一的文字识别接口，支持 EasyOCR 和 RapidOCR 后端。
+提供统一的文字识别接口，支持 EasyOCR 和 MaaFramework FastOCR 后端。
 
 使用方式::
 
@@ -13,8 +13,10 @@
 
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import cv2
@@ -152,6 +154,14 @@ class OCREngine(ABC):
             识别结果列表，按位置排列。
         """
         ...
+
+    def recognize_line(
+        self,
+        image: np.ndarray,
+        allowlist: str = '',
+    ) -> list[OCRResult]:
+        """识别已裁好的单行文字，默认沿用完整识别流程。"""
+        return self.recognize(image, allowlist)
 
     # ── 便捷方法 ──
 
@@ -371,7 +381,7 @@ class OCREngine(ABC):
         Parameters
         ----------
         engine:
-            引擎名称: ``"easyocr"`` 或 ``"rapidocr"``。
+            引擎名称: ``"easyocr"`` 或 ``"fastocr"``。
         gpu:
             是否使用 GPU 加速。
         mirror:
@@ -391,12 +401,12 @@ class OCREngine(ABC):
             instance = EasyOCREngine(gpu=gpu, mirror=mirror)
             cls._instances[cache_key] = instance
             return instance
-        if engine == 'rapidocr':
-            _log.info('[OCR] 初始化 RapidOCR 引擎 (PP-OCR, gpu={})', gpu)
-            instance = RapidOCREngine()
+        if engine == 'fastocr':
+            _log.info('[OCR] 初始化 FastOCR 引擎 (PP-OCRv6-small, CPU)')
+            instance = FastOCREngine()
             cls._instances[cache_key] = instance
             return instance
-        raise ValueError(f'不支持的 OCR 引擎: {engine}，可选: easyocr, rapidocr')
+        raise ValueError(f'不支持的 OCR 引擎: {engine}，可选: easyocr, fastocr')
 
 
 # ── 具体实现 ──
@@ -409,7 +419,27 @@ class EasyOCREngine(OCREngine):
         from autowsgr.vision.easyocr_models_checker import ensure_models
 
         ensure_models(mirror)
-        self._reader = easyocr.Reader(['ch_sim', 'en'], gpu=gpu)
+        self._reader = easyocr.Reader(
+            ['ch_sim', 'en'],
+            gpu=gpu,
+            quantize=False,
+        )
+
+    @staticmethod
+    def _convert_results(raw_results: list) -> list[OCRResult]:
+        return [
+            OCRResult(
+                text=str(text),
+                confidence=float(confidence),
+                bbox=(
+                    int(box[0][0]),
+                    int(box[0][1]),
+                    int(box[2][0]),
+                    int(box[2][1]),
+                ),
+            )
+            for box, text, confidence in raw_results
+        ]
 
     def recognize(
         self,
@@ -420,78 +450,139 @@ class EasyOCREngine(OCREngine):
         if allowlist:
             kwargs['allowlist'] = allowlist
         raw = self._reader.readtext(image, **kwargs)
-        return [
-            OCRResult(
-                text=text,
-                confidence=float(conf),
-                bbox=(
-                    int(box[0][0]),
-                    int(box[0][1]),
-                    int(box[2][0]),
-                    int(box[2][1]),
-                ),
-            )
-            for box, text, conf in raw
-        ]
+        return self._convert_results(raw)
+
+    def recognize_line(
+        self,
+        image: np.ndarray,
+        allowlist: str = '',
+    ) -> list[OCRResult]:
+        """使用已校准的单行参数识别等级等紧凑文字。"""
+        kwargs: dict = {
+            'decoder': 'greedy',
+            'detail': 1,
+            'contrast_ths': 1.0,
+            'adjust_contrast': 1.0,
+        }
+        if allowlist:
+            kwargs['allowlist'] = allowlist
+        raw = self._reader.recognize(image, **kwargs)
+        return self._convert_results(raw)
 
 
-class RapidOCREngine(OCREngine):
-    """基于 RapidOCR (PP-OCRv6, onnxruntime) 的识别引擎。
+class FastOCREngine(OCREngine):
+    """基于 MaaFramework FastOCR 和 PP-OCRv6-small 的 CPU 引擎。"""
 
-    模型内嵌于 pip 包，无需联网下载；采用 lazy import，
-    未启用增强识别时不会加载任何额外依赖。
-
-    .. note::
-        onnx 引擎不支持 EasyOCR 式的动态 ``allowlist``，
-        这里通过识别后字符过滤近似实现（实测 PP-OCRv6 对数字/字母已很准）。
-    """
+    _MODEL_DIR_ENV = 'AUTOWSGR_FASTOCR_MODEL_DIR'
+    _USER_DIR_ENV = 'AUTOWSGR_FASTOCR_USER_DIR'
+    _THRESHOLD_ENV = 'AUTOWSGR_FASTOCR_THRESHOLD'
+    _BUNDLED_MODEL_DIR = Path(__file__).resolve().parents[1] / 'data' / 'ocr' / 'ppocr_v6_small'
 
     def __init__(self) -> None:
-        from rapidocr import RapidOCR
+        from maa.library import Library
+        from maa.pipeline import JOCR, JRecognitionType
+        from maa.resource import Resource
+        from maa.tasker import Tasker
+        from maa.toolkit import Toolkit
 
-        self._reader = RapidOCR()
+        configured_model_dir = os.getenv(self._MODEL_DIR_ENV, '').strip()
+        model_dir = (
+            Path(configured_model_dir).expanduser().resolve()
+            if configured_model_dir
+            else self._BUNDLED_MODEL_DIR
+        )
+        required_files = ('det.onnx', 'rec.onnx', 'keys.txt')
+        missing = [name for name in required_files if not (model_dir / name).is_file()]
+        if missing:
+            raise RuntimeError(f'FastOCR 模型目录缺少文件: {", ".join(missing)}')
+
+        configured_user_dir = os.getenv(self._USER_DIR_ENV, '').strip()
+        user_dir = (
+            Path(configured_user_dir).expanduser().resolve()
+            if configured_user_dir
+            else Path.home() / '.autowsgr' / 'fastocr'
+        )
+        user_dir.mkdir(parents=True, exist_ok=True)
+        if not Toolkit.init_option(user_dir, {'logging': False}):
+            raise RuntimeError('FastOCR 初始化 MaaFramework Toolkit 失败')
+
+        resource = Resource()
+        if not resource.use_cpu():
+            raise RuntimeError('FastOCR 无法启用 CPU 执行器')
+        model_job = resource.post_ocr_model(model_dir).wait()
+        if not model_job.succeeded:
+            raise RuntimeError(f'FastOCR 无法加载模型: {model_dir}')
+
+        tasker = Tasker()
+        tasker._resource_holder = resource
+        bound = Library.framework().MaaTaskerBindResource(
+            tasker._handle,
+            resource._handle,
+        )
+        if not bound or not tasker.inited:
+            raise RuntimeError('FastOCR 无法绑定 OCR Resource')
+
+        try:
+            self._threshold = float(os.getenv(self._THRESHOLD_ENV, '0.3'))
+        except ValueError as exc:
+            raise RuntimeError(f'{self._THRESHOLD_ENV} 必须是数字') from exc
+        self._tasker = tasker
+        self._resource = resource
+        self._recognition_type = JRecognitionType.OCR
+        self._ocr_options_type = JOCR
 
     def recognize(
         self,
         image: np.ndarray,
         allowlist: str = '',
     ) -> list[OCRResult]:
-        # RapidOCR 遵循 OpenCV 惯例使用 BGR；本项目的截图均为 RGB。
+        """执行完整文字检测，之后按调用方提供的字符集过滤文本。"""
         bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        output = self._reader(bgr)
-        if output.txts is None:
-            return []
+        job = self._tasker.post_recognition(
+            self._recognition_type,
+            self._ocr_options_type(
+                only_rec=False,
+                threshold=self._threshold,
+            ),
+            bgr,
+        ).wait()
+        if not job.succeeded:
+            raise RuntimeError('FastOCR 识别任务失败')
+        detail = job.get()
+        if detail is None:
+            raise RuntimeError('FastOCR 未返回识别详情')
 
         results: list[OCRResult] = []
-        for idx, raw_text in enumerate(output.txts):
-            text = str(raw_text)
-            if allowlist:
-                filtered = ''.join(ch for ch in text if ch in allowlist)
-                if not filtered:
+        for node in detail.nodes:
+            recognition = node.recognition
+            if recognition is None:
+                continue
+            for result in recognition.filtered_results:
+                text = str(getattr(result, 'text', ''))
+                if allowlist:
+                    text = ''.join(character for character in text if character in allowlist)
+                if not text:
                     continue
-                text = filtered
-            bbox = None
-            if output.boxes is not None and idx < len(output.boxes):
-                box = output.boxes[idx]
-                bbox = (
-                    int(box[0][0]),
-                    int(box[0][1]),
-                    int(box[2][0]),
-                    int(box[2][1]),
+                box_x, box_y, box_width, box_height = map(float, result.box)
+                results.append(
+                    OCRResult(
+                        text=text,
+                        confidence=float(result.score),
+                        bbox=(
+                            round(box_x),
+                            round(box_y),
+                            round(box_x + box_width),
+                            round(box_y + box_height),
+                        ),
+                    )
                 )
-            confidence = (
-                float(output.scores[idx])
-                if output.scores is not None and idx < len(output.scores)
-                else 0.0
-            )
-            results.append(
-                OCRResult(
-                    text=text,
-                    confidence=confidence,
-                    bbox=bbox,
-                )
-            )
-        return results
+        return sorted(
+            results,
+            key=lambda result: (
+                result.bbox[1] if result.bbox is not None else 0,
+                result.bbox[0] if result.bbox is not None else 0,
+            ),
+        )
 
 
 # ── 辅助函数 ──

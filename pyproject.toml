@@ -19,7 +19,7 @@ dependencies = [
     "loguru",
     "keyboard",
     "easyocr>=1.7.1",
-    "rapidocr>=3.0",
+    "maafw>=5.12.3,<6.0",
     "adbutils>=2.0,<3.0",
     "autowsgr_native==0.3.0",
     "av>=12.0",
@@ -177,6 +177,12 @@ extend-safe-fixes = [
 ]
 "tools/**" = [
     "T201",    # print
+]
+"tools/ocr_change_fleet_e2e/**" = [
+    "I001",    # import block (黑盒 E2E 框架保持原样)
+    "INP001",  # implicit-namespace-package
+    "RUF100",  # unused-noqa
+    "TC003",   # typing-only-standard-library-import
 ]
 "examples/**" = [
     "T201",    # print

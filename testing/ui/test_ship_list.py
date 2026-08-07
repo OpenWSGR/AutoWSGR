@@ -29,6 +29,9 @@ def _reset_ship_name_aliases():
         ('LV.ll0', 110),
         ('LVII04', 110),
         ('LVIo4', 104),
+        ('L.1', 1),
+        ('L.1I0', 110),
+        ('L1.110', 110),
     ],
 )
 def test_level_parser_accepts_two_ambiguous_digits(text: str, expected: int):

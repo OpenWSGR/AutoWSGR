@@ -129,7 +129,7 @@ class BaseBattlePreparation:
     def _preferred_ocr(self) -> OCREngine | None:
         """返回船只识别优先使用的 OCR 引擎。
 
-        增强船只识别 (RapidOCR) 开启时优先使用它，未开启时回退默认 OCR。
+        增强船只识别 (FastOCR) 开启时优先使用它，未开启时回退默认 OCR。
         只有名称 / 等级 / 舰种等船只信息节点应使用本属性，其余节点仍用 ``_ocr``。
         """
         return self._ship_ocr or self._ocr

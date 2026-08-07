@@ -168,7 +168,7 @@ class Launcher:
         return self._ocr
 
     def create_ship_ocr(self) -> OCREngine | None:
-        """根据配置创建增强船只识别 OCR 引擎 (RapidOCR / PP-OCR)。
+        """根据配置创建增强船只识别 OCR 引擎 (FastOCR / PP-OCRv6-small)。
 
         仅在 ``cfg.ocr.enhanced_ship_ocr`` 开启时创建；
         默认关闭，返回 ``None``，船只识别节点继续使用默认 EasyOCR。
@@ -177,8 +177,8 @@ class Launcher:
         if not cfg.ocr.enhanced_ship_ocr:
             _log.info('[Launcher] 增强船只识别 OCR 未开启，船只识别节点继续使用 EasyOCR')
             return None
-        _log.info('[Launcher] 创建增强船只识别 OCR 引擎: RapidOCR (PP-OCR)')
-        return OCREngine.create(engine='rapidocr', gpu=cfg.ocr.gpu)
+        _log.info('[Launcher] 创建增强船只识别 OCR 引擎: FastOCR (PP-OCRv6-small)')
+        return OCREngine.create(engine='fastocr', gpu=False)
 
     # ── 构造 GameContext ──
 
@@ -202,7 +202,9 @@ class Launcher:
             ocr=self._ocr,
             ship_ocr=self.create_ship_ocr(),
         )
-        ship_engine = 'RapidOCR (PP-OCR)' if ctx.ship_ocr is not None else '未启用 (沿用 EasyOCR)'
+        ship_engine = (
+            'FastOCR (PP-OCRv6-small)' if ctx.ship_ocr is not None else '未启用 (沿用 EasyOCR)'
+        )
         _log.info('[Launcher] OCR 加载完成: 通用引擎=EasyOCR, 船只识别引擎={}', ship_engine)
         _log.info('[Launcher] GameContext 已构建')
         return ctx

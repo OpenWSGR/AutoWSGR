@@ -40,9 +40,9 @@ from .image_template import (
 from .matcher import PixelChecker
 from .ocr import (
     EasyOCREngine,
+    FastOCREngine,
     OCREngine,
     OCRResult,
-    RapidOCREngine,
     ShipNameMismatchError,
     apply_ship_patches,
 )
@@ -68,6 +68,7 @@ __all__ = [
     'Color',
     'CompositePixelSignature',
     'EasyOCREngine',
+    'FastOCREngine',
     'ImageChecker',
     'ImageMatchDetail',
     'ImageMatchResult',
@@ -83,7 +84,6 @@ __all__ = [
     'PixelMatchResult',
     'PixelRule',
     'PixelSignature',
-    'RapidOCREngine',
     'ShipNameMismatchError',
     'apply_ship_patches',
     'get_api_dll',

@@ -17,15 +17,16 @@ from autowsgr.types import ShipType
 from autowsgr.vision import apply_ship_patches, get_api_dll
 from autowsgr.vision.ocr import OCRResult, _fuzzy_match
 from autowsgr.vision.ocr_rules import (
-    LEVEL_NOISY_PATTERN as _LEVEL_NOISY_PATTERN,
-)
-from autowsgr.vision.ocr_rules import (
-    LEVEL_PATTERN as _LEVEL_PATTERN,
-)
-from autowsgr.vision.ocr_rules import (
+    LEVEL_DIGIT_CONFUSABLES,
+    LEVEL_OCR_ALLOWLIST,
     is_valid_ship_level,
     normalize_level_digits,
 )
+from autowsgr.vision.ocr_rules import (
+    LEVEL_NOISY_PATTERN as _LEVEL_NOISY_PATTERN,
+)
+from autowsgr.vision.ocr_rules import LEVEL_PATTERN as _LEVEL_PATTERN
+from autowsgr.vision.ocr_rules import LEVEL_SHORT_PATTERN as _LEVEL_SHORT_PATTERN
 
 
 if TYPE_CHECKING:
@@ -231,18 +232,11 @@ def _parse_level_with_status(text: str) -> tuple[int | None, bool]:
     """解析等级并返回是否应触发重识别。"""
     compact = text.strip().replace(' ', '')
 
-    m = _LEVEL_PATTERN.search(compact)
-    if m:
-        raw_digits = m.group(1)
-        if _noise_char_count(raw_digits) > _MAX_LEVEL_NOISE_CHARS:
-            return None, True
-        level = _coerce_level_digits(raw_digits)
-        if level is not None:
-            return level, False
-
-    m2 = _LEVEL_NOISY_PATTERN.search(compact)
-    if m2:
-        raw_digits = m2.group(1)
+    for pattern in (_LEVEL_PATTERN, _LEVEL_NOISY_PATTERN, _LEVEL_SHORT_PATTERN):
+        match = pattern.search(compact)
+        if match is None:
+            continue
+        raw_digits = match.group(1)
         if _noise_char_count(raw_digits) > _MAX_LEVEL_NOISE_CHARS:
             return None, True
         level = _coerce_level_digits(raw_digits)
@@ -253,7 +247,7 @@ def _parse_level_with_status(text: str) -> tuple[int | None, bool]:
 
 
 def _noise_char_count(raw_digits: str) -> int:
-    return sum(1 for ch in raw_digits if ch in 'ILilOo')
+    return sum(1 for ch in raw_digits if ch in LEVEL_DIGIT_CONFUSABLES)
 
 
 def _coerce_level_digits(raw_digits: str) -> int | None:
@@ -323,7 +317,10 @@ def _probe_level_near_name(
 
     def collect_levels(img: np.ndarray) -> None:
         nonlocal noisy_level_hits
-        results = ocr.recognize(img, allowlist='LlVvIiYy0Oo1.:-/0123456789')
+        results = ocr.recognize(
+            img,
+            allowlist=f'{LEVEL_OCR_ALLOWLIST}-/',
+        )
         split_level_hits: list[int] = []
         for r in results:
             text = r.text.strip()

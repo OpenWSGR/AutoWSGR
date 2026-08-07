@@ -92,8 +92,8 @@ class OCRConfig(BaseModel):
     mirror: OcrMirror = OcrMirror.modelscope
     """EasyOCR 模型下载镜像源"""
     enhanced_ship_ocr: bool = False
-    """是否启用增强船只识别 OCR (RapidOCR)。默认关闭保持原行为；开启后
-    船只名称 / 等级 / 舰种识别节点优先使用 RapidOCR，无需额外下载模型。"""
+    """是否启用增强船只识别 OCR (FastOCR + PP-OCRv6-small)。默认关闭；
+    开启后船只名称、等级和舰种识别节点优先使用内置 FastOCR 模型。"""
 
     # 舰名匹配
     ship_name_match_confidence: float = Field(

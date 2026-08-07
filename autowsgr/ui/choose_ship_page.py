@@ -124,7 +124,7 @@ class ChooseShipPage:
 
     @property
     def _preferred_ocr(self) -> OCREngine | None:
-        """返回选船识别优先使用的 OCR 引擎 (增强识别开启时用 RapidOCR)。"""
+        """返回选船识别优先使用的 OCR 引擎 (增强识别开启时用 FastOCR)。"""
         return self._ship_ocr or self._ctx.ocr
 
     def _detect_hit_ship_type(

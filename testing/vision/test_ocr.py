@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import ClassVar
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -16,11 +18,15 @@ from autowsgr.constants import (
 )
 from autowsgr.vision import OCREngine, OCRResult, ShipNameMismatchError
 from autowsgr.vision.ocr import (
+    EasyOCREngine,
+    FastOCREngine,
     _fuzzy_match,
     apply_ship_patches,
     set_ship_name_match_confidence,
 )
 from autowsgr.vision.ocr_rules import (
+    LEVEL_OCR_ALLOWLIST,
+    normalize_level_digits,
     set_user_ship_name_aliases,
     set_user_ship_name_corrections,
 )
@@ -47,6 +53,113 @@ class MockOCREngine(OCREngine):
 
 def _dummy_image() -> np.ndarray:
     return np.zeros((10, 10, 3), dtype=np.uint8)
+
+
+# ─────────────────────────────────────────────
+# 等级 OCR 引擎
+# ─────────────────────────────────────────────
+
+
+class TestLevelOCREngines:
+    def test_easyocr_disables_cpu_quantization(self):
+        with (
+            patch('autowsgr.vision.easyocr_models_checker.ensure_models'),
+            patch('autowsgr.vision.ocr.easyocr.Reader') as reader,
+        ):
+            EasyOCREngine(gpu=False)
+
+        reader.assert_called_once_with(
+            ['ch_sim', 'en'],
+            gpu=False,
+            quantize=False,
+        )
+
+    def test_easyocr_line_uses_calibrated_parameters(self):
+        reader = MagicMock()
+        reader.recognize.return_value = [
+            (
+                [[0, 0], [9, 0], [9, 9], [0, 9]],
+                'LV.110',
+                0.99,
+            ),
+        ]
+        engine = EasyOCREngine.__new__(EasyOCREngine)
+        engine._reader = reader
+
+        results = engine.recognize_line(
+            _dummy_image(),
+            allowlist=LEVEL_OCR_ALLOWLIST,
+        )
+
+        assert results == [
+            OCRResult(
+                text='LV.110',
+                confidence=pytest.approx(0.99),
+                bbox=(0, 0, 9, 9),
+            ),
+        ]
+        assert reader.recognize.call_args.kwargs == {
+            'decoder': 'greedy',
+            'allowlist': LEVEL_OCR_ALLOWLIST,
+            'detail': 1,
+            'contrast_ths': 1.0,
+            'adjust_contrast': 1.0,
+        }
+
+    def test_fastocr_filters_with_shared_allowlist(self):
+        raw_result = SimpleNamespace(
+            text='LV.1D3@',
+            score=0.98,
+            box=[1, 2, 10, 4],
+        )
+        recognition = SimpleNamespace(filtered_results=[raw_result])
+        detail = SimpleNamespace(
+            nodes=[SimpleNamespace(recognition=recognition)],
+        )
+        job = MagicMock(succeeded=True)
+        job.get.return_value = detail
+        tasker = MagicMock()
+        tasker.post_recognition.return_value.wait.return_value = job
+
+        options = MagicMock(return_value='options')
+        engine = FastOCREngine.__new__(FastOCREngine)
+        engine._tasker = tasker
+        engine._recognition_type = 'ocr'
+        engine._ocr_options_type = options
+        engine._threshold = 0.3
+
+        results = engine.recognize(
+            _dummy_image(),
+            allowlist=LEVEL_OCR_ALLOWLIST,
+        )
+
+        assert results == [
+            OCRResult(
+                text='LV.1D3',
+                confidence=pytest.approx(0.98),
+                bbox=(1, 2, 11, 6),
+            ),
+        ]
+        options.assert_called_once_with(
+            only_rec=False,
+            threshold=0.3,
+        )
+
+
+@pytest.mark.parametrize(
+    ('raw', 'expected'),
+    [
+        ('1I', '11'),
+        ('1D3', '103'),
+        ('S', '5'),
+        ('B', '8'),
+    ],
+)
+def test_normalize_level_digits_uses_shared_corrections(
+    raw: str,
+    expected: str,
+):
+    assert normalize_level_digits(raw) == expected
 
 
 # ─────────────────────────────────────────────
@@ -315,6 +428,10 @@ class TestOCREngineCreate:
     def test_paddleocr_not_supported(self):
         with pytest.raises(ValueError, match='不支持的 OCR 引擎'):
             OCREngine.create('paddleocr')
+
+    def test_rapidocr_not_supported(self):
+        with pytest.raises(ValueError, match='不支持的 OCR 引擎'):
+            OCREngine.create('rapidocr')
 
 
 class TestPoolAwareMatch:
