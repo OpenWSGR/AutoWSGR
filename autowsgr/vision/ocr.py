@@ -25,8 +25,10 @@ import easyocr
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision.ocr_rules import (
+    EasyOCRProfile,
     apply_ship_name_rules,
     expand_ship_name_candidates,
+    get_easyocr_params,
 )
 
 
@@ -159,9 +161,15 @@ class OCREngine(ABC):
         self,
         image: np.ndarray,
         allowlist: str = '',
+        *,
+        easyocr_profile: EasyOCRProfile | str = EasyOCRProfile.DEFAULT,
     ) -> list[OCRResult]:
-        """识别已裁好的单行文字，默认沿用完整识别流程。"""
-        return self.recognize(image, allowlist)
+        """识别已裁好的单行文字。
+
+        EasyOCR 使用配置档案中的完整参数，其他引擎使用其中的字符白名单。
+        """
+        params = get_easyocr_params(easyocr_profile)
+        return self.recognize(image, allowlist or params.allowlist)
 
     # ── 便捷方法 ──
 
@@ -456,16 +464,20 @@ class EasyOCREngine(OCREngine):
         self,
         image: np.ndarray,
         allowlist: str = '',
+        *,
+        easyocr_profile: EasyOCRProfile | str = EasyOCRProfile.DEFAULT,
     ) -> list[OCRResult]:
-        """使用已校准的单行参数识别等级等紧凑文字。"""
+        """根据调用场景配置档案识别已裁剪单行文字。"""
+        params = get_easyocr_params(easyocr_profile)
+        effective_allowlist = allowlist or params.allowlist
         kwargs: dict = {
-            'decoder': 'greedy',
+            'decoder': params.decoder,
             'detail': 1,
-            'contrast_ths': 1.0,
-            'adjust_contrast': 1.0,
+            'contrast_ths': params.contrast_ths,
+            'adjust_contrast': params.adjust_contrast,
         }
-        if allowlist:
-            kwargs['allowlist'] = allowlist
+        if effective_allowlist:
+            kwargs['allowlist'] = effective_allowlist
         raw = self._reader.recognize(image, **kwargs)
         return self._convert_results(raw)
 

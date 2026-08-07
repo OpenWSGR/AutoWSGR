@@ -26,6 +26,8 @@ from autowsgr.vision.ocr import (
 )
 from autowsgr.vision.ocr_rules import (
     LEVEL_OCR_ALLOWLIST,
+    EasyOCRProfile,
+    get_easyocr_params,
     normalize_level_digits,
     set_user_ship_name_aliases,
     set_user_ship_name_corrections,
@@ -88,7 +90,7 @@ class TestLevelOCREngines:
 
         results = engine.recognize_line(
             _dummy_image(),
-            allowlist=LEVEL_OCR_ALLOWLIST,
+            easyocr_profile=EasyOCRProfile.FLEET_SHIP_LEVEL,
         )
 
         assert results == [
@@ -106,7 +108,21 @@ class TestLevelOCREngines:
             'adjust_contrast': 1.0,
         }
 
-    def test_fastocr_filters_with_shared_allowlist(self):
+    @pytest.mark.parametrize('profile', list(EasyOCRProfile))
+    def test_easyocr_parameter_profiles_are_registered(self, profile: EasyOCRProfile):
+        params = get_easyocr_params(profile)
+
+        if profile is EasyOCRProfile.FLEET_SHIP_LEVEL:
+            assert params.allowlist == LEVEL_OCR_ALLOWLIST
+        assert params.decoder == 'greedy'
+        assert params.contrast_ths == 1.0
+        assert params.adjust_contrast == 1.0
+
+    def test_easyocr_unknown_parameter_profile_is_rejected(self):
+        with pytest.raises(ValueError, match='未知的 EasyOCR 参数配置档案'):
+            get_easyocr_params('unknown')
+
+    def test_fastocr_line_uses_profile_allowlist(self):
         raw_result = SimpleNamespace(
             text='LV.1D3@',
             score=0.98,
@@ -128,9 +144,9 @@ class TestLevelOCREngines:
         engine._ocr_options_type = options
         engine._threshold = 0.3
 
-        results = engine.recognize(
+        results = engine.recognize_line(
             _dummy_image(),
-            allowlist=LEVEL_OCR_ALLOWLIST,
+            easyocr_profile=EasyOCRProfile.FLEET_SHIP_LEVEL,
         )
 
         assert results == [

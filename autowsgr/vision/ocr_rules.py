@@ -21,11 +21,14 @@
    ``'OCR 字符': '数字'``，并把该字符加入 ``LEVEL_OCR_ALLOWLIST``；
    右侧必须是单个十进制数字。
 7. 舰船等级范围固定为 1-110，不通过新增规则放宽上限。
+8. EasyOCR 单行参数统一登记到 ``EasyOCRProfile`` 映射，调用方只传配置档案。
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from autowsgr.constants import (
@@ -33,6 +36,7 @@ from autowsgr.constants import (
 )
 from autowsgr.constants import get_ship_name_group_id, set_ship_name_aliases
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import ShipType
 
 
 if TYPE_CHECKING:
@@ -40,6 +44,25 @@ if TYPE_CHECKING:
 
 
 _log = get_logger('vision.ocr')
+
+
+class EasyOCRProfile(StrEnum):
+    """EasyOCR 单行识别参数配置档案。"""
+
+    DEFAULT = 'default'
+    FLEET_SHIP_LEVEL = 'fleet_ship_level'
+    SHIP_POOL_TYPE = 'ship_pool_type'
+
+
+@dataclass(frozen=True, slots=True)
+class EasyOCRParams:
+    """一组集中维护的 EasyOCR 单行识别参数。"""
+
+    allowlist: str = ''
+    decoder: str = 'greedy'
+    contrast_ths: float = 1.0
+    adjust_contrast: float = 1.0
+
 
 # 系统规则由项目维护，目标必须是 shipnames.yaml 中的标准舰名。
 SHIP_NAME_CORRECTIONS: dict[str, str] = {
@@ -63,6 +86,25 @@ SHIP_LEVEL_MAX = 110
 # 两种等级 OCR 引擎共用该字符集，识别后再统一纠错。
 LEVEL_OCR_ALLOWLIST = '0123456789ILilOoDdSsBbVvYy.:'
 LEVEL_DIGIT_CONFUSABLES = 'ILilOoDdSsBb'
+SHIP_TYPE_OCR_ALLOWLIST = ''.join(
+    dict.fromkeys(ship_type.value for ship_type in ShipType if ship_type is not ShipType.Other),
+)
+
+_EASY_OCR_PARAMS_BY_PROFILE: dict[EasyOCRProfile, EasyOCRParams] = {
+    EasyOCRProfile.DEFAULT: EasyOCRParams(),
+    EasyOCRProfile.FLEET_SHIP_LEVEL: EasyOCRParams(allowlist=LEVEL_OCR_ALLOWLIST),
+    EasyOCRProfile.SHIP_POOL_TYPE: EasyOCRParams(allowlist=SHIP_TYPE_OCR_ALLOWLIST),
+}
+
+
+def get_easyocr_params(profile: EasyOCRProfile | str) -> EasyOCRParams:
+    """根据调用场景配置档案返回 EasyOCR 参数。"""
+    try:
+        normalized_profile = EasyOCRProfile(profile)
+    except ValueError as exc:
+        raise ValueError(f'未知的 EasyOCR 参数配置档案: {profile}') from exc
+    return _EASY_OCR_PARAMS_BY_PROFILE[normalized_profile]
+
 
 # 等级数字的易混淆字符；新增项时右侧只能是一个数字。
 LEVEL_DIGIT_TRANSLATION = str.maketrans(

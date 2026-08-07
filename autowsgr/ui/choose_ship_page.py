@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,7 @@ from autowsgr.vision import (
     PixelSignature,
 )
 from autowsgr.vision.ocr import _fuzzy_match
+from autowsgr.vision.ocr_rules import EasyOCRProfile
 
 from .utils import wait_for_page, wait_leave_page
 from .utils.ship_list import (
@@ -72,10 +74,9 @@ _OCR_MAX_ATTEMPTS: int = 3
 #: 船池卡片信息区域，以 1280x720 截图为校准基准。
 _CARD_REFERENCE_WIDTH = 1280
 _CARD_REFERENCE_HEIGHT = 720
-_SHIP_TYPE_HALF_WIDTH = 68
-_SHIP_TYPE_TOP_OFFSET = 72
-_SHIP_TYPE_BOTTOM_OFFSET = 24
-_SHIP_TYPE_OCR_SCALES = (2, 3)
+_SHIP_TYPE_CROP_OFFSETS = (-62, -59, -13, -34.5)
+"""舰种区域相对舰名中心 X 和 DLL 横带 Y 的偏移量 (x1, y1, x2, y2)。"""
+_SHIP_TYPE_OCR_SCALES = (2, 3, 4)
 _MAX_LEVEL_CARD_X_DISTANCE = 80 / _CARD_REFERENCE_WIDTH
 
 PAGE_SIGNATURE = PixelSignature(
@@ -134,10 +135,8 @@ class ChooseShipPage:
         cy: float,
         row_key: float,
     ) -> ShipType | None:
-        """按链路选择舰种识别入口：新链路用单卡固定坐标，旧链路用命中点探测。"""
-        if self._ship_ocr is not None:
-            return self._detect_ship_type_in_single_card(screen, cx, cy, row_key)
-        return self._detect_ship_type_near_hit(screen, cx, cy, row_key)
+        """以舰名位置为锚点，只识别命中卡片内的舰种区域。"""
+        return self._detect_ship_type_in_single_card(screen, cx, cy, row_key)
 
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
@@ -491,39 +490,6 @@ class ChooseShipPage:
 
         return None
 
-    def _detect_ship_type_near_hit(
-        self,
-        screen: np.ndarray,
-        cx: float,
-        cy: float,
-        row_key: float,
-    ) -> ShipType | None:
-        """使用旧 OCR 流程在命中卡片附近识别舰种。"""
-        assert self._ctx.ocr is not None
-
-        h, w = screen.shape[:2]
-        x_px = int(max(0, min(w - 1, cx * w)))
-        y_px = int(max(0, min(h - 1, cy * h)))
-        row_y = int(max(0, min(h - 1, row_key * h))) if row_key >= 0 else y_px
-
-        probes: list[tuple[int, int, int, int]] = [
-            (max(0, x_px - 110), max(0, row_y - 120), min(w, x_px + 110), max(0, row_y - 12)),
-            (max(0, x_px - 130), max(0, y_px - 150), min(w, x_px + 130), max(0, y_px - 18)),
-            (max(0, x_px - 140), max(0, y_px - 170), min(w, x_px + 140), min(h, y_px + 20)),
-        ]
-
-        for x1, y1, x2, y2 in probes:
-            if x2 - x1 < 16 or y2 - y1 < 16:
-                continue
-            crop = screen[y1:y2, x1:x2]
-            results = self._ctx.ocr.recognize(crop)
-            for result in results:
-                text = str(getattr(result, 'text', '')).strip()
-                ship_type = self._extract_ship_type_from_text(text)
-                if ship_type is not None:
-                    return ship_type
-        return None
-
     def _detect_ship_type_in_single_card(
         self,
         screen: np.ndarray,
@@ -531,7 +497,7 @@ class ChooseShipPage:
         cy: float,
         row_key: float,
     ) -> ShipType | None:
-        """新 OCR 的单卡舰种识别入口，旧 OCR 流程不会调用此方法。"""
+        """根据舰名中心和所在横带，裁剪单张卡片的舰种区域。"""
         ocr = self._preferred_ocr
         assert ocr is not None
 
@@ -540,28 +506,37 @@ class ChooseShipPage:
         y_px = max(0, min(h - 1, round(cy * h)))
         row_y = max(0, min(h - 1, round(row_key * h))) if row_key >= 0 else y_px
 
-        half_width = max(1, round(_SHIP_TYPE_HALF_WIDTH * w / _CARD_REFERENCE_WIDTH))
-        top_offset = max(1, round(_SHIP_TYPE_TOP_OFFSET * h / _CARD_REFERENCE_HEIGHT))
-        bottom_offset = max(1, round(_SHIP_TYPE_BOTTOM_OFFSET * h / _CARD_REFERENCE_HEIGHT))
-
-        x1 = max(0, x_px - half_width)
-        x2 = min(w, x_px + half_width)
-        y1 = max(0, row_y - top_offset)
-        y2 = max(0, min(h, row_y - bottom_offset))
+        left, top, right, bottom = _SHIP_TYPE_CROP_OFFSETS
+        x1 = max(0.0, min(float(w), x_px + left * w / _CARD_REFERENCE_WIDTH))
+        x2 = max(0.0, min(float(w), x_px + right * w / _CARD_REFERENCE_WIDTH))
+        y1 = max(0.0, min(float(h), row_y + top * h / _CARD_REFERENCE_HEIGHT))
+        y2 = max(0.0, min(float(h), row_y + bottom * h / _CARD_REFERENCE_HEIGHT))
         if x2 - x1 < 16 or y2 - y1 < 16:
             return None
 
-        crop = screen[y1:y2, x1:x2]
+        source_x1 = math.floor(x1)
+        source_x2 = math.ceil(x2)
+        source_y1 = math.floor(y1)
+        source_y2 = math.ceil(y2)
+        source_crop = screen[source_y1:source_y2, source_x1:source_x2]
         for scale in _SHIP_TYPE_OCR_SCALES:
-            enlarged = cv2.resize(
-                crop,
+            enlarged_source = cv2.resize(
+                source_crop,
                 None,
                 fx=scale,
                 fy=scale,
                 interpolation=cv2.INTER_CUBIC,
             )
+            crop_x1 = round((x1 - source_x1) * scale)
+            crop_x2 = round((x2 - source_x1) * scale)
+            crop_y1 = round((y1 - source_y1) * scale)
+            crop_y2 = round((y2 - source_y1) * scale)
+            enlarged = enlarged_source[crop_y1:crop_y2, crop_x1:crop_x2]
             detected_types: set[ShipType] = set()
-            results = ocr.recognize(enlarged)
+            results = ocr.recognize_line(
+                enlarged,
+                easyocr_profile=EasyOCRProfile.SHIP_POOL_TYPE,
+            )
             for result in results:
                 text = str(getattr(result, 'text', '')).strip()
                 ship_type = self._extract_ship_type_from_text(text)

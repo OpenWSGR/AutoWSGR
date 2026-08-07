@@ -43,7 +43,10 @@ from autowsgr.ui.battle.preparation import (
 from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 from autowsgr.vision import OCRResult
-from autowsgr.vision.ocr_rules import LEVEL_OCR_ALLOWLIST, set_user_ship_name_aliases
+from autowsgr.vision.ocr_rules import (
+    EasyOCRProfile,
+    set_user_ship_name_aliases,
+)
 
 
 if TYPE_CHECKING:
@@ -215,7 +218,7 @@ class TestLevelOCRRouting:
         threshold.assert_called_once()
         assert threshold.call_args.args[3] == cv2.THRESH_BINARY + cv2.THRESH_OTSU
         assert ocr.recognize_line.call_args.kwargs == {
-            'allowlist': LEVEL_OCR_ALLOWLIST,
+            'easyocr_profile': EasyOCRProfile.FLEET_SHIP_LEVEL,
         }
 
     def test_fastocr_path_keeps_original_roi_and_shared_rules(self):
@@ -248,7 +251,7 @@ class TestLevelOCRRouting:
         threshold.assert_not_called()
         fastocr.recognize_line.assert_called_once()
         assert fastocr.recognize_line.call_args.kwargs == {
-            'allowlist': LEVEL_OCR_ALLOWLIST,
+            'easyocr_profile': EasyOCRProfile.FLEET_SHIP_LEVEL,
         }
         easyocr.recognize_line.assert_not_called()
 

@@ -11,7 +11,7 @@ from autowsgr.ui.choose_ship_page import ChooseShipPage
 from autowsgr.ui.utils.ship_list import LevelOCRRetryNeededError
 from autowsgr.vision import OCRResult
 from autowsgr.vision.ocr import set_ship_name_match_confidence
-from autowsgr.vision.ocr_rules import set_user_ship_name_aliases
+from autowsgr.vision.ocr_rules import EasyOCRProfile, set_user_ship_name_aliases
 
 
 class TestShipNameMatching:
@@ -52,12 +52,12 @@ class TestShipTypeProbeRoutes:
         ctx = SimpleNamespace(ctrl=MagicMock(), ocr=ocr)
         return ChooseShipPage(ctx), ocr
 
-    def test_legacy_entry_keeps_original_probe(self):
+    def test_default_entry_uses_single_card_roi(self):
         page, ocr = self._build_page()
-        ocr.recognize.return_value = [OCRResult(text='航母', confidence=0.99)]
+        ocr.recognize_line.return_value = [OCRResult(text='航母', confidence=0.99)]
         screen = np.zeros((720, 1280, 3), dtype=np.uint8)
 
-        ship_type = page._detect_ship_type_near_hit(
+        ship_type = page._detect_hit_ship_type(
             screen,
             cx=403 / 1280,
             cy=650 / 720,
@@ -65,12 +65,15 @@ class TestShipTypeProbeRoutes:
         )
 
         assert ship_type is ShipType.CV
-        assert ocr.recognize.call_count == 1
-        assert ocr.recognize.call_args.args[0].shape == (108, 220, 3)
+        assert ocr.recognize_line.call_count == 1
+        assert ocr.recognize_line.call_args.args[0].shape == (49, 98, 3)
+        assert ocr.recognize_line.call_args.kwargs == {
+            'easyocr_profile': EasyOCRProfile.SHIP_POOL_TYPE,
+        }
 
     def test_uses_single_card_roi_at_720p(self):
         page, ocr = self._build_page()
-        ocr.recognize.return_value = [OCRResult(text='航母', confidence=0.99)]
+        ocr.recognize_line.return_value = [OCRResult(text='航母', confidence=0.99)]
         screen = np.zeros((720, 1280, 3), dtype=np.uint8)
 
         ship_type = page._detect_ship_type_in_single_card(
@@ -81,12 +84,12 @@ class TestShipTypeProbeRoutes:
         )
 
         assert ship_type is ShipType.CV
-        assert ocr.recognize.call_count == 1
-        assert ocr.recognize.call_args.args[0].shape == (96, 272, 3)
+        assert ocr.recognize_line.call_count == 1
+        assert ocr.recognize_line.call_args.args[0].shape == (49, 98, 3)
 
     def test_scales_single_card_roi_with_screen_resolution(self):
         page, ocr = self._build_page()
-        ocr.recognize.return_value = [OCRResult(text='轻母', confidence=0.99)]
+        ocr.recognize_line.return_value = [OCRResult(text='轻母', confidence=0.99)]
         screen = np.zeros((1080, 1920, 3), dtype=np.uint8)
 
         ship_type = page._detect_ship_type_in_single_card(
@@ -97,11 +100,11 @@ class TestShipTypeProbeRoutes:
         )
 
         assert ship_type is ShipType.CVL
-        assert ocr.recognize.call_args.args[0].shape == (144, 408, 3)
+        assert ocr.recognize_line.call_args.args[0].shape == (73, 147, 3)
 
     def test_retries_by_upscaling_the_same_card_roi(self):
         page, ocr = self._build_page()
-        ocr.recognize.side_effect = [
+        ocr.recognize_line.side_effect = [
             [],
             [OCRResult(text='轻母', confidence=0.99)],
         ]
@@ -115,15 +118,36 @@ class TestShipTypeProbeRoutes:
         )
 
         assert ship_type is ShipType.CVL
-        assert ocr.recognize.call_count == 2
-        first_image = ocr.recognize.call_args_list[0].args[0]
-        retry_image = ocr.recognize.call_args_list[1].args[0]
-        assert first_image.shape == (96, 272, 3)
-        assert retry_image.shape == (144, 408, 3)
+        assert ocr.recognize_line.call_count == 2
+        first_image = ocr.recognize_line.call_args_list[0].args[0]
+        retry_image = ocr.recognize_line.call_args_list[1].args[0]
+        assert first_image.shape == (49, 98, 3)
+        assert retry_image.shape == (74, 147, 3)
+
+    def test_retries_ship_type_at_four_times_scale(self):
+        page, ocr = self._build_page()
+        ocr.recognize_line.side_effect = [
+            [],
+            [],
+            [OCRResult(text='战巡', confidence=0.99)],
+        ]
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        ship_type = page._detect_ship_type_in_single_card(
+            screen,
+            cx=403 / 1280,
+            cy=650 / 720,
+            row_key=648 / 720,
+        )
+
+        assert ship_type is ShipType.BC
+        assert ocr.recognize_line.call_count == 3
+        final_image = ocr.recognize_line.call_args_list[2].args[0]
+        assert final_image.shape == (98, 196, 3)
 
     def test_rejects_multiple_ship_types_without_guessing(self):
         page, ocr = self._build_page()
-        ocr.recognize.return_value = [
+        ocr.recognize_line.return_value = [
             OCRResult(text='航母', confidence=0.99),
             OCRResult(text='轻母', confidence=0.99),
         ]
@@ -137,11 +161,11 @@ class TestShipTypeProbeRoutes:
         )
 
         assert ship_type is None
-        assert ocr.recognize.call_count == 1
+        assert ocr.recognize_line.call_count == 1
 
     def test_ignores_faction_parens_in_ship_type_text(self):
         page, ocr = self._build_page()
-        ocr.recognize.return_value = [OCRResult(text='轻巡(J国)', confidence=0.99)]
+        ocr.recognize_line.return_value = [OCRResult(text='轻巡(J国)', confidence=0.99)]
         screen = np.zeros((720, 1280, 3), dtype=np.uint8)
 
         ship_type = page._detect_ship_type_in_single_card(
@@ -287,7 +311,7 @@ class TestIndependentShipRules:
             ),
             patch.object(
                 page,
-                '_detect_ship_type_near_hit',
+                '_detect_hit_ship_type',
                 return_value=ShipType.BB,
             ) as detect_ship_type,
             patch('autowsgr.ui.choose_ship_page.time.sleep'),

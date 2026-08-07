@@ -19,9 +19,9 @@ from autowsgr.ui.utils.ship_list import extract_ship_type_from_text
 from autowsgr.vision import PixelChecker
 from autowsgr.vision.ocr_rules import (
     LEVEL_NOISY_PATTERN,
-    LEVEL_OCR_ALLOWLIST,
     LEVEL_PATTERN,
     LEVEL_SHORT_PATTERN,
+    EasyOCRProfile,
     is_valid_ship_level,
     normalize_level_digits,
 )
@@ -180,7 +180,7 @@ class DetectionMixin(BaseBattlePreparation):
             level = self._best_level_from_results(
                 ocr.recognize_line(
                     prepared,
-                    allowlist=LEVEL_OCR_ALLOWLIST,
+                    easyocr_profile=EasyOCRProfile.FLEET_SHIP_LEVEL,
                 ),
             )
             levels[slot] = level
