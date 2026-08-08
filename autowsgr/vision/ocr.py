@@ -26,9 +26,11 @@ from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision.ocr_rules import (
     EasyOCRProfile,
+    FastOCRProfile,
     apply_ship_name_rules,
     expand_ship_name_candidates,
     get_easyocr_params,
+    get_fastocr_params,
 )
 
 
@@ -549,11 +551,36 @@ class FastOCREngine(OCREngine):
         allowlist: str = '',
     ) -> list[OCRResult]:
         """执行完整文字检测，之后按调用方提供的字符集过滤文本。"""
+        return self._recognize(image, allowlist, FastOCRProfile.DEFAULT)
+
+    def recognize_line(
+        self,
+        image: np.ndarray,
+        allowlist: str = '',
+        *,
+        easyocr_profile: EasyOCRProfile | str = EasyOCRProfile.DEFAULT,
+    ) -> list[OCRResult]:
+        """跳过文字检测，识别已裁剪的单行文字。"""
+        easyocr_params = get_easyocr_params(easyocr_profile)
+        return self._recognize(
+            image,
+            allowlist or easyocr_params.allowlist,
+            FastOCRProfile.SINGLE_LINE,
+        )
+
+    def _recognize(
+        self,
+        image: np.ndarray,
+        allowlist: str,
+        profile: FastOCRProfile,
+    ) -> list[OCRResult]:
+        """根据集中维护的 FastOCR 参数执行识别。"""
+        params = get_fastocr_params(profile)
         bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
         job = self._tasker.post_recognition(
             self._recognition_type,
             self._ocr_options_type(
-                only_rec=False,
+                only_rec=params.only_rec,
                 threshold=self._threshold,
             ),
             bgr,
