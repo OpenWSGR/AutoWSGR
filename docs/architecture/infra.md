@@ -49,7 +49,7 @@ _log.info('进入战斗: {}', map_name)
 ### 日志输出
 
 - 控制台: 彩色输出
-- 文件: 每次启动独立目录 `log/{timestamp}/`
+- 文件: 每次启动独立目录 `logs/{timestamp}/`
 - 截图保存: `save_images=True` 时，配合 `save_screenshot()` 将调试截图保存到日志目录
 
 ---

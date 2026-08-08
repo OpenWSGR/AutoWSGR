@@ -30,7 +30,7 @@
     # 应用启动时调用一次
     from autowsgr.infra.logger import setup_logger
     setup_logger(
-        log_dir=Path("log/2026-01-01"),
+        log_dir=Path("logs/2026-01-01"),
         channels={
             "vision.pixel": "TRACE",   # 开启像素匹配逐条输出
             "emulator": "INFO",        # 屏蔽 click/swipe 的 DEBUG
