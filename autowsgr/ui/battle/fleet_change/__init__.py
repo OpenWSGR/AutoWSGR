@@ -6,7 +6,8 @@
 内部模块:
 
 - ``_detect.py`` -- 准备页舰队 OCR 检测
-- ``_planning.py`` -- 目标规划与规则校验
+- ``_rules.py`` -- 舰队规则匹配与校验
+- ``_planning.py`` -- 目标分配与槽位规划
 - ``_alignment.py`` -- 舰队调整与船池页面操作
 - ``_change.py`` -- 换船主流程编排
 """
