@@ -1528,10 +1528,8 @@ class TestSmartFleetChange:
                 side_effect=[
                     _snapshot(fleet_a_b),
                     _snapshot(fleet_c),
-                    _snapshot(fleet_c),
-                    _snapshot(fleet_c),
                 ],
-            ),
+            ) as detect,
             patch.object(page, '_try_select_option', side_effect=select_option),
             patch.object(page, '_change_single_ship', side_effect=change_ship),
             patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
@@ -1542,6 +1540,10 @@ class TestSmartFleetChange:
             ('select', 2, 'C'),
             ('remove', 1, None),
             ('remove', 0, None),
+        ]
+        assert detect.call_args_list == [
+            call(expected_pool=['C']),
+            call(expected_names=fleet_c),
         ]
 
     def test_first_fleet_cannot_be_empty(self):
@@ -1599,13 +1601,10 @@ class TestSmartFleetChange:
         expected_names = ['A', None, None, None, None, None]
         assert detect.call_args_list == [
             call(expected_pool=['A']),
-            call(expected_pool=['A']),
             call(expected_names=expected_names),
             call(expected_names=expected_names),
-            call(expected_pool=['A']),
             call(expected_names=expected_names),
             call(expected_names=expected_names),
-            call(expected_pool=['A']),
             call(expected_names=expected_names),
         ]
 
@@ -2691,6 +2690,8 @@ class TestFleetAlignment:
 
         assert actions[0] == 'replace'
         assert actions[1:] == ['remove', 'remove']
+        assert current == ['A', 'C', 'B', None, None, None]
+        assert occupied == [True, True, True, False, False, False]
         detect.assert_not_called()
 
     def test_unknown_occupied_slot_is_not_treated_as_empty(self):

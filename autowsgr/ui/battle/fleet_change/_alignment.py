@@ -356,22 +356,14 @@ class FleetAlignmentMixin(FleetSelectionMixin):
                 continue
             _log.info("[准备页] 移除多余槽位 {} 的 '{}'", slot, current[slot])
             self._change_single_ship(slot, None, slot_occupied=True)
-            current[slot] = None
-            occupied[slot] = False
+            # 游戏会将右侧舰船整体左移，直接同步已确认的成员位置。
+            current.pop(slot)
+            current.append(None)
+            occupied.pop(slot)
+            occupied.append(False)
             time.sleep(0.3)
 
-    def _refresh_members(
-        self,
-        current: list[str | None],
-        occupied: list[bool],
-        expected_pool: Sequence[str],
-    ) -> None:
-        """删除或替换后重新获取成员集合和占用状态。"""
-        snapshot = self.detect_fleet_snapshot(expected_pool=expected_pool)
-        current[:] = snapshot.names
-        occupied[:] = snapshot.occupied
-
-    # 首次调整时完成成员复用、缺员补充、多余成员移除和压缩后补位。
+    # 首次调整时完成成员复用、缺员补充和多余成员移除。
     def _full_align(
         self,
         current: list[str | None],
@@ -381,7 +373,6 @@ class FleetAlignmentMixin(FleetSelectionMixin):
         verified_slots: set[int],
         unavailable: set[tuple[int, ShipSelector]],
         locked: dict[int, ShipSelector],
-        expected_pool: Sequence[str],
         deferred_primary_slots: set[int] | None = None,
     ) -> None:
         """首次将当前舰队调整为目标成员集合。"""
@@ -396,17 +387,6 @@ class FleetAlignmentMixin(FleetSelectionMixin):
             deferred_primary_slots,
         )
         self._remove_extra_members(current, occupied, assigned, verified_slots)
-        self._refresh_members(current, occupied, expected_pool)
-        self._align_member_set(
-            current,
-            occupied,
-            assigned,
-            selectors,
-            verified_slots,
-            unavailable,
-            locked,
-            deferred_primary_slots,
-        )
 
     # OCR 验证失败后，只修正成员集合，不在此阶段拖拽排序。
     def _local_fix(
