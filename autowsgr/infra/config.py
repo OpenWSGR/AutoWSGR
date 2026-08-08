@@ -138,7 +138,7 @@ class LogConfig(BaseModel):
 
     level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'DEBUG'
     """日志级别"""
-    root: Path = Path('log')
+    root: Path = Path('logs')
     """日志保存根目录"""
     dir: Path | None = None
     """日志保存路径。自动按日期生成"""
