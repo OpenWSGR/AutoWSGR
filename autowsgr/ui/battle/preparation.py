@@ -8,8 +8,10 @@
     ├── DetectionMixin        (血量 / 等级识别)
     ├── SupplyMixin           (补给 / 支援)
     ├── RepairMixin           (修理, 依赖 DetectionMixin)
-    └── FleetChangeMixin      (换船: 扫描->定点更换->调整次序)
-        └── FleetDetectMixin  (准备页舰队 OCR 检测)
+    └── FleetChangeMixin         (换船主流程编排)
+        └── FleetAlignmentMixin  (成员更换与位置调整)
+            └── FleetPlanningMixin  (目标规划与规则校验)
+                └── FleetDetectMixin  (准备页舰队 OCR 检测)
             ↓
     BattlePreparationPage     (最终控制器)
 
