@@ -7,9 +7,9 @@
 5. 保留已有目标成员，优先补齐主选，再处理 fallback 和 candidate-only。
 6. 主选失败后重新执行全局唯一分配，不能局部抢占其他主选。
 7. 先替换目标舰船，再删除多余舰船，避免一队为空。
-8. 删除舰船造成槽位压缩后，再检查并补齐缺员。
+8. 删除多余舰船时在内存中同步槽位压缩，保留已确认的成员信息。
 9. 成员集合完整后拖拽舰船，将现有成员调整到目标槽位。
-10. OCR 再次验证舰名、顺序、空槽和同舰唯一性。
+10. OCR 再次验证舰名、顺序和空槽，漏识别时保留已确认的槽位舰名。
 11. 验证失败后只修正错误槽位，最多修正两次。
 一个 YAML 只执行一套舰队，不会切换其他 preset。
 常规出征使用搜索框，决战可通过开关选择是否使用本算法。
@@ -64,6 +64,27 @@ class FleetChangeMixin(FleetAlignmentMixin):
         if self._last_changed_fleet is None:
             return None
         return list(self._last_changed_fleet)
+
+    @staticmethod
+    def _merge_position_snapshot(
+        current: Sequence[str | None],
+        snapshot: FleetSnapshot,
+    ) -> tuple[list[str | None], list[bool]]:
+        """合并最终位置 OCR，并保留有船槽位中已经确认的舰名。"""
+        names: list[str | None] = []
+        for confirmed_name, detected_name, is_occupied in zip(
+            current,
+            snapshot.names,
+            snapshot.occupied,
+            strict=True,
+        ):
+            if not is_occupied:
+                names.append(None)
+            elif detected_name is not None:
+                names.append(detected_name)
+            else:
+                names.append(confirmed_name)
+        return names, list(snapshot.occupied)
 
     def _prepare_members_for_reorder(
         self,
@@ -202,10 +223,9 @@ class FleetChangeMixin(FleetAlignmentMixin):
             names = self._target_names(assigned)
             self._reorder(current, names)
 
-            # Step 7：最终 OCR 验证舰名、顺序、空槽和重名情况。
+            # Step 7：最终 OCR 验证位置；有船但漏识别舰名时保留已确认信息。
             snapshot = self.detect_fleet_snapshot(expected_names=names)
-            current = snapshot.names
-            occupied = snapshot.occupied
+            current, occupied = self._merge_position_snapshot(current, snapshot)
             # 最终舰队符合目标时，返回成功。
             if self._validate_assignment(
                 current,
@@ -226,8 +246,7 @@ class FleetChangeMixin(FleetAlignmentMixin):
                 )
                 time.sleep(0.5)
                 snapshot = self.detect_fleet_snapshot(expected_names=names)
-                current = snapshot.names
-                occupied = snapshot.occupied
+                current, occupied = self._merge_position_snapshot(current, snapshot)
 
             # 所有重试都失败时，记录当前舰队并退出。
             else:

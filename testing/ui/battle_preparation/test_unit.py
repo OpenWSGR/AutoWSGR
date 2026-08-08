@@ -1463,6 +1463,55 @@ class TestSmartFleetChange:
             (3, 2),
         ]
 
+    def test_final_ocr_keeps_confirmed_names_after_reorder(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        old_fleet = ['B', 'A', 'D', 'C', None, None]
+        target_fleet = ['A', 'B', 'C', 'D', None, None]
+        final_snapshot = _snapshot(
+            [None, None, None, None, None, None],
+            [True, True, True, True, False, False],
+        )
+
+        def move_ship(src: int, dst: int, current: list[str | None]) -> None:
+            current.insert(dst, current.pop(src))
+
+        with (
+            patch.object(
+                page,
+                'detect_fleet_snapshot',
+                side_effect=[
+                    _snapshot(old_fleet),
+                    final_snapshot,
+                ],
+            ) as detect,
+            patch.object(page, '_full_align') as full_align,
+            patch.object(page, '_local_fix') as local_fix,
+            patch.object(page, '_circular_move', side_effect=move_ship) as circular_move,
+        ):
+            assert page.change_fleet(None, exact_fleet_rules(target_fleet[:4]))
+
+        full_align.assert_not_called()
+        local_fix.assert_not_called()
+        assert detect.call_count == 2
+        assert [item.args[:2] for item in circular_move.call_args_list] == [
+            (1, 0),
+            (3, 2),
+        ]
+        assert page.last_changed_fleet == target_fleet
+
+    def test_position_snapshot_only_keeps_unknown_occupied_names(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        current = ['A', 'B', 'C', None, None, None]
+        snapshot = _snapshot(
+            [None, 'X', None, None, None, None],
+            [True, True, False, False, False, False],
+        )
+
+        names, occupied = page._merge_position_snapshot(current, snapshot)
+
+        assert names == ['A', 'X', None, None, None, None]
+        assert occupied == [True, True, False, False, False, False]
+
     def test_candidate_only_reuses_existing_nonpreferred_candidate(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
         old_fleet = ['岛风', '扶桑', None, None, None, None]
