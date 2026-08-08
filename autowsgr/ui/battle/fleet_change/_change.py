@@ -75,10 +75,9 @@ class FleetChangeMixin(FleetAlignmentMixin):
         verified_slots: set[int],
         unavailable: set[tuple[int, ShipSelector]],
         locked: dict[int, ShipSelector],
-        expected_pool: Sequence[str],
         deferred_primary_slots: set[int],
     ) -> tuple[list[str | None], list[bool]]:
-        """确保目标成员齐全，并返回排序前的最新成员快照。"""
+        """确保目标成员齐全，并保留已经确认的成员信息。"""
         if self._member_set_satisfied(
             current,
             occupied,
@@ -98,7 +97,6 @@ class FleetChangeMixin(FleetAlignmentMixin):
                 verified_slots,
                 unavailable,
                 locked,
-                expected_pool,
                 deferred_primary_slots,
             )
         else:
@@ -113,8 +111,7 @@ class FleetChangeMixin(FleetAlignmentMixin):
                 locked,
             )
 
-        snapshot = self.detect_fleet_snapshot(expected_pool=expected_pool)
-        return snapshot.names, snapshot.occupied
+        return current, occupied
 
     # 执行一套六槽舰队的完整换船、排序和验证流程。
     def change_fleet(
@@ -195,7 +192,6 @@ class FleetChangeMixin(FleetAlignmentMixin):
                     verified_slots,
                     unavailable,
                     locked,
-                    expected_pool,
                     deferred_primary_slots,
                 )
             except _UnresolvedPrimaryError as error:
