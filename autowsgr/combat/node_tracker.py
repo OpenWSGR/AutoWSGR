@@ -479,7 +479,7 @@ class NodeTracker:
         self._last_ship_position = self._ship_position
         sx, sy = self._ship_position
 
-        # 速度方向（上一帧 -> 当前帧）；首帧或零位移时退化为欧氏距离模式
+        # 速度方向（上一帧 -> 当前帧）；首帧退化为欧氏距离模式
         has_ray = False
         vx = 0.0
         vy = 0.0
@@ -490,12 +490,11 @@ class NodeTracker:
 
         if not has_ray:
             _log.debug(
-                '[NodeTracker] has_ray=False，保持当前节点: {}，位置: ({:.3f}, {:.3f})',
+                '[NodeTracker] 首帧无速度方向，按欧氏距离判断节点: {}，位置: ({:.3f}, {:.3f})',
                 self._current_node,
                 sx,
                 sy,
             )
-            return self._current_node
 
         current_data = self._map_data.get(self._current_node)
 

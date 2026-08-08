@@ -14,7 +14,12 @@ from autowsgr.combat.history import (
     EventType,
     FightResult,
 )
-from autowsgr.combat.node_tracker import MapNodeData, _resolve_event_map_path
+from autowsgr.combat.node_tracker import (
+    MapNodeData,
+    NodePosition,
+    NodeTracker,
+    _resolve_event_map_path,
+)
 from autowsgr.combat.plan import (
     _MODE_SPECS,
     MODE_TRANSITIONS,
@@ -828,6 +833,34 @@ class TestCombatPlanEntrance:
 # ═══════════════════════════════════════════════════════════════════════════════
 # node_tracker load_event 测试
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestNodeTracker:
+    """节点追踪器在第一帧尚无速度方向时的定位测试。"""
+
+    @staticmethod
+    def _make_tracker() -> NodeTracker:
+        map_data = MapNodeData(
+            {
+                '0': NodePosition('0', 0.20, 0.60, ['A']),
+                'A': NodePosition('A', 0.50, 0.50, []),
+            }
+        )
+        return NodeTracker(map_data)
+
+    def test_first_position_near_first_node_updates_immediately(self) -> None:
+        """首个有效画面已接近 A 点时，不应等到下一段移动才更新节点。"""
+        tracker = self._make_tracker()
+        object.__setattr__(tracker, '_ship_position', (0.49, 0.50))
+
+        assert tracker.update_node() == 'A'
+
+    def test_first_position_near_start_keeps_zero(self) -> None:
+        """首个有效画面仍靠近地图起点时，应继续保留未知起始节点。"""
+        tracker = self._make_tracker()
+        object.__setattr__(tracker, '_ship_position', (0.21, 0.60))
+
+        assert tracker.update_node() == '0'
 
 
 class TestResolveEventMapPath:
