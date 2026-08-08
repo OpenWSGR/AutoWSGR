@@ -56,6 +56,10 @@ _EXTRA_SHIPS: dict[str, str] = {
     '8116': '戈本',
 }
 
+_WIKI_SHIP_NAME_CORRECTIONS: dict[str, str] = {
+    '塞尔弗里奇': '赛尔弗里吉',
+}
+
 # 末尾固定附加：战例
 _OTHER_SECTION = """\
 Other: # 战例
@@ -167,10 +171,18 @@ def _ships_to_yaml(ships: list[tuple[str, str]], extra: dict[str, str]) -> str:
         if key in seen:
             return
         seen.add(key)
+        source_name = full_name
+        suffix = '·改' if source_name.endswith('·改') else ''
+        base_name = source_name.removesuffix(suffix)
+        full_name = f'{_WIKI_SHIP_NAME_CORRECTIONS.get(base_name, base_name)}{suffix}'
         # 短名：去掉括号内的补充说明
         short = re.sub(r'[\(（][^\)）]*[\)）]', '', full_name).strip()
         lines.append(f'{key}: # {full_name}')
         lines.append(f'  - "{short}"')
+        source_short = re.sub(r'[\(（][^\)）]*[\)）]', '', source_name).strip()
+        source_short = source_short.removesuffix('·改')
+        if source_short != short.removesuffix('·改'):
+            lines.append(f'  - "{source_short}"')
 
     for no, name in ships:
         _add(no, name)
