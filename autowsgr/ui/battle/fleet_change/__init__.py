@@ -6,6 +6,7 @@
 内部模块:
 
 - ``_detect.py`` -- 准备页舰队 OCR 检测
+- ``_planning.py`` -- 目标规划与规则校验
 - ``_change.py`` -- 更换算法 Mixin
 """
 
