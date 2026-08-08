@@ -276,14 +276,8 @@ class CanteenPage:
 
 ```python
 class ChooseShipPage:
-    def click_search_box(self) -> None:
-        """点击搜索框。"""
-    def input_ship_name(self, name: str) -> None:
-        """输入舰船名。"""
-    def dismiss_keyboard(self) -> None:
-        """关闭软键盘。"""
-    def click_first_result(self) -> None:
-        """点击搜索结果第一项。"""
+    def change_single_ship(self, selector: ShipSelector | None) -> str | None:
+        """按规则查找并选择舰船；selector 为 None 时移除当前舰船。"""
     def click_remove(self) -> None:
         """移除当前槽位舰船。"""
 ```

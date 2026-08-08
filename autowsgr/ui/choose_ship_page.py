@@ -1,14 +1,6 @@
 """选船页面 UI 控制器。
 
-已完成，需测试
-
-使用方式::
-
-    from autowsgr.ui.choose_ship_page import ChooseShipPage
-
-    page = ChooseShipPage(ctrl)
-    page.click_search_box()
-    page.click_first_result()
+使用 :meth:`ChooseShipPage.change_single_ship` 根据舰名、等级和舰种查找并选择舰船。
 """
 
 from __future__ import annotations
@@ -62,9 +54,6 @@ CLICK_DISMISS_KEYBOARD: tuple[float, float] = (500 / 960, 50 / 540)
 
 CLICK_REMOVE_SHIP: tuple[float, float] = (83 / 960, 167 / 540)
 """「移除」按钮 — 将当前槽位舰船移除。"""
-
-CLICK_FIRST_RESULT: tuple[float, float] = (183 / 960, 167 / 540)
-"""搜索结果列表中的第一个结果。"""
 
 #: 选船列表滚动参数
 _SCROLL_FROM_Y: float = 0.55
@@ -198,11 +187,6 @@ class ChooseShipPage:
         )
         # 等待键盘关闭
         time.sleep(0.2)
-
-    def click_first_result(self) -> None:
-        """点击搜索结果中的第一个舰船。"""
-        _log.debug('[UI] 选船 → 点击第一个结果')
-        self._ctrl.click(*CLICK_FIRST_RESULT)
 
     def click_remove(self) -> None:
         """点击「移除」按钮，移除当前槽位的舰船。"""
@@ -466,6 +450,7 @@ class ChooseShipPage:
                         if not relaxed_constraints:
                             continue
 
+                # 当前不判断“远征中”“维修中”等不可选状态；如需支持，应在点击前增加卡片状态识别。
                 _log.info(
                     "[UI] 选船 DLL+OCR -> '{}' (第 {}/{} 次), 点击 ({:.3f}, {:.3f})",
                     name,
