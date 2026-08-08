@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from autowsgr.constants import SHIPNAMES, normalize_ship_name
+from autowsgr.constants import SHIPNAMES, normalize_ship_name, ship_name_identity
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState, ShipType
 from autowsgr.ui.battle.base import BaseBattlePreparation
@@ -31,7 +31,7 @@ from autowsgr.vision.ocr import (
 
 # 仅在类型检查时导入运行逻辑不需要的类型。
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     import numpy as np
 
@@ -55,14 +55,14 @@ _SHIP_FUZZY_THRESHOLD: int = 2
 
 @dataclass(slots=True)
 class FleetSnapshot:
-    """同一准备页截图中的舰名和槽位占用状态。"""
+    """准备页六个槽位累计得到的最终 OCR 信息。"""
 
     names: list[str | None]
     occupied: list[bool]
     ship_types: list[ShipType | None] | None = None
-    """槽位号 (0-5) → 舰种；仅在首次快照识别时填充，否则为 ``None``。"""
+    """槽位号 (0-5) → 舰种；未请求详细信息时整个字段为 ``None``。"""
     ship_levels: list[int | None] | None = None
-    """槽位号 (0-5) → 等级；仅在首次快照识别时填充，否则为 ``None``。"""
+    """槽位号 (0-5) → 等级；未请求详细信息时整个字段为 ``None``。"""
 
     @property
     def unknown_slots(self) -> list[int]:
@@ -72,6 +72,33 @@ class FleetSnapshot:
             for slot, (name, occupied) in enumerate(zip(self.names, self.occupied, strict=True))
             if name is None and occupied
         ]
+
+    @property
+    def unknown_type_slots(self) -> list[int]:
+        """返回有舰船但舰种 OCR 未识别的槽位。"""
+        ship_types = self.ship_types or [None] * 6
+        return [
+            slot
+            for slot, (ship_type, occupied) in enumerate(
+                zip(ship_types, self.occupied, strict=True)
+            )
+            if ship_type is None and occupied
+        ]
+
+    @property
+    def unknown_level_slots(self) -> list[int]:
+        """返回有舰船但等级 OCR 未识别的槽位。"""
+        ship_levels = self.ship_levels or [None] * 6
+        return [
+            slot
+            for slot, (level, occupied) in enumerate(zip(ship_levels, self.occupied, strict=True))
+            if level is None and occupied
+        ]
+
+    @property
+    def has_unknown_details(self) -> bool:
+        """返回是否仍有需要定点补识别的槽位字段。"""
+        return bool(self.unknown_slots or self.unknown_type_slots or self.unknown_level_slots)
 
 
 # 负责识别准备页当前六个舰队槽位。
@@ -192,6 +219,64 @@ class FleetDetectMixin(BaseBattlePreparation):
         _log.info('[准备页] 当前舰队: {}', ships)
         return ships
 
+    def _recognize_fleet_names_at_slots(
+        self,
+        screen: np.ndarray,
+        slots: Sequence[int],
+        *,
+        expected_pool: Sequence[str] | None = None,
+    ) -> dict[int, str | None]:
+        """只裁切并识别指定槽位的舰名。"""
+        ocr = self._preferred_ocr
+        target_slots = sorted(set(slots))
+        names: dict[int, str | None] = dict.fromkeys(target_slots)
+        if ocr is None:
+            _log.warning('[准备页] 未提供 OCR 引擎，无法补识别舰名')
+            return names
+
+        normalized_pool = [
+            normalized
+            for name in dict.fromkeys(expected_pool or ())
+            if (normalized := normalize_ship_name(name)) is not None
+        ]
+        h, w = screen.shape[:2]
+        y1 = int(_NAME_STRIP_Y1 * h)
+        y2 = int(_NAME_STRIP_Y2 * h)
+        for slot in target_slots:
+            if not 0 <= slot < len(_SLOT_X_CENTERS):
+                continue
+            center = _SLOT_X_CENTERS[slot]
+            left_center = _SLOT_X_CENTERS[max(slot - 1, 0)]
+            right_center = _SLOT_X_CENTERS[min(slot + 1, 5)]
+            left = center - (right_center - center) / 2 if slot == 0 else (left_center + center) / 2
+            right = (
+                center + (center - left_center) / 2 if slot == 5 else (center + right_center) / 2
+            )
+            crop = screen[y1:y2, max(0, int(left * w)) : min(w, int(right * w))]
+            results = [result for result in ocr.recognize(crop) if result.text.strip()]
+            if not results:
+                _log.debug('[准备页] 槽位 {} 舰名单槽 OCR 无文本', slot)
+                continue
+
+            result = max(results, key=lambda item: item.confidence)
+            raw_text = result.text.strip()
+            patched_text = apply_ship_patches(raw_text)
+            matched = _fuzzy_match(
+                patched_text,
+                SHIPNAMES,
+                _SHIP_FUZZY_THRESHOLD,
+            )
+            if matched is None and normalized_pool:
+                matched = self._match_context_ship_name(patched_text, normalized_pool)
+            names[slot] = matched
+            _log.debug(
+                "[准备页] 槽位 {} 舰名单槽 OCR: '{}' -> '{}'",
+                slot,
+                raw_text,
+                matched,
+            )
+        return names
+
     def detect_fleet_snapshot(
         self,
         *,
@@ -204,8 +289,8 @@ class FleetDetectMixin(BaseBattlePreparation):
         Parameters
         ----------
         recognize_ship_details:
-            是否额外识别各槽位舰种和等级。仅首次换船快照需要开启，
-            避免每次重新截图都做 6 个舰种/等级区域的 OCR。
+            是否在当前截图额外识别各槽位舰名、舰种和等级。四阶段换船流程
+            不启用该参数，而是通过 ``fill_missing_fleet_snapshot()`` 获取新截图。
         """
         screen = self._ctrl.screenshot()
         names = self.detect_fleet(
@@ -219,11 +304,111 @@ class FleetDetectMixin(BaseBattlePreparation):
             or damage.get(slot, ShipDamageState.NO_SHIP) != ShipDamageState.NO_SHIP
             for slot in range(6)
         ]
-        ship_types = self._recognize_fleet_ship_types(screen) if recognize_ship_details else None
-        ship_levels = self._recognize_fleet_levels(screen) if recognize_ship_details else None
+        if recognize_ship_details:
+            unknown_name_slots = [
+                slot for slot in range(6) if occupied[slot] and names[slot] is None
+            ]
+            if unknown_name_slots:
+                names_by_slot = self._recognize_fleet_names_at_slots(
+                    screen,
+                    unknown_name_slots,
+                    expected_pool=expected_pool,
+                )
+                for slot in unknown_name_slots:
+                    if names_by_slot.get(slot) is not None:
+                        names[slot] = names_by_slot[slot]
+
+            occupied_slots = [slot for slot in range(6) if occupied[slot]]
+            types_by_slot = self._recognize_fleet_ship_types(screen, occupied_slots)
+            levels_by_slot = self._recognize_fleet_levels(screen, occupied_slots)
+            ship_types = [types_by_slot.get(slot) for slot in range(6)]
+            ship_levels = [levels_by_slot.get(slot) for slot in range(6)]
+        else:
+            ship_types = None
+            ship_levels = None
         return FleetSnapshot(
             names=names,
             occupied=occupied,
+            ship_types=ship_types,
+            ship_levels=ship_levels,
+        )
+
+    def fill_missing_fleet_snapshot(
+        self,
+        snapshot: FleetSnapshot,
+        *,
+        expected_pool: Sequence[str] | None = None,
+        detail_requirements: Mapping[str, tuple[bool, bool]] | None = None,
+    ) -> FleetSnapshot:
+        """获取新截图，只补充已有快照中仍为 ``None`` 的字段。
+
+        ``detail_requirements`` 未提供时补充所有有船槽位的舰种和等级，用于
+        LEVEL2/3。提供时按舰名身份映射 ``(需要舰种, 需要等级)``，用于
+        LEVEL4 跳过即将被主选替换的备选舰船。
+        """
+        names = list(snapshot.names)
+        ship_types = list(snapshot.ship_types or [None] * 6)
+        ship_levels = list(snapshot.ship_levels or [None] * 6)
+
+        def required_detail_slots() -> tuple[list[int], list[int]]:
+            if detail_requirements is None:
+                return snapshot.unknown_type_slots, snapshot.unknown_level_slots
+
+            type_slots: list[int] = []
+            level_slots: list[int] = []
+            for slot, (name, occupied) in enumerate(
+                zip(names, snapshot.occupied, strict=True),
+            ):
+                identity = ship_name_identity(name)
+                requirements = detail_requirements.get(identity) if identity is not None else None
+                if not occupied or requirements is None:
+                    continue
+                needs_type, needs_level = requirements
+                if needs_type and ship_types[slot] is None:
+                    type_slots.append(slot)
+                if needs_level and ship_levels[slot] is None:
+                    level_slots.append(slot)
+            return type_slots, level_slots
+
+        type_slots, level_slots = required_detail_slots()
+        if not snapshot.unknown_slots and not type_slots and not level_slots:
+            return snapshot
+
+        screen = self._ctrl.screenshot()
+
+        if snapshot.unknown_slots:
+            names_by_slot = self._recognize_fleet_names_at_slots(
+                screen,
+                snapshot.unknown_slots,
+                expected_pool=expected_pool,
+            )
+            for slot in snapshot.unknown_slots:
+                if names_by_slot.get(slot) is not None:
+                    names[slot] = names_by_slot[slot]
+
+        # LEVEL4 的舰名可能刚在本次截图中识别成功，需要据此重新确定细节槽位。
+        type_slots, level_slots = required_detail_slots()
+        if type_slots:
+            types_by_slot = self._recognize_fleet_ship_types(
+                screen,
+                type_slots,
+            )
+            for slot in type_slots:
+                if types_by_slot.get(slot) is not None:
+                    ship_types[slot] = types_by_slot[slot]
+
+        if level_slots:
+            levels_by_slot = self._recognize_fleet_levels(
+                screen,
+                level_slots,
+            )
+            for slot in level_slots:
+                if levels_by_slot.get(slot) is not None:
+                    ship_levels[slot] = levels_by_slot[slot]
+
+        return FleetSnapshot(
+            names=names,
+            occupied=list(snapshot.occupied),
             ship_types=ship_types,
             ship_levels=ship_levels,
         )

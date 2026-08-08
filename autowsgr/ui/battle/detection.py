@@ -35,6 +35,8 @@ from .constants import (
 
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
+
     import numpy as np
 
     from autowsgr.context.ship import Ship
@@ -131,6 +133,7 @@ class DetectionMixin(BaseBattlePreparation):
     def _recognize_fleet_levels(
         self,
         screen: np.ndarray,
+        slots: Collection[int] | None = None,
     ) -> dict[int, int | None]:
         """从准备页截图中 OCR 识别每艘舰船的等级。
 
@@ -140,33 +143,43 @@ class DetectionMixin(BaseBattlePreparation):
         ----------
         screen:
             出征准备页的截图。
+        slots:
+            仅识别指定槽位。未指定时按原逻辑先检测血条，再识别全部有船槽位。
 
         Returns
         -------
         dict[int, int | None]
             槽位号 (0-5) → 等级。无法识别或无舰船则为 ``None``。
         """
-        levels: dict[int, int | None] = {}
+        requested_slots = list(range(6)) if slots is None else sorted(set(slots))
+        levels: dict[int, int | None] = dict.fromkeys(requested_slots)
         ocr = self._preferred_ocr
         if ocr is None:
             _log.warning('[UI] 未提供 OCR 引擎，无法识别舰船等级')
-            return dict.fromkeys(range(6))
+            return levels
 
-        # 先检测哪些槽位有舰船
-        damage = self.detect_ship_damage(screen)
+        if slots is None:
+            damage = self.detect_ship_damage(screen)
+            target_slots = [
+                slot for slot in requested_slots if damage.get(slot) != ShipDamageState.NO_SHIP
+            ]
+        else:
+            target_slots = requested_slots
 
-        for slot in range(6):
-            if damage.get(slot) == ShipDamageState.NO_SHIP:
-                levels[slot] = None
-                continue
-
+        for slot in target_slots:
             crop_region = SHIP_LEVEL_CROP.get(slot)
             if crop_region is None:
-                levels[slot] = None
                 continue
 
             prepared = PixelChecker.crop(screen, *crop_region)
             if self._ship_ocr is None:
+                prepared = cv2.resize(
+                    prepared,
+                    None,
+                    fx=2,
+                    fy=2,
+                    interpolation=cv2.INTER_CUBIC,
+                )
                 gray = cv2.cvtColor(prepared, cv2.COLOR_RGB2GRAY)
                 _, binary = cv2.threshold(
                     gray,
@@ -194,7 +207,7 @@ class DetectionMixin(BaseBattlePreparation):
             '[准备页] 等级检测: {}',
             ' | '.join(
                 f'槽{i}={"Lv." + str(levels[i]) if levels[i] is not None else "无"}'
-                for i in range(6)
+                for i in requested_slots
             ),
         )
         return levels
@@ -204,29 +217,31 @@ class DetectionMixin(BaseBattlePreparation):
     def _recognize_fleet_ship_types(
         self,
         screen: np.ndarray,
+        slots: Collection[int] | None = None,
     ) -> dict[int, ShipType | None]:
         """从准备页截图中 OCR 识别每艘舰船的舰种。
 
         读取各舰船卡片上的舰种文本 (如 ``轻巡(J国)``)，用于首次换船快照，
         使已就位的目标舰船可以跳过船池二次确认。
         """
-        ship_types: dict[int, ShipType | None] = {}
+        requested_slots = list(range(6)) if slots is None else sorted(set(slots))
+        ship_types: dict[int, ShipType | None] = dict.fromkeys(requested_slots)
         ocr = self._preferred_ocr
         if ocr is None:
             _log.warning('[UI] 未提供 OCR 引擎，无法识别舰种')
-            return dict.fromkeys(range(6))
+            return ship_types
 
-        # 先检测哪些槽位有舰船
-        damage = self.detect_ship_damage(screen)
+        if slots is None:
+            damage = self.detect_ship_damage(screen)
+            target_slots = [
+                slot for slot in requested_slots if damage.get(slot) != ShipDamageState.NO_SHIP
+            ]
+        else:
+            target_slots = requested_slots
 
-        for slot in range(6):
-            if damage.get(slot) == ShipDamageState.NO_SHIP:
-                ship_types[slot] = None
-                continue
-
+        for slot in target_slots:
             crop_region = SHIP_TYPE_CROP.get(slot)
             if crop_region is None:
-                ship_types[slot] = None
                 continue
 
             cropped = PixelChecker.crop(screen, *crop_region)
@@ -247,7 +262,7 @@ class DetectionMixin(BaseBattlePreparation):
             '[准备页] 舰种检测: {}',
             ' | '.join(
                 f'槽{i}={ship_types[i].value if ship_types[i] is not None else "未知"}'
-                for i in range(6)
+                for i in requested_slots
             ),
         )
         return ship_types

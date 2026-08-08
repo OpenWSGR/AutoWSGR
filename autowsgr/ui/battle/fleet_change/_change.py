@@ -100,7 +100,7 @@ class FleetChangeMixin(FleetDetectMixin):
             raise ValueError('1 队槽位 0 不能为空')
 
         expected_pool = self._ocr_target_pool(selectors)
-        snapshot = self._detect_initial_snapshot(expected_pool)
+        snapshot = self._detect_initial_snapshot(expected_pool, selectors)
         current = snapshot.names
         occupied = snapshot.occupied
         assigned = self._plan_target_options(
@@ -319,69 +319,165 @@ class FleetChangeMixin(FleetDetectMixin):
             normalize_ship_name(option.name) if option is not None else None for option in assigned
         ]
 
-    def _detect_initial_snapshot(self, expected_pool: Sequence[str]) -> FleetSnapshot:
-        """初次识别舰队 (名称+舰种+等级)；存在未知占用槽位时再识别一次并保守合并。
+    @staticmethod
+    def _level4_detail_requirements(
+        selectors: Sequence[FleetSlotRule | None],
+    ) -> dict[str, tuple[bool, bool]]:
+        """返回 LEVEL4 需要继续补充舰种、等级的舰名。
 
-        首次快照额外识别各槽位舰种和等级，作为换船流程的上下文，
-        供后续跳过已就位目标舰船的二次确认。
+        有主选的槽位只保留主选；识别为备选后必然进入换船，不再补充细节。
+        纯备选槽没有主选，仍需按被选中的备选自身约束完成校验。
         """
-        first = self.detect_fleet_snapshot(
-            expected_pool=expected_pool,
-            recognize_ship_details=True,
-        )
-        if not first.unknown_slots:
-            return first
+        requirements: dict[str, tuple[bool, bool]] = {}
+        for selector in selectors:
+            if selector is None:
+                continue
+            options = (selector.primary,) if selector.primary is not None else selector.candidates
+            for option in options:
+                identity = ship_name_identity(option.name)
+                if identity is None:
+                    continue
+                needs_type = bool(option.ship_types)
+                needs_level = option.min_level is not None or option.max_level is not None
+                previous = requirements.get(identity, (False, False))
+                requirements[identity] = (
+                    previous[0] or needs_type,
+                    previous[1] or needs_level,
+                )
+        return requirements
 
-        second = self.detect_fleet_snapshot(
-            expected_pool=expected_pool,
-            recognize_ship_details=True,
-        )
-        names = list(first.names)
-        for slot, second_name in enumerate(second.names):
-            if names[slot] is None and second_name is not None:
-                names[slot] = second_name
-            elif (
-                names[slot] is not None
-                and second_name is not None
-                and ship_name_identity(names[slot]) != ship_name_identity(second_name)
+    @staticmethod
+    def _retry_invalid_strict_details(
+        snapshot: FleetSnapshot,
+        selectors: Sequence[FleetSlotRule | None],
+        *,
+        level: str,
+    ) -> FleetSnapshot:
+        """将不符合 strict YAML 的舰种、等级标记为未确认，留给下一阶段重识别。"""
+        requirements: dict[str, list[ShipSelector]] = {}
+        for selector in selectors:
+            if selector is None:
+                continue
+            options = (selector.primary,) if selector.primary is not None else selector.candidates
+            for option in options:
+                if option.relaxed_constraints:
+                    continue
+                identity = ship_name_identity(option.name)
+                if identity is not None:
+                    requirements.setdefault(identity, []).append(option)
+
+        ship_types = list(snapshot.ship_types or [None] * 6)
+        ship_levels = list(snapshot.ship_levels or [None] * 6)
+        changed = False
+        for slot, name in enumerate(snapshot.names):
+            options = requirements.get(ship_name_identity(name) or '')
+            if not options:
+                continue
+
+            type_options = [option for option in options if option.ship_types]
+            ship_type = ship_types[slot]
+            if (
+                ship_type is not None
+                and type_options
+                and not any(ship_type in option.ship_types for option in type_options)
             ):
-                names[slot] = None
-        occupied = [
-            first_occupied or second_occupied
-            for first_occupied, second_occupied in zip(
-                first.occupied,
-                second.occupied,
-                strict=True,
-            )
-        ]
-        ship_types = list(first.ship_types or [None] * 6)
-        second_types = second.ship_types or [None] * 6
-        for slot, second_type in enumerate(second_types):
-            if ship_types[slot] is None and second_type is not None:
-                ship_types[slot] = second_type
-            elif (
-                ship_types[slot] is not None
-                and second_type is not None
-                and ship_types[slot] != second_type
-            ):
+                _log.info(
+                    '[准备页] {} 槽位 {} 舰种 {} 不符合 strict YAML，下一阶段重识别',
+                    level,
+                    slot + 1,
+                    ship_type,
+                )
                 ship_types[slot] = None
-        ship_levels = list(first.ship_levels or [None] * 6)
-        second_levels = second.ship_levels or [None] * 6
-        for slot, second_level in enumerate(second_levels):
-            if ship_levels[slot] is None and second_level is not None:
-                ship_levels[slot] = second_level
-            elif (
-                ship_levels[slot] is not None
-                and second_level is not None
-                and ship_levels[slot] != second_level
+                changed = True
+
+            level_options = [
+                option
+                for option in options
+                if option.min_level is not None or option.max_level is not None
+            ]
+            ship_level = ship_levels[slot]
+            if (
+                ship_level is not None
+                and level_options
+                and not any(
+                    (option.min_level is None or ship_level >= option.min_level)
+                    and (option.max_level is None or ship_level <= option.max_level)
+                    for option in level_options
+                )
             ):
+                _log.info(
+                    '[准备页] {} 槽位 {} 等级 {} 不符合 strict YAML，下一阶段重识别',
+                    level,
+                    slot + 1,
+                    ship_level,
+                )
                 ship_levels[slot] = None
+                changed = True
+
+        if not changed:
+            return snapshot
         return FleetSnapshot(
-            names=names,
-            occupied=occupied,
+            names=list(snapshot.names),
+            occupied=list(snapshot.occupied),
             ship_types=ship_types,
             ship_levels=ship_levels,
         )
+
+    def _detect_initial_snapshot(
+        self,
+        expected_pool: Sequence[str],
+        selectors: Sequence[FleetSlotRule | None],
+    ) -> FleetSnapshot:
+        """通过四次独立截图累计舰队信息，只补仍未确认的字段。
+
+        LEVEL1 全局识别舰名并检测血条；LEVEL2 使用新截图补舰名并首次识别
+        全部有船槽位的舰种、等级；strict 约束不符的字段视为未确认；
+        LEVEL3 再补充一次；LEVEL4 最后补舰名，并只补主选或纯备选规则实际
+        需要的舰种、等级。
+        """
+        snapshot = self.detect_fleet_snapshot(
+            expected_pool=expected_pool,
+        )
+        _log.info('[准备页] LEVEL1 完成: 舰名未知槽位={}', snapshot.unknown_slots)
+
+        _log.info('[准备页] LEVEL2 使用新截图首次识别舰名、舰种和等级')
+        snapshot = self.fill_missing_fleet_snapshot(
+            snapshot,
+            expected_pool=expected_pool,
+        )
+        snapshot = self._retry_invalid_strict_details(
+            snapshot,
+            selectors,
+            level='LEVEL2',
+        )
+
+        if snapshot.has_unknown_details:
+            _log.info(
+                '[准备页] LEVEL3 执行一次补识别: 舰名槽位={}, 舰种槽位={}, 等级槽位={}',
+                snapshot.unknown_slots,
+                snapshot.unknown_type_slots,
+                snapshot.unknown_level_slots,
+            )
+            snapshot = self.fill_missing_fleet_snapshot(
+                snapshot,
+                expected_pool=expected_pool,
+            )
+            snapshot = self._retry_invalid_strict_details(
+                snapshot,
+                selectors,
+                level='LEVEL3',
+            )
+
+        _log.info(
+            '[准备页] LEVEL4 最后补识别: 舰名槽位={}',
+            snapshot.unknown_slots,
+        )
+        snapshot = self.fill_missing_fleet_snapshot(
+            snapshot,
+            expected_pool=expected_pool,
+            detail_requirements=self._level4_detail_requirements(selectors),
+        )
+        return snapshot
 
     @classmethod
     def _option_matches_name(
