@@ -367,7 +367,7 @@ class TestFleetSelectionCallChain:
         monkeypatch.setattr(
             page,
             '_detect_initial_snapshot',
-            lambda _pool: next(snapshots),
+            lambda _pool, _selectors: next(snapshots),
         )
         monkeypatch.setattr(page, 'detect_fleet_snapshot', lambda **_kwargs: next(snapshots))
         monkeypatch.setattr(page, 'detect_ship_damage', lambda _screen: {})
