@@ -168,6 +168,31 @@ class FleetPlanningMixin(FleetRuleMixin):
                 return False
         return True
 
+    @classmethod
+    def _member_set_satisfied(
+        cls,
+        current: Sequence[str | None],
+        occupied: Sequence[bool],
+        assigned: Sequence[ShipSelector | None],
+        verified_slots: set[int] | frozenset[int],
+    ) -> bool:
+        """判断目标成员是否齐全且没有额外成员，不检查舰船顺序。"""
+        protected, satisfied, _ = cls._assignment_locations(
+            current,
+            occupied,
+            assigned,
+            verified_slots,
+        )
+        required_slots = {slot for slot, option in enumerate(assigned) if option is not None}
+        member_slots = {
+            slot
+            for slot, (name, is_occupied) in enumerate(
+                zip(current, occupied, strict=True),
+            )
+            if is_occupied or name is not None
+        }
+        return satisfied == required_slots and protected == member_slots
+
     def _mark_snapshot_verified_slots(
         self,
         snapshot: FleetSnapshot,

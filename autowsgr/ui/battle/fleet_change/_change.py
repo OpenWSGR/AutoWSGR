@@ -65,6 +65,57 @@ class FleetChangeMixin(FleetAlignmentMixin):
             return None
         return list(self._last_changed_fleet)
 
+    def _prepare_members_for_reorder(
+        self,
+        attempt: int,
+        current: list[str | None],
+        occupied: list[bool],
+        assigned: list[ShipSelector | None],
+        selectors: list[FleetSlotRule | None],
+        verified_slots: set[int],
+        unavailable: set[tuple[int, ShipSelector]],
+        locked: dict[int, ShipSelector],
+        expected_pool: Sequence[str],
+        deferred_primary_slots: set[int],
+    ) -> tuple[list[str | None], list[bool]]:
+        """确保目标成员齐全，并返回排序前的最新成员快照。"""
+        if self._member_set_satisfied(
+            current,
+            occupied,
+            assigned,
+            verified_slots,
+        ):
+            _log.info('[准备页] 目标成员已齐全, 直接调整舰船顺序')
+            return current, occupied
+
+        # 第一轮执行完整对齐，重试轮只处理错误槽位。
+        if attempt == 0:
+            self._full_align(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                verified_slots,
+                unavailable,
+                locked,
+                expected_pool,
+                deferred_primary_slots,
+            )
+        else:
+            _log.info('[准备页] 第 {} 次重试: 局部修正', attempt)
+            self._local_fix(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                verified_slots,
+                unavailable,
+                locked,
+            )
+
+        snapshot = self.detect_fleet_snapshot(expected_pool=expected_pool)
+        return snapshot.names, snapshot.occupied
+
     # 执行一套六槽舰队的完整换船、排序和验证流程。
     def change_fleet(
         self,
@@ -133,28 +184,10 @@ class FleetChangeMixin(FleetAlignmentMixin):
                 self._last_changed_fleet = list(current)
                 return True
 
-            # Step 5：第一轮执行完整对齐，重试轮只处理错误槽位。
-            # 第一次调整需要补船、删船并处理槽位压缩。
-            if attempt == 0:
-                try:
-                    self._full_align(
-                        current,
-                        occupied,
-                        assigned,
-                        selectors,
-                        verified_slots,
-                        unavailable,
-                        locked,
-                        expected_pool,
-                        deferred_primary_slots,
-                    )
-                except _UnresolvedPrimaryError as error:
-                    _log.error('[准备页] {}', error)
-                    return False
-            # 后续调整只修正 OCR 验证失败的槽位。
-            else:
-                _log.info('[准备页] 第 {} 次重试: 局部修正', attempt)
-                self._local_fix(
+            # Step 5：成员齐全时直接排序，否则先执行完整或局部调整。
+            try:
+                current, occupied = self._prepare_members_for_reorder(
+                    attempt,
                     current,
                     occupied,
                     assigned,
@@ -163,13 +196,14 @@ class FleetChangeMixin(FleetAlignmentMixin):
                     unavailable,
                     locked,
                     expected_pool,
+                    deferred_primary_slots,
                 )
+            except _UnresolvedPrimaryError as error:
+                _log.error('[准备页] {}', error)
+                return False
 
-            # Step 6：重新识别成员，再通过拖拽调整舰船顺序。
+            # Step 6：通过拖拽调整舰船顺序。
             names = self._target_names(assigned)
-            snapshot = self.detect_fleet_snapshot(expected_pool=expected_pool)
-            current = snapshot.names
-            occupied = snapshot.occupied
             self._reorder(current, names)
 
             # Step 7：最终 OCR 验证舰名、顺序、空槽和重名情况。

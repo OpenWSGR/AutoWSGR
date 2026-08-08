@@ -417,7 +417,6 @@ class FleetAlignmentMixin(FleetSelectionMixin):
         verified_slots: set[int],
         unavailable: set[tuple[int, ShipSelector]],
         locked: dict[int, ShipSelector],
-        expected_pool: Sequence[str],
     ) -> None:
         """重试时重新补齐成员，再清理多余成员。"""
         self._align_member_set(
@@ -430,7 +429,6 @@ class FleetAlignmentMixin(FleetSelectionMixin):
             locked,
         )
         self._remove_extra_members(current, occupied, assigned, verified_slots)
-        self._refresh_members(current, occupied, expected_pool)
 
     # 从左到右拖拽舰船，使当前舰队顺序与目标槽位一致。
     def _reorder(

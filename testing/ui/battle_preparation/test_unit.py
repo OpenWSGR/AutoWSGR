@@ -1418,8 +1418,8 @@ class TestSmartFleetChange:
     def test_existing_group_variant_is_reordered_without_reselection(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
         set_user_ship_name_aliases({'契卡洛夫': '85工程'})
-        old_fleet = ['岛风', '85工程', None, None, None, None]
-        target_fleet = ['85工程', '岛风', None, None, None, None]
+        old_fleet = ['岛风', '85工程', '扶桑', '长春', None, None]
+        target_fleet = ['85工程', '岛风', '长春', '扶桑', None, None]
 
         def move_ship(src: int, dst: int, current: list[str | None]) -> None:
             current.insert(dst, current.pop(src))
@@ -1431,17 +1431,17 @@ class TestSmartFleetChange:
                 'detect_fleet_snapshot',
                 side_effect=[
                     _snapshot(old_fleet),
-                    _snapshot(old_fleet),
-                    _snapshot(old_fleet),
                     _snapshot(target_fleet),
                 ],
-            ),
+            ) as detect,
             patch.object(
                 page,
                 '_try_select_option',
                 return_value=None,
             ) as select_option,
             patch.object(page, '_change_single_ship') as change_ship,
+            patch.object(page, '_full_align') as full_align,
+            patch.object(page, '_local_fix') as local_fix,
             patch.object(page, '_circular_move', side_effect=move_ship) as circular_move,
             patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
         ):
@@ -1449,13 +1449,19 @@ class TestSmartFleetChange:
                 1,
                 [
                     _rule({'candidates': [{'name': '契卡洛夫'}]}),
-                    *exact_fleet_rules(['岛风']),
+                    *exact_fleet_rules(['岛风', '长春', '扶桑']),
                 ],
             )
 
         select_option.assert_not_called()
         change_ship.assert_not_called()
-        assert circular_move.call_args.args[:2] == (1, 0)
+        full_align.assert_not_called()
+        local_fix.assert_not_called()
+        assert detect.call_count == 2
+        assert [item.args[:2] for item in circular_move.call_args_list] == [
+            (1, 0),
+            (3, 2),
+        ]
 
     def test_candidate_only_reuses_existing_nonpreferred_candidate(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
@@ -1738,6 +1744,56 @@ class TestSmartFleetChange:
             assigned,
         )
         assert BattlePreparationPage._validate_assignment(
+            current,
+            occupied,
+            assigned,
+            {0},
+        )
+
+    def test_member_set_satisfied_ignores_order_but_rejects_extra_member(self):
+        assigned: list[ShipSelector | None] = [
+            ShipSelector(name='A'),
+            ShipSelector(name='B'),
+            None,
+            None,
+            None,
+            None,
+        ]
+        current = ['B', 'A', None, None, None, None]
+        occupied = [True, True, False, False, False, False]
+
+        assert BattlePreparationPage._member_set_satisfied(
+            current,
+            occupied,
+            assigned,
+            set(),
+        )
+        assert not BattlePreparationPage._member_set_satisfied(
+            ['B', 'A', 'X', None, None, None],
+            [True, True, True, False, False, False],
+            assigned,
+            set(),
+        )
+
+    def test_member_set_satisfied_requires_strict_verification(self):
+        assigned: list[ShipSelector | None] = [
+            ShipSelector(name='A', ship_types=(ShipType.DD,), min_level=100),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
+        current = ['A', None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+
+        assert not BattlePreparationPage._member_set_satisfied(
+            current,
+            occupied,
+            assigned,
+            set(),
+        )
+        assert BattlePreparationPage._member_set_satisfied(
             current,
             occupied,
             assigned,
@@ -2615,8 +2671,7 @@ class TestFleetAlignment:
             patch.object(
                 page,
                 'detect_fleet_snapshot',
-                return_value=_snapshot(['A', 'B', 'C', None, None, None]),
-            ),
+            ) as detect,
             patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
         ):
             page._local_fix(
@@ -2627,11 +2682,11 @@ class TestFleetAlignment:
                 set(),
                 set(),
                 {},
-                ['A', 'B', 'C'],
             )
 
         assert actions[0] == 'replace'
         assert actions[1:] == ['remove', 'remove']
+        detect.assert_not_called()
 
     def test_unknown_occupied_slot_is_not_treated_as_empty(self):
         option = ShipSelector(name='A')
