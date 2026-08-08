@@ -187,7 +187,7 @@ class ChooseShipPage:
     # ── 操作 ──────────────────────────────────────────────────────────────
     def ensure_search_box(self) -> None:
         """点击搜索框，准备输入舰船名。"""
-        _log.info('[UI] 选船 → 打开搜索框')
+        _log.debug('[UI] 选船 → 打开搜索框')
         self._ctrl.click(*CLICK_SEARCH_BOX)
         wait_for_page(
             self._ctrl,
@@ -337,12 +337,12 @@ class ChooseShipPage:
                 row_key,
             )
             if detected_ship_type is None:
-                _log.warning("[UI] 命中 '{}', 但舰种未识别", matched)
+                _log.debug("[UI] 命中 '{}', 但舰种未识别", matched)
                 if not relaxed_constraints:
                     return _CardConstraintResult(accepted=False)
                 type_unknown = True
             elif not self._is_ship_type_in_rule(detected_ship_type, ship_type):
-                _log.warning(
+                _log.debug(
                     "[UI] 命中 '{}' 舰种 '{}' 不满足要求 '{}'",
                     matched,
                     detected_ship_type,
@@ -363,11 +363,11 @@ class ChooseShipPage:
             except LevelOCRRetryNeededError:
                 retry_level_ocr = True
                 level = None
-                _log.warning("[UI] 命中 '{}', 但等级 OCR 噪声过高", matched)
+                _log.debug("[UI] 命中 '{}', 但等级 OCR 噪声过高", matched)
 
             if level is None:
                 if not retry_level_ocr:
-                    _log.warning("[UI] 命中 '{}', 但等级未识别", matched)
+                    _log.debug("[UI] 命中 '{}', 但等级未识别", matched)
                 if not relaxed_constraints:
                     return _CardConstraintResult(
                         accepted=False,
@@ -375,7 +375,7 @@ class ChooseShipPage:
                     )
                 level_unknown = True
             elif not self._is_level_in_range(level, min_level, max_level):
-                _log.warning(
+                _log.debug(
                     "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",
                     matched,
                     level,
@@ -384,12 +384,21 @@ class ChooseShipPage:
                 )
                 return _CardConstraintResult(accepted=False)
 
-        return _CardConstraintResult(
+        result = _CardConstraintResult(
             accepted=True,
             type_unknown=type_unknown,
             level_unknown=level_unknown,
             retry_level_ocr=retry_level_ocr,
         )
+        _log.debug(
+            "[选船列表] 船卡校验通过: name='{}' row={} type_unknown={} level_unknown={} relaxed={}",
+            matched,
+            row_key,
+            type_unknown,
+            level_unknown,
+            relaxed_constraints,
+        )
+        return result
 
     def _click_ship_in_list(
         self,
@@ -436,6 +445,18 @@ class ChooseShipPage:
                 raw_hits = locate_ship_rows(ocr, screen)
 
             hits = [self._normalize_hit_entry(hit) for hit in raw_hits]
+            _log.debug(
+                "[选船列表] OCR轮次 {}/{}: target='{}' hits={} required_types={} "
+                'level_range=[{}, {}] relaxed={}',
+                attempt + 1,
+                _OCR_MAX_ATTEMPTS,
+                name,
+                hits,
+                [item.value for item in ship_type] if ship_type is not None else [],
+                min_level,
+                max_level,
+                relaxed_constraints,
+            )
             selected_hit: tuple[str, float, float] | None = None
             relaxed_hits: list[tuple[int, bool, int, tuple[str, float, float]]] = []
             retry_level_ocr = False
@@ -480,7 +501,7 @@ class ChooseShipPage:
             if selected_hit is not None:
                 matched, cx, cy = selected_hit
                 # 当前不判断“远征中”“维修中”等不可选状态；如需支持，应在点击前增加卡片状态识别。
-                _log.info(
+                _log.debug(
                     "[UI] 选船 DLL+OCR -> '{}' (第 {}/{} 次), 点击 ({:.3f}, {:.3f})",
                     name,
                     attempt + 1,
@@ -493,18 +514,18 @@ class ChooseShipPage:
                 return matched
 
             if retry_level_ocr and not relaxed_constraints:
-                _log.warning(
+                _log.debug(
                     '[UI] 等级 OCR 噪声过高，触发重新识别 (第 {}/{} 次)',
                     attempt + 1,
                     _OCR_MAX_ATTEMPTS,
                 )
                 if attempt >= _OCR_MAX_ATTEMPTS - 1:
-                    _log.error('[UI] 等级 OCR 噪声过高，本规则校验失败')
+                    _log.debug('[UI] 等级 OCR 噪声过高，本规则校验失败')
                     return None
                 time.sleep(0.3)
                 continue
 
-            _log.warning(
+            _log.debug(
                 "[UI] 选船列表未匹配到 '{}' (第 {}/{} 次), 向上滚动",
                 name,
                 attempt + 1,
@@ -568,10 +589,18 @@ class ChooseShipPage:
                 ship_type = self._extract_ship_type_from_text(text)
                 if ship_type is not None:
                     detected_types.add(ship_type)
+            _log.debug(
+                '[选船列表] 舰种OCR原始及后处理: row={} card_x={} scale={} raw={} parsed={}',
+                row_key,
+                cx,
+                scale,
+                results,
+                sorted(ship_type.value for ship_type in detected_types),
+            )
             if len(detected_types) == 1:
                 return next(iter(detected_types))
             if len(detected_types) > 1:
-                _log.warning(
+                _log.debug(
                     '[UI] 单卡舰种 OCR 得到多个结果: {}',
                     sorted(ship_type.value for ship_type in detected_types),
                 )

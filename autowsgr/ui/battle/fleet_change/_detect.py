@@ -199,10 +199,12 @@ class FleetDetectMixin(BaseBattlePreparation):
                 matched = self._match_context_ship_name(text, normalized_pool)
             recognized_ocr.append(
                 {
-                    'slot': slot,
+                    'physical_slot': slot + 1,
                     'raw': raw_text,
                     'patched': text,
                     'matched': matched,
+                    'confidence': r.confidence,
+                    'bbox': r.bbox,
                 }
             )
             # 完整船池和目标上下文都无法识别时跳过该文字。
@@ -210,13 +212,13 @@ class FleetDetectMixin(BaseBattlePreparation):
                 _log.debug("[准备页] OCR '{}' -> 无匹配, 跳过", raw_text)
                 continue
             ships[slot] = matched
-            _log.debug("[准备页] 槽位 {} OCR -> '{}'", slot, matched)
+            _log.debug("[准备页] 物理槽位 {} 舰名 OCR -> '{}'", slot + 1, matched)
 
-        _log.info(
-            '[准备页] 编队 OCR 识别: {}',
+        _log.debug(
+            '[准备页] 舰名OCR原始及后处理: {}',
             recognized_ocr,
         )
-        _log.info('[准备页] 当前舰队: {}', ships)
+        _log.debug('[准备页] 舰名OCR后处理编队: {}', ships)
         return ships
 
     def _recognize_fleet_names_at_slots(
@@ -255,7 +257,7 @@ class FleetDetectMixin(BaseBattlePreparation):
             crop = screen[y1:y2, max(0, int(left * w)) : min(w, int(right * w))]
             results = [result for result in ocr.recognize(crop) if result.text.strip()]
             if not results:
-                _log.debug('[准备页] 槽位 {} 舰名单槽 OCR 无文本', slot)
+                _log.debug('[准备页] 物理槽位 {} 舰名单槽OCR无文本', slot + 1)
                 continue
 
             result = max(results, key=lambda item: item.confidence)
@@ -270,10 +272,14 @@ class FleetDetectMixin(BaseBattlePreparation):
                 matched = self._match_context_ship_name(patched_text, normalized_pool)
             names[slot] = matched
             _log.debug(
-                "[准备页] 槽位 {} 舰名单槽 OCR: '{}' -> '{}'",
-                slot,
+                '[准备页] 舰名单槽OCR原始及后处理: 物理槽位={} raw={} patched={} '
+                'matched={} confidence={} bbox={}',
+                slot + 1,
                 raw_text,
+                patched_text,
                 matched,
+                result.confidence,
+                result.bbox,
             )
         return names
 

@@ -1249,8 +1249,8 @@ class TestContextShipNameMatch:
 
         try:
             with patch(
-                'autowsgr.ui.battle.fleet_change._detect._log.info',
-            ) as log_info:
+                'autowsgr.ui.battle.fleet_change._detect._log.debug',
+            ) as log_debug:
                 detected = page.detect_fleet(
                     np.zeros((720, 1280, 3), dtype=np.uint8),
                     expected_names=['契卡洛夫'],
@@ -1259,19 +1259,21 @@ class TestContextShipNameMatch:
             set_user_ship_name_aliases({})
 
         assert detected == ['85工程', None, None, None, None, None]
-        log_info.assert_any_call(
-            '[准备页] 编队 OCR 识别: {}',
+        log_debug.assert_any_call(
+            '[准备页] 舰名OCR原始及后处理: {}',
             [
                 {
-                    'slot': 0,
+                    'physical_slot': 1,
                     'raw': '契卡洛夫',
                     'patched': '契卡洛夫',
                     'matched': '85工程',
+                    'confidence': 0.99,
+                    'bbox': (127, 2, 167, 24),
                 }
             ],
         )
-        log_info.assert_any_call(
-            '[准备页] 当前舰队: {}',
+        log_debug.assert_any_call(
+            '[准备页] 舰名OCR后处理编队: {}',
             ['85工程', None, None, None, None, None],
         )
 
@@ -1993,10 +1995,11 @@ class TestSmartFleetChange:
 
         select_option.assert_called_once_with(0, primary)
         detect.assert_not_called()
-        error = str(log_error.call_args.args[1])
-        assert "槽位 1 的主选 'A' 选择失败" in error
-        assert '主选 OCR 识别失败' in error
-        assert '账号不存在该舰船' in error
+        errors = [str(item.args[1]) for item in log_error.call_args_list]
+        selection_error = next(error for error in errors if "槽位 1 的主选 'A' 选择失败" in error)
+        assert '主选 OCR 识别失败' in selection_error
+        assert '账号不存在该舰船' in selection_error
+        assert "槽位1舰名未识别，目标为'A'" in errors
 
     def test_unknown_slot_uses_candidate_then_rechecks_primary(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))

@@ -232,14 +232,14 @@ class FleetPlanningMixin(FleetRuleMixin):
             if position is None:
                 continue
             if not self._snapshot_satisfies_option(snapshot, position, option):
-                _log.info(
+                _log.debug(
                     '[准备页] 快照校验未通过: 逻辑槽位 {} ({}), 进入选船二次确认',
                     target_slot,
                     snapshot.names[position],
                 )
                 continue
             verified_slots.add(target_slot)
-            _log.info(
+            _log.debug(
                 '[准备页] 快照确认逻辑槽位 {} 已就位 ({}), 跳过选船二次确认',
                 target_slot,
                 snapshot.names[position],

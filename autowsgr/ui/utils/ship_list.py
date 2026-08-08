@@ -187,6 +187,13 @@ def locate_ship_rows(
             matched_results = _match_ship_results(upscaled_results)
             result_scale = 2.0
 
+        _log.debug(
+            '[选船列表] 舰名OCR原始及后处理: row={} raw={} upscaled={} matched={}',
+            (y_start_720, y_end_720),
+            results,
+            upscaled_results,
+            [name for _, name in matched_results],
+        )
         for r, name in matched_results:
             if deduplicate_by_name and name in seen:
                 continue
@@ -367,6 +374,22 @@ def _probe_level_near_name(
                 split_level_hits.append(split_level)
 
         parsed_levels.extend(split_level_hits)
+        raw_results = [
+            {
+                'text': result.text,
+                'confidence': result.confidence,
+                'bbox': result.bbox,
+            }
+            for result in results
+        ]
+        _log.debug(
+            '[选船列表] 等级OCR原始及后处理: scale={} name_x={} raw={} parsed={} noisy_hits={}',
+            scale,
+            name_x,
+            raw_results,
+            parsed_levels,
+            noisy_level_hits,
+        )
         if parsed_levels:
             return max(parsed_levels)
 
