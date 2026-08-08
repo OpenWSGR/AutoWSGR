@@ -190,26 +190,19 @@ class DetectionMixin(BaseBattlePreparation):
                 prepared = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
 
             # 两种引擎统一使用等级字符集和同一套结果解析规则。
-            level = self._best_level_from_results(
-                ocr.recognize_line(
-                    prepared,
-                    easyocr_profile=EasyOCRProfile.FLEET_SHIP_LEVEL,
-                ),
+            ocr_results = ocr.recognize_line(
+                prepared,
+                easyocr_profile=EasyOCRProfile.FLEET_SHIP_LEVEL,
             )
+            level = self._best_level_from_results(ocr_results)
             levels[slot] = level
 
-            if level is not None:
-                _log.debug('[UI] 槽位{} 等级: Lv.{}', slot, level)
-            else:
-                _log.debug('[UI] 槽位{} 等级识别失败', slot)
-
-        _log.info(
-            '[准备页] 等级检测: {}',
-            ' | '.join(
-                f'槽{i}={"Lv." + str(levels[i]) if levels[i] is not None else "无"}'
-                for i in requested_slots
-            ),
-        )
+            _log.debug(
+                '[准备页] 等级OCR原始及后处理: 物理槽位={} raw={} parsed={}',
+                slot + 1,
+                ocr_results,
+                level,
+            )
         return levels
 
     # ── 舰种 OCR ─────────────────────────────────────────────────────────
@@ -250,21 +243,16 @@ class DetectionMixin(BaseBattlePreparation):
                 cropped,
                 (cropped.shape[1] * 4, cropped.shape[0] * 4),
             )
-            ship_type = self._best_ship_type_from_results(ocr.recognize(upscaled))
+            ocr_results = ocr.recognize(upscaled)
+            ship_type = self._best_ship_type_from_results(ocr_results)
             ship_types[slot] = ship_type
 
-            if ship_type is not None:
-                _log.debug('[UI] 槽位{} 舰种: {}', slot, ship_type.value)
-            else:
-                _log.debug('[UI] 槽位{} 舰种识别失败', slot)
-
-        _log.info(
-            '[准备页] 舰种检测: {}',
-            ' | '.join(
-                f'槽{i}={ship_types[i].value if ship_types[i] is not None else "未知"}'
-                for i in requested_slots
-            ),
-        )
+            _log.debug(
+                '[准备页] 舰种OCR原始及后处理: 物理槽位={} raw={} parsed={}',
+                slot + 1,
+                ocr_results,
+                ship_type.value if ship_type is not None else None,
+            )
         return ship_types
 
     @staticmethod

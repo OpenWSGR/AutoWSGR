@@ -82,11 +82,12 @@ class FleetAlignmentMixin(FleetSelectionMixin):
             ):
                 continue
 
-            _log.info(
+            _log.debug(
                 "[准备页] 槽位 {} 身份未知，先用备选 '{}' 释放原舰船",
-                target_slot,
+                target_slot + 1,
                 candidate.name,
             )
+            previous_name = current[target_slot]
             selection = self._try_select_option(target_slot, candidate)
             if selection.name is None:
                 unavailable.add((target_slot, candidate))
@@ -98,6 +99,12 @@ class FleetAlignmentMixin(FleetSelectionMixin):
 
             current[target_slot] = selection.name
             occupied[target_slot] = True
+            _log.info(
+                "[准备页] 换船: 槽位{} '{}' -> '{}'",
+                target_slot + 1,
+                previous_name or '未知舰船',
+                selection.name,
+            )
             time.sleep(0.3)
             return candidate
         return None
@@ -111,6 +118,7 @@ class FleetAlignmentMixin(FleetSelectionMixin):
         locked: dict[int, ShipSelector],
     ) -> bool:
         """尝试主选并同步已确认的槽位状态。"""
+        previous_name = current[target_slot]
         selection = self._try_select_option(target_slot, primary)
         if selection.name is None:
             return False
@@ -120,6 +128,12 @@ class FleetAlignmentMixin(FleetSelectionMixin):
             )
 
         current[target_slot] = selection.name
+        _log.info(
+            "[准备页] 换船: 槽位{} '{}' -> '{}'",
+            target_slot + 1,
+            previous_name or '未知舰船',
+            selection.name,
+        )
         locked[target_slot] = primary
         verified_slots.discard(target_slot)
         if self._requires_selection_validation(primary):
@@ -163,20 +177,20 @@ class FleetAlignmentMixin(FleetSelectionMixin):
                     unavailable,
                 )
                 if fallback is None:
-                    _log.warning(
+                    _log.debug(
                         '[准备页] 槽位 {} 没有可用备选，保留原换船流程',
-                        target_slot,
+                        target_slot + 1,
                     )
                     continue
-                _log.info(
+                _log.debug(
                     "[准备页] 槽位 {} 已释放，重新尝试主选 '{}'",
-                    target_slot,
+                    target_slot + 1,
                     primary.name,
                 )
             else:
-                _log.info(
+                _log.debug(
                     "[准备页] 槽位 {} 身份未知且没有备选，最后搜索一次主选 '{}'",
-                    target_slot,
+                    target_slot + 1,
                     primary.name,
                 )
 
@@ -221,6 +235,11 @@ class FleetAlignmentMixin(FleetSelectionMixin):
                     assigned,
                     verified_slots,
                 )
+            _log.info(
+                '[准备页] YAML目标编队调整: {} -> {}',
+                self._target_names(previous),
+                self._target_names(replanned),
+            )
 
     def _align_member_set(
         self,
@@ -273,9 +292,9 @@ class FleetAlignmentMixin(FleetSelectionMixin):
                 target_slot,
             )
             if ship_slot is None:
-                _log.warning(
+                _log.debug(
                     "[准备页] 目标槽位 {} 的规则 '{}' 不可用，重新规划备选",
-                    target_slot,
+                    target_slot + 1,
                     option.name,
                 )
                 unavailable.add((target_slot, option))
@@ -306,15 +325,21 @@ class FleetAlignmentMixin(FleetSelectionMixin):
                         assigned,
                         verified_slots,
                     )
+                _log.info(
+                    '[准备页] YAML目标编队调整: {} -> {}',
+                    self._target_names(previous),
+                    self._target_names(replanned),
+                )
                 continue
 
-            _log.info(
+            _log.debug(
                 "[准备页] 更换物理槽位 {} <- '{}' (逻辑槽位 {}, 原: '{}')",
-                ship_slot,
+                ship_slot + 1,
                 option.name,
-                target_slot,
+                target_slot + 1,
                 current[ship_slot],
             )
+            previous_name = current[ship_slot]
             selection = self._try_select_option(
                 ship_slot,
                 option,
@@ -329,6 +354,12 @@ class FleetAlignmentMixin(FleetSelectionMixin):
 
             current[ship_slot] = selection.name
             occupied[ship_slot] = True
+            _log.info(
+                "[准备页] 换船: 槽位{} '{}' -> '{}'",
+                ship_slot + 1,
+                previous_name or '空槽',
+                selection.name,
+            )
             locked[target_slot] = option
             verified_slots.discard(target_slot)
             if self._requires_selection_validation(option):
@@ -354,8 +385,13 @@ class FleetAlignmentMixin(FleetSelectionMixin):
         for slot in range(5, -1, -1):
             if slot in protected or not occupied[slot]:
                 continue
-            _log.info("[准备页] 移除多余槽位 {} 的 '{}'", slot, current[slot])
+            previous_name = current[slot]
             self._change_single_ship(slot, None, slot_occupied=True)
+            _log.info(
+                "[准备页] 换船: 槽位{} '{}' -> 空槽",
+                slot + 1,
+                previous_name or '未知舰船',
+            )
             # 游戏会将右侧舰船整体左移，直接同步已确认的成员位置。
             current.pop(slot)
             current.append(None)
@@ -438,13 +474,19 @@ class FleetAlignmentMixin(FleetSelectionMixin):
                     target,
                 )
                 continue
-            _log.info(
+            _log.debug(
                 "[准备页] 位置对齐: 槽位 {} <- '{}' (从槽位 {})",
-                i,
+                i + 1,
                 target,
-                src,
+                src + 1,
             )
             self._circular_move(src, i, current)
+            _log.info(
+                "[准备页] 调整位置: '{}' 槽位{} -> 槽位{}",
+                target,
+                src + 1,
+                i + 1,
+            )
 
     # 将一艘舰船从源槽位拖到目标槽位，并模拟游戏中的循环位移。
     def _circular_move(
