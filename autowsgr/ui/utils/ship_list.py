@@ -378,6 +378,27 @@ def _probe_level_near_name(
     return None
 
 
+def read_ship_level_at_card(
+    ocr: OCREngine,
+    screen: np.ndarray,
+    *,
+    card_x: float,
+    row_key: float,
+) -> int | None:
+    """根据已定位船卡的舰名中心和行中心识别等级。"""
+    h, w = screen.shape[:2]
+    row_y = round(row_key * h)
+    list_w_native = int(w * LEGACY_LIST_WIDTH / LEGACY_WIDTH)
+    return _probe_level_near_name(
+        ocr,
+        screen,
+        y_start=row_y,
+        y_end=row_y,
+        name_x=card_x * w,
+        max_x=list_w_native,
+    )
+
+
 def read_ship_levels(
     ocr: OCREngine,
     screen: np.ndarray,

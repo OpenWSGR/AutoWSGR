@@ -9,6 +9,7 @@ from autowsgr.ui.utils.ship_list import (
     _parse_level_with_status,
     _probe_level_near_name,
     locate_ship_rows,
+    read_ship_level_at_card,
     read_ship_levels,
 )
 from autowsgr.vision import OCREngine, OCRResult
@@ -245,6 +246,32 @@ def test_locate_ship_rows_applies_user_ship_name_alias(
         ('85工程', pytest.approx(250 / 1280), pytest.approx(109 / 720)),
     ]
     assert ocr.recognize.call_count == 1
+
+
+def test_read_ship_level_at_card_converts_relative_card_position(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    ocr = MagicMock()
+    probe = MagicMock(return_value=101)
+    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
+
+    level = read_ship_level_at_card(
+        ocr,
+        screen,
+        card_x=0.25,
+        row_key=0.5,
+    )
+
+    assert level == 101
+    probe.assert_called_once_with(
+        ocr,
+        screen,
+        y_start=360,
+        y_end=360,
+        name_x=320,
+        max_x=1048,
+    )
 
 
 def test_read_ship_levels_probes_level_from_upscaled_name_position(

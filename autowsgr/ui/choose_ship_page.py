@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import cv2
@@ -27,7 +28,7 @@ from .utils.ship_list import (
     LevelOCRRetryNeededError,
     extract_ship_type_from_text,
     locate_ship_rows,
-    read_ship_levels,
+    read_ship_level_at_card,
 )
 
 
@@ -66,7 +67,6 @@ _CARD_REFERENCE_HEIGHT = 720
 _SHIP_TYPE_CROP_OFFSETS = (-62, -59, -13, -34.5)
 """舰种区域相对舰名中心 X 和 DLL 横带 Y 的偏移量 (x1, y1, x2, y2)。"""
 _SHIP_TYPE_OCR_SCALES = (2, 3, 4)
-_MAX_LEVEL_CARD_X_DISTANCE = 80 / _CARD_REFERENCE_WIDTH
 
 PAGE_SIGNATURE = PixelSignature(
     name='choose_ship_page',
@@ -93,6 +93,29 @@ INPUT_SIGNATURE = PixelSignature(
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面控制器
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True, slots=True)
+class _CardConstraintResult:
+    """单张船卡的约束校验结果。"""
+
+    accepted: bool
+    type_unknown: bool = False
+    level_unknown: bool = False
+    retry_level_ocr: bool = False
+
+    @property
+    def is_fallback(self) -> bool:
+        """是否只能作为宽泛校验的后备候选。"""
+        return self.type_unknown or self.level_unknown
+
+    @property
+    def fallback_priority(self) -> tuple[int, bool]:
+        """后备优先级：未知项更少、舰种已确认的候选优先。"""
+        return (
+            int(self.type_unknown) + int(self.level_unknown),
+            self.type_unknown,
+        )
 
 
 class ChooseShipPage:
@@ -265,32 +288,6 @@ class ChooseShipPage:
         return matched, cx, cy, row_key
 
     @staticmethod
-    def _normalize_level_entry(
-        entry: object,
-    ) -> tuple[str, int | None, float | None, float]:
-        """归一化等级结果为 (name, level, card_x, row_key)。"""
-        if not isinstance(entry, (tuple, list)):
-            raise TypeError(f'unsupported level entry: {entry!r}')
-
-        if len(entry) < 2:
-            raise ValueError(f'unsupported level entry length: {entry!r}')
-
-        matched = str(entry[0]).strip()
-        level = entry[1] if isinstance(entry[1], int) else None
-        if len(entry) >= 4:
-            card_x = float(entry[2]) if isinstance(entry[2], (int, float)) else None
-            row_key = round(float(entry[3]), 4) if isinstance(entry[3], (int, float)) else -1.0
-        else:
-            # 兼容旧的 (name, level, row_key) 内部结果。
-            card_x = None
-            row_key = (
-                round(float(entry[2]), 4)
-                if len(entry) >= 3 and isinstance(entry[2], (int, float))
-                else -1.0
-            )
-        return matched, level, card_x, row_key
-
-    @staticmethod
     def _is_level_in_range(level: int | None, min_level: int | None, max_level: int | None) -> bool:
         if min_level is None and max_level is None:
             return True
@@ -300,32 +297,85 @@ class ChooseShipPage:
             return False
         return not (max_level is not None and level > max_level)
 
-    @staticmethod
-    def _take_level_for_card(
-        candidates: list[tuple[int | None, float | None]],
-        card_x: float,
-    ) -> int | None:
-        """领取横坐标最接近当前卡片的等级结果。"""
-        positioned = [
-            (index, candidate)
-            for index, candidate in enumerate(candidates)
-            if candidate[1] is not None
-        ]
-        if not positioned:
-            level, _level_x = candidates.pop(0)
-            return level
+    def _check_hit_constraints(
+        self,
+        ocr: OCREngine,
+        screen: np.ndarray,
+        matched: str,
+        cx: float,
+        cy: float,
+        row_key: float,
+        *,
+        ship_type: tuple[ShipType, ...] | None,
+        min_level: int | None,
+        max_level: int | None,
+        relaxed_constraints: bool,
+    ) -> _CardConstraintResult:
+        """按舰种、等级顺序校验一张已定位的船卡。"""
+        type_unknown = False
+        if ship_type is not None:
+            detected_ship_type = self._detect_hit_ship_type(
+                screen,
+                cx,
+                cy,
+                row_key,
+            )
+            if detected_ship_type is None:
+                _log.warning("[UI] 命中 '{}', 但舰种未识别", matched)
+                if not relaxed_constraints:
+                    return _CardConstraintResult(accepted=False)
+                type_unknown = True
+            elif not self._is_ship_type_in_rule(detected_ship_type, ship_type):
+                _log.warning(
+                    "[UI] 命中 '{}' 舰种 '{}' 不满足要求 '{}'",
+                    matched,
+                    detected_ship_type,
+                    ship_type,
+                )
+                return _CardConstraintResult(accepted=False)
 
-        nearest_index, nearest = min(
-            positioned,
-            key=lambda item: abs(item[1][1] - card_x),
+        level_unknown = False
+        retry_level_ocr = False
+        if min_level is not None or max_level is not None:
+            try:
+                level = read_ship_level_at_card(
+                    ocr,
+                    screen,
+                    card_x=cx,
+                    row_key=row_key,
+                )
+            except LevelOCRRetryNeededError:
+                retry_level_ocr = True
+                level = None
+                _log.warning("[UI] 命中 '{}', 但等级 OCR 噪声过高", matched)
+
+            if level is None:
+                if not retry_level_ocr:
+                    _log.warning("[UI] 命中 '{}', 但等级未识别", matched)
+                if not relaxed_constraints:
+                    return _CardConstraintResult(
+                        accepted=False,
+                        retry_level_ocr=retry_level_ocr,
+                    )
+                level_unknown = True
+            elif not self._is_level_in_range(level, min_level, max_level):
+                _log.warning(
+                    "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",
+                    matched,
+                    level,
+                    min_level if min_level is not None else '-',
+                    max_level if max_level is not None else '-',
+                )
+                return _CardConstraintResult(accepted=False)
+
+        return _CardConstraintResult(
+            accepted=True,
+            type_unknown=type_unknown,
+            level_unknown=level_unknown,
+            retry_level_ocr=retry_level_ocr,
         )
-        if abs(nearest[1] - card_x) > _MAX_LEVEL_CARD_X_DISTANCE:
-            return None
 
-        level, _level_x = candidates.pop(nearest_index)
-        return level
-
-    def _click_ship_in_list(  # noqa: C901, PLR0912
+    def _click_ship_in_list(
         self,
         name: str,
         *,
@@ -344,8 +394,8 @@ class ChooseShipPage:
             目标舰船名。
             匹配时会先做舰名归一化（如去除“·改”与尾部括号别名）后再比较。
         relaxed_constraints:
-            备选舰船使用。舰名命中后只尝试一次等级和舰种校验，
-            约束识别失败或不匹配时仍按舰名选择。
+            备选舰船使用。舰名必须命中；等级或舰种无法识别时允许作为
+            后备候选，明确识别为不符合约束时仍会淘汰。
 
         Returns
         -------
@@ -354,102 +404,65 @@ class ChooseShipPage:
         """
         assert self._ctx.ocr is not None
         ocr = self._preferred_ocr
+        use_level_filter = min_level is not None or max_level is not None
+        use_card_constraints = ship_type is not None or use_level_filter
 
         for attempt in range(_OCR_MAX_ATTEMPTS):
             screen = self._ctrl.screenshot()
-            use_level_filter = min_level is not None or max_level is not None
-            if use_level_filter:
+            if use_card_constraints:
                 raw_hits = locate_ship_rows(
                     ocr,
                     screen,
                     deduplicate_by_name=False,
                     include_row_key=True,
                 )
-                try:
-                    raw_levels = read_ship_levels(
-                        ocr,
-                        screen,
-                        deduplicate_by_name=False,
-                        include_row_key=True,
-                    )
-                except LevelOCRRetryNeededError:
-                    if relaxed_constraints:
-                        _log.warning(
-                            '[UI] 备选舰等级 OCR 失败，继续按舰名校验',
-                        )
-                        raw_levels = []
-                    else:
-                        _log.warning(
-                            '[UI] 等级 OCR 噪声过高，触发重新识别 (第 {}/{} 次)',
-                            attempt + 1,
-                            _OCR_MAX_ATTEMPTS,
-                        )
-                        if attempt >= _OCR_MAX_ATTEMPTS - 1:
-                            _log.error(
-                                '[UI] 等级 OCR 噪声过高，本规则校验失败',
-                            )
-                            return None
-                        time.sleep(0.3)
-                        continue
             else:
                 raw_hits = locate_ship_rows(ocr, screen)
-                raw_levels = []
 
             hits = [self._normalize_hit_entry(hit) for hit in raw_hits]
-            level_map: dict[
-                float,
-                dict[str, list[tuple[int | None, float | None]]],
-            ] = {}
-            for entry in raw_levels:
-                level_name, level, level_x, row_key = self._normalize_level_entry(entry)
-                normalized_level_name = normalize_ship_name(level_name)
-                if normalized_level_name is None:
-                    continue
-                row_levels = level_map.setdefault(row_key, {})
-                row_levels.setdefault(normalized_level_name, []).append((level, level_x))
+            selected_hit: tuple[str, float, float] | None = None
+            relaxed_hits: list[tuple[int, bool, int, tuple[str, float, float]]] = []
+            retry_level_ocr = False
 
-            for matched, cx, cy, row_key in hits:
-                normalized_matched = normalize_ship_name(matched)
-                if normalized_matched is None:
-                    continue
+            for hit_index, (matched, cx, cy, row_key) in enumerate(hits):
                 if not self._matches_ship_name(name, matched):
                     continue
 
-                level = None
-                if use_level_filter:
-                    row_levels = level_map.get(row_key)
-                    if row_levels:
-                        name_levels = row_levels.get(normalized_matched)
-                        if name_levels:
-                            level = self._take_level_for_card(name_levels, cx)
-                if not self._is_level_in_range(level, min_level, max_level):
-                    _log.warning(
-                        "[UI] 命中 '{}', 但等级 {} 不满足范围 [{}, {}]",
-                        matched,
-                        level if level is not None else '未知',
-                        min_level if min_level is not None else '-',
-                        max_level if max_level is not None else '-',
-                    )
-                    if not relaxed_constraints:
-                        continue
+                constraint = self._check_hit_constraints(
+                    ocr,
+                    screen,
+                    matched,
+                    cx,
+                    cy,
+                    row_key,
+                    ship_type=ship_type,
+                    min_level=min_level,
+                    max_level=max_level,
+                    relaxed_constraints=relaxed_constraints,
+                )
+                retry_level_ocr = retry_level_ocr or constraint.retry_level_ocr
+                if not constraint.accepted:
+                    continue
 
-                if ship_type is not None:
-                    detected_ship_type = self._detect_hit_ship_type(
-                        screen,
-                        cx,
-                        cy,
-                        row_key,
+                hit = (matched, cx, cy)
+                if constraint.is_fallback:
+                    relaxed_hits.append(
+                        (
+                            *constraint.fallback_priority,
+                            hit_index,
+                            hit,
+                        ),
                     )
-                    if not self._is_ship_type_in_rule(detected_ship_type, ship_type):
-                        _log.warning(
-                            "[UI] 命中 '{}' 舰种 '{}' 不满足要求 '{}'",
-                            matched,
-                            detected_ship_type if detected_ship_type is not None else '未知',
-                            ship_type,
-                        )
-                        if not relaxed_constraints:
-                            continue
+                    continue
 
+                selected_hit = hit
+                break
+
+            if selected_hit is None and relaxed_hits:
+                selected_hit = min(relaxed_hits, key=lambda candidate: candidate[:3])[3]
+
+            if selected_hit is not None:
+                matched, cx, cy = selected_hit
                 # 当前不判断“远征中”“维修中”等不可选状态；如需支持，应在点击前增加卡片状态识别。
                 _log.info(
                     "[UI] 选船 DLL+OCR -> '{}' (第 {}/{} 次), 点击 ({:.3f}, {:.3f})",
@@ -462,6 +475,18 @@ class ChooseShipPage:
                 time.sleep(1.0)
                 self._ctrl.click(cx, cy)
                 return matched
+
+            if retry_level_ocr and not relaxed_constraints:
+                _log.warning(
+                    '[UI] 等级 OCR 噪声过高，触发重新识别 (第 {}/{} 次)',
+                    attempt + 1,
+                    _OCR_MAX_ATTEMPTS,
+                )
+                if attempt >= _OCR_MAX_ATTEMPTS - 1:
+                    _log.error('[UI] 等级 OCR 噪声过高，本规则校验失败')
+                    return None
+                time.sleep(0.3)
+                continue
 
             _log.warning(
                 "[UI] 选船列表未匹配到 '{}' (第 {}/{} 次), 向上滚动",
