@@ -38,7 +38,14 @@ from .image_template import (
     ImageTemplate,
 )
 from .matcher import PixelChecker
-from .ocr import EasyOCREngine, OCREngine, OCRResult, ShipNameMismatchError, apply_ship_patches
+from .ocr import (
+    EasyOCREngine,
+    FastOCREngine,
+    OCREngine,
+    OCRResult,
+    ShipNameMismatchError,
+    apply_ship_patches,
+)
 from .pixel import (
     Color,
     CompositePixelSignature,
@@ -61,6 +68,7 @@ __all__ = [
     'Color',
     'CompositePixelSignature',
     'EasyOCREngine',
+    'FastOCREngine',
     'ImageChecker',
     'ImageMatchDetail',
     'ImageMatchResult',

@@ -72,6 +72,12 @@ class GameContext:
 
     ocr: OCREngine
     """OCR 引擎实例 (章节/阵型识别等)。"""
+    ship_ocr: OCREngine | None = None
+    """增强船只识别 OCR 引擎 (FastOCR + PP-OCRv6-small, 可选)。
+
+    仅在 ``config.ocr.enhanced_ship_ocr`` 开启时由启动器注入；
+    船只名称 / 等级 / 舰种识别节点优先使用它，其余节点仍走 ``ocr``。
+    """
 
     # ── 游戏运行时状态 ──
 

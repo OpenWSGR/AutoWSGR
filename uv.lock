@@ -62,6 +62,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "keyboard" },
     { name = "loguru" },
+    { name = "maafw" },
     { name = "opencv-python-headless" },
     { name = "pydantic" },
     { name = "retry" },
@@ -89,6 +90,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.100.0" },
     { name = "keyboard" },
     { name = "loguru" },
+    { name = "maafw", specifier = ">=5.12.3,<6.0" },
     { name = "opencv-python-headless" },
     { name = "pydantic", specifier = ">=2.0,<3.0" },
     { name = "retry", specifier = ">=0.9.2" },
@@ -561,6 +563,32 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c", size = 61595, upload-time = "2024-12-06T11:20:54.538Z" },
+]
+
+[[package]]
+name = "maaagentbinary"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b9/89/6b173d2e151517a8a24c3194bc8783643f49186547ae53c8b635be19d310/MaaAgentBinary-1.0.1-py3-none-any.whl", hash = "sha256:d97bcc9f35b52add199b287932511ecfcddcb83930c6b532d1c7010b432ec8bf", size = 5320174, upload-time = "2024-04-12T13:00:29.505Z" },
+]
+
+[[package]]
+name = "maafw"
+version = "5.12.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "maaagentbinary" },
+    { name = "numpy" },
+    { name = "strenum" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/ce/cfa1504c98fdc55074449df8ecd5d81b5cb5f81d748ecc5038cee8e63725/maafw-5.12.3-py3-none-macosx_13_0_arm64.whl", hash = "sha256:8d2ca1eb4e75988adf51e798079bf3894a1759e10770b84668f5e79cf40f3fae", size = 16071481, upload-time = "2026-08-01T16:45:10.048Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/31/08f28824ea89d8eaf702f416ccfd217256d488fec3c8e7254f32e12b5c4c/maafw-5.12.3-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:4860afaba6cca73c646aa66d04bbfaccc46574e6a5cf9e2c75a9ee23f0c50d9a", size = 18102776, upload-time = "2026-08-01T16:45:13.245Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/d6/8e31234ca2fe430ed317a5418329297e60df33ff47de7c82fccf4f9cdbe7/maafw-5.12.3-py3-none-manylinux2014_aarch64.whl", hash = "sha256:6c2c6af0f99508d0cce13d2c041f10813576158eb567a68225d908fffb34897f", size = 16656580, upload-time = "2026-08-01T16:45:16.203Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/a3/38b92640fdff4d3a48a1ab11aa567256dccb78f8197c740f3fd62af0448d/maafw-5.12.3-py3-none-manylinux2014_x86_64.whl", hash = "sha256:b6aef9d98b0fd8f14f34e3f6f21230bd5abe8cddeeb254975fd889475f2e94e0", size = 18591033, upload-time = "2026-08-01T16:45:19.021Z" },
+    { url = "https://files.pythonhosted.org/packages/73/b4/e0814b83b542424752718d60802e4a753ed4d1951531bbe3faecb5125b5d/maafw-5.12.3-py3-none-win_amd64.whl", hash = "sha256:91d24bcac59fe39392fc8c56ffa50e5d8c88130da8f10c9b8d003521f592854c", size = 25017453, upload-time = "2026-08-01T16:45:22.186Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/ad/898526ac489dd93954134c778bfd206e9a76e9aa071d87a431fafe217ba3/maafw-5.12.3-py3-none-win_arm64.whl", hash = "sha256:a8ac1afc3832205e809460210b382a79525f1573d9503fa73ad425a759f28116", size = 24018038, upload-time = "2026-08-01T16:45:25.554Z" },
 ]
 
 [[package]]
@@ -3887,6 +3915,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/bb/2799cc2ede3ed41131f8975621e7213dfc7ef4acbbaadfa440f32500c370/starlette-1.3.1-py3-none-any.whl", hash = "sha256:c7372aae11c3c3f26a42df7bd626cec2f47d03483d261d369516a615a53714c6", size = 73632, upload-time = "2026-06-12T09:23:10.017Z" },
+]
+
+[[package]]
+name = "strenum"
+version = "0.4.15"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/ad/430fb60d90e1d112a62ff57bdd1f286ec73a2a0331272febfddd21f330e1/StrEnum-0.4.15.tar.gz", hash = "sha256:878fb5ab705442070e4dd1929bb5e2249511c0bcf2b0eeacf3bcd80875c82eff", size = 23384, upload-time = "2023-06-29T22:02:58.399Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/69/297302c5f5f59c862faa31e6cb9a4cd74721cd1e052b38e464c5b402df8b/StrEnum-0.4.15-py3-none-any.whl", hash = "sha256:a30cda4af7cc6b5bf52c8055bc4bf4b2b6b14a93b574626da33df53cf7740659", size = 8851, upload-time = "2023-06-29T22:02:56.947Z" },
 ]
 
 [[package]]

@@ -19,6 +19,7 @@ dependencies = [
     "loguru",
     "keyboard",
     "easyocr>=1.7.1",
+    "maafw>=5.12.3,<6.0",
     "adbutils>=2.0,<3.0",
     "autowsgr_native==0.3.0",
     "av>=12.0",

@@ -5,3 +5,4 @@
 *.png binary
 *.PNG binary
 *.jpg binary
+*.onnx binary

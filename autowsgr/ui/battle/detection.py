@@ -13,14 +13,24 @@ from typing import TYPE_CHECKING
 import cv2
 
 from autowsgr.infra.logger import get_logger
-from autowsgr.types import ShipDamageState
+from autowsgr.types import ShipDamageState, ShipType
 from autowsgr.ui.battle.base import BaseBattlePreparation
+from autowsgr.ui.utils.ship_list import extract_ship_type_from_text
 from autowsgr.vision import PixelChecker
+from autowsgr.vision.ocr_rules import (
+    LEVEL_NOISY_PATTERN,
+    LEVEL_PATTERN,
+    LEVEL_SHORT_PATTERN,
+    EasyOCRProfile,
+    is_valid_ship_level,
+    normalize_level_digits,
+)
 
 from .blood import classify_blood
 from .constants import (
     BLOOD_BAR_PROBE,
     SHIP_LEVEL_CROP,
+    SHIP_TYPE_CROP,
 )
 
 
@@ -137,7 +147,7 @@ class DetectionMixin(BaseBattlePreparation):
             槽位号 (0-5) → 等级。无法识别或无舰船则为 ``None``。
         """
         levels: dict[int, int | None] = {}
-        ocr = self._ocr
+        ocr = self._preferred_ocr
         if ocr is None:
             _log.warning('[UI] 未提供 OCR 引擎，无法识别舰船等级')
             return dict.fromkeys(range(6))
@@ -155,16 +165,23 @@ class DetectionMixin(BaseBattlePreparation):
                 levels[slot] = None
                 continue
 
-            cropped = PixelChecker.crop(screen, *crop_region)
-            # 4x 上采样提升小字 OCR 准确率 (对齐 legacy check_level)
-            upscaled = cv2.resize(
-                cropped,
-                (cropped.shape[1] * 4, cropped.shape[0] * 4),
-            )
+            prepared = PixelChecker.crop(screen, *crop_region)
+            if self._ship_ocr is None:
+                gray = cv2.cvtColor(prepared, cv2.COLOR_RGB2GRAY)
+                _, binary = cv2.threshold(
+                    gray,
+                    0,
+                    255,
+                    cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+                )
+                prepared = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
 
-            # 用多结果模式避免 recognize_single 选中噪声文本
+            # 两种引擎统一使用等级字符集和同一套结果解析规则。
             level = self._best_level_from_results(
-                ocr.recognize(upscaled, allowlist='0123456789Llv.V'),
+                ocr.recognize_line(
+                    prepared,
+                    easyocr_profile=EasyOCRProfile.FLEET_SHIP_LEVEL,
+                ),
             )
             levels[slot] = level
 
@@ -181,6 +198,75 @@ class DetectionMixin(BaseBattlePreparation):
             ),
         )
         return levels
+
+    # ── 舰种 OCR ─────────────────────────────────────────────────────────
+
+    def _recognize_fleet_ship_types(
+        self,
+        screen: np.ndarray,
+    ) -> dict[int, ShipType | None]:
+        """从准备页截图中 OCR 识别每艘舰船的舰种。
+
+        读取各舰船卡片上的舰种文本 (如 ``轻巡(J国)``)，用于首次换船快照，
+        使已就位的目标舰船可以跳过船池二次确认。
+        """
+        ship_types: dict[int, ShipType | None] = {}
+        ocr = self._preferred_ocr
+        if ocr is None:
+            _log.warning('[UI] 未提供 OCR 引擎，无法识别舰种')
+            return dict.fromkeys(range(6))
+
+        # 先检测哪些槽位有舰船
+        damage = self.detect_ship_damage(screen)
+
+        for slot in range(6):
+            if damage.get(slot) == ShipDamageState.NO_SHIP:
+                ship_types[slot] = None
+                continue
+
+            crop_region = SHIP_TYPE_CROP.get(slot)
+            if crop_region is None:
+                ship_types[slot] = None
+                continue
+
+            cropped = PixelChecker.crop(screen, *crop_region)
+            # 4x 上采样提升小字 OCR 准确率 (对齐等级识别)
+            upscaled = cv2.resize(
+                cropped,
+                (cropped.shape[1] * 4, cropped.shape[0] * 4),
+            )
+            ship_type = self._best_ship_type_from_results(ocr.recognize(upscaled))
+            ship_types[slot] = ship_type
+
+            if ship_type is not None:
+                _log.debug('[UI] 槽位{} 舰种: {}', slot, ship_type.value)
+            else:
+                _log.debug('[UI] 槽位{} 舰种识别失败', slot)
+
+        _log.info(
+            '[准备页] 舰种检测: {}',
+            ' | '.join(
+                f'槽{i}={ship_types[i].value if ship_types[i] is not None else "未知"}'
+                for i in range(6)
+            ),
+        )
+        return ship_types
+
+    @staticmethod
+    def _best_ship_type_from_results(results: list) -> ShipType | None:
+        """从多个 OCR 结果中提取唯一舰种；歧义或无法识别返回 None。"""
+        detected: ShipType | None = None
+        for r in results:
+            text = str(getattr(r, 'text', '')).strip()
+            if not text:
+                continue
+            ship_type = extract_ship_type_from_text(text)
+            if ship_type is None:
+                continue
+            if detected is not None and detected != ship_type:
+                return None
+            detected = ship_type
+        return detected
 
     # ── 舰队信息聚合 ─────────────────────────────────────────────────────
 
@@ -241,30 +327,38 @@ class DetectionMixin(BaseBattlePreparation):
         OCR 常见噪声: ``"0.106"`` (L 误识为 0), ``"1V.31"`` (前缀数字),
         ``"497"`` (星级数字粘连) 等。
         """
-        # 1) 尝试匹配 [L10I]V.XX 模式 (L 可被 OCR 误识为 1/0/I)
-        m = re.search(r'(?i)[l10i]\s*v\.?\s*(\d{1,3})', text)
-        if m:
-            val = int(m.group(1))
-            if 1 <= val <= 200:
-                return val
 
-        # 2) 尝试匹配 V.XX 模式 (缺失 L)
-        m = re.search(r'(?i)v\.?\s*(\d{1,3})', text)
+        def parse_digits(raw: str) -> int | None:
+            normalized = normalize_level_digits(raw)
+            if normalized is None:
+                return None
+            value = int(normalized)
+            return value if is_valid_ship_level(value) else None
+
+        # 1) 优先使用共享规则解析标准、噪声和缺失 V 的等级标签。
+        for pattern in (LEVEL_PATTERN, LEVEL_NOISY_PATTERN, LEVEL_SHORT_PATTERN):
+            match = pattern.search(text)
+            if match is None:
+                continue
+            level = parse_digits(match.group(1))
+            if level is not None:
+                return level
+
+        # 2) 兼容缺失 L、只剩 V.XX 的结果。
+        m = re.search(r'(?i)v\.?\s*([0-9liodsb]{1,3})', text)
         if m:
-            val = int(m.group(1))
-            if 1 <= val <= 200:
-                return val
+            return parse_digits(m.group(1))
 
         # 3) 回退: 取最后一个合法数字 (跳过星级等前缀噪声)
         for m in reversed(list(re.finditer(r'\d+', text))):
             val = int(m.group())
-            if 1 <= val <= 200:
+            if is_valid_ship_level(val):
                 return val
-            # 3 位以上数字 > 200 时尝试去掉首位 (星级粘连)
+            # 3 位以上超出等级上限时尝试去掉首位 (星级粘连)
             s = m.group()
-            if val > 200 and len(s) >= 3:
+            if len(s) >= 3:
                 val2 = int(s[1:])
-                if 1 <= val2 <= 200:
+                if is_valid_ship_level(val2):
                     return val2
 
         return None
@@ -273,30 +367,40 @@ class DetectionMixin(BaseBattlePreparation):
     def _best_level_from_results(cls, results: list) -> int | None:
         """从多个 OCR 结果中选取最佳等级值。
 
-        优先选择包含 LV/V 模式的结果 (更可能是等级文本),
-        其次选择纯数字回退结果，避免噪声文本干扰。
+        优先选择包含 LV/V 模式或可完整拼接的结果。独立数字结果按
+        OCR 置信度排序，避免低置信度噪声抢在真实等级前面。
         """
-        # 按优先级分桶: lv_match > fallback
-        lv_candidates: list[int] = []
-        fallback_candidates: list[int] = []
+        combined = ''.join(r.text.strip() for r in results)
+        if re.search(r'(?i)v', combined) or LEVEL_SHORT_PATTERN.search(combined):
+            combined_level = cls._parse_level(combined)
+            if combined_level is not None:
+                return combined_level
+
+        compact = re.sub(r'[.\s]', '', combined)
+        if re.fullmatch(r'(?i)(?:[dsb]|[0-9liodsb]{2,3})', compact):
+            normalized = normalize_level_digits(compact)
+            if normalized is not None:
+                combined_level = int(normalized)
+                if is_valid_ship_level(combined_level):
+                    return combined_level
+
+        # 按优先级分桶: lv_match > fallback；桶内按置信度选择。
+        lv_candidates: list[tuple[float, int]] = []
+        fallback_candidates: list[tuple[float, int]] = []
 
         for r in results:
             text = r.text.strip()
             if not text:
                 continue
 
-            # 有 V 字母 → 大概率是 LV.XX
-            if re.search(r'(?i)v', text):
-                val = cls._parse_level(text)
-                if val is not None:
-                    lv_candidates.append(val)
-            else:
-                val = cls._parse_level(text)
-                if val is not None:
-                    fallback_candidates.append(val)
+            val = cls._parse_level(text)
+            if val is None:
+                continue
+            candidates = lv_candidates if re.search(r'(?i)v', text) else fallback_candidates
+            candidates.append((r.confidence, val))
 
         if lv_candidates:
-            return lv_candidates[0]
+            return max(lv_candidates, key=lambda item: item[0])[1]
         if fallback_candidates:
-            return fallback_candidates[0]
+            return max(fallback_candidates, key=lambda item: item[0])[1]
         return None
