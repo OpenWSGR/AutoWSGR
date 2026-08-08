@@ -10,8 +10,9 @@
     ├── RepairMixin           (修理, 依赖 DetectionMixin)
     └── FleetChangeMixin         (换船主流程编排)
         └── FleetAlignmentMixin  (成员更换与位置调整)
-            └── FleetPlanningMixin  (目标规划与规则校验)
-                └── FleetDetectMixin  (准备页舰队 OCR 检测)
+            └── FleetPlanningMixin  (目标分配与槽位规划)
+                └── FleetRuleMixin  (舰队规则匹配与校验)
+                    └── FleetDetectMixin  (准备页舰队 OCR 检测)
             ↓
     BattlePreparationPage     (最终控制器)
 
