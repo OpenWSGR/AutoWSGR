@@ -1373,6 +1373,93 @@ class TestDecisiveFleetChangeFeatureGate:
         new_change.assert_called_once_with(None, exact_fleet_rules(['A']))
 
 
+class TestFleetSelection:
+    @pytest.mark.parametrize(
+        'aliases',
+        [
+            {'别名甲': '85工程', '别名乙': '85工程'},
+            {'别名乙': '85工程', '别名甲': '85工程'},
+        ],
+    )
+    def test_try_select_option_retries_all_aliases_in_stable_order(
+        self,
+        aliases: dict[str, str],
+    ):
+        page = BattlePreparationPage(
+            _make_ctx(MagicMock(spec=AndroidController), MagicMock()),
+        )
+        set_user_ship_name_aliases(aliases)
+        option = ShipSelector(
+            name='85工程',
+            ship_types=(ShipType.CV,),
+            min_level=100,
+        )
+        first_page = MagicMock()
+        first_page.change_single_ship.return_value = None
+        second_page = MagicMock()
+        second_page.change_single_ship.return_value = '85工程'
+
+        with (
+            patch.object(
+                page,
+                '_open_choose_page',
+                side_effect=[first_page, second_page],
+            ) as open_page,
+            patch.object(page, '_cancel_choose_page') as cancel_page,
+        ):
+            selected = page._try_select_option(2, option)
+
+        attempted = [
+            first_page.change_single_ship.call_args.args[0],
+            second_page.change_single_ship.call_args.args[0],
+        ]
+        assert selected == _ShipSelection(name='85工程', option=option)
+        assert [item.search_name for item in attempted] == sorted(aliases)
+        assert all(item.ship_types == (ShipType.CV,) for item in attempted)
+        assert all(item.min_level == 100 for item in attempted)
+        assert open_page.call_args_list == [call(2), call(2)]
+        cancel_page.assert_called_once_with()
+
+    def test_try_select_option_falls_back_to_standard_name(self):
+        page = BattlePreparationPage(
+            _make_ctx(MagicMock(spec=AndroidController), MagicMock()),
+        )
+        aliases = {'别名甲': '85工程', '别名乙': '85工程'}
+        set_user_ship_name_aliases(aliases)
+        option = ShipSelector(name='85工程')
+        choose_pages = [MagicMock(), MagicMock(), MagicMock()]
+        for choose_page in choose_pages[:-1]:
+            choose_page.change_single_ship.return_value = None
+        choose_pages[-1].change_single_ship.return_value = '85工程'
+
+        with (
+            patch.object(
+                page,
+                '_open_choose_page',
+                side_effect=choose_pages,
+            ),
+            patch.object(page, '_cancel_choose_page') as cancel_page,
+        ):
+            selected = page._try_select_option(0, option)
+
+        attempted = [
+            choose_page.change_single_ship.call_args.args[0].search_name
+            for choose_page in choose_pages
+        ]
+        assert selected == _ShipSelection(name='85工程', option=option)
+        assert attempted == [*sorted(aliases), '85工程']
+        assert cancel_page.call_count == 2
+
+    def test_explicit_search_name_is_not_expanded(self):
+        page = BattlePreparationPage(
+            _make_ctx(MagicMock(spec=AndroidController), MagicMock()),
+        )
+        set_user_ship_name_aliases({'别名甲': '85工程', '别名乙': '85工程'})
+        option = ShipSelector(name='85工程', search_name='别名乙')
+
+        assert page._search_options(option) == (option,)
+
+
 # ─────────────────────────────────────────────
 # 智能换船
 # ─────────────────────────────────────────────
