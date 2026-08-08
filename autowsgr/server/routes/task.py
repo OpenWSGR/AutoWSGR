@@ -19,6 +19,7 @@ from autowsgr.server.schemas import (
     TaskStatusResponse,
 )
 from autowsgr.server.serializers import (
+    apply_combat_plan_overrides,
     build_combat_plan,
     build_fleet_selection,
     convert_combat_result,
@@ -116,12 +117,13 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
 
         if request.plan_id:
             plan = CombatPlan.from_yaml(request.plan_id)
+            apply_combat_plan_overrides(plan, request.plan)
         elif request.plan:
             plan = build_combat_plan(request.plan)
         else:
             raise ValueError('必须提供 plan 或 plan_id')
 
-        # API plan 覆盖 YAML 舰队；DTO 在 runner 启动前转换成领域模型。
+        # API plan 覆盖 YAML 节点配置和舰队；DTO 在 runner 启动前转换成领域模型。
         fleet_selection = build_fleet_selection(plan, request.plan)
 
         for i in range(request.times):
@@ -169,6 +171,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
 
         if request.plan_id:
             plan = CombatPlan.from_yaml(request.plan_id)
+            apply_combat_plan_overrides(plan, request.plan)
         elif request.plan:
             plan = build_combat_plan(request.plan)
         else:
