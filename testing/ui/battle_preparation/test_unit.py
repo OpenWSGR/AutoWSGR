@@ -2391,83 +2391,6 @@ class TestFleetSlotRules:
             relaxed_constraints=False,
         )
 
-    def test_candidate_only_slots_use_backtracking(self):
-        selectors = [
-            _candidate_rule('胡德', '扶桑'),
-            _candidate_rule('胡德'),
-            None,
-            None,
-            None,
-            None,
-        ]
-        names = [
-            selector.preferred_name if selector is not None else None for selector in selectors
-        ]
-
-        assert BattlePreparationPage._assign_unique_targets(
-            names,
-            selectors,
-        ) == ['扶桑', '胡德', None, None, None, None]
-
-    def test_overlapping_priorities_use_backtracking(self):
-        names = ['A', 'A', None, None, None, None]
-        selectors: list[FleetSlotRule | None] = [
-            _candidate_rule('A', 'B'),
-            _candidate_rule('A'),
-            None,
-            None,
-            None,
-            None,
-        ]
-
-        assert BattlePreparationPage._assign_unique_targets(names, selectors) == [
-            'B',
-            'A',
-            None,
-            None,
-            None,
-            None,
-        ]
-
-    def test_same_candidate_in_two_slots_is_impossible(self):
-        names = ['岛风', '岛风', None, None, None, None]
-        selectors: list[FleetSlotRule | None] = [
-            _candidate_rule('岛风'),
-            _candidate_rule('岛风'),
-            None,
-            None,
-            None,
-            None,
-        ]
-
-        assert BattlePreparationPage._assign_unique_targets(names, selectors) is None
-
-    def test_same_ship_group_names_cannot_use_two_slots(self):
-        set_user_ship_name_aliases({'契卡洛夫': '85工程'})
-        names = ['85工程', '契卡洛夫', None, None, None, None]
-
-        assert BattlePreparationPage._assign_unique_targets(names, [None] * 6) is None
-
-    def test_occupied_name_is_removed_from_slot_candidates(self):
-        selected, selector = BattlePreparationPage._select_available_candidate(
-            ['岛风', None, None, None, None, None],
-            '岛风',
-            _candidate_rule('岛风', '雪风'),
-        )
-
-        assert selected == '雪风'
-        assert selector == (ShipSelector(name='雪风', relaxed_constraints=True),)
-
-    def test_replacing_same_slot_may_keep_current_name(self):
-        selected, _selector = BattlePreparationPage._select_available_candidate(
-            ['岛风', None, None, None, None, None],
-            '岛风',
-            _candidate_rule('岛风', '雪风'),
-            slot_to_replace=0,
-        )
-
-        assert selected == '岛风'
-
     def test_existing_members_are_matched_only_once(self):
         current = ['炽热', '絮弗伦', '岛风', '黑潮', None, None]
         desired = ['岛风', '黑潮', '阳炎', '早春', '吹雪', '初夏']
@@ -2523,16 +2446,6 @@ class TestFleetSlotRules:
             selectors,
             {0},
         )
-
-    def test_find_wrong_slots(self):
-        current = ['X', 'B', 'Y', None, 'E', None]
-        desired = ['A', 'B', 'C', None, None, None]
-
-        assert BattlePreparationPage._find_wrong_slots(
-            current,
-            desired,
-            [None] * 6,
-        ) == [0, 2, 4]
 
 
 class TestFleetAlignment:

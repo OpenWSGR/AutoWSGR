@@ -412,11 +412,3 @@ class FleetDetectMixin(BaseBattlePreparation):
             ship_types=ship_types,
             ship_levels=ship_levels,
         )
-
-    @staticmethod
-    def _validate_fleet(
-        current: list[str | None],
-        desired: list[str | None],
-    ) -> bool:
-        """验证当前舰队是否已满足目标，目标空槽不参与比较。"""
-        return all(desired[i] is None or current[i] == desired[i] for i in range(6))
