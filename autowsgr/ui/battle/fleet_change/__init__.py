@@ -7,7 +7,8 @@
 
 - ``_detect.py`` -- 准备页舰队 OCR 检测
 - ``_planning.py`` -- 目标规划与规则校验
-- ``_change.py`` -- 更换算法 Mixin
+- ``_alignment.py`` -- 舰队调整与船池页面操作
+- ``_change.py`` -- 换船主流程编排
 """
 
 from autowsgr.ui.battle.fleet_change._change import FleetChangeMixin
