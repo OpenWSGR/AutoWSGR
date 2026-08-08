@@ -1810,6 +1810,281 @@ class TestSmartFleetChange:
         assert assigned[0].name == 'B'
         assert 0 in verified
 
+    def test_unknown_primary_slot_is_deferred_when_candidate_exists(self):
+        primary = ShipSelector(name='A')
+        candidate = ShipSelector(name='B')
+        rule = FleetSlotRule(primary=primary, candidates=(candidate,))
+        snapshot = FleetSnapshot(
+            names=[None, 'C', None, None, None, None],
+            occupied=[True, True, False, False, False, False],
+        )
+
+        assert BattlePreparationPage._deferred_primary_slots(
+            snapshot,
+            [rule, None, None, None, None, None],
+            [primary, None, None, None, None, None],
+        ) == {0}
+
+    def test_unknown_primary_only_slot_is_selected_once(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        primary = ShipSelector(name='A', ship_types=(ShipType.DD,))
+        rule = FleetSlotRule(primary=primary)
+        selectors: list[FleetSlotRule | None] = [rule, None, None, None, None, None]
+        assigned: list[ShipSelector | None] = [primary, None, None, None, None, None]
+        current = [None, None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+        verified: set[int] = set()
+        locked: dict[int, ShipSelector] = {}
+        deferred = BattlePreparationPage._deferred_primary_slots(
+            FleetSnapshot(names=current, occupied=occupied),
+            selectors,
+            assigned,
+        )
+
+        with (
+            patch.object(
+                page,
+                '_try_select_option',
+                return_value=_ShipSelection('A', primary),
+            ) as select_option,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._resolve_deferred_primaries(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                verified,
+                set(),
+                locked,
+                deferred,
+            )
+
+        select_option.assert_called_once_with(0, primary)
+        assert current[0] == 'A'
+        assert verified == {0}
+        assert locked == {0: primary}
+        assert deferred == set()
+
+    def test_unknown_primary_only_slot_stops_when_search_is_empty(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        primary = ShipSelector(name='A')
+        rule = FleetSlotRule(primary=primary)
+        snapshot = FleetSnapshot(
+            names=[None, None, None, None, None, None],
+            occupied=[True, False, False, False, False, False],
+        )
+
+        with (
+            patch.object(page, '_detect_initial_snapshot', return_value=snapshot),
+            patch.object(
+                page,
+                '_try_select_option',
+                return_value=_ShipSelection(None, primary),
+            ) as select_option,
+            patch.object(page, 'detect_fleet_snapshot') as detect,
+        ):
+            assert not page.change_fleet(None, [rule])
+
+        select_option.assert_called_once_with(0, primary)
+        detect.assert_not_called()
+
+    def test_unknown_slot_uses_candidate_then_rechecks_primary(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        primary = ShipSelector(name='A', ship_types=(ShipType.DD,))
+        candidate = ShipSelector(name='B')
+        rule = FleetSlotRule(primary=primary, candidates=(candidate,))
+        selectors: list[FleetSlotRule | None] = [rule, None, None, None, None, None]
+        assigned: list[ShipSelector | None] = [primary, None, None, None, None, None]
+        current = [None, None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+        verified: set[int] = set()
+        unavailable: set[tuple[int, ShipSelector]] = set()
+        locked: dict[int, ShipSelector] = {}
+        deferred = {0}
+
+        with (
+            patch.object(
+                page,
+                '_try_select_option',
+                side_effect=[
+                    _ShipSelection('B', candidate),
+                    _ShipSelection('A', primary),
+                ],
+            ) as select_option,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._align_member_set(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                verified,
+                unavailable,
+                locked,
+                deferred,
+            )
+
+        assert select_option.call_args_list == [
+            call(0, candidate),
+            call(0, primary),
+        ]
+        assert current[0] == 'A'
+        assert assigned[0] == primary
+        assert verified == {0}
+        assert locked == {0: primary}
+        assert unavailable == set()
+        assert deferred == set()
+
+    def test_unknown_slot_keeps_candidate_when_primary_recheck_fails(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        primary = ShipSelector(name='A', ship_types=(ShipType.DD,))
+        candidate = ShipSelector(name='B', ship_types=(ShipType.DD,))
+        rule = FleetSlotRule(primary=primary, candidates=(candidate,))
+        selectors: list[FleetSlotRule | None] = [rule, None, None, None, None, None]
+        assigned: list[ShipSelector | None] = [primary, None, None, None, None, None]
+        current = [None, None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+        verified: set[int] = set()
+        unavailable: set[tuple[int, ShipSelector]] = set()
+        locked: dict[int, ShipSelector] = {}
+
+        with (
+            patch.object(
+                page,
+                '_try_select_option',
+                side_effect=[
+                    _ShipSelection('B', candidate),
+                    _ShipSelection(None, primary),
+                ],
+            ) as select_option,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._align_member_set(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                verified,
+                unavailable,
+                locked,
+                {0},
+            )
+
+        assert select_option.call_args_list == [
+            call(0, candidate),
+            call(0, primary),
+        ]
+        assert current[0] == 'B'
+        assert assigned[0] == candidate
+        assert verified == {0}
+        assert locked == {0: candidate}
+        assert unavailable == {(0, primary)}
+
+    def test_deferred_primary_skips_candidate_reserved_by_another_slot(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        primary_a = ShipSelector(name='A')
+        reserved_b = ShipSelector(name='B')
+        fallback_c = ShipSelector(name='C')
+        rule_a = FleetSlotRule(
+            primary=primary_a,
+            candidates=(reserved_b, fallback_c),
+        )
+        rule_b = FleetSlotRule(primary=reserved_b)
+        selectors: list[FleetSlotRule | None] = [
+            rule_a,
+            rule_b,
+            None,
+            None,
+            None,
+            None,
+        ]
+        assigned: list[ShipSelector | None] = [
+            primary_a,
+            reserved_b,
+            None,
+            None,
+            None,
+            None,
+        ]
+        current = [None, None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+
+        with (
+            patch.object(
+                page,
+                '_try_select_option',
+                side_effect=[
+                    _ShipSelection('C', fallback_c),
+                    _ShipSelection('A', primary_a),
+                ],
+            ) as select_option,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._resolve_deferred_primaries(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                set(),
+                set(),
+                {},
+                {0},
+            )
+
+        assert select_option.call_args_list == [
+            call(0, fallback_c),
+            call(0, primary_a),
+        ]
+        assert current[0] == 'A'
+
+    def test_deferred_primary_tries_candidates_in_yaml_order(self):
+        page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))
+        primary = ShipSelector(name='A')
+        candidate_b = ShipSelector(name='B')
+        candidate_c = ShipSelector(name='C')
+        rule = FleetSlotRule(
+            primary=primary,
+            candidates=(candidate_b, candidate_c),
+        )
+        selectors: list[FleetSlotRule | None] = [rule, None, None, None, None, None]
+        assigned: list[ShipSelector | None] = [primary, None, None, None, None, None]
+        current = [None, None, None, None, None, None]
+        occupied = [True, False, False, False, False, False]
+        unavailable: set[tuple[int, ShipSelector]] = set()
+
+        with (
+            patch.object(
+                page,
+                '_try_select_option',
+                side_effect=[
+                    _ShipSelection(None, candidate_b),
+                    _ShipSelection('C', candidate_c),
+                    _ShipSelection('A', primary),
+                ],
+            ) as select_option,
+            patch('autowsgr.ui.battle.fleet_change._change.time.sleep'),
+        ):
+            page._resolve_deferred_primaries(
+                current,
+                occupied,
+                assigned,
+                selectors,
+                set(),
+                unavailable,
+                {},
+                {0},
+            )
+
+        assert select_option.call_args_list == [
+            call(0, candidate_b),
+            call(0, candidate_c),
+            call(0, primary),
+        ]
+        assert unavailable == {(0, candidate_b)}
+        assert current[0] == 'A'
+
+
 class TestFleetSlotRules:
     @pytest.mark.parametrize(
         ('raw', 'expected'),
