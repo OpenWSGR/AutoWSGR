@@ -1939,11 +1939,16 @@ class TestSmartFleetChange:
                 return_value=_ShipSelection(None, primary),
             ) as select_option,
             patch.object(page, 'detect_fleet_snapshot') as detect,
+            patch('autowsgr.ui.battle.fleet_change._change._log.error') as log_error,
         ):
             assert not page.change_fleet(None, [rule])
 
         select_option.assert_called_once_with(0, primary)
         detect.assert_not_called()
+        error = str(log_error.call_args.args[1])
+        assert "槽位 1 的主选 'A' 选择失败" in error
+        assert '主选 OCR 识别失败' in error
+        assert '账号不存在该舰船' in error
 
     def test_unknown_slot_uses_candidate_then_rechecks_primary(self):
         page = BattlePreparationPage(_make_ctx(MagicMock(spec=AndroidController)))

@@ -191,8 +191,9 @@ class FleetAlignmentMixin(FleetSelectionMixin):
 
             if fallback is None:
                 raise _UnresolvedPrimaryError(
-                    f'槽位 {target_slot} 连续 OCR 后身份仍未知，且船池未找到唯一主选 '
-                    f"'{primary.name}'；无法区分主选已在编队或账号未拥有，停止本次换船",
+                    f"槽位 {target_slot + 1} 的主选 '{primary.name}' 选择失败："
+                    '准备页连续 OCR 后仍无法确认，船池搜索和 OCR 也未找到；'
+                    '可能是主选 OCR 识别失败，或账号不存在该舰船，已停止本次换船',
                 )
 
             unavailable.add((target_slot, primary))
