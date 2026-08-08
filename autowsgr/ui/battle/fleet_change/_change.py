@@ -27,11 +27,11 @@ from ._alignment import (
     FleetAlignmentMixin,
     _UnresolvedPrimaryError,
 )
-from ._alignment import _ShipSelection as _AlignmentShipSelection
 from ._detect import FleetSnapshot
+from ._selection import _ShipSelection as _SelectionResult
 
 
-_ShipSelection = _AlignmentShipSelection
+_ShipSelection = _SelectionResult
 
 
 # 仅在类型检查时导入 Sequence，运行时不产生额外依赖。
