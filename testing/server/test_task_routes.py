@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 import autowsgr.ops.normal_fight as normal_fight_module
 from autowsgr import ops
-from autowsgr.combat import CombatResult
+from autowsgr.combat import CombatPlan, CombatResult
 from autowsgr.combat.fleet import FleetSelectionSource, ResolvedFleetSelection
 from autowsgr.server import main as server_main
 from autowsgr.server.device_lease import DeviceOperationBusyError
@@ -25,6 +25,7 @@ from autowsgr.server.schemas import (
     EventFightRequest,
     ExerciseRequest,
     FleetRuleRequest,
+    NodeDecisionRequest,
     NormalFightRequest,
     RoundResult,
     TaskStatusResponse,
@@ -432,6 +433,59 @@ def test_event_route_top_level_fleet_id_overrides_api_plan(
     asyncio.run(task._start_event_fight(object(), request))
 
     assert captured[0].fleet_id == 5
+
+
+def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """GUI 随请求发送的节点阵型应覆盖入队时生成的 YAML 快照。"""
+    manager = _ExecutingTaskManager()
+    captured: list[CombatPlan] = []
+
+    def run_normal_fight(
+        _ctx: object,
+        plan: CombatPlan,
+        *,
+        times: int,
+        fleet_selection: ResolvedFleetSelection,
+    ) -> list[CombatResult]:
+        assert times == 1
+        assert fleet_selection.fleet_id == 1
+        captured.append(plan)
+        return [CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)]
+
+    yaml_path = tmp_path / 'node-formation.yaml'
+    yaml_path.write_text(
+        '\n'.join(
+            [
+                'chapter: 7',
+                'map: 4',
+                'selected_nodes: [A, B]',
+                'node_defaults:',
+                '  formation: 2',
+                'node_args:',
+                '  B:',
+                '    formation: 3',
+                '',
+            ],
+        ),
+        encoding='utf-8',
+    )
+    request = NormalFightRequest(
+        plan_id=str(yaml_path),
+        plan=CombatPlanRequest(
+            node_args={'B': NodeDecisionRequest(formation=4)},
+        ),
+    )
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'run_normal_fight', run_normal_fight)
+
+    response = asyncio.run(task._start_normal_fight(object(), request))
+
+    assert response.success is True
+    assert len(captured) == 1
+    assert captured[0].get_node_decision('B').formation.value == 4
 
 
 def test_normal_route_enters_real_runner_with_resolved_selection(
