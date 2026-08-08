@@ -27,7 +27,9 @@ from autowsgr.vision.ocr import (
 from autowsgr.vision.ocr_rules import (
     LEVEL_OCR_ALLOWLIST,
     EasyOCRProfile,
+    FastOCRProfile,
     get_easyocr_params,
+    get_fastocr_params,
     normalize_level_digits,
     set_user_ship_name_aliases,
     set_user_ship_name_corrections,
@@ -125,6 +127,36 @@ class TestLevelOCREngines:
         with pytest.raises(ValueError, match='未知的 EasyOCR 参数配置档案'):
             get_easyocr_params('unknown')
 
+    @pytest.mark.parametrize('profile', list(FastOCRProfile))
+    def test_fastocr_parameter_profiles_are_registered(self, profile: FastOCRProfile):
+        params = get_fastocr_params(profile)
+
+        assert params.only_rec is (profile is FastOCRProfile.SINGLE_LINE)
+
+    def test_fastocr_unknown_parameter_profile_is_rejected(self):
+        with pytest.raises(ValueError, match='未知的 FastOCR 参数配置档案'):
+            get_fastocr_params('unknown')
+
+    def test_fastocr_full_recognition_uses_detection(self):
+        detail = SimpleNamespace(nodes=[])
+        job = MagicMock(succeeded=True)
+        job.get.return_value = detail
+        tasker = MagicMock()
+        tasker.post_recognition.return_value.wait.return_value = job
+
+        options = MagicMock(return_value='options')
+        engine = FastOCREngine.__new__(FastOCREngine)
+        engine._tasker = tasker
+        engine._recognition_type = 'ocr'
+        engine._ocr_options_type = options
+        engine._threshold = 0.3
+
+        assert engine.recognize(_dummy_image()) == []
+        options.assert_called_once_with(
+            only_rec=False,
+            threshold=0.3,
+        )
+
     def test_fastocr_line_uses_profile_allowlist(self):
         raw_result = SimpleNamespace(
             text='LV.1D3@',
@@ -160,7 +192,7 @@ class TestLevelOCREngines:
             ),
         ]
         options.assert_called_once_with(
-            only_rec=False,
+            only_rec=True,
             threshold=0.3,
         )
 
