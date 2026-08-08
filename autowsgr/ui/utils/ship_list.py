@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from typing import TYPE_CHECKING
 
@@ -15,10 +16,10 @@ from autowsgr.constants import SHIPNAMES
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipType
 from autowsgr.vision import apply_ship_patches, get_api_dll
-from autowsgr.vision.ocr import OCRResult, _fuzzy_match
+from autowsgr.vision.ocr import EasyOCREngine, OCRResult, _fuzzy_match
 from autowsgr.vision.ocr_rules import (
     LEVEL_DIGIT_CONFUSABLES,
-    LEVEL_OCR_ALLOWLIST,
+    EasyOCRProfile,
     is_valid_ship_level,
     normalize_level_digits,
 )
@@ -47,6 +48,8 @@ LEGACY_LIST_WIDTH: int = 1048
 _MAX_LEVEL_NOISE_CHARS = 2
 _MAX_NOISY_LEVEL_HITS_BEFORE_RETRY = 5
 _MIN_SPLIT_LEVEL_CONFIDENCE = 0.85
+_SHIP_LEVEL_CROP_OFFSETS = (-62, -38, -2, -20)
+_SHIP_LEVEL_OCR_SCALES = (2, 3, 4)
 
 
 def extract_ship_type_from_text(text: str) -> ShipType | None:
@@ -294,39 +297,66 @@ def _probe_level_near_name(
     name_x: float,
     max_x: int,
 ) -> int | None:
-    """在同一 y 行按舰名 x 位置裁剪区域，二次识别等级。"""
+    """以舰名和 DLL 行中心为锚点，顺序识别同一卡片的等级。"""
     h, w = screen.shape[:2]
-    row_h = max(1, y_end - y_start)
-
-    x_pad = max(70, int(w * 0.045))
-    x0 = max(0, int(name_x - x_pad))
-    x1 = min(max_x, int(name_x + x_pad))
-
-    y0 = max(0, y_start - int(row_h * 1.6))
-    y1 = min(h, y_end + int(row_h * 0.4))
-
-    if x1 <= x0 or y1 <= y0:
+    row_y = (y_start + y_end) / 2
+    left, top, right, bottom = _SHIP_LEVEL_CROP_OFFSETS
+    x1 = max(0.0, min(float(max_x), name_x + left * w / LEGACY_WIDTH))
+    x2 = max(0.0, min(float(max_x), name_x + right * w / LEGACY_WIDTH))
+    y1 = max(0.0, min(float(h), row_y + top * h / LEGACY_HEIGHT))
+    y2 = max(0.0, min(float(h), row_y + bottom * h / LEGACY_HEIGHT))
+    if x2 <= x1 or y2 <= y1:
         return None
 
-    roi = screen[y0:y1, x0:x1]
-    if roi.size == 0:
+    source_x1 = math.floor(x1)
+    source_x2 = math.ceil(x2)
+    source_y1 = math.floor(y1)
+    source_y2 = math.ceil(y2)
+    source_crop = screen[source_y1:source_y2, source_x1:source_x2]
+    if source_crop.size == 0:
         return None
 
-    parsed_levels: list[int] = []
     noisy_level_hits = 0
+    use_otsu = isinstance(ocr, EasyOCREngine)
 
-    def collect_levels(img: np.ndarray) -> None:
-        nonlocal noisy_level_hits
-        results = ocr.recognize(
-            img,
-            allowlist=f'{LEVEL_OCR_ALLOWLIST}-/',
+    for scale in _SHIP_LEVEL_OCR_SCALES:
+        enlarged_source = cv2.resize(
+            source_crop,
+            None,
+            fx=scale,
+            fy=scale,
+            interpolation=cv2.INTER_CUBIC,
         )
+        crop_x1 = round((x1 - source_x1) * scale)
+        crop_x2 = round((x2 - source_x1) * scale)
+        crop_y1 = round((y1 - source_y1) * scale)
+        crop_y2 = round((y2 - source_y1) * scale)
+        enlarged = enlarged_source[crop_y1:crop_y2, crop_x1:crop_x2]
+        if enlarged.size == 0:
+            continue
+
+        prepared = enlarged
+        if use_otsu:
+            gray = cv2.cvtColor(enlarged, cv2.COLOR_RGB2GRAY)
+            binary = cv2.threshold(
+                gray,
+                0,
+                255,
+                cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+            )[1]
+            prepared = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+
+        results = ocr.recognize_line(
+            prepared,
+            easyocr_profile=EasyOCRProfile.SHIP_POOL_LEVEL,
+        )
+        parsed_levels: list[int] = []
         split_level_hits: list[int] = []
-        for r in results:
-            text = r.text.strip()
-            split_level = _parse_bare_level(text, r.confidence)
+        for result in results:
+            text = result.text.strip()
             if not text:
                 continue
+            split_level = _parse_bare_level(text, result.confidence)
             level, need_retry = _parse_level_with_status(text)
             if need_retry:
                 noisy_level_hits += 1
@@ -336,30 +366,19 @@ def _probe_level_near_name(
             elif split_level is not None:
                 split_level_hits.append(split_level)
 
-        # 当前 ROI 只覆盖一艘船的紧凑等级区域，高置信度数字不强制带 Lv.。
         parsed_levels.extend(split_level_hits)
+        if parsed_levels:
+            return max(parsed_levels)
 
-    collect_levels(roi)
-
-    gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
-    up = cv2.resize(gray, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-    norm = cv2.normalize(up, None, 0, 255, cv2.NORM_MINMAX)
-    binary = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    binary_rgb = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
-    collect_levels(binary_rgb)
-
-    if not parsed_levels and noisy_level_hits > _MAX_NOISY_LEVEL_HITS_BEFORE_RETRY:
+    if noisy_level_hits > _MAX_NOISY_LEVEL_HITS_BEFORE_RETRY:
         raise LevelOCRRetryNeededError(
             f'等级 OCR 噪声过高: {noisy_level_hits} 条异常等级文本 (阈值 {_MAX_NOISY_LEVEL_HITS_BEFORE_RETRY})',
         )
 
-    if not parsed_levels:
-        return None
-
-    return max(parsed_levels)
+    return None
 
 
-def read_ship_levels(  # noqa: PLR0912
+def read_ship_levels(
     ocr: OCREngine,
     screen: np.ndarray,
     *,
@@ -368,8 +387,8 @@ def read_ship_levels(  # noqa: PLR0912
 ) -> list[tuple[str, int | None] | tuple[str, int | None, float, float]]:
     """在选船列表页识别各舰船的名称及等级。
 
-    使用与 :func:`locate_ship_rows` 相同的 DLL 行定位 + OCR 流程,
-    额外解析每行中的 ``Lv.XX`` 等级文本。
+    使用与 :func:`locate_ship_rows` 相同的 DLL 行定位 + OCR 流程，
+    再以每个舰名中心和 DLL 行中心裁切同一卡片的等级区域。
 
     参考 legacy ``Fleet.check_level`` 的思路, 但适配选船列表的
     动态行布局 (由 DLL 定位) 而非固定槽位坐标。
@@ -421,18 +440,6 @@ def read_ship_levels(  # noqa: PLR0912
             (name, _center_x(result.bbox, row_img.shape[1]))
             for result, name in _match_ship_results(results)
         ]
-        local_level_hits: list[tuple[int, float]] = []
-
-        for r in results:
-            text = r.text.strip()
-            if not text:
-                continue
-
-            x_center = _center_x(r.bbox, row_img.shape[1])
-
-            level = _parse_level(text)
-            if level is not None:
-                local_level_hits.append((level, x_center))
 
         # 等级约束路径也仅在原图舰名失败时执行一次 2x 放大。
         if not name_hits:
@@ -452,37 +459,19 @@ def read_ship_levels(  # noqa: PLR0912
                 continue
 
         name_hits.sort(key=lambda item: item[1])
-        local_level_hits.sort(key=lambda item: item[1])
-        max_pair_dist = max(80.0, row_img.shape[1] * 0.12)
 
         for row_name, name_x in name_hits:
             if deduplicate_by_name and row_name in seen:
                 continue
 
-            row_level: int | None = None
-
-            best_index: int | None = None
-            best_dist = float('inf')
-            for index, (_candidate_level, candidate_x) in enumerate(local_level_hits):
-                dist = abs(candidate_x - name_x)
-                if dist < best_dist:
-                    best_dist = dist
-                    best_index = index
-
-            if best_index is not None and best_dist <= max_pair_dist:
-                row_level, _candidate_x = local_level_hits.pop(best_index)
-
-            if row_level is None:
-                probe_level = _probe_level_near_name(
-                    ocr,
-                    screen,
-                    y_start=y_start,
-                    y_end=y_end,
-                    name_x=name_x,
-                    max_x=list_w_native,
-                )
-                if probe_level is not None:
-                    row_level = probe_level
+            row_level = _probe_level_near_name(
+                ocr,
+                screen,
+                y_start=y_start,
+                y_end=y_end,
+                name_x=name_x,
+                max_x=list_w_native,
+            )
 
             if deduplicate_by_name:
                 seen.add(row_name)

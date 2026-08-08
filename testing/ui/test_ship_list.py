@@ -11,8 +11,9 @@ from autowsgr.ui.utils.ship_list import (
     locate_ship_rows,
     read_ship_levels,
 )
-from autowsgr.vision import OCRResult
-from autowsgr.vision.ocr_rules import set_user_ship_name_aliases
+from autowsgr.vision import OCREngine, OCRResult
+from autowsgr.vision.ocr import EasyOCREngine
+from autowsgr.vision.ocr_rules import EasyOCRProfile, set_user_ship_name_aliases
 
 
 @pytest.fixture(autouse=True)
@@ -43,8 +44,8 @@ def test_level_parser_retries_when_more_than_two_digits_are_ambiguous():
 
 
 def _probe_with_binary_results(results: list[OCRResult]) -> int | None:
-    ocr = MagicMock()
-    ocr.recognize.side_effect = [[], results]
+    ocr = MagicMock(spec=EasyOCREngine)
+    ocr.recognize_line.return_value = results
     screen = np.zeros((720, 1280, 3), dtype=np.uint8)
     return _probe_level_near_name(
         ocr,
@@ -91,6 +92,106 @@ def test_level_probe_rejects_split_level_above_maximum():
         OCRResult(text='217', confidence=0.99),
     ]
     assert _probe_with_binary_results(results) is None
+
+
+def test_level_probe_uses_x2_x3_x4_ordered_fallback():
+    ocr = MagicMock(spec=EasyOCREngine)
+    ocr.recognize_line.side_effect = [
+        [],
+        [],
+        [OCRResult(text='LV.110', confidence=0.99)],
+    ]
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+    level = _probe_level_near_name(
+        ocr,
+        screen,
+        y_start=335,
+        y_end=373,
+        name_x=262,
+        max_x=1048,
+    )
+
+    assert level == 110
+    assert ocr.recognize_line.call_count == 3
+    assert [call.args[0].shape for call in ocr.recognize_line.call_args_list] == [
+        (36, 120, 3),
+        (54, 180, 3),
+        (72, 240, 3),
+    ]
+    assert all(
+        call.kwargs['easyocr_profile'] is EasyOCRProfile.SHIP_POOL_LEVEL
+        for call in ocr.recognize_line.call_args_list
+    )
+
+
+def test_level_probe_stops_after_first_valid_scale():
+    ocr = MagicMock(spec=EasyOCREngine)
+    ocr.recognize_line.side_effect = [
+        [OCRResult(text='LV.1', confidence=0.99)],
+        [OCRResult(text='LV.110', confidence=0.99)],
+    ]
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+    level = _probe_level_near_name(
+        ocr,
+        screen,
+        y_start=335,
+        y_end=373,
+        name_x=262,
+        max_x=1048,
+    )
+
+    assert level == 1
+    assert ocr.recognize_line.call_count == 1
+    assert ocr.recognize_line.call_args.args[0].shape == (36, 120, 3)
+
+
+def test_level_probe_binarizes_easyocr_input():
+    ocr = MagicMock(spec=EasyOCREngine)
+    ocr.recognize_line.return_value = [OCRResult(text='LV.110', confidence=0.99)]
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    screen[:, :, 0] = np.arange(1280, dtype=np.uint16) % 256
+    screen[:, :, 1] = 40
+    screen[:, :, 2] = 180
+
+    level = _probe_level_near_name(
+        ocr,
+        screen,
+        y_start=335,
+        y_end=373,
+        name_x=262,
+        max_x=1048,
+    )
+
+    prepared = ocr.recognize_line.call_args.args[0]
+    assert level == 110
+    assert set(np.unique(prepared)).issubset({0, 255})
+    assert np.array_equal(prepared[:, :, 0], prepared[:, :, 1])
+    assert np.array_equal(prepared[:, :, 1], prepared[:, :, 2])
+
+
+def test_level_probe_keeps_non_easyocr_input_unbinarized():
+    ocr = MagicMock(spec=OCREngine)
+    ocr.recognize_line.return_value = [OCRResult(text='LV.110', confidence=0.99)]
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    screen[:, :, 0] = np.arange(1280, dtype=np.uint16) % 256
+    screen[:, :, 1] = 40
+    screen[:, :, 2] = 180
+
+    level = _probe_level_near_name(
+        ocr,
+        screen,
+        y_start=335,
+        y_end=373,
+        name_x=262,
+        max_x=1048,
+    )
+
+    prepared = ocr.recognize_line.call_args.args[0]
+    assert level == 110
+    assert not set(np.unique(prepared)).issubset({0, 255})
+    assert not np.array_equal(prepared[:, :, 0], prepared[:, :, 1])
 
 
 def test_level_parser_rejects_value_above_game_maximum():
@@ -146,7 +247,7 @@ def test_locate_ship_rows_applies_user_ship_name_alias(
     assert ocr.recognize.call_count == 1
 
 
-def test_read_ship_levels_pairs_original_level_with_upscaled_name(
+def test_read_ship_levels_probes_level_from_upscaled_name_position(
     monkeypatch: pytest.MonkeyPatch,
 ):
     screen = _single_row_screen(monkeypatch)
@@ -155,12 +256,22 @@ def test_read_ship_levels_pairs_original_level_with_upscaled_name(
         [OCRResult(text='Lv.110', confidence=0.99, bbox=(550, 2, 650, 18))],
         [OCRResult(text='火力', confidence=0.9, bbox=(1100, 4, 1300, 36))],
     ]
+    probe = MagicMock(return_value=103)
+    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
 
-    assert read_ship_levels(ocr, screen) == [('火力', 110)]
+    assert read_ship_levels(ocr, screen) == [('火力', 103)]
     assert ocr.recognize.call_count == 2
+    probe.assert_called_once_with(
+        ocr,
+        screen,
+        y_start=99,
+        y_end=121,
+        name_x=600,
+        max_x=1048,
+    )
 
 
-def test_read_ship_levels_applies_alias_before_level_pairing(
+def test_read_ship_levels_applies_alias_before_card_level_probe(
     monkeypatch: pytest.MonkeyPatch,
 ):
     screen = _single_row_screen(monkeypatch)
@@ -170,11 +281,21 @@ def test_read_ship_levels_applies_alias_before_level_pairing(
         OCRResult(text='Lv.110', confidence=0.99, bbox=(330, 2, 390, 18)),
     ]
     set_user_ship_name_aliases({'希尔德布兰德': 'AIII'})
+    probe = MagicMock(return_value=101)
+    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
 
     found = read_ship_levels(ocr, screen)
 
-    assert found == [('AIII', 110)]
+    assert found == [('AIII', 101)]
     assert ocr.recognize.call_count == 1
+    probe.assert_called_once_with(
+        ocr,
+        screen,
+        y_start=99,
+        y_end=121,
+        name_x=260,
+        max_x=1048,
+    )
 
 
 def test_read_ship_levels_includes_card_position_for_binding(
@@ -186,6 +307,8 @@ def test_read_ship_levels_includes_card_position_for_binding(
         OCRResult(text='昆西', confidence=0.99, bbox=(200, 2, 300, 18)),
         OCRResult(text='Lv.110', confidence=0.99, bbox=(240, 2, 300, 18)),
     ]
+    probe = MagicMock(return_value=1)
+    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
 
     found = read_ship_levels(
         ocr,
@@ -197,8 +320,16 @@ def test_read_ship_levels_includes_card_position_for_binding(
     assert found == [
         (
             '昆西',
-            110,
+            1,
             pytest.approx(250 / 1280),
             pytest.approx(round(110 / 720, 4)),
         )
     ]
+    probe.assert_called_once_with(
+        ocr,
+        screen,
+        y_start=99,
+        y_end=121,
+        name_x=250,
+        max_x=1048,
+    )

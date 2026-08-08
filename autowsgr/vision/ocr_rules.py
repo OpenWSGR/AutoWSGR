@@ -51,6 +51,7 @@ class EasyOCRProfile(StrEnum):
 
     DEFAULT = 'default'
     FLEET_SHIP_LEVEL = 'fleet_ship_level'
+    SHIP_POOL_LEVEL = 'ship_pool_level'
     SHIP_POOL_TYPE = 'ship_pool_type'
 
 
@@ -93,6 +94,7 @@ SHIP_TYPE_OCR_ALLOWLIST = ''.join(
 _EASY_OCR_PARAMS_BY_PROFILE: dict[EasyOCRProfile, EasyOCRParams] = {
     EasyOCRProfile.DEFAULT: EasyOCRParams(),
     EasyOCRProfile.FLEET_SHIP_LEVEL: EasyOCRParams(allowlist=LEVEL_OCR_ALLOWLIST),
+    EasyOCRProfile.SHIP_POOL_LEVEL: EasyOCRParams(allowlist=LEVEL_OCR_ALLOWLIST),
     EasyOCRProfile.SHIP_POOL_TYPE: EasyOCRParams(allowlist=SHIP_TYPE_OCR_ALLOWLIST),
 }
 

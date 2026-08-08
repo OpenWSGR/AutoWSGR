@@ -112,7 +112,10 @@ class TestLevelOCREngines:
     def test_easyocr_parameter_profiles_are_registered(self, profile: EasyOCRProfile):
         params = get_easyocr_params(profile)
 
-        if profile is EasyOCRProfile.FLEET_SHIP_LEVEL:
+        if profile in {
+            EasyOCRProfile.FLEET_SHIP_LEVEL,
+            EasyOCRProfile.SHIP_POOL_LEVEL,
+        }:
             assert params.allowlist == LEVEL_OCR_ALLOWLIST
         assert params.decoder == 'greedy'
         assert params.contrast_ths == 1.0
