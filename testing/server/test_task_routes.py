@@ -475,7 +475,14 @@ def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
     request = NormalFightRequest(
         plan_id=str(yaml_path),
         plan=CombatPlanRequest(
-            node_args={'B': NodeDecisionRequest(formation=4)},
+            node_args={
+                'B': NodeDecisionRequest(
+                    formation=4,
+                    night=True,
+                    long_missile_support=True,
+                    proceed=False,
+                )
+            },
         ),
     )
     monkeypatch.setattr(task, 'task_manager', manager)
@@ -485,7 +492,11 @@ def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
 
     assert response.success is True
     assert len(captured) == 1
-    assert captured[0].get_node_decision('B').formation.value == 4
+    decision = captured[0].get_node_decision('B')
+    assert decision.formation.value == 4
+    assert decision.night is True
+    assert decision.long_missile_support is True
+    assert decision.proceed is False
 
 
 def test_normal_route_enters_real_runner_with_resolved_selection(
