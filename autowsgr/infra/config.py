@@ -168,7 +168,9 @@ class LogConfig(BaseModel):
     @model_validator(mode='after')
     def _set_log_dir(self) -> LogConfig:
         if self.dir is None:
-            ts = datetime.datetime.now(tz=datetime.UTC).strftime('%Y-%m-%d_%H-%M-%S')
+            # 使用系统本地时区（如 Asia/Shanghai），保证日志目录名与用户认知的日期一致；
+            # 若用 UTC 会与本地时间相差 8 小时，出现"9 号的日志被归入 8 号目录"的错位。
+            ts = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
             object.__setattr__(self, 'dir', self.root / ts)
         return self
 
