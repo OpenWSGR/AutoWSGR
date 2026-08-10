@@ -128,6 +128,11 @@ class TestUserConfig:
 
         assert not hasattr(config, 'bathroom_feature_count')
 
+    def test_dock_full_destroy_defaults_off_and_allows_opt_in(self):
+        assert UserConfig.model_fields['dock_full_destroy'].default is False
+        assert UserConfig().dock_full_destroy is False
+        assert UserConfig(dock_full_destroy=True).dock_full_destroy is True
+
     def test_from_yaml(self, tmp_yaml: Callable[[str, str], Path]):
         content = """\
 emulator:

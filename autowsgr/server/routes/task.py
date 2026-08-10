@@ -242,6 +242,7 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
                 result = runner.run()
                 for j, r in enumerate(result):
                     converted = convert_combat_result(r, i * len(result) + j + 1)
+                    converted['result'] = r.flag.value
                     results.append(converted)
                     task_manager.add_result(converted)
             except Exception as e:

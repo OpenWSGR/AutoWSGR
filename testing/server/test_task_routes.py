@@ -107,6 +107,45 @@ def test_task_start_requires_system_context(monkeypatch: pytest.MonkeyPatch) -> 
     assert exc_info.value.status_code == 503
 
 
+def test_campaign_route_preserves_out_of_times_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Campaign terminal reason reaches the task outcome consumed by the GUI."""
+    manager = _ExecutingTaskManager()
+
+    class CampaignRunnerStub:
+        def __init__(
+            self,
+            _ctx: object,
+            *,
+            campaign_name: str,
+            times: int,
+        ) -> None:
+            assert campaign_name == '困难航母'
+            assert times == 1
+
+        @staticmethod
+        def run() -> list[CombatResult]:
+            return [CombatResult(flag=ConditionFlag.BATTLE_TIMES_EXCEED)]
+
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'CampaignRunner', CampaignRunnerStub)
+
+    response = asyncio.run(
+        task._start_campaign(
+            object(),
+            CampaignRequest(campaign_name='困难航母', times=1),
+        )
+    )
+
+    assert response.success is True
+    assert manager.outcome is not None
+    assert manager.outcome.success is False
+    assert manager.outcome.results[0]['success'] is False
+    assert manager.outcome.results[0]['result'] == ConditionFlag.BATTLE_TIMES_EXCEED.value
+    assert manager.results == manager.outcome.results
+
+
 def test_task_start_reports_device_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
     """Task lease conflicts are returned synchronously as HTTP 409."""
     manager = _TaskManager()
