@@ -185,15 +185,18 @@ def build_combat_plan(request: Any) -> Any:
         selected_nodes=request.selected_nodes,
         default_node=NodeDecision.from_dict(node_defaults),
         nodes=node_args,
+        node_overrides={
+            node: node_request.model_dump(exclude_unset=True)
+            for node, node_request in request.node_args.items()
+        },
         event_name=request.event_name,
     )
 
 
-def _overlay_node_decision(base: Any, request: Any) -> Any:
-    """把请求中明确提供的字段覆盖到已有节点决策。"""
+def _overlay_node_decision_data(base: Any, data: dict[str, Any]) -> Any:
+    """把明确提供的节点字段覆盖到默认决策。"""
     from autowsgr.combat import NodeDecision
 
-    data = request.model_dump(exclude_unset=True)
     parsed = NodeDecision.from_dict(
         {key: value for key, value in data.items() if value is not None},
     )
@@ -207,6 +210,14 @@ def _overlay_node_decision(base: Any, request: Any) -> Any:
             None if value is None else copy.deepcopy(getattr(parsed, attribute_name)),
         )
     return result
+
+
+def _overlay_node_decision(base: Any, request: Any) -> Any:
+    """把请求中明确提供的字段覆盖到默认决策。"""
+    return _overlay_node_decision_data(
+        base,
+        request.model_dump(exclude_unset=True),
+    )
 
 
 def apply_combat_plan_overrides(
@@ -227,8 +238,21 @@ def apply_combat_plan_overrides(
         plan.default_node = NodeDecision.from_dict(
             request.node_defaults.model_dump(exclude_none=True),
         )
+        plan.nodes = {
+            node: _overlay_node_decision_data(
+                plan.default_node,
+                plan.node_overrides.get(node, {}),
+            )
+            for node in plan.nodes
+        }
+        for node in plan.selected_nodes:
+            plan.nodes.setdefault(node, copy.deepcopy(plan.default_node))
 
     if 'node_args' in fields:
+        plan.node_overrides = {
+            node: node_request.model_dump(exclude_unset=True)
+            for node, node_request in request.node_args.items()
+        }
         plan.nodes = {
             node: _overlay_node_decision(plan.default_node, node_request)
             for node, node_request in request.node_args.items()
