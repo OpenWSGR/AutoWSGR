@@ -16,7 +16,11 @@ from autowsgr.server.schemas import (
     FleetRuleRequest,
     NodeDecisionRequest,
 )
-from autowsgr.server.serializers import build_combat_plan, build_fleet_selection
+from autowsgr.server.serializers import (
+    apply_combat_plan_overrides,
+    build_combat_plan,
+    build_fleet_selection,
+)
 from autowsgr.types import ShipType
 
 
@@ -476,3 +480,33 @@ def test_api_node_args_inherit_defaults_and_keep_explicit_overrides():
     assert decision.formation.value == 3
     assert decision.night is True
     assert decision.detour is False
+
+
+def test_yaml_nodes_reinherit_api_defaults_and_keep_explicit_overrides():
+    plan = CombatPlan.from_dict(
+        {
+            'selected_nodes': ['A', 'B', 'C'],
+            'node_defaults': {'formation': 2, 'night': False},
+            'node_args': {
+                'B': {'formation': 3},
+                'C': {'night': False},
+            },
+        },
+    )
+
+    apply_combat_plan_overrides(
+        plan,
+        CombatPlanRequest(
+            node_defaults=NodeDecisionRequest(
+                formation=4,
+                night=True,
+            ),
+        ),
+    )
+
+    assert plan.nodes['A'].formation.value == 4
+    assert plan.nodes['A'].night is True
+    assert plan.nodes['B'].formation.value == 3
+    assert plan.nodes['B'].night is True
+    assert plan.nodes['C'].formation.value == 4
+    assert plan.nodes['C'].night is False
