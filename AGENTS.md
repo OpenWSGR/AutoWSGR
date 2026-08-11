@@ -198,6 +198,7 @@ uv build
 - 普通 push 禁止 `--force` 和 `--force-with-lease`。只有用户明确授权历史改写、已说明将被替换的远端提交且备份完成时，才允许使用 `--force-with-lease`。
 - push 前必须确认当前分支、工作树、提交范围和目标分支：`git status --short --branch`、`git diff --check`、`git log --oneline -5` 和 `git log origin/ShiinaKuroko..ShiinaKuroko`。
 - push 完成后检查其他本地工作分支：只有确认有效提交已进入 `ShiinaKuroko`、没有独有未推送提交、没有未提交修改且未被 worktree 使用时才能删除。不得批量强删；保留 `main`、`ShiinaKuroko` 和仍未合入的活动 PR 分支。
+- 删除、重命名或强制移动本地分支前，必须检查 `git config --local --get branch.<分支名>.agentProtected`；值为 `true` 的分支是用户保留分支，排除在所有 Agent 分支清理范围之外。即使该分支已合入、没有远端跟踪或未被 worktree 使用也不得处理，只有用户明确要求时才能移除保护标记或分支。
 
 ### 9.3 发布
 
