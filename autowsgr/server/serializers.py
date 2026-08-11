@@ -197,12 +197,19 @@ def _overlay_node_decision_data(base: Any, data: dict[str, Any]) -> Any:
     """把明确提供的节点字段覆盖到默认决策。"""
     from autowsgr.combat import NodeDecision
 
+    normalized_data = dict(data)
+    legacy_sl_key = 'sl_when_detour_fails'
+    canonical_sl_key = 'SL_when_detour_fails'
+    if legacy_sl_key in normalized_data:
+        normalized_data.setdefault(canonical_sl_key, normalized_data[legacy_sl_key])
+        del normalized_data[legacy_sl_key]
+
     parsed = NodeDecision.from_dict(
-        {key: value for key, value in data.items() if value is not None},
+        {key: value for key, value in normalized_data.items() if value is not None},
     )
     result = copy.deepcopy(base)
     attribute_names = {'enemy_formation_rules': 'formation_rules'}
-    for field_name, value in data.items():
+    for field_name, value in normalized_data.items():
         attribute_name = attribute_names.get(field_name, field_name)
         setattr(
             result,

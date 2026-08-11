@@ -510,3 +510,28 @@ def test_yaml_nodes_reinherit_api_defaults_and_keep_explicit_overrides():
     assert plan.nodes['B'].night is True
     assert plan.nodes['C'].formation.value == 4
     assert plan.nodes['C'].night is False
+
+
+def test_yaml_legacy_detour_sl_field_survives_api_default_override():
+    plan = CombatPlan.from_dict(
+        {
+            'selected_nodes': ['A'],
+            'node_args': {
+                'A': {
+                    'detour': True,
+                    'sl_when_detour_fails': False,
+                },
+            },
+        },
+    )
+
+    apply_combat_plan_overrides(
+        plan,
+        CombatPlanRequest(
+            node_defaults=NodeDecisionRequest(formation=4),
+        ),
+    )
+
+    assert plan.nodes['A'].detour is True
+    assert plan.nodes['A'].SL_when_detour_fails is False
+    assert not hasattr(plan.nodes['A'], 'sl_when_detour_fails')
