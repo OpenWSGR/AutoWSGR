@@ -506,6 +506,7 @@ def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
                 'node_args:',
                 '  B:',
                 '    formation: 3',
+                '    sl_when_detour_fails: false',
                 '',
             ],
         ),
@@ -514,12 +515,14 @@ def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
     request = NormalFightRequest(
         plan_id=str(yaml_path),
         plan=CombatPlanRequest(
+            node_defaults=NodeDecisionRequest(formation=2),
             node_args={
                 'B': NodeDecisionRequest(
                     formation=4,
                     night=True,
                     long_missile_support=True,
                     proceed=False,
+                    SL_when_detour_fails=True,
                 )
             },
         ),
@@ -536,6 +539,8 @@ def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
     assert decision.night is True
     assert decision.long_missile_support is True
     assert decision.proceed is False
+    assert decision.SL_when_detour_fails is True
+    assert not hasattr(decision, 'sl_when_detour_fails')
 
 
 def test_normal_route_enters_real_runner_with_resolved_selection(
