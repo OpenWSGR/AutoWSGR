@@ -388,7 +388,7 @@ class UserConfig(BaseModel):
     """UI 操作后随机延迟下界 (秒)。兼容层把 classic 的 delay 同时迁为本字段与 _max。"""
     operation_delay_max: float = 0.0
     """UI 操作后随机延迟上界 (秒)。"""
-    dock_full_destroy: bool = True
+    dock_full_destroy: bool = False
     """船坞满时自动清空"""
     repair_manually: bool = False
     """是否手动修理"""
