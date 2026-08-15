@@ -10,7 +10,6 @@ from autowsgr.ui.utils.ship_list import (
     _probe_level_near_name,
     locate_ship_rows,
     read_ship_level_at_card,
-    read_ship_levels,
 )
 from autowsgr.vision import OCREngine, OCRResult
 from autowsgr.vision.ocr import EasyOCREngine
@@ -270,93 +269,5 @@ def test_read_ship_level_at_card_converts_relative_card_position(
         y_start=360,
         y_end=360,
         name_x=320,
-        max_x=1048,
-    )
-
-
-def test_read_ship_levels_probes_level_from_upscaled_name_position(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    screen = _single_row_screen(monkeypatch)
-    ocr = MagicMock()
-    ocr.recognize.side_effect = [
-        [OCRResult(text='Lv.110', confidence=0.99, bbox=(550, 2, 650, 18))],
-        [OCRResult(text='火力', confidence=0.9, bbox=(1100, 4, 1300, 36))],
-    ]
-    probe = MagicMock(return_value=103)
-    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
-
-    assert read_ship_levels(ocr, screen) == [('火力', 103)]
-    assert ocr.recognize.call_count == 2
-    probe.assert_called_once_with(
-        ocr,
-        screen,
-        y_start=99,
-        y_end=121,
-        name_x=600,
-        max_x=1048,
-    )
-
-
-def test_read_ship_levels_applies_alias_before_card_level_probe(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    screen = _single_row_screen(monkeypatch)
-    ocr = MagicMock()
-    ocr.recognize.return_value = [
-        OCRResult(text='希尔德布兰德', confidence=0.99, bbox=(200, 2, 320, 18)),
-        OCRResult(text='Lv.110', confidence=0.99, bbox=(330, 2, 390, 18)),
-    ]
-    set_user_ship_name_aliases({'希尔德布兰德': 'AIII'})
-    probe = MagicMock(return_value=101)
-    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
-
-    found = read_ship_levels(ocr, screen)
-
-    assert found == [('AIII', 101)]
-    assert ocr.recognize.call_count == 1
-    probe.assert_called_once_with(
-        ocr,
-        screen,
-        y_start=99,
-        y_end=121,
-        name_x=260,
-        max_x=1048,
-    )
-
-
-def test_read_ship_levels_includes_card_position_for_binding(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    screen = _single_row_screen(monkeypatch)
-    ocr = MagicMock()
-    ocr.recognize.return_value = [
-        OCRResult(text='昆西', confidence=0.99, bbox=(200, 2, 300, 18)),
-        OCRResult(text='Lv.110', confidence=0.99, bbox=(240, 2, 300, 18)),
-    ]
-    probe = MagicMock(return_value=1)
-    monkeypatch.setattr('autowsgr.ui.utils.ship_list._probe_level_near_name', probe)
-
-    found = read_ship_levels(
-        ocr,
-        screen,
-        deduplicate_by_name=False,
-        include_row_key=True,
-    )
-
-    assert found == [
-        (
-            '昆西',
-            1,
-            pytest.approx(250 / 1280),
-            pytest.approx(round(110 / 720, 4)),
-        )
-    ]
-    probe.assert_called_once_with(
-        ocr,
-        screen,
-        y_start=99,
-        y_end=121,
-        name_x=250,
         max_x=1048,
     )

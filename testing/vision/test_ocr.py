@@ -30,7 +30,6 @@ from autowsgr.vision.ocr_rules import (
     FastOCRProfile,
     get_easyocr_params,
     get_fastocr_params,
-    get_user_ship_name_aliases,
     normalize_level_digits,
     set_user_ship_name_aliases,
     set_user_ship_name_corrections,
@@ -569,23 +568,6 @@ class TestPoolAwareMatch:
         assert _fuzzy_match(apply_ship_patches('契卡洛夫'), SHIPNAMES) == '85工程'
         assert _fuzzy_match(apply_ship_patches('U-47·狼群'), SHIPNAMES) == 'U-47'
         assert _fuzzy_match(apply_ship_patches('巴尔的摩:英魂'), SHIPNAMES) == '巴尔的摩'
-
-    @pytest.mark.parametrize(
-        'aliases',
-        [
-            {'别名甲': '85工程', '别名乙': '85工程'},
-            {'别名乙': '85工程', '别名甲': '85工程'},
-        ],
-    )
-    def test_reverse_alias_lookup_returns_all_aliases_in_stable_order(
-        self,
-        aliases: dict[str, str],
-    ):
-        set_user_ship_name_aliases(aliases)
-
-        expected = tuple(sorted(aliases))
-        assert get_user_ship_name_aliases('85工程') == expected
-        assert get_user_ship_name_aliases(expected[0]) == (expected[0],)
 
     def test_user_ship_name_is_added_to_the_same_ship_group(self):
         set_user_ship_name_aliases({'契卡洛夫': '85工程'})

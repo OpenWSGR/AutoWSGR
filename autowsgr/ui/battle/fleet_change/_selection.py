@@ -6,13 +6,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from autowsgr.combat.fleet import ShipSelector
 from autowsgr.infra.logger import get_logger
 from autowsgr.ui.battle.constants import CLICK_BACK
-from autowsgr.vision.ocr_rules import get_user_ship_name_aliases
 
 from ._planning import FleetPlanningMixin
 
@@ -39,15 +38,6 @@ class _ShipSelection:
 
 class FleetSelectionMixin(FleetPlanningMixin):
     """提供船池页面的进入、退出、选择和移除操作。"""
-
-    def _search_options(self, option: ShipSelector) -> tuple[ShipSelector, ...]:
-        """按固定顺序生成自定义舰名和标准舰名搜索规则。"""
-        if not self._use_search or option.search_name is not None:
-            return (option,)
-
-        aliases = get_user_ship_name_aliases(option.name)
-        search_names = aliases if option.name in aliases else (*aliases, option.name)
-        return tuple(replace(option, search_name=name) for name in search_names)
 
     def _open_choose_page(self, slot: int) -> ChooseShipPage:
         """打开指定物理槽位的选船页面。"""
@@ -86,16 +76,14 @@ class FleetSelectionMixin(FleetPlanningMixin):
         if self._ctx.ocr is None:
             raise RuntimeError('智能换船需要 OCR 引擎')
 
-        for search_option in self._search_options(option):
-            choose_page = self._open_choose_page(slot)
-            selected = choose_page.change_single_ship(
-                search_option,
-                use_search=self._use_search,
-            )
-            if selected is not None:
-                return _ShipSelection(name=selected, option=option)
+        choose_page = self._open_choose_page(slot)
+        selected = choose_page.change_single_ship(
+            option,
+            use_search=self._use_search,
+        )
+        if selected is None:
             self._cancel_choose_page()
-        return _ShipSelection(name=None, option=option)
+        return _ShipSelection(name=selected, option=option)
 
     # 打开指定槽位的选船页面，完成单艘舰船的选择或移除。
     def _change_single_ship(
