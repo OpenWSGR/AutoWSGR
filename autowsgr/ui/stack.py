@@ -67,7 +67,7 @@ class UIStack:
     keep_frames:
         留存截图的帧数上限 —— 仅最近 N 帧保留 ``screen``,
         更早帧只留页面名 (内存 ~4MB 上限)。留存帧目前只存不消费,
-        为后续浮层比对 (OverlayChecker before 参照) 预留。
+        为后续浮层比对预留参照帧。
     """
 
     def __init__(self, *, max_depth: int = 8, keep_frames: int = 2) -> None:

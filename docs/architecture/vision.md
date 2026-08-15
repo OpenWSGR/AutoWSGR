@@ -155,7 +155,6 @@ class ImageChecker:
 `_unmask(img, factor)` 把被半透明黑罩压暗的画面除以 `factor` 还原亮度（借鉴 WSG-NCC 的 `unmask=0.33`）。通过 `ImageRule.unmask_factor` 字段或各 `find_*` 方法的 `unmask_factor` 参数启用，默认 `0.0`（禁用，完全向后兼容）。
 
 - **作用范围**：仅还原截图搜索区域，**模板保持原始亮度**（模板是干净基准）。
-- **采集/分析工具复用**：`examples/analyze_overlay.py` 直接调用 `ImageChecker._unmask`，用通用 **ratio clustering + 拓扑** 方案判断 click 是否触发均匀蒙版浮层——找乘性压暗系数 `t`（`after/before` 比值众数），再用 `t` unmask 后按**拓扑**判定（最外圈精确还原 + 外围匹配多于中心的环形包围），利用浮层"外围底层页被压暗/中心面板不压暗"的几何结构。一组参数适用所有均匀蒙版浮层，无需逐浮层调参。
 
 > ⚠️ **TM_CCOEFF_NORMED 缩放不变性**：相关系数在正标量乘法下不变，故纯乘性均匀压暗本就不破坏模板匹配置信度（实测压暗屏幕置信度仍 ~0.998），**unmask 对模板匹配几乎无意义**。其价值在于像素级 MAE 对比（如“操作驱动状态追踪”中对比 click 前后边缘像素），以及未来含加性偏移的场景。
 

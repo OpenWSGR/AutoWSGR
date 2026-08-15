@@ -29,7 +29,6 @@ from autowsgr.vision import (
     Color,
     ImageChecker,
     ImageMatchDetail,
-    OverlayChecker,
     PageMatch,
     PixelChecker,
 )
@@ -121,12 +120,6 @@ def _get_difficulty_easy_templates() -> list[ImageTemplate]:
         load_template('event/difficulty_easy_540p_1.png', name='diff_easy1'),
         load_template('event/difficulty_easy_540p_2.png', name='diff_easy2'),
     ]
-
-
-# ── 节点详情浮层检测 ─────────────────────────────────────────────────────
-# 点击地图节点后弹出关卡详情浮层 (均匀蒙版压暗整页)。其检测用 OverlayChecker
-# 双帧浮层检测 (见 BaseEventPage._enter_node), 不再用"出击准备"按钮模板——
-# 浮层外观随活动主题变, 按钮模板需逐活动重截, 浮层检测则与新活动无关。
 
 
 NODE_POSITIONS = {
@@ -452,48 +445,41 @@ class BaseEventPage:
     def go_back(self) -> None:
         """返回主页面。
 
-        循环点击返回箭头逐层退出直到主页面 (照搬 classic ``go_main_page`` 的"不断
-        点返回键")。战斗结束回港后, 活动地图页上常浮着关卡详情浮层 (红色 X 关闭),
-        该浮层为模态, 会拦截左上返回箭头的点击——直接点一次 ``CLICK_BACK`` 会被
-        浮层吸收而无效。
+        循环点击返回箭头逐层退出直到主页面。战斗结束回港后, 活动地图页上常浮着
+        关卡详情浮层 (红色 X 关闭), 该浮层为模态, 会拦截左上返回箭头的点击——
+        直接点 ``CLICK_BACK`` 会被浮层吸收而无效。
 
-        用**变化检测**判断返回是否被浮层吸收: 点返回后截图对比, 若前后几乎无变化
-        (:meth:`OverlayChecker.page_changed` 返回 False) → 点击被模态浮层吸收 →
-        点红色 X 关闭浮层, 下轮再试。这是静态/反向场景 (进入时可能已是浮层态,
-        无干净 before 供双帧浮层检测), 变化检测比浮层检测更直接。
+        纯模板驱动判定 (与页面识别同一套锚点): **出击按钮可见 = 浮层在** (模态
+        浮层在按钮必在) → 点红色 X 关闭; 按钮不可见 → 点返回。
 
         **防连点过冲**: 点一次返回后用一个轮询窗口 (~3s) 等主页出现, 期间**不重复
         点返回**。画面切换有滞后, 若点完立即下一轮再点, 第二次返回会落到已切到的
         主页左上角, 误开"提督信息"浮层 (该浮层不遮主页识别元素 → 识别仍判主页 →
-        后续点击错乱)。只有"点了返回但画面完全静止"(浮层吸收) 才点 X 关浮层。
+        后续点击错乱)。
         """
         from autowsgr.ui.main_page import MainPage
         from autowsgr.ui.utils import NavigationError
 
         deadline = time.monotonic() + 15.0
         while time.monotonic() < deadline:
-            before = self._ctrl.screenshot()
-            if MainPage.is_current_page(before):
+            screen = self._ctrl.screenshot()
+            if MainPage.is_current_page(screen):
                 _log.info('[UI] 活动地图 -> 已到达主页面')
                 return
-            self._ctrl.click(*CLICK_BACK)
-            # 点一次返回后轮询等主页——期间不重复点返回, 防滞后连点过冲 (见 docstring)
-            absorbed = False
-            wait_until = time.monotonic() + 3.0
-            while time.monotonic() < wait_until:
-                time.sleep(0.3)
-                after = self._ctrl.screenshot()
-                if MainPage.is_current_page(after):
-                    _log.info('[UI] 活动地图 -> 已到达主页面')
-                    return
-                if not OverlayChecker.page_changed(before, after):
-                    absorbed = True  # 画面静止 = 点返回被模态浮层吸收
-                    break
-            if absorbed:
-                _log.info('[UI] 活动地图: 返回被关卡浮层吸收, 点击红色 X 关闭')
+            if self._fight_button_detail(screen) is not None:
+                _log.info('[UI] 活动地图: 检测到关卡浮层, 点击红色 X 关闭')
                 self._ctrl.click(*CLICK_CLOSE_NODE_OVERLAY)
                 time.sleep(0.5)
-            # 否则 (画面在变但 3s 内未到主页) → 外层循环重新评估
+                continue
+            self._ctrl.click(*CLICK_BACK)
+            # 点一次返回后轮询等主页——期间不重复点返回, 防滞后连点过冲 (见 docstring)
+            settled = time.monotonic() + 3.0
+            while time.monotonic() < settled:
+                time.sleep(0.3)
+                if MainPage.is_current_page(self._ctrl.screenshot()):
+                    _log.info('[UI] 活动地图 -> 已到达主页面')
+                    return
+            # 3s 内未到主页 (画面在变) → 外层循环重新评估
         raise NavigationError(
             '活动地图: 返回主页面超时 (浮层/返回点击未能逐层退出)',
             screen=self._ctrl.screenshot(),

@@ -3,7 +3,7 @@
 覆盖三个关键路径:
   - ``is_current_page``: 三层锚点 (出击按钮浮层态 / 难度图标干净页 / 标题兜底)
   - ``_enter_node``: 出击按钮出现确认节点选择成功 (单帧, 替代旧双帧浮层检测)
-  - ``go_back``: 变化检测 (点返回无效 → 被模态浮层吸收 → 点红色 X)
+  - ``go_back``: 纯模板驱动 (出击按钮可见 = 浮层在 → 点红色 X; 否则点返回)
   - ``ensure_no_overlay``: 出击按钮可见 = 浮层在 → 点 X → 按钮消失确认
 """
 
@@ -26,14 +26,9 @@ from autowsgr.vision import ImageMatchDetail
 
 
 def _gradient_screen(lo: int = 80, hi: int = 180) -> np.ndarray:
-    """连续渐变图 (模拟真实 UI 背景); 正版与原理说明见 testing/vision/test_overlay.py。"""
+    """连续渐变图 (模拟真实 UI 背景)。"""
     xs = np.tile(np.linspace(0, 1, 960), (540, 1))
     return ((lo + xs * (hi - lo))[:, :, None].repeat(3, 2)).astype(np.uint8)
-
-
-def _darken(img: np.ndarray, factor: float) -> np.ndarray:
-    """乘性压暗 (模拟半透明黑罩浮层)。"""
-    return np.clip(img.astype(np.float32) * factor, 0, 255).astype(np.uint8)
 
 
 def _button_detail(confidence: float = 0.9) -> ImageMatchDetail:
@@ -160,7 +155,7 @@ class TestEnterNode:
 
 
 # ─────────────────────────────────────────────
-# go_back (变化检测)
+# go_back (纯模板驱动)
 # ─────────────────────────────────────────────
 
 
@@ -176,13 +171,14 @@ class TestGoBack:
 
         ctrl.click.assert_not_called()
 
-    def test_overlay_absorbs_back_then_close(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """点返回被模态浮层吸收 (前后无变化) → 点红色 X, 下轮到达主页。"""
+    def test_overlay_visible_closes_first(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """出击按钮可见 (关卡浮层在) → 点红色 X 而非点返回, 下轮到达主页。"""
         page, ctrl = _make_page()
         frame = _gradient_screen()
         main_frame = _gradient_screen(lo=200, hi=210)
-        # 两帧相同 (page_changed False) → 点 X; 第三帧到主页 → 返回
+        # 第一帧按钮可见 (浮层在) → 点 X; 第二帧干净 → 点返回; 轮询帧到主页
         ctrl.screenshot.side_effect = [frame, frame, main_frame]
+        _mock_fight_button(monkeypatch, [_button_detail(), None])
         monkeypatch.setattr(
             'autowsgr.ui.main_page.MainPage.is_current_page',
             MagicMock(side_effect=[False, False, True]),
@@ -190,23 +186,50 @@ class TestGoBack:
 
         page.go_back()
 
-        assert ctrl.click.call_args_list == [call(*CLICK_BACK), call(*CLICK_CLOSE_NODE_OVERLAY)]
+        assert ctrl.click.call_args_list == [
+            call(*CLICK_CLOSE_NODE_OVERLAY),
+            call(*CLICK_BACK),
+        ]
 
-    def test_back_effective_skips_close(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """点返回生效 (前后有变化) → 不点 X, 下轮到达主页。"""
+    def test_back_effective_single_click(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """干净页点返回生效, 轮询窗口内到主页 → 只点一次返回 (防连点过冲)。"""
         page, ctrl = _make_page()
         frame = _gradient_screen()
-        changed = _darken(frame, 0.50)  # 与 frame 不同 → page_changed True
         main_frame = _gradient_screen(lo=200, hi=210)
-        ctrl.screenshot.side_effect = [frame, changed, main_frame]
+        # 第一帧干净 → 点返回; 轮询帧到主页 → 返回
+        ctrl.screenshot.side_effect = [frame, main_frame]
+        _mock_fight_button(monkeypatch, [None])
         monkeypatch.setattr(
             'autowsgr.ui.main_page.MainPage.is_current_page',
-            MagicMock(side_effect=[False, False, True]),
+            MagicMock(side_effect=[False, True]),
         )
 
         page.go_back()
 
         assert ctrl.click.call_args_list == [call(*CLICK_BACK)]
+
+    def test_timeout_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """始终不在主页且无浮层 → 15s 超时 → NavigationError。"""
+        from itertools import count
+
+        from autowsgr.ui.utils import NavigationError
+
+        page, ctrl = _make_page()
+        ctrl.screenshot.return_value = _gradient_screen()
+        monkeypatch.setattr(
+            'autowsgr.ui.main_page.MainPage.is_current_page', MagicMock(return_value=False)
+        )
+        monkeypatch.setattr(
+            BaseEventPage, '_fight_button_detail', staticmethod(MagicMock(return_value=None))
+        )
+        # time.sleep 已被 _no_sleep 屏蔽; mock monotonic 递增驱动超时
+        monkeypatch.setattr(
+            'autowsgr.ui.event.event_page.time.monotonic',
+            MagicMock(side_effect=count(0, 1)),
+        )
+
+        with pytest.raises(NavigationError):
+            page.go_back()
 
 
 # ─────────────────────────────────────────────
