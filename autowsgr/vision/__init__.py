@@ -26,6 +26,9 @@
 
     # OCR
     from autowsgr.vision import OCREngine, OCRResult
+
+    # 浮层检测 (双帧, 操作驱动)
+    from autowsgr.vision import OverlayChecker, OverlayDetectResult
 """
 
 from .api_dll import ApiDll, get_api_dll
@@ -46,6 +49,8 @@ from .ocr import (
     ShipNameMismatchError,
     apply_ship_patches,
 )
+from .overlay import OverlayChecker, OverlayDetectResult
+from .page_match import PageMatch
 from .pixel import (
     Color,
     CompositePixelSignature,
@@ -79,6 +84,10 @@ __all__ = [
     # ocr
     'OCREngine',
     'OCRResult',
+    # overlay
+    'OverlayChecker',
+    'OverlayDetectResult',
+    'PageMatch',
     'PixelChecker',
     'PixelDetail',
     'PixelMatchResult',

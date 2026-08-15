@@ -10,6 +10,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from autowsgr.image_resources._lazy import LazyTemplate, load_template
+from autowsgr.image_resources.pages import Bath, CommonPage, Decisive, MainPage
 
 
 if TYPE_CHECKING:
@@ -141,44 +142,7 @@ class Error:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class Decisive:
-    """决战相关模板。"""
-
-    USE_LAST_FLEET = LazyTemplate('decisive/use_last_fleet_540p.png', 'decisive_use_last_fleet')
-    """"使用上次舰队" 确认按钮 — 进入已有进度的章节时弹出。"""
-
-    # ── 入口状态检测 (总览页) ──
-
-    ENTRY_CANT_FIGHT = LazyTemplate(
-        'decisive/entry_cant_fight_540p.png', 'decisive_entry_cant_fight'
-    )
-    """入口状态: 无法出击。"""
-
-    ENTRY_CHALLENGING = LazyTemplate(
-        'decisive/entry_challenging_540p.png', 'decisive_entry_challenging'
-    )
-    """入口状态: 挑战中 (当前章节正在进行)。"""
-
-    ENTRY_REFRESHED = LazyTemplate('decisive/entry_refreshed_540p.png', 'decisive_entry_refreshed')
-    """入口状态: 已刷新 (有存档进度可继续)。"""
-
-    ENTRY_REFRESH = LazyTemplate('decisive/entry_refresh_540p.png', 'decisive_entry_refresh')
-    """入口状态: 可重置 (显示"重置关卡")。"""
-
-    @classmethod
-    def entry_status_templates(cls) -> list[ImageTemplate]:
-        """按 :class:`~autowsgr.types.DecisiveEntryStatus` 枚举顺序返回入口状态模板列表。
-
-        索引 0-3 分别对应 CANT_FIGHT / CHALLENGING / REFRESHED / REFRESH。
-        """
-        return [
-            cls.ENTRY_CANT_FIGHT,
-            cls.ENTRY_CHALLENGING,
-            cls.ENTRY_REFRESHED,
-            cls.ENTRY_REFRESH,
-        ]
-
-
+# 页面/浮层识别模板已迁入 pages/ 子包 (CommonPage / MainPage / Decisive / Bath)。
 class Templates:
     """图像模板统一入口。
 
@@ -202,3 +166,6 @@ class Templates:
     BackButton = BackButton
     Error = Error
     Decisive = Decisive
+    Page = CommonPage
+    MainPage = MainPage
+    Bath = Bath

@@ -99,8 +99,9 @@ if PixelChecker.is_matching(screen, MAIN_PAGE_SIG):
 
 ```python
 ROI(x1, y1, x2, y2)              # 感兴趣区域 (相对坐标 0-1)
-  .crop(screen) -> np.ndarray    # 裁剪截图
-  .invert()                      # 取反区域
+  .crop(screen) -> np.ndarray    # 裁剪截图 (返回视图, 非拷贝)
+  .to_absolute(w, h)             # 转绝对像素坐标
+  .contains(x, y)                # 判断点是否在区域内
 
 ImageTemplate(
     image: np.ndarray,            # 模板图片 (HxWx3, RGB)
@@ -108,7 +109,8 @@ ImageTemplate(
     source_resolution: (960, 540) # 采集分辨率
 )
 
-ImageRule(templates, strategy)    # 多模板 + 匹配策略
+ImageRule(templates, strategy, unmask_factor=0.0)  # 多模板 + 匹配策略
+  # unmask_factor: 截图搜索区域反蒙版还原因子 (见“反蒙版还原”小节)
 ImageSignature(rules, strategy)   # 多规则组合签名
 
 ImageMatchDetail(found, confidence, location, template_name)
@@ -124,13 +126,21 @@ class ImageChecker:
         # 截图分辨率不同时自动缩放模板
 
     @staticmethod
-    def _match_single_template(screen, template, roi, confidence, method)
+    def _unmask(img, factor)
+        # 反蒙版还原: img / factor → clip(0,255); factor<=0 透传
+
+    @staticmethod
+    def _match_single_template(screen, template, roi, confidence, method, unmask_factor=0.0)
         # 单模板匹配 → ImageMatchDetail | None
+        # unmask_factor>0 时对截图搜索区域 (非模板) 做 _unmask 后再匹配
 
     @staticmethod
     def fetch_all_templates(screen, signature, roi) -> list[ImageMatchDetail]
     def is_matching(screen, signature, roi) -> bool
     def find_match(screen, signature, roi) -> ImageMatchDetail | None
+
+    # 便捷方法均接受 unmask_factor 关键字 (默认 0.0):
+    # find_template / find_any / find_best / find_all / template_exists / find_all_occurrences
 ```
 
 ### 分辨率适配
@@ -139,6 +149,15 @@ class ImageChecker:
 
 - 缩小: `cv2.INTER_AREA`（抗锯齿）
 - 放大: `cv2.INTER_LINEAR`
+
+### 反蒙版还原 (unmask)
+
+`_unmask(img, factor)` 把被半透明黑罩压暗的画面除以 `factor` 还原亮度（借鉴 WSG-NCC 的 `unmask=0.33`）。通过 `ImageRule.unmask_factor` 字段或各 `find_*` 方法的 `unmask_factor` 参数启用，默认 `0.0`（禁用，完全向后兼容）。
+
+- **作用范围**：仅还原截图搜索区域，**模板保持原始亮度**（模板是干净基准）。
+- **采集/分析工具复用**：`examples/analyze_overlay.py` 直接调用 `ImageChecker._unmask`，用通用 **ratio clustering + 拓扑** 方案判断 click 是否触发均匀蒙版浮层——找乘性压暗系数 `t`（`after/before` 比值众数），再用 `t` unmask 后按**拓扑**判定（最外圈精确还原 + 外围匹配多于中心的环形包围），利用浮层"外围底层页被压暗/中心面板不压暗"的几何结构。一组参数适用所有均匀蒙版浮层，无需逐浮层调参。
+
+> ⚠️ **TM_CCOEFF_NORMED 缩放不变性**：相关系数在正标量乘法下不变，故纯乘性均匀压暗本就不破坏模板匹配置信度（实测压暗屏幕置信度仍 ~0.998），**unmask 对模板匹配几乎无意义**。其价值在于像素级 MAE 对比（如“操作驱动状态追踪”中对比 click 前后边缘像素），以及未来含加性偏移的场景。
 
 ---
 
