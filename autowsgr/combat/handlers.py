@@ -422,11 +422,18 @@ class PhaseHandlersMixin:
         attempts: int = 4,
         interval: float = 0.8,
     ) -> None:
-        """点击战果类页面继续，并验证页面确实已关闭。
+        """点击战果类页面继续，并验证已到达**已知后继状态**。
 
-        模拟器可能吞掉过快的点击 (结算动画未播完、连点间隔过短)，若不验证，
-        战斗引擎会在页面未退出的情况下返回，上层导航在全量识别下报 NavError。
-        故每次点击后延迟截图复检：页面签名仍在 → 再点一次，直到关闭或次数用尽。
+        验证判据是到达验证而非"原页面签名消失"——点击 RESULT 战果页后,
+        游戏先进入**经验结算子页** (战斗结果 + "点击继续..", 无对应
+        CombatPhase 状态): 若以"RESULT 消失"为成功判据, 复检会在经验页
+        误判成功提前返回, 引擎随后等待 PROCEED/GET_SHIP 等状态全部落空
+        (实机 2026-08-15: 状态识别超时 → 恢复失败 → 强制重启)。
+
+        故每次点击后延迟截图, 在 ``[phase] + 后继状态`` 集合上识别:
+          - 命中 *phase* → 页面未关闭 (点击被吞/动画未播完), 重试点击;
+          - 命中后继 → 成功返回;
+          - 全不命中 (经验结算等中间页) → **继续点击** 推进流程。
 
         Parameters
         ----------
@@ -437,14 +444,35 @@ class PhaseHandlersMixin:
         interval:
             每次点击后的复检延迟 (秒)。
         """
+        successors = self._result_successors(phase)
+        candidates = [phase, *successors]
         for attempt in range(1, attempts + 1):
             click_result(self._device)
             time.sleep(interval)
             screen = self._device.screenshot()
-            if self._recognizer.identify_current(screen, [phase]) is None:
+            current = self._recognizer.identify_current(screen, candidates)
+            if current == phase:
+                _log.warning('[Combat] {} 页面未关闭 (第 {} 次点击), 延迟重试', phase.name, attempt)
+            elif current is not None:
+                _log.debug('[Combat] {} 已推进到 {}', phase.name, current.name)
                 return
-            _log.warning('[Combat] {} 页面未关闭 (第 {} 次点击), 延迟重试', phase.name, attempt)
-        _log.error('[Combat] {} 页面点击 {} 次仍未关闭, 继续执行', phase.name, attempts)
+            else:
+                _log.debug('[Combat] {} 点击后进入中间页 (第 {} 次), 继续点击', phase.name, attempt)
+        _log.error('[Combat] {} 页面点击 {} 次仍未推进, 继续执行', phase.name, attempts)
+
+    def _result_successors(self, phase: CombatPhase) -> list[CombatPhase]:
+        """返回战果类页面的后继状态集合 (与 state.py 转移图一致)。
+
+        RESULT 之后: PROCEED / 终态页 / GET_SHIP / 旗舰大破;
+        GET_SHIP 之后: 同上但去掉 GET_SHIP 自身。
+        """
+        successors = [CombatPhase.PROCEED, CombatPhase.FLAGSHIP_SEVERE_DAMAGE]
+        end_phase = self._plan.end_phase
+        if end_phase is not None:
+            successors.append(end_phase)
+        if phase != CombatPhase.GET_SHIP:
+            successors.append(CombatPhase.GET_SHIP)
+        return successors
 
     def _handle_get_ship(self) -> ConditionFlag:
         """处理获取舰船。"""

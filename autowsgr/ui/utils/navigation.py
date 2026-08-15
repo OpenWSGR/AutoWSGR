@@ -155,7 +155,8 @@ def wait_leave_page(
     source: str = '',
     target: str = '',
     candidates: set[str] | None = None,
-) -> np.ndarray:
+    probe: bool = False,
+) -> np.ndarray | None:
     """反复截图，直到 ``checker`` 返回 ``False`` (已离开)。
 
     目标页面签名未采集时的降级方案。优先使用 :func:`wait_for_page`。
@@ -165,11 +166,20 @@ def wait_leave_page(
     candidates:
         当前页识别的候选页面名集合 (来自 UIStack), 收缩轮询日志中
         全量识别的搜索空间;``None`` 时全量识别。
+    probe:
+        探测模式 — 超时是**预期结果之一** (如战役次数用尽的出征探测)。
+        超时不抛异常、不保存 NavError 截图，返回 ``None`` 交由调用方判定；
+        超时日志降为 debug，避免预期分支污染错误记录。
+
+    Returns
+    -------
+    np.ndarray | None
+        到达新页面时返回该帧;``probe=True`` 且超时时返回 ``None``。
 
     Raises
     ------
     NavigationError
-        超时仍在原页面。
+        超时仍在原页面 (仅 ``probe=False`` 时)。
     """
     from autowsgr.ui.page import get_current_page
 
@@ -195,6 +205,15 @@ def wait_leave_page(
         _log.debug('[UI] 等待离开 #{}: 仍在 {}', attempt, source or '?')
 
         if time.monotonic() >= deadline:
+            if probe:
+                _log.debug(
+                    '[UI] 离开超时 (探测): {} -> {} ({} 次截图后仍在 {})',
+                    source or '?',
+                    target or '?',
+                    attempt,
+                    source or '?',
+                )
+                return None
             msg = (
                 f'离开超时: {source or "?"} -> {target or "?"}, '
                 f'{attempt} 次截图后仍在 {source or "?"}'
