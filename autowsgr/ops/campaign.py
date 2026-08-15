@@ -185,6 +185,12 @@ class CampaignRunner:
                 )
                 results.append(result)
                 _log.info('[OPS] 战役次数已用完')
+                # 主动退回地图页面: 此时仍停在出征准备页, 不退的话下一个
+                # 任务的导航要靠漂移对账兜底 (栈预测与实际不符)。
+                try:
+                    BattlePreparationPage(self._ctx).go_back()
+                except NavigationError as e:
+                    _log.warning('[OPS] 战役次数用尽后回退地图失败: {}', e)
                 break
 
             # 同步战前信息到上下文

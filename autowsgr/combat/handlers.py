@@ -43,6 +43,7 @@ from .state import CombatPhase
 
 
 if TYPE_CHECKING:
+    from autowsgr.combat.recognizer import CombatRecognizer
     from autowsgr.emulator import AndroidController
     from autowsgr.vision import OCREngine
 
@@ -83,6 +84,7 @@ class PhaseHandlersMixin:
         _history: CombatHistory
         _node_count: int
         _formation_by_rule: Formation | None
+        _recognizer: CombatRecognizer
     """
 
     # 类型提示 (供 IDE/mypy 在 Mixin 上下文使用)
@@ -93,6 +95,7 @@ class PhaseHandlersMixin:
     _last_action: str
     _ship_stats: list[ShipDamageState]
     _history: CombatHistory
+    _recognizer: CombatRecognizer
     _node_count: int
     _formation_by_rule: Formation | None
 
@@ -408,11 +411,40 @@ class PhaseHandlersMixin:
         _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
 
         # ── 关闭结算界面 ──
-        time.sleep(1)
-        click_result(self._device)
-        time.sleep(0.25)
-        click_result(self._device)
+        time.sleep(1)  # 等结算动画播完再点 (点早了会被动画吞掉)
+        self._click_result_until_closed(CombatPhase.RESULT)
         return ConditionFlag.FIGHT_CONTINUE
+
+    def _click_result_until_closed(
+        self,
+        phase: CombatPhase,
+        *,
+        attempts: int = 4,
+        interval: float = 0.8,
+    ) -> None:
+        """点击战果类页面继续，并验证页面确实已关闭。
+
+        模拟器可能吞掉过快的点击 (结算动画未播完、连点间隔过短)，若不验证，
+        战斗引擎会在页面未退出的情况下返回，上层导航在全量识别下报 NavError。
+        故每次点击后延迟截图复检：页面签名仍在 → 再点一次，直到关闭或次数用尽。
+
+        Parameters
+        ----------
+        phase:
+            待关闭页面的状态签名 (RESULT / GET_SHIP)。
+        attempts:
+            最大点击次数。
+        interval:
+            每次点击后的复检延迟 (秒)。
+        """
+        for attempt in range(1, attempts + 1):
+            click_result(self._device)
+            time.sleep(interval)
+            screen = self._device.screenshot()
+            if self._recognizer.identify_current(screen, [phase]) is None:
+                return
+            _log.warning('[Combat] {} 页面未关闭 (第 {} 次点击), 延迟重试', phase.name, attempt)
+        _log.error('[Combat] {} 页面点击 {} 次仍未关闭, 继续执行', phase.name, attempts)
 
     def _handle_get_ship(self) -> ConditionFlag:
         """处理获取舰船。"""
@@ -427,7 +459,7 @@ class PhaseHandlersMixin:
                 result=ship_name or '',
             )
         )
-        click_result(self._device)
+        self._click_result_until_closed(CombatPhase.GET_SHIP)
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_proceed(self) -> ConditionFlag:
