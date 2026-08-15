@@ -412,7 +412,6 @@ class PhaseHandlersMixin:
         _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
 
         # ── 关闭结算界面 ──
-        time.sleep(1)  # 等结算动画播完再点 (点早了会被动画吞掉)
         self._click_result_until_closed(CombatPhase.RESULT)
         return ConditionFlag.FIGHT_CONTINUE
 
@@ -420,8 +419,8 @@ class PhaseHandlersMixin:
         self,
         phase: CombatPhase,
         *,
-        attempts: int = 4,
-        interval: float = 0.8,
+        attempts: int = 6,
+        interval: float = 0.3,
     ) -> None:
         """点击战果类页面继续，并验证已到达**已知后继状态**。
 
@@ -431,10 +430,12 @@ class PhaseHandlersMixin:
         引擎随后等待 PROCEED/GET_SHIP 等状态全部落空
         (实机 2026-08-15: 状态识别超时 → 恢复失败 → 强制重启)。
 
-        故每次点击后延迟截图, 在 ``[phase] + 后继状态`` 集合上识别:
-          - 命中 *phase* → 页面未关闭 (点击被吞/动画未播完), 重试点击;
+        **快速点击 + 自适应重试**: 不再固定 sleep 等结算动画 (每页曾各等
+        1s, 两页共 ~2s 且大多数战斗不需要停留采集信息)。点击后短间隔复检,
+        在 ``[phase] + 后继状态`` 集合上识别:
+          - 命中 *phase* → 点击被动画吞掉, 重试点击 (重试本身就是动画等待);
           - 命中后继 (含 EXP_SETTLEMENT 经验结算页) → 成功返回;
-          - 全不命中 (未知中间页) → **继续点击** 推进流程。
+          - 全不命中 (过渡帧/未知中间页) → **继续点击** 推进流程。
 
         Parameters
         ----------
@@ -462,7 +463,12 @@ class PhaseHandlersMixin:
         _log.error('[Combat] {} 页面点击 {} 次仍未推进, 继续执行', phase.name, attempts)
 
     def _result_successors(self, phase: CombatPhase) -> list[CombatPhase]:
-        """返回战果类页面的后继状态集合 (与 state.py 转移图一致)。
+        """返回战果类页面点击后的**合法落点集合** (到达验证候选)。
+
+        比 state.py 转移图宽: 转移图按真实流转建模 (RESULT 只到
+        EXP_SETTLEMENT), 此集合额外包含穿透场景 — 快速点击下连点两击
+        可能跳过中间页 (如 RESULT 点击穿透到 GET_SHIP), 复检把它们都
+        认出来即可提前停止点击, 交引擎主循环按当前页继续。
 
         RESULT 之后: 经验结算页 / PROCEED / 终态页 / GET_SHIP / 旗舰大破;
         EXP_SETTLEMENT 之后: 同上但去掉 EXP_SETTLEMENT 自身;
@@ -480,7 +486,6 @@ class PhaseHandlersMixin:
 
     def _handle_exp_settlement(self) -> ConditionFlag:
         """处理经验结算子页 — 点击继续推进到掉落/前进/终态页。"""
-        time.sleep(1)  # 等结算动画播完再点 (点早了会被动画吞掉)
         self._click_result_until_closed(CombatPhase.EXP_SETTLEMENT)
         return ConditionFlag.FIGHT_CONTINUE
 

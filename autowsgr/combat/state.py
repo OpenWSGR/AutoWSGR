@@ -197,9 +197,9 @@ def _build_map_transitions(
         'no': [CombatPhase.RESULT],
     }
 
-    # RESULT 之后先进经验结算子页, 再到掉落/继续前进等 (经验页识别失败时
-    # 直接落 after_result, 与旧流程兼容)
-    t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT, *after_result]
+    # 战果页点击后必进经验结算子页 (游戏固定流转), 掉落/继续前进等
+    # 只能从经验页到达 — 转移图按真实流转建模, 不为识别失败留兜底边
+    t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
     t[CombatPhase.EXP_SETTLEMENT] = list(after_result)
 
     # GET_SHIP 后继 = 经验结算后继 去掉 GET_SHIP 自身

@@ -88,6 +88,17 @@ class TestResolveSuccessors:
         result = resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '')
         assert CombatPhase.EXERCISE_PAGE in result
 
+    def test_normal_result_only_reaches_exp(self):
+        """MAP 类转移图按真实流转建模: RESULT 只到经验结算页,
+        掉落/继续前进/终态页只能从经验页到达 (无识别失败兜底边)。"""
+        normal = MODE_TRANSITIONS[CombatMode.NORMAL]
+        result = resolve_successors(normal, CombatPhase.RESULT, '')
+        assert result == [CombatPhase.EXP_SETTLEMENT]
+        after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
+        assert CombatPhase.PROCEED in after_exp
+        assert CombatPhase.MAP_PAGE in after_exp
+        assert CombatPhase.GET_SHIP in after_exp
+
     def test_unknown_phase_raises(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
         with pytest.raises(KeyError):
