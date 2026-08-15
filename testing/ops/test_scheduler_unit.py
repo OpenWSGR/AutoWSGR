@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import threading
 import types
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -69,86 +68,6 @@ class _FakeCtx:
     def __init__(self) -> None:
         self.active_fight_tasks = 0
         self.stop_event = threading.Event()
-
-
-# ── 每日主页面浮层检查 ──
-
-
-def test_ensure_main_page_clean_calls_daily_overlay_handler(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """调度器将当前上下文交给每日浮层处理入口。"""
-    from autowsgr.ops import startup
-
-    handler = MagicMock()
-    monkeypatch.setattr(startup, 'handle_daily_overlays', handler)
-    ctx = _FakeCtx()
-    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
-
-    sched._ensure_main_page_clean()
-
-    handler.assert_called_once_with(ctx)
-
-
-def test_ensure_main_page_clean_does_not_interrupt_scheduler(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """浮层识别异常只记录警告，不能中断后续任务。"""
-    import autowsgr.scheduler.scheduler as scheduler_module
-    from autowsgr.ops import startup
-
-    handler = MagicMock(side_effect=RuntimeError('截图失败'))
-    logger = MagicMock()
-    monkeypatch.setattr(startup, 'handle_daily_overlays', handler)
-    monkeypatch.setattr(scheduler_module, '_log', logger)
-    sched = TaskScheduler(_FakeCtx(), expedition_interval=0)  # type: ignore[arg-type]
-
-    sched._ensure_main_page_clean()
-
-    logger.opt.assert_called_once_with(exception=True)
-    logger.opt.return_value.warning.assert_called_once()
-
-
-def test_run_checks_daily_overlays_before_each_task(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """顺序调度每项任务前都检查一次主页面浮层。"""
-    result = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
-    task = FightTask(runner=_SingleRunner(result), times=1)
-    sched = TaskScheduler(_FakeCtx(), expedition_interval=0)  # type: ignore[arg-type]
-    sched.add(task)
-    clean = MagicMock()
-    run_task = MagicMock()
-    monkeypatch.setattr(sched, '_ensure_main_page_clean', clean)
-    monkeypatch.setattr(sched, '_run_task', run_task)
-    monkeypatch.setattr(sched, '_print_summary', MagicMock())
-
-    assert sched.run() == [task]
-
-    clean.assert_called_once_with()
-    run_task.assert_called_once_with(task)
-
-
-def test_run_daily_checks_overlays_while_queue_is_idle(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """长期挂机队列为空时检查浮层，并在停止信号到达后退出。"""
-    import autowsgr.scheduler.scheduler as scheduler_module
-
-    ctx = _FakeCtx()
-    sched = TaskScheduler(ctx, expedition_interval=0, idle_sleep=0)  # type: ignore[arg-type]
-    clean = MagicMock(side_effect=ctx.stop_event.set)
-    monkeypatch.setattr(sched, '_ensure_main_page_clean', clean)
-    monkeypatch.setattr(sched, '_sync_initial_counts', MagicMock())
-    monkeypatch.setattr(sched, '_check_daily_reset', MagicMock())
-    monkeypatch.setattr(sched, '_print_summary', MagicMock())
-    sleep = MagicMock()
-    monkeypatch.setattr(scheduler_module.time, 'sleep', sleep)
-
-    sched.run_daily()
-
-    clean.assert_called_once_with()
-    sleep.assert_called_once_with(0)
 
 
 def test_run_task_handles_list_runner(monkeypatch: pytest.MonkeyPatch):

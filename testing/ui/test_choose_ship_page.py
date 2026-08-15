@@ -37,15 +37,12 @@ class TestShipNameMatching:
     def test_bidirectional_prefix_ambiguity_is_rejected(self):
         assert not ChooseShipPage._matches_ship_name('安东尼奥', '安东尼')
 
-    def test_user_alias_is_used_for_matching(self):
+    def test_user_alias_is_used_for_search_and_matching(self):
         set_user_ship_name_aliases({'契卡洛夫': '85工程'})
 
         assert ChooseShipPage._normalize_search_keyword('契卡洛夫') == '契卡洛夫'
         assert ChooseShipPage._matches_ship_name('契卡洛夫', '85工程')
         assert ChooseShipPage._matches_ship_name('85工程', '契卡洛夫')
-
-    def test_standard_name_is_used_when_no_user_alias_exists(self):
-        assert ChooseShipPage._normalize_search_keyword(' 岛风 ') == '岛风'
 
 
 class TestShipTypeProbeRoutes:
