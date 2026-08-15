@@ -271,6 +271,16 @@ class CombatPlan:
     event_name: str | None = None
     """活动名称（如 ``"20260212"``），用于定位活动地图节点数据。
     在 YAML 中写为 ``event: "20260212"``。"""
+    collect_result_info: bool = False
+    """是否在战果/经验结算页停留采集信息 (评级/MVP) — 慢速通过。
+
+    ``False`` (默认, 快速穿行): 经验结算页是过渡页, RESULT 识别后点击
+    循环直接穿行到掉落/前进/终态页, 不为页面停留 (血量检测除外, 单次
+    截图, 全局舰队状态同步需要)。多数刷战斗模式用此默认。
+
+    ``True`` (慢速): 经验页入状态机逐页推进, RESULT 页完整采集评级与
+    MVP (:class:`FightResult` / 战斗历史)。需要战果信息决策的调用方设
+    此项 (如 normal_fight 条件战斗按评级判定是否计入次数)。"""
 
     def __post_init__(self) -> None:
         """\u5c06单个 repair_mode 展开为 6 个位置的列表，保证属性始终为 ``list[RepairMode]``。"""
@@ -279,8 +289,13 @@ class CombatPlan:
 
     @property
     def transitions(self) -> dict[CombatPhase, PhaseBranch]:
-        """获取当前模式对应的状态转移图。"""
-        return MODE_TRANSITIONS[self.mode]
+        """当前计划的状态转移图 (按模式 + ``collect_result_info`` 构建)。"""
+        category, ep = _MODE_SPECS[self.mode]
+        return build_transitions(
+            category,
+            ep,
+            collect_result_info=self.collect_result_info,
+        )
 
     @property
     def end_phase(self) -> CombatPhase:

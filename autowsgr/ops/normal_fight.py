@@ -256,6 +256,8 @@ class NormalFightRunner:
         target_result_index = result_list.index(result.upper())
         start_time = time.time()
         self._results = []
+        # 按评级判定是否计入次数 → 战果页需完整采集 (grade/MVP, 慢速通过)
+        self._plan.collect_result_info = True
 
         while times > 0:
             _log.info('[OPS] 条件战斗，剩余次数：{}', times)

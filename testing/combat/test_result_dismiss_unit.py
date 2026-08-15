@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, call
 import numpy as np
 import pytest
 
+from autowsgr.combat import handlers as handlers_mod
 from autowsgr.combat.handlers import PhaseHandlersMixin
 from autowsgr.combat.state import CombatPhase
 
@@ -26,25 +27,35 @@ class _Host(PhaseHandlersMixin):
     """最小宿主: 只提供 _click_result_until_closed 用到的属性。"""
 
     def __init__(
-        self, device: MagicMock, recognizer: MagicMock, end_phase: CombatPhase | None
+        self,
+        device: MagicMock,
+        recognizer: MagicMock,
+        end_phase: CombatPhase | None,
+        collect_result_info: bool = True,
     ) -> None:
         self._device = device
         self._recognizer = recognizer
         plan = MagicMock()
         plan.end_phase = end_phase
+        plan.collect_result_info = collect_result_info
         self._plan = plan
+        # _handle_result 用到的其余属性
+        self._ship_stats: list = [None] * 6
+        self._history = MagicMock()
+        self._node = 'A'
 
 
 def _make_host(
     phase_results: list[CombatPhase | None],
     end_phase: CombatPhase | None = None,
+    collect_result_info: bool = True,
 ) -> tuple[_Host, MagicMock, MagicMock]:
     """构造宿主; *phase_results* 为每次点击后复检的返回序列 (None=中间页)。"""
     device = MagicMock()
     device.screenshot.return_value = np.zeros((540, 960, 3), dtype=np.uint8)
     recognizer = MagicMock()
     recognizer.identify_current.side_effect = phase_results
-    return _Host(device, recognizer, end_phase), device, recognizer
+    return _Host(device, recognizer, end_phase, collect_result_info), device, recognizer
 
 
 @pytest.fixture(autouse=True)
@@ -61,19 +72,28 @@ class TestClickResultUntilClosed:
         recognizer.identify_current.assert_called_once()
 
     def test_intermediate_page_keeps_clicking(self):
-        """复检识别不到任何状态 (经验结算中间页) → 继续点击直到后继出现。
+        """整个复检窗口识别不到任何状态 (过渡帧) → 窗口耗尽后继续点击直到后继。
 
         这是问题2的核心回归: 旧判据 (签名消失即成功) 在这里会提前返回。
+        窗口内只等待不点击 (防穿透); 4 次 None 耗尽 polls 后才第二次点击。
         """
-        host, device, _ = _make_host([None, None, CombatPhase.GET_SHIP])
+        host, device, _ = _make_host([None, None, None, None, CombatPhase.GET_SHIP])
         host._click_result_until_closed(CombatPhase.RESULT)
-        assert device.click.call_count == 3
+        assert device.click.call_count == 2
 
     def test_retries_while_signature_remains(self):
         """前两次点击被吞 (签名仍在) → 第三次到后继, 共点 3 次。"""
         host, device, _ = _make_host([CombatPhase.RESULT, CombatPhase.RESULT, CombatPhase.PROCEED])
         host._click_result_until_closed(CombatPhase.RESULT)
         assert device.click.call_count == 3
+
+    def test_pass_through_page_keeps_clicking(self):
+        """命中 pass_through 过渡页 (快速穿行的经验页) → 继续点击直到真正后继。"""
+        host, device, _ = _make_host([CombatPhase.EXP_SETTLEMENT, CombatPhase.GET_SHIP])
+        host._click_result_until_closed(
+            CombatPhase.RESULT, pass_through=(CombatPhase.EXP_SETTLEMENT,)
+        )
+        assert device.click.call_count == 2
 
     def test_gives_up_after_attempts(self):
         """持续停在原页面 → 达到 attempts 上限后停止, 不抛异常 (交上层处理)。"""
@@ -92,7 +112,7 @@ class TestClickResultUntilClosed:
 
 class TestResultSuccessors:
     def test_event_result_includes_end_phase(self):
-        """活动战斗 (end_phase=EVENT_MAP_PAGE): RESULT 后继含终态页 + 经验页。"""
+        """活动战斗 (慢速): RESULT 后继含终态页 + 经验页 (逐页推进)。"""
         host, _, _ = _make_host([], end_phase=CombatPhase.EVENT_MAP_PAGE)
         assert set(host._result_successors(CombatPhase.RESULT)) == {
             CombatPhase.PROCEED,
@@ -100,6 +120,16 @@ class TestResultSuccessors:
             CombatPhase.EVENT_MAP_PAGE,
             CombatPhase.GET_SHIP,
             CombatPhase.EXP_SETTLEMENT,
+        }
+
+    def test_fast_result_excludes_exp(self):
+        """快速穿行: 经验页是 pass_through 过渡页, 不在 RESULT 到达集合。"""
+        host, _, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE, collect_result_info=False)
+        assert set(host._result_successors(CombatPhase.RESULT)) == {
+            CombatPhase.PROCEED,
+            CombatPhase.FLAGSHIP_SEVERE_DAMAGE,
+            CombatPhase.MAP_PAGE,
+            CombatPhase.GET_SHIP,
         }
 
     def test_campaign_result_no_end_phase(self):
@@ -127,3 +157,35 @@ class TestResultSuccessors:
         assert CombatPhase.GET_SHIP not in successors
         assert CombatPhase.EXP_SETTLEMENT not in successors
         assert CombatPhase.MAP_PAGE in successors
+
+
+class TestHandleResultModes:
+    """_handle_result 快速穿行 / 慢速采集双模式。"""
+
+    @pytest.fixture(autouse=True)
+    def _stub_detectors(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(handlers_mod, 'detect_ship_stats', lambda *_a: _a[1])
+        monkeypatch.setattr(handlers_mod, 'detect_result_grade', lambda *_a, **_k: 'S')
+        monkeypatch.setattr(handlers_mod, 'detect_mvp', lambda *_a, **_k: '鲃鱼')
+
+    def test_fast_passes_through_exp(self):
+        """快速: 不采集评级/MVP, 不记录战果事件, 经验页穿行 (pass_through)。"""
+        host, device, _ = _make_host(
+            [CombatPhase.EXP_SETTLEMENT, CombatPhase.PROCEED],
+            collect_result_info=False,
+        )
+        host._handle_result()
+        # 经验页命中后继续点击, 直到 PROCEED 才停 → 2 次点击
+        assert device.click.call_count == 2
+        host._history.add.assert_not_called()
+
+    def test_slow_collects_grade_mvp_and_records(self):
+        """慢速: 采集评级/MVP 记入战斗历史, 经验页是到达点 (只点一次)。"""
+        host, device, _ = _make_host([CombatPhase.EXP_SETTLEMENT], collect_result_info=True)
+        host._handle_result()
+        assert device.click.call_count == 1
+        host._history.add.assert_called_once()
+        event = host._history.add.call_args.args[0]
+        assert event.event_type.name == 'RESULT'
+        assert event.result == 'S'
+        assert event.extra == {'mvp': '鲃鱼'}

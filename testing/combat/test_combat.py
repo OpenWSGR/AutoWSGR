@@ -82,16 +82,35 @@ class TestResolveSuccessors:
 
     def test_exercise_transitions(self):
         exercise = MODE_TRANSITIONS[CombatMode.EXERCISE]
-        # 演习: RESULT → 经验结算 → 结束页 (两跳)
+        # 演习 (快速穿行): RESULT 直达结束页, 经验页同为终点
         result = resolve_successors(exercise, CombatPhase.RESULT, '')
-        assert result == [CombatPhase.EXP_SETTLEMENT]
+        assert result == [CombatPhase.EXERCISE_PAGE]
         result = resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '')
-        assert CombatPhase.EXERCISE_PAGE in result
+        assert result == [CombatPhase.EXERCISE_PAGE]
 
-    def test_normal_result_only_reaches_exp(self):
-        """MAP 类转移图按真实流转建模: RESULT 只到经验结算页,
-        掉落/继续前进/终态页只能从经验页到达 (无识别失败兜底边)。"""
+    def test_exercise_transitions_slow(self):
+        """慢速 (collect_result_info=True): 经验页入状态机逐页推进。"""
+        exercise = build_transitions(
+            ModeCategory.SINGLE, CombatPhase.EXERCISE_PAGE, collect_result_info=True
+        )
+        assert resolve_successors(exercise, CombatPhase.RESULT, '') == [CombatPhase.EXP_SETTLEMENT]
+        assert resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '') == [
+            CombatPhase.EXERCISE_PAGE
+        ]
+
+    def test_normal_result_passes_through_exp(self):
+        """MAP 类 (快速穿行): 经验页是过渡页, RESULT 的后继直达
+        掉落/继续前进/终态页, 不经过 EXP_SETTLEMENT。"""
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
+        result = resolve_successors(normal, CombatPhase.RESULT, '')
+        assert CombatPhase.EXP_SETTLEMENT not in result
+        assert CombatPhase.PROCEED in result
+        assert CombatPhase.MAP_PAGE in result
+        assert CombatPhase.GET_SHIP in result
+
+    def test_normal_result_only_reaches_exp_when_slow(self):
+        """MAP 类 (慢速): RESULT 只到经验结算页, 掉落/前进/终态从经验页到达。"""
+        normal = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=True)
         result = resolve_successors(normal, CombatPhase.RESULT, '')
         assert result == [CombatPhase.EXP_SETTLEMENT]
         after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')

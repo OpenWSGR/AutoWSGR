@@ -385,34 +385,48 @@ class PhaseHandlersMixin:
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_result(self) -> ConditionFlag:
-        """处理战果结算 -- 识别评级、更新血量、MVP、关闭界面。"""
-        # ── 信息采集 ──
-        grade = detect_result_grade(self._device)
+        """处理战果结算 -- 更新血量, 按 ``collect_result_info`` 决定采集与通过速度。
+
+        快速穿行 (默认): 血量检测 (单次截图, 全局舰队状态同步需要) 后点击
+        穿行, 经验结算页 (:attr:`CombatPhase.EXP_SETTLEMENT`) 作为过渡页直接
+        点过, 不入状态机。
+
+        慢速 (:attr:`CombatPlan.collect_result_info`): RESULT 页停留采集
+        评级/MVP/血量并记录 :class:`FightResult` (供条件战斗按评级判定等),
+        经验页入状态机逐页推进。
+        """
+        # ── 血量采集 (快慢模式都做: 单次截图, sync_after_combat 全局依赖) ──
         self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
 
-        # MVP 识别 (在关闭结算界面之前)
-        screen = self._device.screenshot()
-        mvp = detect_mvp(screen)
+        if self._plan.collect_result_info:
+            # ── 慢速: 完整采集 (评级/MVP) ──
+            grade = detect_result_grade(self._device)
+            screen = self._device.screenshot()
+            mvp = detect_mvp(screen)
 
-        fight_result = FightResult(
-            node=self._node,
-            mvp=mvp,
-            grade=grade,
-            ship_stats=self._ship_stats[:],
-        )
-        self._history.add(
-            CombatEvent(
-                event_type=EventType.RESULT,
+            fight_result = FightResult(
                 node=self._node,
-                result=grade,
+                mvp=mvp,
+                grade=grade,
                 ship_stats=self._ship_stats[:],
-                extra={'mvp': mvp},
             )
-        )
-        _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
-
-        # ── 关闭结算界面 ──
-        self._click_result_until_closed(CombatPhase.RESULT)
+            self._history.add(
+                CombatEvent(
+                    event_type=EventType.RESULT,
+                    node=self._node,
+                    result=grade,
+                    ship_stats=self._ship_stats[:],
+                    extra={'mvp': mvp},
+                )
+            )
+            _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
+            self._click_result_until_closed(CombatPhase.RESULT)
+        else:
+            # ── 快速: 经验页是过渡页, 点击直接穿行 ──
+            self._click_result_until_closed(
+                CombatPhase.RESULT,
+                pass_through=(CombatPhase.EXP_SETTLEMENT,),
+            )
         return ConditionFlag.FIGHT_CONTINUE
 
     def _click_result_until_closed(
@@ -421,6 +435,8 @@ class PhaseHandlersMixin:
         *,
         attempts: int = 6,
         interval: float = 0.3,
+        polls: int = 4,
+        pass_through: tuple[CombatPhase, ...] = (),
     ) -> None:
         """点击战果类页面继续，并验证已到达**已知后继状态**。
 
@@ -430,12 +446,15 @@ class PhaseHandlersMixin:
         引擎随后等待 PROCEED/GET_SHIP 等状态全部落空
         (实机 2026-08-15: 状态识别超时 → 恢复失败 → 强制重启)。
 
-        **快速点击 + 自适应重试**: 不再固定 sleep 等结算动画 (每页曾各等
-        1s, 两页共 ~2s 且大多数战斗不需要停留采集信息)。点击后短间隔复检,
-        在 ``[phase] + 后继状态`` 集合上识别:
-          - 命中 *phase* → 点击被动画吞掉, 重试点击 (重试本身就是动画等待);
-          - 命中后继 (含 EXP_SETTLEMENT 经验结算页) → 成功返回;
-          - 全不命中 (过渡帧/未知中间页) → **继续点击** 推进流程。
+        **快速点击 + 复检轮询**: 点击后每 *interval* 秒截图识别一次
+        (最多 *polls* 次), 在 ``[phase] + pass_through + 后继状态`` 集合上判定:
+          - 命中后继 → 成功返回;
+          - 命中 *pass_through* 中的页面 (如快速穿行模式的经验页) →
+            视为未到达, 继续点击跳过;
+          - 命中 *phase* → 点击被动画吞掉, 立即重试点击 (重试即动画等待);
+          - 识别不到 (过渡帧/页面渐变中) → **只等待不点击**: 对切换中的
+            页面盲目连点会穿透中间页, 落点若是 PROCEED 对话框还可能误触
+            按钮。轮询窗口耗尽仍认不出才继续点击推进 (真正的未知页)。
 
         Parameters
         ----------
@@ -444,33 +463,56 @@ class PhaseHandlersMixin:
         attempts:
             最大点击次数。
         interval:
-            每次点击后的复检延迟 (秒)。
+            复检轮询间隔 (秒)。
+        polls:
+            每次点击后的复检轮询上限 (过渡帧最长等待 attempts x interval x polls)。
+        pass_through:
+            识别到即**继续点击跳过**的过渡页 (快速穿行模式的 EXP_SETTLEMENT)。
         """
         successors = self._result_successors(phase)
-        candidates = [phase, *successors]
+        candidates = [phase, *pass_through, *successors]
         for attempt in range(1, attempts + 1):
             click_result(self._device)
-            time.sleep(interval)
-            screen = self._device.screenshot()
-            current = self._recognizer.identify_current(screen, candidates)
-            if current == phase:
-                _log.warning('[Combat] {} 页面未关闭 (第 {} 次点击), 延迟重试', phase.name, attempt)
-            elif current is not None:
+            for _ in range(polls):
+                time.sleep(interval)
+                screen = self._device.screenshot()
+                current = self._recognizer.identify_current(screen, candidates)
+                if current is None:
+                    continue  # 过渡帧: 只等待, 不点击 (防穿透/误触)
+                if current in pass_through:
+                    _log.debug(
+                        '[Combat] {} 到达过渡页 {} (第 {} 次点击), 继续点击跳过',
+                        phase.name,
+                        current.name,
+                        attempt,
+                    )
+                    break  # 过渡页: 继续点击 (与"被吞"同路径)
+                if current == phase:
+                    _log.warning(
+                        '[Combat] {} 页面未关闭 (第 {} 次点击), 延迟重试', phase.name, attempt
+                    )
+                    break  # 确认被吞 → 重试点击
                 _log.debug('[Combat] {} 已推进到 {}', phase.name, current.name)
                 return
             else:
-                _log.debug('[Combat] {} 点击后进入中间页 (第 {} 次), 继续点击', phase.name, attempt)
+                # 整个轮询窗口都无法识别 → 未知页, 继续点击推进
+                _log.debug(
+                    '[Combat] {} 点击后持续无法识别 (第 {} 次), 继续点击', phase.name, attempt
+                )
         _log.error('[Combat] {} 页面点击 {} 次仍未推进, 继续执行', phase.name, attempts)
 
     def _result_successors(self, phase: CombatPhase) -> list[CombatPhase]:
         """返回战果类页面点击后的**合法落点集合** (到达验证候选)。
 
-        比 state.py 转移图宽: 转移图按真实流转建模 (RESULT 只到
-        EXP_SETTLEMENT), 此集合额外包含穿透场景 — 快速点击下连点两击
-        可能跳过中间页 (如 RESULT 点击穿透到 GET_SHIP), 复检把它们都
-        认出来即可提前停止点击, 交引擎主循环按当前页继续。
+        比 state.py 转移图宽: 转移图按真实流转建模, 此集合额外包含穿透
+        场景 — 快速点击下连点两击可能跳过中间页 (如 RESULT 点击穿透到
+        GET_SHIP), 复检把它们都认出来即可提前停止点击, 交引擎主循环按
+        当前页继续。
 
-        RESULT 之后: 经验结算页 / PROCEED / 终态页 / GET_SHIP / 旗舰大破;
+        慢速 (collect_result_info=True): RESULT 之后含经验结算页 (作为
+        到达点逐页推进); 快速: 经验页是 pass_through 过渡页, 不在到达集。
+
+        RESULT 之后: PROCEED / 终态页 / GET_SHIP / 旗舰大破 (+经验页, 慢速);
         EXP_SETTLEMENT 之后: 同上但去掉 EXP_SETTLEMENT 自身;
         GET_SHIP 之后: 同上但去掉 GET_SHIP 自身。
         """
@@ -479,7 +521,9 @@ class PhaseHandlersMixin:
         if end_phase is not None:
             successors.append(end_phase)
         if phase == CombatPhase.RESULT:
-            successors += [CombatPhase.EXP_SETTLEMENT, CombatPhase.GET_SHIP]
+            successors.append(CombatPhase.GET_SHIP)
+            if self._plan.collect_result_info:
+                successors.append(CombatPhase.EXP_SETTLEMENT)
         elif phase == CombatPhase.EXP_SETTLEMENT:
             successors.append(CombatPhase.GET_SHIP)
         return successors
