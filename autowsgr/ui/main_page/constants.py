@@ -102,8 +102,8 @@ class DismissCoord(enum.Enum):
     BOOKING = (0.618, 0.564)
     """预约页面关闭坐标。"""
 
-    USER_INFO_CLOSE = (0.948, 0.056)
-    """提督信息浮层关闭按钮 (右上角 X) — TODO: 实机测定精确坐标。"""
+    USER_INFO_CLOSE = (0.877, 0.221)
+    """提督信息浮层关闭按钮 (右上角 X)"""
 
     @property
     def xy(self) -> tuple[float, float]:
