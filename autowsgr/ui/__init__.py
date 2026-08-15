@@ -115,7 +115,10 @@ OverlayType = OverlayKind
 
 register_page(PageName.MAIN, MainPage.is_current_page)
 register_page(PageName.MAP, MapPage.is_current_page)
-register_page(PageName.BATTLE_PREP, BattlePreparationPage.is_current_page)
+# BATTLE_PREP 不注册: 出征准备页在游戏流转中是单向中转 (战斗结束跳过它直接回
+# 准备页之前的 UI —— 演习/战役/决战/活动皆然), 不属于 UI 导航域。它是战斗
+# 流程的锚点: start_fight / wait_leave_page 等直接引用
+# BattlePreparationPage.is_current_page 签名 (不经过注册中心)。
 register_page(PageName.SIDEBAR, SidebarPage.is_current_page)
 register_page(PageName.MISSION, MissionPage.is_current_page)
 register_page(PageName.BACKYARD, BackyardPage.is_current_page)

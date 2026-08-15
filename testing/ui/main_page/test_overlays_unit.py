@@ -9,6 +9,7 @@ import pytest
 import autowsgr.ui.utils as ui_utils
 from autowsgr.ui.main_page import overlays
 from autowsgr.ui.main_page.constants import DismissCoord
+from autowsgr.vision import ImageChecker
 
 
 @pytest.mark.parametrize('second_confirmed', [False, True])
@@ -32,3 +33,31 @@ def test_dismiss_sign_handles_optional_second_confirmation(
         call(ctrl, must_confirm=False, timeout=overlays._SIGN_CONFIRM_TIMEOUT),
     ]
     sleep.assert_called_once_with(overlays._SIGN_CONFIRM_WAIT)
+
+
+@pytest.mark.parametrize(
+    ('template_name', 'expected'),
+    [
+        ('overlay_news', overlays.OverlayKind.NEWS),
+        ('overlay_sign', overlays.OverlayKind.SIGN),
+        ('overlay_booking', overlays.OverlayKind.BOOKING),
+        ('overlay_user_info', overlays.OverlayKind.USER_INFO),
+    ],
+)
+def test_detect_overlay_uses_templates(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    template_name: str,
+    expected: overlays.OverlayKind,
+) -> None:
+    """浮层检测改用图像模板匹配 (含 USER_INFO 新增分支)。"""
+    monkeypatch.setattr(
+        ImageChecker, 'template_exists', lambda _s, t, **_k: t.name == template_name
+    )
+    assert overlays.detect_overlay(MagicMock()) is expected
+
+
+def test_detect_overlay_none_when_no_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    """无浮层命中时返回 None。"""
+    monkeypatch.setattr(ImageChecker, 'template_exists', lambda *_a, **_k: False)
+    assert overlays.detect_overlay(MagicMock()) is None

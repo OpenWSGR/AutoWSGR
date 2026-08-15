@@ -19,8 +19,9 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
-from autowsgr.vision import PixelChecker
+from autowsgr.vision import ImageChecker, PixelChecker
 
 from .constants import DismissCoord, OverlayKind, Sig
 
@@ -51,22 +52,26 @@ _SIGN_CONFIRM_TIMEOUT: float = 8.0
 def detect_overlay(screen: np.ndarray) -> OverlayKind | None:
     """检测截图中是否存在主页面浮层。
 
-    按优先级依次检测: NEWS → SIGN → BOOKING。
+    按优先级依次检测: NEWS → SIGN → BOOKING → USER_INFO。
 
     Returns
     -------
     OverlayKind | None
         检测到的浮层类型，无浮层返回 ``None``。
     """
-    if PixelChecker.check_signature(screen, Sig.NEWS.ps).matched:
+    page = Templates.MainPage
+    if ImageChecker.template_exists(screen, page.NEWS, confidence=0.85):
         _log.debug('[UI] 检测到浮层: 新闻公告')
         return OverlayKind.NEWS
-    if PixelChecker.check_signature(screen, Sig.SIGN.ps).matched:
+    if ImageChecker.template_exists(screen, page.SIGN, confidence=0.85):
         _log.debug('[UI] 检测到浮层: 每日签到')
         return OverlayKind.SIGN
-    if PixelChecker.check_signature(screen, Sig.BOOKING.ps).matched:
+    if ImageChecker.template_exists(screen, page.BOOKING, confidence=0.85):
         _log.debug('[UI] 检测到浮层: 活动预约')
         return OverlayKind.BOOKING
+    if ImageChecker.template_exists(screen, page.USER_INFO, confidence=0.85):
+        _log.debug('[UI] 检测到浮层: 提督信息')
+        return OverlayKind.USER_INFO
     return None
 
 
@@ -119,10 +124,8 @@ def dismiss_booking(ctrl: AndroidController) -> None:
     ctrl.click(*DismissCoord.BOOKING.xy)
     time.sleep(1.0)
     # 二次确认 — 若仍未返回主页面则再点一次
-    from autowsgr.ui.main_page.constants import Sig as _Sig
-
     screen = ctrl.screenshot()
-    if not PixelChecker.check_signature(screen, _Sig.PAGE.ps).matched:
+    if not ImageChecker.template_exists(screen, Templates.MainPage.MAIN, confidence=0.85):
         _log.warning('[UI] 活动预约: 首次关闭未生效，重试')
         ctrl.click(*DismissCoord.BOOKING.xy)
         time.sleep(1.0)
@@ -131,6 +134,13 @@ def dismiss_booking(ctrl: AndroidController) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # 消除 — 统一分发
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def dismiss_user_info(ctrl: AndroidController) -> None:
+    """关闭提督信息浮层 (全屏个人资料)。"""
+    _log.info('[UI] 提督信息: 关闭')
+    ctrl.click(*DismissCoord.USER_INFO_CLOSE.xy)
+    time.sleep(0.5)
 
 
 def dismiss_overlay(ctrl: AndroidController, overlay: OverlayKind) -> None:
@@ -142,5 +152,7 @@ def dismiss_overlay(ctrl: AndroidController, overlay: OverlayKind) -> None:
             dismiss_sign(ctrl)
         case OverlayKind.BOOKING:
             dismiss_booking(ctrl)
+        case OverlayKind.USER_INFO:
+            dismiss_user_info(ctrl)
         case _:
             raise ValueError(f'未知浮层类型: {overlay}')

@@ -32,9 +32,9 @@ from autowsgr.ui.mission_page.data import (
     MissionPanel,
 )
 from autowsgr.ui.mission_page.recognition import find_button_rows, recognize_row
-from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
+from autowsgr.ui.tabbed_page import TabbedPageType, check_tabbed_page
 from autowsgr.ui.utils import click_and_wait_for_page
-from autowsgr.vision import ImageChecker
+from autowsgr.vision import ImageChecker, PageMatch
 
 
 if TYPE_CHECKING:
@@ -63,9 +63,9 @@ class MissionPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
-        """判断截图是否为任务页面。"""
-        return identify_page_type(screen) == TabbedPageType.MISSION
+    def is_current_page(screen: np.ndarray) -> PageMatch:
+        """判断截图是否为任务页面 (返回带覆盖度分数的 PageMatch)。"""
+        return check_tabbed_page(screen, TabbedPageType.MISSION)
 
     # ── 面板切换 ──────────────────────────────────────────────────────────
 

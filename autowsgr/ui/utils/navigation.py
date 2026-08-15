@@ -92,10 +92,17 @@ def wait_for_page(
     handle_overlays: bool = True,  # noqa: ARG001
     source: str = '',
     target: str = '',
+    candidates: set[str] | None = None,
 ) -> np.ndarray:
     """反复截图，直到 ``checker`` 返回 ``True``。
 
     内置浮层消除。遇到可消除浮层时立即处理并继续轮询（不计入睡眠延迟）。
+
+    Parameters
+    ----------
+    candidates:
+        当前页识别的候选页面名集合 (来自 UIStack), 收缩轮询日志中
+        全量识别的搜索空间;``None`` 时全量识别。
 
     Raises
     ------
@@ -118,7 +125,7 @@ def wait_for_page(
             )
             return screen
 
-        current = get_current_page(screen)
+        current = get_current_page(screen, candidates=candidates)
         _log.debug(
             '[UI] 等待 #{}: {} -> {}, 当前={}',
             attempt,
@@ -147,10 +154,17 @@ def wait_leave_page(
     handle_overlays: bool = True,  # noqa: ARG001
     source: str = '',
     target: str = '',
+    candidates: set[str] | None = None,
 ) -> np.ndarray:
     """反复截图，直到 ``checker`` 返回 ``False`` (已离开)。
 
     目标页面签名未采集时的降级方案。优先使用 :func:`wait_for_page`。
+
+    Parameters
+    ----------
+    candidates:
+        当前页识别的候选页面名集合 (来自 UIStack), 收缩轮询日志中
+        全量识别的搜索空间;``None`` 时全量识别。
 
     Raises
     ------
@@ -168,7 +182,7 @@ def wait_leave_page(
         screen = ctrl.screenshot()
 
         if not checker(screen):
-            current = get_current_page(screen)
+            current = get_current_page(screen, candidates=candidates)
             _log.debug(
                 '[UI] 已离开: {} -> {} (第 {} 次截图, 到达={})',
                 source or '?',
@@ -204,6 +218,7 @@ def click_and_wait_for_page(
     source: str = '',
     target: str = '',
     config: NavConfig = DEFAULT_NAV_CONFIG,
+    candidates: set[str] | None = None,
 ) -> np.ndarray:
     """点击 + 等待到达目标页面，内置重试。
 
@@ -222,6 +237,7 @@ def click_and_wait_for_page(
         handle_overlays=config.handle_overlays,
         source=source,
         target=target,
+        candidates=candidates,
     )
 
 
@@ -315,6 +331,7 @@ def click_and_wait_leave_page(
     source: str = '',
     target: str = '',
     config: NavConfig = DEFAULT_NAV_CONFIG,
+    candidates: set[str] | None = None,
 ) -> np.ndarray:
     """点击 + 等待离开当前页面，内置重试。
 
@@ -351,6 +368,7 @@ def click_and_wait_leave_page(
                 handle_overlays=config.handle_overlays,
                 source=source,
                 target=target,
+                candidates=candidates,
             )
         except NavigationError as e:
             last_err = e

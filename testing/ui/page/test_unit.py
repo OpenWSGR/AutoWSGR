@@ -17,6 +17,7 @@ from autowsgr.ui.utils import (
     NavigationError,
     wait_for_page,
 )
+from autowsgr.vision import PageMatch
 
 
 _W, _H = 960, 540
@@ -66,6 +67,36 @@ class TestGetCurrentPage:
         register_page('bad', bad_checker)
         register_page('good', lambda _s: True)
         assert get_current_page(_blank()) == 'good'
+
+    def test_candidate_filtering(self):
+        """candidates 限制只评估候选页:未在候选集的真页不返回。"""
+        register_page('a', lambda _s: True)
+        register_page('b', lambda _s: True)
+        assert get_current_page(_blank(), candidates={'a'}) == 'a'
+        assert get_current_page(_blank(), candidates=set()) is None
+
+    def test_score_ranking(self):
+        """命中多页时按 score 降序取最高分(而非注册顺序)。"""
+        register_page('low', lambda _s: PageMatch(name='low', matched=True, score=0.5))
+        register_page('high', lambda _s: PageMatch(name='high', matched=True, score=0.9))
+        assert get_current_page(_blank()) == 'high'
+
+    def test_register_order_tiebreak(self):
+        """同分时按注册顺序(稳定排序)决胜。"""
+        register_page('first', lambda _s: PageMatch(name='first', matched=True, score=0.8))
+        register_page('second', lambda _s: PageMatch(name='second', matched=True, score=0.8))
+        assert get_current_page(_blank()) == 'first'
+
+    def test_bool_checker_normalized(self):
+        """旧式 bool checker 归一化:True→score=1.0,胜过低分 PageMatch。"""
+        register_page('bool_true', lambda _s: True)
+        register_page('low_score', lambda _s: PageMatch(name='low_score', matched=True, score=0.7))
+        assert get_current_page(_blank()) == 'bool_true'
+
+    def test_unregistered_candidate_ignored(self):
+        """候选集中未注册的名称被静默跳过。"""
+        register_page('only', lambda _s: True)
+        assert get_current_page(_blank(), candidates={'only', 'ghost'}) == 'only'
 
 
 # ─────────────────────────────────────────────

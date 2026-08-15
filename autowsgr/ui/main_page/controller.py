@@ -7,15 +7,15 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
-from autowsgr.vision import PixelChecker
+from autowsgr.vision import ImageChecker, PageMatch, PixelChecker
 
 from .constants import (
     NavCoord,
     OverlayKind,
     ProbePoint,
-    Sig,
     Target,
     ThemeColor,
 )
@@ -92,24 +92,32 @@ class MainPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为主页面 (含浮层覆盖)。
 
         参考 :class:`~autowsgr.ui.event.event_page.BaseEventPage` 模式，
-        将浮层 (新闻公告 / 每日签到 / 活动预约) 也识别为主页面。
+        将浮层 (新闻公告 / 每日签到 / 活动预约 / 提督信息) 也识别为主页面。
+        基础模板用更高阈值 (0.95) 抑制动态背景误命中, 浮层模板 0.85。
+
+        返回带置信度的 :class:`PageMatch` 供候选集排序
+        (``PageMatch.__bool__`` 保证旧式真值调用不变)。
         """
-        if PixelChecker.check_signature(screen, Sig.PAGE.ps).matched:
-            return True
-        if PixelChecker.check_signature(screen, Sig.NEWS.ps).matched:
-            return True
-        if PixelChecker.check_signature(screen, Sig.SIGN.ps).matched:
-            return True
-        return PixelChecker.check_signature(screen, Sig.BOOKING.ps).matched
+        page = Templates.MainPage
+        name = PageName.MAIN.value
+        result = ImageChecker.find_template(screen, page.MAIN, confidence=0.95)
+        if result is not None:
+            return PageMatch(name=name, matched=True, score=result.confidence)
+        overlay = ImageChecker.find_any(
+            screen, [page.NEWS, page.SIGN, page.BOOKING, page.USER_INFO], confidence=0.85
+        )
+        if overlay is not None:
+            return PageMatch(name=name, matched=True, score=overlay.confidence)
+        return PageMatch(name=name, matched=False, score=0.0)
 
     @staticmethod
     def is_base_page(screen: np.ndarray) -> bool:
         """判断截图是否为主页面基础状态 (不含浮层)。"""
-        return PixelChecker.check_signature(screen, Sig.PAGE.ps).matched
+        return ImageChecker.template_exists(screen, Templates.MainPage.MAIN, confidence=0.85)
 
     @staticmethod
     def detect_overlay(screen: np.ndarray) -> OverlayKind | None:

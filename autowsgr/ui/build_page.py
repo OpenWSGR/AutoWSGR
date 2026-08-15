@@ -32,13 +32,13 @@ from typing import TYPE_CHECKING
 from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName, ShipType
-from autowsgr.vision import ImageChecker
+from autowsgr.vision import ImageChecker, PageMatch
 
 from .page import click_and_wait_for_page
 from .tabbed_page import (
     TabbedPageType,
+    check_tabbed_page,
     get_active_tab_index,
-    identify_page_type,
     make_tab_checker,
 )
 
@@ -161,17 +161,17 @@ class BuildPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为建造页面组 (含全部 4 个标签)。
 
-        通过统一标签页检测层识别。
+        通过统一标签页检测层识别,返回带覆盖度分数的 PageMatch。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        return identify_page_type(screen) == TabbedPageType.BUILD
+        return check_tabbed_page(screen, TabbedPageType.BUILD)
 
     @staticmethod
     def get_active_tab(screen: np.ndarray) -> BuildTab | None:

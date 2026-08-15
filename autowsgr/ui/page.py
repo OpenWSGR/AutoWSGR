@@ -25,6 +25,7 @@ from autowsgr.ui.utils import (
     wait_for_page,
     wait_leave_page,
 )
+from autowsgr.vision.page_match import PageMatch
 
 
 if TYPE_CHECKING:
@@ -39,11 +40,15 @@ _log = get_logger('ui')
 # 页面注册中心
 # ---------------------------------------------------------------------------
 
-_PAGE_REGISTRY: dict[str, Callable[[np.ndarray], bool]] = {}
+_PAGE_REGISTRY: dict[str, Callable[[np.ndarray], PageMatch | bool]] = {}
 
 
-def register_page(name: str, checker: Callable[[np.ndarray], bool]) -> None:
-    """注册页面识别函数。"""
+def register_page(name: str, checker: Callable[[np.ndarray], PageMatch | bool]) -> None:
+    """注册页面识别函数。
+
+    checker 宜返回 :class:`~autowsgr.vision.page_match.PageMatch`(携带 score,
+    供候选集排序);兼容旧式返回 ``bool`` 的识别器(自动归一化:True→1.0, False→0.0)。
+    """
     # Python 3.13+ 中 StrEnum 的 str()/format() 返回 'ClassName.MEMBER' 而非值，
     # 显式提取 .value 确保 key 始终为纯 str，避免日志和比较中出现意外格式。
     key: str = name.value if hasattr(name, 'value') else name
@@ -53,25 +58,101 @@ def register_page(name: str, checker: Callable[[np.ndarray], bool]) -> None:
     # _log.debug("[UI] 注册页面: {}", key)
 
 
-def get_current_page(screen: np.ndarray) -> str | None:
-    """识别截图对应的页面名称，无匹配返回 ``None``。"""
-    failed_checkers: list[str] = []
-    for name, checker in _PAGE_REGISTRY.items():
+def _normalize_match(name: str, result: object) -> PageMatch:
+    """把识别器返回值归一化为 :class:`PageMatch`。
+
+    兼容三种返回:
+
+    - :class:`PageMatch` —— 直接采用(以注册名覆盖 ``result.name``,防漂移)
+    - ``bool`` —— 旧式布尔识别器,True → score=1.0, False → 0.0
+    - 其他(如 :class:`~autowsgr.vision.PixelMatchResult`)——
+      取 ``.matched`` 与 ``.score``/``.ratio``/``.confidence`` 之一
+    """
+    if isinstance(result, PageMatch):
+        return (
+            result
+            if result.name == name
+            else PageMatch(
+                name=name,
+                matched=result.matched,
+                score=result.score,
+            )
+        )
+    if isinstance(result, bool):
+        return PageMatch(name=name, matched=result, score=1.0 if result else 0.0)
+    matched = bool(getattr(result, 'matched', False))
+    raw = getattr(result, 'score', None)
+    if raw is None:
+        raw = getattr(result, 'ratio', None)
+    if raw is None:
+        raw = getattr(result, 'confidence', None)
+    score = float(raw) if raw is not None else (1.0 if matched else 0.0)
+    return PageMatch(name=name, matched=matched, score=score)
+
+
+def get_current_page(
+    screen: np.ndarray,
+    candidates: set[str] | None = None,
+) -> str | None:
+    """识别截图对应的页面名称,无匹配返回 ``None``。
+
+    在命中的页面里按 ``score`` 降序取最高分(替代旧的"首次匹配即胜");
+    分数相同者保持注册(候选)顺序。每个识别器返回
+    :class:`~autowsgr.vision.page_match.PageMatch`,score 归一自像素 ratio /
+    模板 confidence / tabbed 覆盖度。
+
+    Parameters
+    ----------
+    screen:
+        截图 (HxWx3, RGB)。
+    candidates:
+        候选页面名集合。给出时只评估候选页 —— 导航时可利用"当前页 + 可达页"
+        上下文约束,大幅降低不特异签名(如决战页深色背景点)误命中无关页的风险。
+        为 ``None`` 时评估全部注册页。
+    """
+    # 按注册顺序遍历候选(而非候选 set 的任意顺序):同分时稳定排序保持注册顺序,
+    # 让旧的"注册顺序优先级"(如 EVENT_MAP 排在 DECISIVE_BATTLE 前)自然融入排序语义。
+    reg_order: list[str] = list(_PAGE_REGISTRY.keys())
+    if candidates is not None:
+        names = [n for n in reg_order if n in candidates]
+    else:
+        names = reg_order
+    hits: list[PageMatch] = []
+    failed: list[str] = []
+    for name in names:
+        checker = _PAGE_REGISTRY.get(name)
+        if checker is None:
+            continue
         try:
-            if checker(screen):
-                _log.debug('[UI] 当前页面: {}', name)
-                return name
+            pm = _normalize_match(name, checker(screen))
         except Exception:
             _log.opt(exception=True).warning("[UI] 页面 '{}' 识别器异常", name)
-            failed_checkers.append(name)
-    if failed_checkers:
+            failed.append(name)
+            continue
+        if pm.matched:
+            hits.append(pm)
+
+    if hits:
+        # 稳定排序:分数降序,同分保持候选顺序
+        hits.sort(key=lambda m: m.score, reverse=True)
+        best = hits[0]
+        _log.debug(
+            '[UI] 当前页面: {} (score={:.3f}, 候选 {} / 命中 {})',
+            best.name,
+            best.score,
+            len(names),
+            len(hits),
+        )
+        return best.name
+
+    if failed:
         _log.warning(
-            '[UI] 无匹配页面，且以下识别器抛异常: {} (共 {} 个注册页面)',
-            failed_checkers,
-            len(_PAGE_REGISTRY),
+            '[UI] 无匹配页面，且以下识别器抛异常: {} (评估 {} 个候选)',
+            failed,
+            len(names),
         )
     else:
-        _log.debug('[UI] 当前页面: 无匹配 (共 {} 个注册页面)', len(_PAGE_REGISTRY))
+        _log.debug('[UI] 当前页面: 无匹配 (评估 {} 个候选)', len(names))
     return None
 
 

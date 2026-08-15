@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
+from autowsgr.ui.stack import UIStack
 
 from .bathroom import BathRoom
 from .build import BuildQueue
@@ -93,8 +94,20 @@ class GameContext:
     """浴室修理槽位状态 (空位调度用)。"""
     ship_registry: dict[str, Ship] = field(default_factory=dict)
     """舰船注册表, 以名称为键。"""
+    ui_stack: UIStack = field(default_factory=UIStack)
+    """UI 导航栈 — 页面来路追踪。
+
+    识别候选剪枝与 go_back 期望父页的来源, 由导航循环
+    (:func:`autowsgr.ops.navigate._goto_page`) 维护。
+    """
     current_page: PageName | None = None
-    """当前游戏页面。"""
+    """当前游戏页面。
+
+    .. deprecated::
+        改读 :attr:`ui_stack.current`。本字段由导航循环尽力同步
+        (页面名不在 :class:`~autowsgr.types.PageName` 枚举内时为 ``None``),
+        仅为 server 状态上报等旧读者保留。
+    """
 
     # ── 每日计数器 ──
 

@@ -25,13 +25,11 @@ import enum
 import time
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.utils import click_and_wait_for_page, wait_for_page
-from autowsgr.vision import (
-    Color,
-    PixelChecker,
-)
+from autowsgr.vision import ImageChecker, PageMatch
 
 
 if TYPE_CHECKING:
@@ -61,25 +59,8 @@ class SidebarTarget(enum.Enum):
 # 页面识别签名
 # ═══════════════════════════════════════════════════════════════════════════════
 
-MENU_PROBES: list[tuple[float, float]] = [
-    (0.0417, 0.0806),  # 商城
-    (0.0422, 0.2102),  # 活动
-    (0.0453, 0.3463),  # 建造
-    (0.0406, 0.4676),  # 强化
-    (0.0396, 0.6028),  # 图鉴
-    (0.0432, 0.7231),  # 好友
-]
-"""侧边栏左侧 6 个菜单探测点 (来自 sig.py)。
-
-每个点在未选中时为深灰 ≈ (57, 57, 57)，选中时为亮蓝 ≈ (0, 160, 232)。
-"""
-
-_MENU_GRAY = Color.of(57, 57, 57)
-"""菜单项未选中颜色 (深灰)。"""
-_MENU_SELECTED = Color.of(0, 160, 232)
-"""菜单项选中颜色 (亮蓝)。"""
-_MENU_TOLERANCE = 30.0
-"""菜单项颜色匹配容差。"""
+# 页面级识别已改用 Templates.Page.SIDEBAR 模板匹配 (迁移自 classic options_page),
+# 详见 :meth:`SidebarPage.is_current_page`。
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -145,28 +126,23 @@ class SidebarPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为侧边栏页面。
 
-        检测逻辑:
-        1. 6 个左侧菜单探测点每个都必须匹配 **灰色** 或 **蓝色高亮**。
-        2. 蓝色高亮的数量为 0 或 1 (无选中 / 单选中)。
+        用侧边栏独有的大区域模板 (classic ``options_page``) 匹配。
+        正样本置信度约 0.86 (大模板含背景, 易随主题波动), 故阈值放宽到 0.8;
+        其他页最高仅 0.32, 区分度充足。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        blue_count = 0
-        for x, y in MENU_PROBES:
-            pixel = PixelChecker.get_pixel(screen, x, y)
-            if pixel.near(_MENU_SELECTED, _MENU_TOLERANCE):
-                blue_count += 1
-            elif pixel.near(_MENU_GRAY, _MENU_TOLERANCE):
-                pass  # 灰色 — 正常
-            else:
-                return False  # 既不灰也不蓝 → 不是侧边栏
-        return blue_count <= 1
+        result = ImageChecker.find_template(screen, Templates.Page.SIDEBAR, confidence=0.8)
+        name = PageName.SIDEBAR.value
+        if result is None:
+            return PageMatch(name=name, matched=False, score=0.0)
+        return PageMatch(name=name, matched=True, score=result.confidence)
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 

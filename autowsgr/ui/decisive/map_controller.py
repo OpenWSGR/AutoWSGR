@@ -35,7 +35,7 @@ from autowsgr.ui.decisive.overlay import (
     CLICK_SORTIE,
     DecisiveOverlay,
     detect_decisive_overlay,
-    get_overlay_signature,
+    get_overlay_template,
     is_decisive_map_page,
     is_fleet_acquisition,
 )
@@ -520,20 +520,21 @@ class DecisiveMapController:
         """点击右下角「编队」按钮。"""
         # TODO: 改进鲁棒性
         time.sleep(1)
+        # 调试：检测当前页面状态
+        from autowsgr.image_resources import Templates
         from autowsgr.ui.utils.navigation import NavConfig
 
-        # 调试：检测当前页面状态
         screen = self._ctrl.screenshot()
-        from autowsgr.ui.battle.base import PAGE_SIGNATURE
-        from autowsgr.ui.decisive.overlay import SIG_MAP_PAGE
-        from autowsgr.vision.matcher import PixelChecker
-
-        map_check = PixelChecker.check_signature(screen, SIG_MAP_PAGE)
-        prep_check = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        map_check = ImageChecker.template_exists(
+            screen, Templates.Decisive.MAP_PAGE, confidence=0.85
+        )
+        prep_check = ImageChecker.template_exists(
+            screen, Templates.Page.BATTLE_PREP, confidence=0.85
+        )
         _log.debug(
             '[地图控制器] 点击编队前 - 地图页: {}, 出征准备页: {}',
-            map_check.matched,
-            prep_check.matched,
+            map_check,
+            prep_check,
         )
 
         config = NavConfig(timeout=10.0, interval=0.5, max_retries=3)
@@ -725,11 +726,11 @@ class DecisiveMapController:
         interval: float = 0.3,
     ) -> np.ndarray:
         """反复截图直到指定 overlay 出现。"""
-        sig = get_overlay_signature(target)
+        tmpl = get_overlay_template(target)
         deadline = time.monotonic() + timeout
         while True:
             screen = self._ctrl.screenshot()
-            if PixelChecker.check_signature(screen, sig):
+            if ImageChecker.template_exists(screen, tmpl, confidence=0.85):
                 return screen
             if time.monotonic() >= deadline:
                 raise TimeoutError(f'等待 overlay {target.value} 超时 ({timeout}s)')
