@@ -34,11 +34,7 @@ from typing import TYPE_CHECKING
 from autowsgr.constants import (
     expand_ship_name_candidates as expand_group_candidates,
 )
-from autowsgr.constants import (
-    get_ship_name_group_id,
-    normalize_ship_name,
-    set_ship_name_aliases,
-)
+from autowsgr.constants import get_ship_name_group_id, set_ship_name_aliases
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipType
 
@@ -213,24 +209,6 @@ def set_user_ship_name_aliases(aliases: Mapping[str, str]) -> int:
     _USER_SHIP_NAME_ALIASES.clear()
     _USER_SHIP_NAME_ALIASES.update(loaded)
     return len(loaded)
-
-
-def get_user_ship_name_aliases(ship_name: str) -> tuple[str, ...]:
-    """返回标准舰名对应的全部游戏内自定义名，结果不依赖配置顺序。"""
-    name = ship_name.strip()
-    if not name:
-        return ()
-    if name in _USER_SHIP_NAME_ALIASES:
-        return (name,)
-
-    identity = normalize_ship_name(name)
-    return tuple(
-        sorted(
-            alias
-            for alias, standard_name in _USER_SHIP_NAME_ALIASES.items()
-            if normalize_ship_name(standard_name) == identity
-        )
-    )
 
 
 def expand_ship_name_candidates(candidates: list[str]) -> list[str]:
