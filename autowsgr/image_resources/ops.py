@@ -75,12 +75,6 @@ class Fight:
     """战斗相关模板 (ops 侧复用)。"""
 
     NIGHT_BATTLE = LazyTemplate('combat/night_battle_540p.png', 'night_battle')
-    RESULT_PAGE = LazyTemplate('combat/result_page_540p.png', 'result_page')
-
-    @staticmethod
-    @lru_cache(maxsize=1)
-    def result_pages() -> list[ImageTemplate]:
-        return [load_template('combat/result_page_540p.png', name='result_page')]
 
 
 class FightResult:
@@ -113,7 +107,9 @@ class Symbol:
 
     GET_SHIP = LazyTemplate('combat/get_ship_540p.png', 'symbol_get_ship')
     GET_ITEM = LazyTemplate('combat/get_item_540p.png', 'symbol_get_item')
-    CLICK_TO_CONTINUE = LazyTemplate('combat/result_540p.png', 'click_to_continue')
+    # MVP 徽章 (result_page_540p): 战果/经验结算页必有且不被遮挡, 比
+    # "点击继续" 文字 (result_540p, 被舰船立绘遮挡致分数波动) 稳定
+    CLICK_TO_CONTINUE = LazyTemplate('combat/result_page_540p.png', 'click_to_continue')
 
 
 class BackButton:

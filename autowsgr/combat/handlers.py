@@ -61,6 +61,7 @@ _PHASE_HANDLERS: dict[CombatPhase, str] = {
     CombatPhase.FIGHT_PERIOD: '_handle_fight_period',
     CombatPhase.NIGHT_PROMPT: '_handle_night_prompt',
     CombatPhase.RESULT: '_handle_result',
+    CombatPhase.EXP_SETTLEMENT: '_handle_exp_settlement',
     CombatPhase.GET_SHIP: '_handle_get_ship',
     CombatPhase.PROCEED: '_handle_proceed',
     CombatPhase.FLAGSHIP_SEVERE_DAMAGE: '_handle_flagship_severe_damage',
@@ -425,15 +426,15 @@ class PhaseHandlersMixin:
         """点击战果类页面继续，并验证已到达**已知后继状态**。
 
         验证判据是到达验证而非"原页面签名消失"——点击 RESULT 战果页后,
-        游戏先进入**经验结算子页** (战斗结果 + "点击继续..", 无对应
-        CombatPhase 状态): 若以"RESULT 消失"为成功判据, 复检会在经验页
-        误判成功提前返回, 引擎随后等待 PROCEED/GET_SHIP 等状态全部落空
+        游戏先进入**经验结算子页** (逐舰船经验, 对应 CombatPhase.EXP_SETTLEMENT):
+        若以"RESULT 消失"为成功判据, 复检会在经验页误判成功提前返回,
+        引擎随后等待 PROCEED/GET_SHIP 等状态全部落空
         (实机 2026-08-15: 状态识别超时 → 恢复失败 → 强制重启)。
 
         故每次点击后延迟截图, 在 ``[phase] + 后继状态`` 集合上识别:
           - 命中 *phase* → 页面未关闭 (点击被吞/动画未播完), 重试点击;
-          - 命中后继 → 成功返回;
-          - 全不命中 (经验结算等中间页) → **继续点击** 推进流程。
+          - 命中后继 (含 EXP_SETTLEMENT 经验结算页) → 成功返回;
+          - 全不命中 (未知中间页) → **继续点击** 推进流程。
 
         Parameters
         ----------
@@ -463,16 +464,25 @@ class PhaseHandlersMixin:
     def _result_successors(self, phase: CombatPhase) -> list[CombatPhase]:
         """返回战果类页面的后继状态集合 (与 state.py 转移图一致)。
 
-        RESULT 之后: PROCEED / 终态页 / GET_SHIP / 旗舰大破;
+        RESULT 之后: 经验结算页 / PROCEED / 终态页 / GET_SHIP / 旗舰大破;
+        EXP_SETTLEMENT 之后: 同上但去掉 EXP_SETTLEMENT 自身;
         GET_SHIP 之后: 同上但去掉 GET_SHIP 自身。
         """
         successors = [CombatPhase.PROCEED, CombatPhase.FLAGSHIP_SEVERE_DAMAGE]
         end_phase = self._plan.end_phase
         if end_phase is not None:
             successors.append(end_phase)
-        if phase != CombatPhase.GET_SHIP:
+        if phase == CombatPhase.RESULT:
+            successors += [CombatPhase.EXP_SETTLEMENT, CombatPhase.GET_SHIP]
+        elif phase == CombatPhase.EXP_SETTLEMENT:
             successors.append(CombatPhase.GET_SHIP)
         return successors
+
+    def _handle_exp_settlement(self) -> ConditionFlag:
+        """处理经验结算子页 — 点击继续推进到掉落/前进/终态页。"""
+        time.sleep(1)  # 等结算动画播完再点 (点早了会被动画吞掉)
+        self._click_result_until_closed(CombatPhase.EXP_SETTLEMENT)
+        return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_get_ship(self) -> ConditionFlag:
         """处理获取舰船。"""

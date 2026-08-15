@@ -41,16 +41,15 @@ class CombatTemplates:
     +===========================+======================================+
     | FORMATION                 | combat/formation_540p.png            |
     | SPOT_ENEMY                | combat/spot_enemy_540p.png           |
-    | RESULT                    | combat/result_540p.png               |
     | FLAGSHIP_DAMAGE           | combat/flagship_damage_540p.png      |
     | PROCEED                   | combat/proceed_540p.png              |
     | NIGHT_BATTLE              | combat/night_battle_540p.png         |
     | FIGHT_CONDITION           | combat/fight_condition_540p.png      |
     | BYPASS                    | combat/bypass_540p.png               |
-    | RESULT_PAGE               | combat/result_page_540p.png          |
     | MISSILE_SUPPORT           | combat/missile_support_540p.png      |
     | MISSILE_ANIMATION         | combat/missile_animation_540p.png    |
     | FIGHT_PERIOD              | combat/fight_period_540p.png         |
+    | RESULT_PAGE               | combat/result_page_540p.png          |
     | GET_SHIP                  | combat/get_ship_540p.png             |
     | GET_ITEM                  | combat/get_item_540p.png             |
     | END_MAP_PAGE              | combat/end_map_page_540p.png         |
@@ -62,16 +61,15 @@ class CombatTemplates:
     # ── 战斗阶段 ──
     FORMATION = LazyTemplate('combat/formation_540p.png', 'formation')
     SPOT_ENEMY = LazyTemplate('combat/spot_enemy_540p.png', 'spot_enemy')
-    RESULT = LazyTemplate('combat/result_540p.png', 'result')
     FLAGSHIP_DAMAGE = LazyTemplate('combat/flagship_damage_540p.png', 'flagship_damage')
     PROCEED = LazyTemplate('combat/proceed_540p.png', 'proceed')
     NIGHT_BATTLE = LazyTemplate('combat/night_battle_540p.png', 'night_battle')
     FIGHT_CONDITION = LazyTemplate('combat/fight_condition_540p.png', 'fight_condition')
     BYPASS = LazyTemplate('combat/bypass_540p.png', 'bypass')
-    RESULT_PAGE = LazyTemplate('combat/result_page_540p.png', 'result_page')
     MISSILE_SUPPORT = LazyTemplate('combat/missile_support_540p.png', 'missile_support')
     MISSILE_ANIMATION = LazyTemplate('combat/missile_animation_540p.png', 'missile_animation')
     FIGHT_PERIOD = LazyTemplate('combat/fight_period_540p.png', 'fight_period')
+    RESULT_PAGE = LazyTemplate('combat/result_page_540p.png', 'result_page')
     GET_SHIP = LazyTemplate('combat/get_ship_540p.png', 'get_ship')
     GET_ITEM = LazyTemplate('combat/get_item_540p.png', 'get_item')
 

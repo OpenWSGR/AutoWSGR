@@ -82,7 +82,10 @@ class TestResolveSuccessors:
 
     def test_exercise_transitions(self):
         exercise = MODE_TRANSITIONS[CombatMode.EXERCISE]
+        # 演习: RESULT → 经验结算 → 结束页 (两跳)
         result = resolve_successors(exercise, CombatPhase.RESULT, '')
+        assert result == [CombatPhase.EXP_SETTLEMENT]
+        result = resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '')
         assert CombatPhase.EXERCISE_PAGE in result
 
     def test_unknown_phase_raises(self):

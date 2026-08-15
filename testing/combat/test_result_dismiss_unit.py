@@ -7,7 +7,8 @@
      返回, 引擎等待 PROCEED/GET_SHIP 等状态 7.5s 全落空 → 恢复失败 →
      强制重启游戏。
 现行判据是**到达验证**: 在 ``[phase] + 后继状态`` 集合上识别,
-命中后继才算成功, 识别不到任何状态 (中间页) 则继续点击推进。
+命中后继才算成功, 识别不到任何状态 (未知中间页) 则继续点击推进。
+经验结算子页后正式注册为 ``CombatPhase.EXP_SETTLEMENT``, 不再是盲点。
 """
 
 from __future__ import annotations
@@ -91,13 +92,14 @@ class TestClickResultUntilClosed:
 
 class TestResultSuccessors:
     def test_event_result_includes_end_phase(self):
-        """活动战斗 (end_phase=EVENT_MAP_PAGE): RESULT 后继含终态页。"""
+        """活动战斗 (end_phase=EVENT_MAP_PAGE): RESULT 后继含终态页 + 经验页。"""
         host, _, _ = _make_host([], end_phase=CombatPhase.EVENT_MAP_PAGE)
         assert set(host._result_successors(CombatPhase.RESULT)) == {
             CombatPhase.PROCEED,
             CombatPhase.FLAGSHIP_SEVERE_DAMAGE,
             CombatPhase.EVENT_MAP_PAGE,
             CombatPhase.GET_SHIP,
+            CombatPhase.EXP_SETTLEMENT,
         }
 
     def test_campaign_result_no_end_phase(self):
@@ -107,11 +109,21 @@ class TestResultSuccessors:
             CombatPhase.PROCEED,
             CombatPhase.FLAGSHIP_SEVERE_DAMAGE,
             CombatPhase.GET_SHIP,
+            CombatPhase.EXP_SETTLEMENT,
         }
 
-    def test_get_ship_excludes_self(self):
-        """GET_SHIP 后继不含 GET_SHIP 自身。"""
+    def test_exp_settlement_excludes_self(self):
+        """EXP_SETTLEMENT 后继不含自身, 仍含 GET_SHIP (掉落在经验页之后)。"""
+        host, _, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE)
+        successors = host._result_successors(CombatPhase.EXP_SETTLEMENT)
+        assert CombatPhase.EXP_SETTLEMENT not in successors
+        assert CombatPhase.GET_SHIP in successors
+        assert CombatPhase.MAP_PAGE in successors
+
+    def test_get_ship_excludes_self_and_exp(self):
+        """GET_SHIP 后继不含 GET_SHIP 自身与 EXP_SETTLEMENT (经验页只跟在 RESULT 后)。"""
         host, _, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE)
         successors = host._result_successors(CombatPhase.GET_SHIP)
         assert CombatPhase.GET_SHIP not in successors
+        assert CombatPhase.EXP_SETTLEMENT not in successors
         assert CombatPhase.MAP_PAGE in successors

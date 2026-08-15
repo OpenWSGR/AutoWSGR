@@ -1,7 +1,8 @@
 """战斗状态枚举与状态转移图。
 一次完整的 MAP 类战斗流程::
     PROCEED → FIGHT_CONDITION → SPOT_ENEMY_SUCCESS → FORMATION
-        → FIGHT_PERIOD → NIGHT_PROMPT → RESULT → GET_SHIP → PROCEED → ...
+        → FIGHT_PERIOD → NIGHT_PROMPT → RESULT → EXP_SETTLEMENT
+        → GET_SHIP → PROCEED → ...
 """
 
 from __future__ import annotations
@@ -54,6 +55,9 @@ class CombatPhase(Enum):
     # ── 战果结算 ──
     RESULT = auto()
     """战果评价界面（S/A/B/C/D/SS）。"""
+
+    EXP_SETTLEMENT = auto()
+    """经验结算子页（战果页点击后，逐舰船显示经验增加/"升级剩余经验"）。"""
 
     # ── 掉落 ──
     GET_SHIP = auto()
@@ -193,9 +197,12 @@ def _build_map_transitions(
         'no': [CombatPhase.RESULT],
     }
 
-    t[CombatPhase.RESULT] = list(after_result)
+    # RESULT 之后先进经验结算子页, 再到掉落/继续前进等 (经验页识别失败时
+    # 直接落 after_result, 与旧流程兼容)
+    t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT, *after_result]
+    t[CombatPhase.EXP_SETTLEMENT] = list(after_result)
 
-    # GET_SHIP 后继 = RESULT 后继 去掉 GET_SHIP 自身
+    # GET_SHIP 后继 = 经验结算后继 去掉 GET_SHIP 自身
     t[CombatPhase.GET_SHIP] = [p for p in after_result if p != CombatPhase.GET_SHIP]
 
     if ep is not None:
@@ -233,8 +240,13 @@ def _build_single_transitions(
     }
 
     if ep is not None:
-        t[CombatPhase.RESULT] = [ep]
-    # ep is None → RESULT 为终止态，无后继
+        # 演习等: 战果页 → 经验结算 → 结束页
+        t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
+        t[CombatPhase.EXP_SETTLEMENT] = [ep]
+    else:
+        # ep is None (战役/决战) → RESULT 为终止态；引擎在 RESULT 即返回,
+        # 经验页由 _click_result_until_closed 的候选集合兜住, 无转移后继。
+        t[CombatPhase.EXP_SETTLEMENT] = []
 
     return t
 

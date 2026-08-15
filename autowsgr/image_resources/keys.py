@@ -35,16 +35,15 @@ class TemplateKey(Enum):
     # ── 战斗阶段 ──
     FORMATION = 'formation'
     SPOT_ENEMY = 'spot_enemy'
-    RESULT = 'result'
     FLAGSHIP_DAMAGE = 'flagship_damage'
     PROCEED = 'proceed'
     NIGHT_BATTLE = 'night_battle'
     FIGHT_CONDITION = 'fight_condition'
     BYPASS = 'bypass'
-    RESULT_PAGE = 'result_page'
     MISSILE_SUPPORT = 'missile_support'
     MISSILE_ANIMATION = 'missile_animation'
     FIGHT_PERIOD = 'fight_period'
+    RESULT_PAGE = 'result_page'
     GET_SHIP = 'get_ship'
     GET_ITEM = 'get_item'
     GET_SHIP_OR_ITEM = 'get_ship_or_item'
@@ -61,6 +60,7 @@ class TemplateKey(Enum):
     BATTLE_TIMES_EXCEED = 'battle_times_exceed'
 
     # ── 战果评级 ──
+    RESULT_GRADES = 'result_grades'
     GRADE_SS = 'grade_ss'
     GRADE_S = 'grade_s'
     GRADE_A = 'grade_a'
@@ -87,16 +87,15 @@ def _build_map() -> dict[TemplateKey, list[ImageTemplate]]:
     return {
         TemplateKey.FORMATION: [T.FORMATION],
         TemplateKey.SPOT_ENEMY: [T.SPOT_ENEMY],
-        TemplateKey.RESULT: [T.RESULT],
         TemplateKey.FLAGSHIP_DAMAGE: [T.FLAGSHIP_DAMAGE],
         TemplateKey.PROCEED: [T.PROCEED],
         TemplateKey.NIGHT_BATTLE: [T.NIGHT_BATTLE],
         TemplateKey.FIGHT_CONDITION: [T.FIGHT_CONDITION],
         TemplateKey.BYPASS: [T.BYPASS],
-        TemplateKey.RESULT_PAGE: [T.RESULT_PAGE],
         TemplateKey.MISSILE_SUPPORT: [T.MISSILE_SUPPORT],
         TemplateKey.MISSILE_ANIMATION: [T.MISSILE_ANIMATION],
         TemplateKey.FIGHT_PERIOD: [T.FIGHT_PERIOD],
+        TemplateKey.RESULT_PAGE: [T.RESULT_PAGE],
         TemplateKey.GET_SHIP: [T.GET_SHIP],
         TemplateKey.GET_ITEM: [T.GET_ITEM],
         TemplateKey.GET_SHIP_OR_ITEM: [T.GET_SHIP, T.GET_ITEM],
@@ -106,7 +105,8 @@ def _build_map() -> dict[TemplateKey, list[ImageTemplate]]:
         TemplateKey.END_EXERCISE_PAGE: [T.END_EXERCISE_PAGE],
         # 船坞已满
         TemplateKey.DOCK_FULL: [T.DOCK_FULL],
-        # 战果评级
+        # 战果评级 (SS~D 任一命中即为战果页; 评级字母仅战果页出现)
+        TemplateKey.RESULT_GRADES: T.Result.all_grades(),
         TemplateKey.GRADE_SS: [T.Result.SS],
         TemplateKey.GRADE_S: [T.Result.S],
         TemplateKey.GRADE_A: [T.Result.A],
