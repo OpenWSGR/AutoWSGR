@@ -32,8 +32,8 @@ from dataclasses import dataclass, field
 
 # 处理 Windows GBK 编码兼容性
 try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:  # noqa: S110
     pass  # 如果 reconfigure 不可用，继续使用默认编码
 from datetime import UTC, datetime

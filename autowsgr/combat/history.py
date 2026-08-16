@@ -94,7 +94,7 @@ class CombatEvent:
     extra: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
-        parts = [f'[{self.event_type.name}]']
+        parts: list[str] = [f'[{self.event_type.name}]']
         if self.node:
             parts.append(f'节点={self.node}')
         if self.action:

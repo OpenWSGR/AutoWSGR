@@ -140,7 +140,7 @@ class ExerciseOnceRunner(ExerciseRunner):
     远征等高优先级任务插队。
     """
 
-    def run(self) -> CombatResult:  # type: ignore[override]
+    def run(self) -> CombatResult:  # ty: ignore[invalid-method-override]
         """挑战下一个可用对手; 无对手返回 ``SKIP_FIGHT``。"""
         self._enter_exercise_page()
         rivals_status = MapPage(self._ctx).get_exercise_rival_status()

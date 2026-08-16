@@ -179,6 +179,7 @@ class MissionPage:
         candidates = get_all_mission_names()
         missions: list[MissionInfo] = []
         for anchor_y, btn_type in rows:
+            assert self._ctx.ocr is not None
             info = recognize_row(screen, anchor_y, btn_type, self._ctx.ocr, candidates)
             if info is None:
                 _log.debug('[UI] 任务识别: 跳过无效行 (anchor_y={:.3f})', anchor_y)

@@ -53,8 +53,8 @@ sys.path.insert(0, str(_ROOT))
 # ── UTF-8 输出兼容 (Windows 终端) ────────────────────────────────────────────
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # ty: ignore[call-non-callable]
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # ty: ignore[unresolved-attribute]
 except Exception:  # noqa: S110
     pass
 

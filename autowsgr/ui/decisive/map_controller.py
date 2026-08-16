@@ -325,6 +325,7 @@ class DecisiveMapController:
         """OCR 识别战备舰队获取界面的可选项。"""
         if screen is None:
             screen = self.wait_for_fleet_overlay_stable()
+        assert self._ocr is not None
         return _fleet_ocr.recognize_fleet_options(
             self._ocr,
             screen,
@@ -359,6 +360,7 @@ class DecisiveMapController:
         """读取战备舰队最后一张卡的名称，用于首节点判定修正。"""
         if screen is None:
             screen = self._ctrl.screenshot()
+        assert self._ocr is not None
         return _fleet_ocr.detect_last_offer_name(self._ocr, screen)
 
     def buy_fleet_option(self, click_position: tuple[float, float]) -> None:
@@ -423,6 +425,7 @@ class DecisiveMapController:
 
     def use_skill(self) -> list[str]:
         """在地图页使用一次副官技能并返回识别到的舰船。"""
+        assert self._ocr is not None
         return _fleet_ocr.use_skill(self._ctrl, self._ocr)
 
     def check_fleet(
@@ -476,6 +479,7 @@ class DecisiveMapController:
             time.sleep(0.3)  # 等待选船列表内容稳定
             ship_list_screen = self._ctrl.screenshot()
 
+        assert self._ocr is not None
         available = _recognize_ships(self._ocr, ship_list_screen)
         _log.debug('[地图控制器] 选船列表识别结果: {}', sorted(available))
 
@@ -620,9 +624,11 @@ class DecisiveMapController:
                 if detail is None:
                     break
 
+            assert self._ocr is not None
             ship_drop = recognize_ship_drop(screen, ocr=self._ocr)
             _log.info(f'[地图控制器] 检测到掉落: {ship_drop.ship_name}({ship_drop.ship_type})')
-            collected.append(ship_drop.ship_name)
+            if ship_drop.ship_name is not None:
+                collected.append(ship_drop.ship_name)
             self._ctrl.click(0.953, 0.954)
             time.sleep(0.5)
             confirm_operation(self._ctrl, timeout=1.0)

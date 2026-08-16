@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -41,7 +42,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
     from autowsgr.ui.intensify_page import IntensifyPage, IntensifyTab
     from autowsgr.ui.sidebar_page import SidebarPage
 
-    intensify_page = IntensifyPage(runner.ctrl)
+    intensify_page = IntensifyPage(runner.ctx)
 
     runner.verify_current('初始验证: 强化页面', '强化页面', IntensifyPage.is_current_page)
     if runner.aborted:
@@ -79,13 +80,14 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
 
     if not reset_to_main_page(ctrl, pause):
         return
+    ctx = _make_test_ctx(ctrl)
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        MainPage(ctrl).navigate_to(MainPage.Target.SIDEBAR)
+        MainPage(ctx).navigate_to(MainPage.Target.SIDEBAR)
         time.sleep(pause)
         screen = ctrl.screenshot()
     if SidebarPage.is_current_page(screen):
-        SidebarPage(ctrl).go_to_intensify()
+        SidebarPage(ctx).go_to_intensify()
         time.sleep(pause)
 
 

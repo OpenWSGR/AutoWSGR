@@ -266,11 +266,13 @@ def find_path(source: str, target: str) -> list[NavEdge] | None:
     list[NavEdge] | None
         路径上的边列表；``source == target`` 时返回空列表；不可达返回 ``None``。
     """
-    if source == target:
+    source_name = PageName(source)
+    target_name = PageName(target)
+    if source_name == target_name:
         return []
 
-    visited: set[str] = {source}
-    queue: deque[tuple[str, list[NavEdge]]] = deque([(source, [])])
+    visited: set[PageName] = {source_name}
+    queue: deque[tuple[PageName, list[NavEdge]]] = deque([(source_name, [])])
 
     while queue:
         current, path = queue.popleft()
@@ -278,7 +280,7 @@ def find_path(source: str, target: str) -> list[NavEdge] | None:
             if edge.target in visited:
                 continue
             new_path = [*path, edge]
-            if edge.target == target:
+            if edge.target == target_name:
                 return new_path
             visited.add(edge.target)
             queue.append((edge.target, new_path))

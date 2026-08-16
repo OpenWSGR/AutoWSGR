@@ -106,6 +106,8 @@ def _build_map() -> dict[TemplateKey, list[ImageTemplate]]:
         TemplateKey.END_EXERCISE_PAGE: [T.END_EXERCISE_PAGE],
         # 船坞已满
         TemplateKey.DOCK_FULL: [T.DOCK_FULL],
+        # 战役次数耗尽
+        TemplateKey.BATTLE_TIMES_EXCEED: [T.BATTLE_TIMES_EXCEED],
         # 战果评级
         TemplateKey.GRADE_SS: [T.Result.SS],
         TemplateKey.GRADE_S: [T.Result.S],

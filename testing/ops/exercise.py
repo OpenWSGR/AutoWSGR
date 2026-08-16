@@ -22,8 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore[union-attr]
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:  # noqa: S110
     pass
 from loguru import logger
@@ -94,7 +94,7 @@ def main() -> None:
 
         from autowsgr.ops.exercise import run_exercise
 
-        results = run_exercise(ctrl, fleet_id=args.fleet, rival=args.rival)
+        results = run_exercise(ctx, fleet_id=args.fleet, rival=args.rival)
         logger.info('run_exercise() 返回 {} 场结果', len(results))
         print(f'  [OK] 完成 {len(results)} 场演习')
         print()

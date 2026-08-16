@@ -187,7 +187,9 @@ class FleetRuleRequest(FleetShipRuleRequest):
 
     @field_validator('name')
     @classmethod
-    def _validate_name(cls, value: str | None) -> str | None:
+    def _validate_name(  # ty: ignore[invalid-method-override]  # 子类 name 可选，有意放宽签名
+        cls, value: str | None
+    ) -> str | None:
         if value is None:
             return None
         return value.strip() or None

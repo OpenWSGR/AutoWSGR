@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -41,7 +42,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
     from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
     from autowsgr.ui.main_page import MainPage
 
-    db_page = DecisiveBattlePage(runner.ctrl)
+    db_page = DecisiveBattlePage(runner.ctx)
 
     runner.verify_current('初始验证: 决战页面', '决战页面', DecisiveBattlePage.is_current_page)
     if runner.aborted:
@@ -83,17 +84,18 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
 
     if not reset_to_main_page(ctrl, pause):
         return
+    ctx = _make_test_ctx(ctrl)
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        MainPage(ctrl).navigate_to(MainPage.Target.SORTIE)
+        MainPage(ctx).navigate_to(MainPage.Target.SORTIE)
         time.sleep(pause)
         screen = ctrl.screenshot()
     if MapPage.is_current_page(screen):
         if MapPage.get_active_panel(screen) != MapPanel.DECISIVE:
-            MapPage(ctrl).switch_panel(MapPanel.DECISIVE)
+            MapPage(ctx).switch_panel(MapPanel.DECISIVE)
             time.sleep(pause)
             screen = ctrl.screenshot()
-        MapPage(ctrl).enter_decisive()
+        MapPage(ctx).enter_decisive()
         time.sleep(pause)
 
 

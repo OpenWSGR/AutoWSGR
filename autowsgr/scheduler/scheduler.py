@@ -25,7 +25,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from datetime import date
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from autowsgr.combat import CombatResult
 from autowsgr.infra.logger import get_logger
@@ -66,16 +66,16 @@ class BatchRunnerAdapter:
     和 :class:`ExerciseRunner`。
     """
 
-    def __init__(self, inner: object) -> None:
+    def __init__(self, inner: Any) -> None:
         if not hasattr(inner, 'run'):
             raise TypeError(f'{type(inner).__name__} 没有 run() 方法')
         self._inner = inner
 
     def run(self) -> list[CombatResult]:
-        results = self._inner.run()  # type: ignore[union-attr]
+        results = self._inner.run()
         if isinstance(results, list):
             return results
-        return [results]  # type: ignore[list-item]
+        return [results]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

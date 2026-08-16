@@ -45,7 +45,7 @@ class DecisiveState:
     def reset(self) -> None:
         """重置状态 (保留 chapter)。"""
         chapter = self.chapter
-        self.__init__()  # type: ignore[misc]
+        self.__init__()
         self.chapter = chapter
 
     def is_begin(self) -> bool:

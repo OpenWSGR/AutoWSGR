@@ -492,7 +492,7 @@ class PixelMarkerApp:
             return (px, py)
         return None
 
-    def _on_canvas_click(self, event: tk.Event) -> None:  # type: ignore[type-arg]
+    def _on_canvas_click(self, event: tk.Event) -> None:
         """左键点击：添加标注点。"""
         pos = self._canvas_to_image(event.x, event.y)
         if pos is None or self._image is None:
@@ -517,7 +517,7 @@ class PixelMarkerApp:
             f'添加点 #{len(self._config.points)}: ({rx:.4f}, {ry:.4f}) RGB=({r},{g},{b})'
         )
 
-    def _on_canvas_right_click(self, event: tk.Event) -> None:  # type: ignore[type-arg]
+    def _on_canvas_right_click(self, event: tk.Event) -> None:
         """右键点击：删除最近的标注点。"""
         if not self._config.points:
             return
@@ -543,7 +543,7 @@ class PixelMarkerApp:
                 f'删除点: ({removed.rx:.4f}, {removed.ry:.4f}) RGB=({removed.r},{removed.g},{removed.b})'
             )
 
-    def _on_canvas_motion(self, event: tk.Event) -> None:  # type: ignore[type-arg]
+    def _on_canvas_motion(self, event: tk.Event) -> None:
         """鼠标移动：显示当前位置颜色。"""
         pos = self._canvas_to_image(event.x, event.y)
         if pos is None or self._image is None:
@@ -689,7 +689,7 @@ class PixelMarkerApp:
             Path(path).write_text(self._config.to_yaml_str(), encoding='utf-8')
             self._status_var.set(f'已保存: {path}')
 
-    def _on_ctrl_c(self, _event: tk.Event) -> None:  # type: ignore[type-arg]
+    def _on_ctrl_c(self, _event: tk.Event) -> None:
         """Ctrl+C：如果导出框有内容就复制。"""
         content = self._export_text.get('1.0', tk.END).strip()
         if content:
