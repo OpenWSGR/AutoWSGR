@@ -234,7 +234,11 @@ class TaskScheduler:
 
         self._ctx.active_fight_tasks += 1
         try:
-            for j in range(task.times):
+            # 按「真实开打的轮次」计数: 解装完毕的船坞满轮 (DOCK_FULL +
+            # dock_full_destroyed, 本轮未开打) 不占次数, 立即重试; 否则打满
+            # task.times 轮为止
+            rounds = 0
+            while rounds < task.times:
                 if self._ctx.stop_event.is_set():
                     _log.info('[Scheduler] {} 检测到停止信号, 中断', task.name)
                     break
@@ -242,7 +246,7 @@ class TaskScheduler:
                 _log.info(
                     '[Scheduler] {} 第 {}/{} 次',
                     task.name,
-                    j + 1,
+                    rounds + 1,
                     task.times,
                 )
 
@@ -258,17 +262,29 @@ class TaskScheduler:
                     _log.opt(exception=True).error(
                         '[Scheduler] {} 第 {} 次异常, 结束本子任务: {}',
                         task.name,
-                        j + 1,
+                        rounds + 1,
                         exc,
                     )
                     results = [CombatResult(flag=ConditionFlag.ACTION_FAILED)]
 
                 if not results:
-                    _log.error('[Scheduler] {} 第 {} 次未执行任何战斗', task.name, j + 1)
+                    _log.error(
+                        '[Scheduler] {} 第 {} 次未执行任何战斗',
+                        task.name,
+                        rounds + 1,
+                    )
                     results = [CombatResult(flag=ConditionFlag.ACTION_FAILED)]
 
                 task.results.extend(results)
-                task.completed += 1
+
+                # 本轮全部为「解装完毕的船坞满」→ 未开打, 不占轮次,
+                # on_done 后立即重试 (下轮 run 重新导航进图)
+                dock_resolved = results and all(
+                    r.flag == ConditionFlag.DOCK_FULL and r.dock_full_destroyed for r in results
+                )
+                if not dock_resolved:
+                    rounds += 1
+                    task.completed = rounds
 
                 # 通知触发器更新状态 (auto_daily 触发器调度用)
                 for result in results:
@@ -283,17 +299,21 @@ class TaskScheduler:
                             )
 
                     _log.info(
-                        '[Scheduler] {} [{}/{}] → {}',
+                        '[Scheduler] {} [{}/{}] → {}{}',
                         task.name,
                         task.completed,
                         task.times,
                         result.flag.value if result.flag else 'N/A',
+                        ' (解装完毕, 重试)' if dock_resolved else '',
                     )
 
-                # 船坞满则停止当前任务
-                if any(result.flag == ConditionFlag.DOCK_FULL for result in results):
+                # 船坞满且未解装 → 停止当前任务 (解装完毕的轮不进此分支,
+                # 循环自然进入下一轮重试)
+                if any(
+                    r.flag == ConditionFlag.DOCK_FULL and not r.dock_full_destroyed for r in results
+                ):
                     _log.warning(
-                        '[Scheduler] {} 船坞已满, 跳过剩余 {} 次',
+                        '[Scheduler] {} 船坞已满且无法解装, 跳过剩余 {} 次',
                         task.name,
                         task.times - task.completed,
                     )

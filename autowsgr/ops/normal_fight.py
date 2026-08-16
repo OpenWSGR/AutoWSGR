@@ -439,12 +439,16 @@ class NormalFightRunner:
         _log.info('[OPS] 常规战结果: {}', result.flag.value)
 
     def _handle_dock_full(self, result: CombatResult) -> None:
-        """船坞已满: 按配置自动解装并重试，或保持 DOCK_FULL 标志。
+        """船坞已满: 按配置自动解装，并保持 DOCK_FULL 标志。
 
         解装走弹窗直达路线: 点弹窗「解装」按钮直达解体标签 (不绕主
         菜单/侧边栏导航 — 旧全局导航在 event 场景死循环, 2026-08-16
         实机), 其后复用 destroy_ships, 结束在主页面, 下轮 run 重新
         导航进图出击。
+
+        解装成功**不翻 flag**: 本轮引擎未开打 (node_count=0), 翻成功
+        标志会让触发器把未打的轮次计入次数。改置 ``dock_full_destroyed``,
+        由触发器/调度器识别"解装完毕、可重试"与"无法解装、须停止"。
         """
         if self._dock_full_destroy:
             from autowsgr.ops.destroy import destroy_ships_auto
@@ -458,10 +462,10 @@ class NormalFightRunner:
                     goto_page(self._ctx, PageName.MAIN)
                 except NavigationError as back_err:
                     _log.error('[OPS] 返回主页面失败: {}', back_err)
-                return  # result.flag 保持 DOCK_FULL, 由上层停止循环
+                return  # 解装未执行, 保持 DOCK_FULL 且未置 destroyed, 由上层停止
             if destroyed:
                 # 解装成功 (结束在主页面), 下轮 run 重新导航进图出击
-                result.flag = ConditionFlag.OPERATION_SUCCESS
+                result.dock_full_destroyed = True
             # destroyed=False: 白名单覆盖全部舰种, 无可解装对象, 保持 DOCK_FULL
             return
 

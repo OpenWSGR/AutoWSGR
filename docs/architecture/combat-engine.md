@@ -141,6 +141,11 @@ START_FIGHT → FIGHT_CONDITION → SPOT_ENEMY_SUCCESS → FORMATION
     → MAP_PAGE (终止)
 ```
 
+配置 `grade` (节点战果要求, 见 `NodeDecision.grade` / `CombatPlan.conditions`)
+的计划: `RESULT` 的后继改为经验结算页 `EXP_SETTLEMENT` (慢速, 逐页推进
+采集评级/MVP); 无要求计划快速穿行, 不经过经验页。见
+`CombatPlan.collect_result_info` (由 `conditions` 派生)。
+
 分支节点：
 
 - `SPOT_ENEMY_SUCCESS` → `fight` (进入战斗) / `detour` (迂回) / `retreat` (撤退)

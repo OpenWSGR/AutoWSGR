@@ -254,6 +254,7 @@ def _register_normal_fight(
                 name=task.name,
                 fleet_id=fleet_id,
                 target=task.times,  # None = 无限 (空闲填充)
+                conditions=plan.conditions,  # 镜像只读: 触发器按条件计数
             ),
         )
 

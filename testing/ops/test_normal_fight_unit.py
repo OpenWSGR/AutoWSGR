@@ -470,8 +470,8 @@ class TestDockFullDialogRoute:
         plan = CombatPlan.from_dict({'chapter': 2, 'map': 1})
         return NormalFightRunner(ctx, plan, resolve_fleet_selection(plan))
 
-    def test_destroy_success_flips_flag(self, monkeypatch: pytest.MonkeyPatch):
-        """解装成功 → flag 翻 SUCCESS, 下轮 run 重新进图出击。"""
+    def test_destroy_success_marks_destroyed_keeps_flag(self, monkeypatch: pytest.MonkeyPatch):
+        """解装成功 → 置 dock_full_destroyed, flag 保持 DOCK_FULL (未开打不翻成功标志)。"""
         import autowsgr.ops.destroy as destroy_module
 
         calls: list[bool] = []
@@ -486,7 +486,8 @@ class TestDockFullDialogRoute:
         runner._handle_dock_full(result)
 
         assert calls == [True]  # 走弹窗直达路线
-        assert result.flag is ConditionFlag.OPERATION_SUCCESS
+        assert result.flag is ConditionFlag.DOCK_FULL  # 不翻 flag, 触发器不误计数
+        assert result.dock_full_destroyed is True
 
     def test_destroy_exhausted_whitelist_keeps_flag(self, monkeypatch: pytest.MonkeyPatch):
         """白名单覆盖全部舰种 → 无可解装对象 → 保持 DOCK_FULL。"""
@@ -521,3 +522,23 @@ class TestDockFullDialogRoute:
 
         assert result.flag is ConditionFlag.DOCK_FULL
         assert goto_calls == [PageName.MAIN]
+
+
+class TestRunForTimesDockFullBehavior:
+    """run_for_times (老旧 API, 不改): 解装成功后 flag 保持 DOCK_FULL → 提前 break。
+
+    旧版解装成功翻 SUCCESS 会继续下一轮; 根治计数污染后 flag 不翻,
+    循环保守停止, 由上层/用户决策再启动。
+    """
+
+    def test_destroyed_dock_full_stops_loop(self, monkeypatch: pytest.MonkeyPatch):
+        runner = TestDockFullDialogRoute._make_runner()
+
+        resolved = CombatResult(flag=ConditionFlag.DOCK_FULL, dock_full_destroyed=True)
+        calls: list[int] = []
+        monkeypatch.setattr(runner, 'run', lambda **_k: calls.append(1) or resolved)
+
+        results = runner.run_for_times(3)
+
+        assert len(calls) == 1  # DOCK_FULL 即 break, 不再继续
+        assert results == [resolved]

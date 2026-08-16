@@ -16,6 +16,7 @@ import pytest
 from autowsgr.combat import CombatResult
 from autowsgr.context import GameContext
 from autowsgr.scheduler.scheduler import BatchRunnerAdapter, FightTask, TaskScheduler
+from autowsgr.scheduler.triggers import NormalFightPlan, NormalFightTrigger
 from autowsgr.types import ConditionFlag
 
 
@@ -553,3 +554,128 @@ def test_normal_fight_trigger_disable_survives_reset():
 
     assert trigger._disabled is True
     assert trigger.should_fire(ctx) is None
+
+
+# ── 战果条件计数 + DOCK_FULL 解装自愈 ──
+
+
+def _fight_result(node: str, grade: str) -> CombatResult:
+    """构造一场成功战斗: flag=SUCCESS + 单节点战果。"""
+    from autowsgr.combat.history import CombatEvent, EventType
+
+    result = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    result.history.add(CombatEvent(event_type=EventType.RESULT, node=node, result=grade))
+    return result
+
+
+def _make_normal_trigger(
+    conditions: tuple = (),
+    target: int = 3,
+) -> tuple[NormalFightTrigger, NormalFightPlan]:
+    plan: NormalFightPlan = NormalFightPlan(
+        factory=lambda _c: object(),
+        name='x',
+        fleet_id=1,
+        target=target,
+        conditions=conditions,
+    )
+    trigger: NormalFightTrigger = NormalFightTrigger(priority=100, name='常规战', plans=[plan])
+    return trigger, plan
+
+
+def test_normal_fight_trigger_counts_condition_met():
+    """conditions 计划: 达标场次计数, 打满 target 后停止产出。"""
+    from autowsgr.combat import GradeCondition
+
+    trigger, plan = _make_normal_trigger(
+        conditions=(GradeCondition(node='F', grade='S'),),
+        target=2,
+    )
+    ctx = _ctx_with_da(None)
+
+    for _ in range(2):
+        trigger.should_fire(ctx)
+        trigger._on_done(_fight_result('F', 'S'))
+
+    assert plan.completed == 2
+    assert trigger.should_fire(ctx) is None  # 打满
+
+
+def test_normal_fight_trigger_condition_not_met_not_counted():
+    """conditions 计划: 不达标场次 (评级不足) 不计数, 触发器继续产出。"""
+    from autowsgr.combat import GradeCondition
+
+    trigger, plan = _make_normal_trigger(conditions=(GradeCondition(node='F', grade='S'),))
+    ctx = _ctx_with_da(None)
+
+    trigger.should_fire(ctx)
+    trigger._on_done(_fight_result('F', 'A'))  # 评级不足
+
+    assert plan.completed == 0
+    assert trigger._idle is True
+    assert trigger.should_fire(ctx) is not None  # 未达标 → 下轮继续产出
+
+
+def test_normal_fight_trigger_dock_full_resolved_not_counted_retries():
+    """计数污染根治的自愈路径: 解装轮未开打, 不计数; 触发器翻回后重新产出重打。"""
+    trigger, plan = _make_normal_trigger(target=3)
+    ctx = _ctx_with_da(None)
+
+    trigger.should_fire(ctx)
+    trigger._on_done(
+        CombatResult(flag=ConditionFlag.DOCK_FULL, dock_full_destroyed=True),
+    )
+
+    assert plan.completed == 0  # 未开打, 不计数 (旧版翻 SUCCESS 会 +1)
+    assert trigger._idle is True
+    assert trigger.should_fire(ctx) is not None  # 下轮重试
+    assert trigger._current is plan  # 有限未完成 plan 仍被选中
+
+
+def test_run_task_dock_full_resolved_round_does_not_consume_times(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """scheduler: 解装轮不占 times — 解装 1 次 + 真打 3 次, 共 4 次 run 打满 3 轮。"""
+    ctx = _FakeCtx()
+    sched = TaskScheduler(ctx, expedition_interval=0)  # type: ignore[arg-type]
+    monkeypatch.setattr(sched, '_maybe_collect_expedition', lambda: None)
+
+    resolved = CombatResult(flag=ConditionFlag.DOCK_FULL, dock_full_destroyed=True)
+    ok = CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    seq = [resolved, ok, ok, ok]
+    calls: list[int] = []
+    runner = _SingleRunner(ok)
+
+    def run() -> CombatResult:
+        calls.append(1)
+        return seq[len(calls) - 1]
+
+    runner.run = run  # type: ignore[method-assign]
+    task = FightTask(runner=runner, times=3)
+
+    sched._run_task(task)
+
+    assert len(calls) == 4
+    assert task.completed == 3
+    assert task.results == [resolved, ok, ok, ok]
+
+
+def test_register_normal_fight_passes_condition(monkeypatch: pytest.MonkeyPatch):
+    """daily_plan: CombatPlan.condition 镜像到 NormalFightPlan (触发器按条件计数)。"""
+    from autowsgr.combat import CombatPlan, GradeCondition
+    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.ops import normal_fight as nf_mod
+    from autowsgr.scheduler.daily_plan import _register_normal_fight
+
+    plan = CombatPlan.from_dict({'node_args': {'F': {'grade': 'S'}}})
+    monkeypatch.setattr(nf_mod, 'get_normal_fight_plan', lambda *_a, **_k: plan)
+
+    sched = TaskScheduler(_FakeCtx(), expedition_interval=0)  # type: ignore[arg-type]
+    cfg = DailyAutomationConfig(
+        auto_normal_fight=True,
+        normal_fight_tasks=[{'name': 'x', 'times': 3}],
+    )
+    _register_normal_fight(sched, cfg)
+
+    trigger = sched._triggers[-1]
+    assert trigger._plans[0].conditions == (GradeCondition('F', 'S'),)

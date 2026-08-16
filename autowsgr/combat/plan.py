@@ -31,6 +31,9 @@ from .state import (
 
 _log = get_logger('combat')
 
+#: 合法战果等级 (低 → 高, 与 :class:`FightResult` 的比较序一致)
+_GRADE_VALUES: tuple[str, ...] = ('D', 'C', 'B', 'A', 'S', 'SS')
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 节点决策
@@ -70,6 +73,12 @@ class NodeDecision:
         进入战斗时是否 SL（用于卡点）。
     formation_when_spot_enemy_fails:
         索敌失败时使用的替代阵型。
+    grade:
+        本节点要求的最低战果等级 (``D``/``C``/``B``/``A``/``S``/``SS``),
+        空 = 无要求。写入 yaml ``node_args`` 的节点条目 (如
+        ``node_args: {F: {grade: S}}``); 放 ``node_defaults`` 则所有节点
+        都要求。配置后计划自动启用慢速结算采集, 触发器按条件计数
+        (见 :attr:`CombatPlan.conditions`)。
     """
 
     formation: Formation = Formation.double_column
@@ -84,6 +93,18 @@ class NodeDecision:
     SL_when_detour_fails: bool = True
     SL_when_enter_fight: bool = False
     formation_when_spot_enemy_fails: Formation | None = None
+    grade: str = ''
+
+    def __post_init__(self) -> None:
+        """校验并归一化 ``grade`` (空 = 无要求)。"""
+        if not self.grade:
+            return
+        grade = self.grade.upper()
+        if grade not in _GRADE_VALUES:
+            raise ValueError(
+                f'node grade: {self.grade!r} 不合法, 应为 {"/".join(_GRADE_VALUES)} 或留空',
+            )
+        self.grade = grade
 
     @classmethod
     def from_node_config(cls, config: NodeConfig) -> NodeDecision:
@@ -117,6 +138,7 @@ class NodeDecision:
             SL_when_detour_fails=config.SL_when_detour_fails,
             SL_when_enter_fight=config.SL_when_enter_fight,
             formation_when_spot_enemy_fails=formation_when_fail,
+            grade=config.grade,
         )
 
     @classmethod
@@ -192,6 +214,37 @@ MODE_END_PHASES: dict[str, CombatPhase] = {
 }
 
 MODE_CATEGORIES: dict[str, ModeCategory] = {mode: cat for mode, (cat, _ep) in _MODE_SPECS.items()}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 战果条件
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class GradeCondition:
+    """战果达成条件: 指定节点的战果等级达标 (``>=`` 条件等级)。
+
+    由 :attr:`NodeDecision.grade` (yaml ``node_args`` 下的 ``grade`` 键)
+    派生的值对象, 配置了条件的计划自动启用慢速结算采集 (见
+    :attr:`CombatPlan.conditions`), 触发器按条件判定是否计数。
+    """
+
+    node: str
+    grade: str
+
+    def __post_init__(self) -> None:
+        node = self.node.upper()
+        if len(node) != 1 or not 'A' <= node <= 'Z':
+            raise ValueError(f'节点名: {self.node!r} 不合法, 应为 A-Z 的单字母')
+        grade = self.grade.upper()
+        if grade not in _GRADE_VALUES:
+            raise ValueError(
+                f'战果要求: {self.grade!r} 不合法, 应为 {"/".join(_GRADE_VALUES)}',
+            )
+        # 归一化为大写 (frozen 用 object.__setattr__)
+        object.__setattr__(self, 'node', node)
+        object.__setattr__(self, 'grade', grade)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -271,21 +324,53 @@ class CombatPlan:
     event_name: str | None = None
     """活动名称（如 ``"20260212"``），用于定位活动地图节点数据。
     在 YAML 中写为 ``event: "20260212"``。"""
-    collect_result_info: bool = False
-    """是否在战果/经验结算页停留采集信息 (评级/MVP) — 慢速通过。
-
-    ``False`` (默认, 快速穿行): 经验结算页是过渡页, RESULT 识别后点击
-    循环直接穿行到掉落/前进/终态页, 不为页面停留 (血量检测除外, 单次
-    截图, 全局舰队状态同步需要)。多数刷战斗模式用此默认。
-
-    ``True`` (慢速): 经验页入状态机逐页推进, RESULT 页完整采集评级与
-    MVP (:class:`FightResult` / 战斗历史)。需要战果信息决策的调用方设
-    此项 (如 normal_fight 条件战斗按评级判定是否计入次数)。"""
+    _force_collect_result: bool = field(default=False, repr=False, compare=False)
+    """运行时强制慢速采集开关 (仅 :attr:`collect_result_info` 的兼容
+    setter 使用, 不入 yaml)。"""
 
     def __post_init__(self) -> None:
         """\u5c06单个 repair_mode 展开为 6 个位置的列表，保证属性始终为 ``list[RepairMode]``。"""
         if not isinstance(self.repair_mode, list):
             self.repair_mode = [self.repair_mode] * 6
+
+    @property
+    def conditions(self) -> tuple[GradeCondition, ...]:
+        """战果达成条件列表 — 从各节点的 ``grade`` (:attr:`NodeDecision.grade`) 派生。
+
+        yaml 形态 (``node_args`` 下)::
+
+            node_args:
+              F:
+                grade: S   # F 点要求 S 胜 (>= S)
+
+        配置后: ① 自动启用慢速结算采集 (:attr:`collect_result_info` 派生为
+        ``True``); ② 触发器 (:class:`~autowsgr.scheduler.triggers.NormalFightTrigger`)
+        按条件判定本次战斗是否计入次数 (所有配置 grade 的节点全部达标)。
+        空元组 (默认) 无条件, 每场成功即计数, 走快速穿行。
+        """
+        return tuple(
+            GradeCondition(node=node, grade=decision.grade)
+            for node, decision in self.nodes.items()
+            if decision.grade
+        )
+
+    @property
+    def collect_result_info(self) -> bool:
+        """是否在战果/经验结算页停留采集信息 (评级/MVP) — 慢速通过。
+
+        由 :attr:`conditions` 派生: 任一节点配置了战果要求 → ``True``
+        (慢速, 经验页入状态机逐页推进, 完整采集评级与 MVP); 无要求 →
+        ``False`` (默认, 快速穿行, 经验页是过渡页, 不为页面停留)。
+
+        兼容 setter: 运行时赋值 (如 ``run_for_times_condition`` 的
+        ``plan.collect_result_info = True``) 写入内部强制开关, 不改
+        *conditions* 本身。
+        """
+        return bool(self.conditions) or self._force_collect_result
+
+    @collect_result_info.setter
+    def collect_result_info(self, value: bool) -> None:
+        self._force_collect_result = bool(value)
 
     @property
     def transitions(self) -> dict[CombatPhase, PhaseBranch]:

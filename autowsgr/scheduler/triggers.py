@@ -26,6 +26,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
+from autowsgr.combat import GradeCondition, grade_condition_met
 from autowsgr.infra.logger import get_logger
 from autowsgr.scheduler.scheduler import FightTask
 from autowsgr.types import ConditionFlag
@@ -261,6 +262,11 @@ class NormalFightPlan:
         ``stop_max_ship`` / ``stop_max_loot`` / ``quick_repair_limit`` 约束)。
         dev 的 ``DailyAutomationConfig.normal_fight_tasks`` 只给 plan 名、不给次数,
         所以默认 ``None``, 多个无限 plan 会轮询执行。
+    conditions:
+        战果达成条件列表 (镜像自 :class:`CombatPlan.conditions`, 从
+        ``node_args`` 各节点的 ``grade`` 派生)。非空时只有满足全部
+        条件的场次才计数; 配置条件的 plan 自动走慢速结算采集
+        (grade/MVP), 触发器侧谓词才有材料可判。
     completed:
         已成功完成次数 (运行时, 仅日志/有限 plan 的停止判断用)。
     """
@@ -269,6 +275,7 @@ class NormalFightPlan:
     name: str
     fleet_id: int
     target: int | None = None
+    conditions: tuple[GradeCondition, ...] = ()
     completed: int = 0
 
 
@@ -372,8 +379,13 @@ class NormalFightTrigger(Trigger):
         self._idle = True
         if self._current is None:
             return
-        # 仅成功打完一场才计数 (对齐 classic: SUCCESS/SL 才算)
-        if result.flag in _DONE_FLAGS:
+        # 仅成功打完一场才计数 (对齐 classic: SUCCESS/SL 才算);
+        # 配置 conditions 的 plan 还须战果全部达标 — 不达标的场次 (如 SL
+        # 重开、评级不足) 不计入, 触发器下轮继续产出直到达标次数打满。
+        counted = result.flag in _DONE_FLAGS and all(
+            grade_condition_met(cond, result) for cond in self._current.conditions
+        )
+        if counted:
             self._current.completed += 1
             target = self._current.target
             progress = (
@@ -386,6 +398,13 @@ class NormalFightTrigger(Trigger):
                 self.name,
                 self._current.name,
                 progress,
+            )
+        elif result.flag in _DONE_FLAGS and self._current.conditions:
+            _log.info(
+                '[Trigger] {} {} 本场未达战果条件 ({}), 不计数',
+                self.name,
+                self._current.name,
+                '/'.join(f'{c.node}>={c.grade}' for c in self._current.conditions),
             )
 
     def reset(self) -> None:

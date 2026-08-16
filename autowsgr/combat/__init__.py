@@ -11,9 +11,9 @@ from .fleet import (
     fleet_slot_from_api,
     resolve_fleet_selection,
 )
-from .history import CombatEvent, CombatHistory, CombatResult, FightResult
+from .history import CombatEvent, CombatHistory, CombatResult, FightResult, grade_condition_met
 from .node_tracker import MapNodeData, NodeTracker
-from .plan import CombatMode, CombatPlan, NodeDecision
+from .plan import CombatMode, CombatPlan, GradeCondition, NodeDecision
 from .recognition import (
     SHIP_DROP_PAGE_SIGNATURE,
     ShipDropResult,
@@ -38,6 +38,7 @@ __all__ = [
     'FleetPreset',
     'FleetSelectionSource',
     'FleetSlotRule',
+    'GradeCondition',
     'MapNodeData',
     'NodeDecision',
     'NodeTracker',
@@ -47,6 +48,7 @@ __all__ = [
     'ShipDropResult',
     'ShipSelector',
     'fleet_slot_from_api',
+    'grade_condition_met',
     'recognize_enemy_formation',
     'recognize_ship_drop',
     'resolve_fleet_selection',
