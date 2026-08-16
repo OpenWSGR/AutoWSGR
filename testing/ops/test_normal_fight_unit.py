@@ -542,3 +542,78 @@ class TestRunForTimesDockFullBehavior:
 
         assert len(calls) == 1  # DOCK_FULL 即 break, 不再继续
         assert results == [resolved]
+
+
+class TestSkipCheckLifecycle:
+    """skip_check 仅在成功完成一场战斗 (OPERATION_SUCCESS) 后置位。
+
+    背景 (实机 2026-08-16 日志): 解装轮 (DOCK_FULL, 战斗未开打, 解装后停在
+    主页面) 也被无条件置 True, 下一轮带着"活动页浮层态在"的错误假设直接
+    出击 → 按钮匹配不到 → 回退固定坐标盲点误触节点卡片按出浮层 → 超时。
+    中途打断/失败一律恢复完整检查。
+    """
+
+    @staticmethod
+    def _make_runner() -> NormalFightRunner:
+        cfg = SimpleNamespace(dock_full_destroy=False, destroy_ship_types=None)
+        ctx = SimpleNamespace(
+            ctrl=None,
+            config=cfg,
+            sync_before_combat=MagicMock(),
+            sync_after_combat=MagicMock(),
+        )
+        plan = CombatPlan.from_dict({'chapter': 'H', 'map': 5})
+        return NormalFightRunner(ctx, plan, resolve_fleet_selection(plan))
+
+    def _mock_flow(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        runner: NormalFightRunner,
+        flag: ConditionFlag,
+    ) -> None:
+        """mock run() 流程各环节, _do_combat 返回指定 flag 的结果。"""
+        monkeypatch.setattr(runner, '_enter_fight', lambda: None)
+        monkeypatch.setattr(runner, '_prepare_for_battle', list)
+        monkeypatch.setattr(runner, '_do_combat', lambda _stats: CombatResult(flag=flag))
+        monkeypatch.setattr(runner, '_handle_result', lambda _result: None)
+        monkeypatch.setattr(normal_fight_module.time, 'sleep', lambda _seconds: None)
+
+    def test_first_run_starts_with_full_check(self):
+        """新 runner 从完整检查开始 (init 回归, 防语义漂移)。"""
+        assert self._make_runner()._skip_check is False
+
+    def test_success_sets_skip_check(self, monkeypatch: pytest.MonkeyPatch):
+        """成功完成一场战斗 (战后回港必落关卡浮层态) → 下一轮可跳过检查。"""
+        runner = self._make_runner()
+        self._mock_flow(monkeypatch, runner, ConditionFlag.OPERATION_SUCCESS)
+
+        runner.run()
+
+        assert runner._skip_check is True
+
+    def test_dock_full_resets_skip_check(self, monkeypatch: pytest.MonkeyPatch):
+        """解装轮 (DOCK_FULL, 战斗未开打) → 浮层态前提破坏, 恢复完整检查。"""
+        runner = self._make_runner()
+        runner._skip_check = True  # 模拟上一轮成功
+        self._mock_flow(monkeypatch, runner, ConditionFlag.DOCK_FULL)
+
+        runner.run()
+
+        assert runner._skip_check is False
+
+    def test_mid_fight_error_resets_skip_check(self, monkeypatch: pytest.MonkeyPatch):
+        """中途异常 (导航超时等) → 下一轮恢复完整检查 (实机 log 场景回归)。"""
+        from autowsgr.ui.utils import NavigationError
+
+        runner = self._make_runner()
+        runner._skip_check = True  # 模拟上一轮成功
+
+        def _raise_nav_error() -> None:
+            raise NavigationError('等待超时: EVENT_MAP -> BATTLE_PREP')
+
+        monkeypatch.setattr(runner, '_enter_fight', _raise_nav_error)
+
+        with pytest.raises(NavigationError):
+            runner.run()
+
+        assert runner._skip_check is False

@@ -103,7 +103,8 @@ class NormalFightRunner:
             self._entrance = None
             self._map_code = ''
 
-        # 首次执行检查难度/节点, 后续重复出征跳过 (仅 event 分支使用)
+        # 仅上一轮 OPERATION_SUCCESS (成功完成战斗, 战后回港必落关卡浮层态)
+        # 才跳过难度/节点检查直接出击; 中途打断/失败一律恢复完整检查 (仅 event 分支使用)
         self._skip_check = False
 
         self._results: list[CombatResult] = []
@@ -132,37 +133,43 @@ class NormalFightRunner:
             self._plan.name,
             self._fleet_selection.source,
         )
+        try:
+            # 1. 进入战斗地图
+            self._enter_fight()
 
-        # 1. 进入战斗地图
-        self._enter_fight()
+            # 2. 出征准备
+            ship_stats = self._prepare_for_battle()
 
-        # 2. 出征准备
-        ship_stats = self._prepare_for_battle()
+            # 同步战前信息到上下文
+            self._ctx.sync_before_combat(
+                self._fleet_id,
+                self._fleet_ships,
+                loot_count=self._loot_count,
+                ship_acquired_count=self._ship_acquired_count,
+            )
 
-        # 同步战前信息到上下文
-        self._ctx.sync_before_combat(
-            self._fleet_id,
-            self._fleet_ships,
-            loot_count=self._loot_count,
-            ship_acquired_count=self._ship_acquired_count,
-        )
+            # 3. 执行战斗
+            result = self._do_combat(ship_stats)
 
-        # 3. 执行战斗
-        result = self._do_combat(ship_stats)
+            # 赋值出征面板识别到的今日获取数量和舰队信息
+            result.loot_count = self._loot_count
+            result.ship_acquired_count = self._ship_acquired_count
+            result.fleet = self._fleet_ships
 
-        # 赋值出征面板识别到的今日获取数量和舰队信息
-        result.loot_count = self._loot_count
-        result.ship_acquired_count = self._ship_acquired_count
-        result.fleet = self._fleet_ships
+            # 同步战后信息到上下文
+            self._ctx.sync_after_combat(self._fleet_id, result)
 
-        # 同步战后信息到上下文
-        self._ctx.sync_after_combat(self._fleet_id, result)
+            # 4. 处理结果
+            self._handle_result(result)
+        except Exception:
+            # 中途打断 (导航/编队/出征异常): 战后浮层态前提不可知,
+            # 下一轮恢复完整检查 (选难度/节点/入口)
+            self._skip_check = False
+            raise
 
-        # 4. 处理结果
-        self._handle_result(result)
-
-        # 后续重复出征跳过难度/节点检查 (event 分支使用)
-        self._skip_check = True
+        # 仅成功完成一场战斗才允许下一轮跳过检查 (战后回港必落关卡浮层态);
+        # 其余 (DOCK_FULL 解装 / SL / 次数用尽 / 失败) 浮层态前提破坏, 重新检查
+        self._skip_check = result.flag == ConditionFlag.OPERATION_SUCCESS
         return result
 
     def run_for_times(
