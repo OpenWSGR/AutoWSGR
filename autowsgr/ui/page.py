@@ -42,12 +42,36 @@ _log = get_logger('ui')
 
 _PAGE_REGISTRY: dict[str, Callable[[np.ndarray], PageMatch | bool]] = {}
 
+_OVERLAY_PAGES: set[str] = set()
+"""覆盖型页面名集合 (抽屉/浮层)。
 
-def register_page(name: str, checker: Callable[[np.ndarray], PageMatch | bool]) -> None:
+这类页面**不遮挡底页的识别元素** (如侧边栏是左侧抽屉, 主页面签名元素在
+右侧): 打开时底页签名仍会命中, 且分数往往更高 (主页面 0.988 vs 侧边栏
+~0.86)。纯分数排序会把"侧边栏开着"误判为纯主页面, 导致导航在"已到达
+侧边栏"与"当前是主页面"之间震荡 — 反复点击切换按钮把侧边栏开了又关,
+等待超时 (实机 2026-08-16: 船坞满自动解装的 MAIN→SIDEBAR 死循环)。"""
+
+
+def register_page(
+    name: str,
+    checker: Callable[[np.ndarray], PageMatch | bool],
+    *,
+    overlay: bool = False,
+) -> None:
     """注册页面识别函数。
 
     checker 宜返回 :class:`~autowsgr.vision.page_match.PageMatch`(携带 score,
     供候选集排序);兼容旧式返回 ``bool`` 的识别器(自动归一化:True→1.0, False→0.0)。
+
+    Parameters
+    ----------
+    name:
+        页面名 (PageName 或纯 str)。
+    checker:
+        页面识别函数。
+    overlay:
+        是否为覆盖型页面 (抽屉/浮层, 见 :data:`_OVERLAY_PAGES`)。
+        覆盖型页面命中时优先于底页返回 (z-order 优先于分数)。
     """
     # Python 3.13+ 中 StrEnum 的 str()/format() 返回 'ClassName.MEMBER' 而非值，
     # 显式提取 .value 确保 key 始终为纯 str，避免日志和比较中出现意外格式。
@@ -55,6 +79,10 @@ def register_page(name: str, checker: Callable[[np.ndarray], PageMatch | bool]) 
     if key in _PAGE_REGISTRY:
         _log.warning("[UI] 页面 '{}' 已注册，将覆盖", key)
     _PAGE_REGISTRY[key] = checker
+    if overlay:
+        _OVERLAY_PAGES.add(key)
+    else:
+        _OVERLAY_PAGES.discard(key)
     # _log.debug("[UI] 注册页面: {}", key)
 
 
@@ -96,10 +124,11 @@ def get_current_page(
 ) -> str | None:
     """识别截图对应的页面名称,无匹配返回 ``None``。
 
-    在命中的页面里按 ``score`` 降序取最高分(替代旧的"首次匹配即胜");
-    分数相同者保持注册(候选)顺序。每个识别器返回
-    :class:`~autowsgr.vision.page_match.PageMatch`,score 归一自像素 ratio /
-    模板 confidence / tabbed 覆盖度。
+    覆盖型页面 (overlay) 命中时优先于底页返回 — 用户可见/可操作的是覆盖层,
+    底页签名同时命中属于预期 (不遮挡)。非覆盖命中集内按 ``score`` 降序取
+    最高分(替代旧的"首次匹配即胜"); 分数相同者保持注册(候选)顺序。每个
+    识别器返回 :class:`~autowsgr.vision.page_match.PageMatch`,score 归一自
+    像素 ratio / 模板 confidence / tabbed 覆盖度。
 
     Parameters
     ----------
@@ -133,9 +162,12 @@ def get_current_page(
             hits.append(pm)
 
     if hits:
+        # 覆盖型优先 (z-order): 侧边栏开着时主页面也命中且分更高, 但当前页是侧边栏
+        overlay_hits = [m for m in hits if m.name in _OVERLAY_PAGES]
+        pool = overlay_hits or hits
         # 稳定排序:分数降序,同分保持候选顺序
-        hits.sort(key=lambda m: m.score, reverse=True)
-        best = hits[0]
+        pool.sort(key=lambda m: m.score, reverse=True)
+        best = pool[0]
         _log.debug(
             '[UI] 当前页面: {} (score={:.3f}, 候选 {} / 命中 {})',
             best.name,
