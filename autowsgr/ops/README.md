@@ -15,7 +15,7 @@
 - cook
 - reward
 
-每个模块只有少量功能，全部做 e2e 测试即可。测试脚本统一放在 `testing/ops/` 下。
+每个模块只有少量功能，全部做 e2e 测试即可。测试脚本统一放在 `tests/manual/ops/` 下。
 
 | 模块 | 功能 | 状态 |
 |------|------|------|
@@ -36,31 +36,31 @@
 ### startup 测试 ✅
 
 ```bash
-python testing/ops/startup.py
-python testing/ops/startup.py 127.0.0.1:16384
+python tests/ops/startup.py
+python tests/ops/startup.py 127.0.0.1:16384
 ```
 
 ### normal_fight 测试 ✅
 
 ```bash
-python testing/ops/normal_fight.py
-python testing/ops/normal_fight.py 127.0.0.1:16384 3  # 指定设备和次数
-python testing/ops/normal_fight.py --plan examples/plans/normal_fight/7-46SS-all.yaml
+python tests/ops/normal_fight.py
+python tests/ops/normal_fight.py 127.0.0.1:16384 3  # 指定设备和次数
+python tests/ops/normal_fight.py --plan examples/plans/normal_fight/7-46SS-all.yaml
 ```
 
 ### campaign 测试 ✅
 
 ```bash
-python testing/ops/campaign.py                              # 困难驱逐 x1
-python testing/ops/campaign.py 127.0.0.1:16384 困难航母 3  # 指定战役和次数
-python testing/ops/campaign.py "" 简单驱逐 2
+python tests/ops/campaign.py                              # 困难驱逐 x1
+python tests/ops/campaign.py 127.0.0.1:16384 困难航母 3  # 指定战役和次数
+python tests/ops/campaign.py "" 简单驱逐 2
 ```
 
 ### expedition 测试 ✅
 
 ```bash
-python testing/ops/expedition.py
-python testing/ops/expedition.py 127.0.0.1:16384
+python tests/ops/expedition.py
+python tests/ops/expedition.py 127.0.0.1:16384
 ```
 
 ### decisive 测试 ❌
@@ -70,15 +70,15 @@ python testing/ops/expedition.py 127.0.0.1:16384
 ### exercise 测试 ✅
 
 ```bash
-python testing/ops/exercise.py --fleet 1
-python testing/ops/exercise.py --fleet 1 --rival 3
+python tests/ops/exercise.py --fleet 1
+python tests/ops/exercise.py --fleet 1 --rival 3
 ```
 
 ### build 测试 ❌
 
 ```bash
-python testing/ops/build.py
-python testing/ops/build.py 127.0.0.1:16384
+python tests/ops/build.py
+python tests/ops/build.py 127.0.0.1:16384
 ```
 
 ### repair 测试 ❌
@@ -86,8 +86,8 @@ python testing/ops/build.py 127.0.0.1:16384
 #### 修复第一艘舰船 ✅
 
 ```bash
-python testing/ops/repair.py
-python testing/ops/repair.py 127.0.0.1:16384
+python tests/ops/repair.py
+python tests/ops/repair.py 127.0.0.1:16384
 ```
 
 #### 按照名称修复舰船 ❌
@@ -97,21 +97,21 @@ python testing/ops/repair.py 127.0.0.1:16384
 ### destroy 测试 ✅
 
 ```bash
-python testing/ops/destroy.py
-python testing/ops/destroy.py 127.0.0.1:16384
+python tests/ops/destroy.py
+python tests/ops/destroy.py 127.0.0.1:16384
 ```
 
 ### cook 测试 ✅
 
 ```bash
-python testing/ops/cook.py
-python testing/ops/cook.py 127.0.0.1:16384 2
+python tests/ops/cook.py
+python tests/ops/cook.py 127.0.0.1:16384 2
 ```
 
 ### reward 测试 ✅
 
 ```bash
-python testing/ops/reward.py
-python testing/ops/reward.py 127.0.0.1:16384
-python testing/ops/reward.py 127.0.0.1:16384 --auto
+python tests/ops/reward.py
+python tests/ops/reward.py 127.0.0.1:16384
+python tests/ops/reward.py 127.0.0.1:16384 --auto
 ```
