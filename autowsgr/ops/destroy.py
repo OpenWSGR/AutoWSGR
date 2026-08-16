@@ -11,16 +11,13 @@
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import DestroyShipWorkMode, PageName, ShipType
-from autowsgr.ui.battle import BattlePreparationPage
-from autowsgr.ui.build_page import CLICK_BACK as CLICK_BUILD_BACK
 from autowsgr.ui.build_page import BuildPage, BuildTab
-from autowsgr.ui.utils import NavigationError, click_and_wait_for_page
+from autowsgr.ui.utils import click_and_wait_for_page
 
 
 if TYPE_CHECKING:
@@ -81,8 +78,9 @@ def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
     ----------
     from_dialog:
         ``True`` 时要求当前停在船坞满弹窗 (战斗准备页点出征后弹出):
-        点弹窗「解装」按钮直达解体标签执行解装, 解装完成后停在战斗准备页
-        — 不绕主菜单/侧边栏导航, 也不退出地图重选节点。
+        先点弹窗「解装」按钮直达建造页 (不绕主菜单/侧边栏导航),
+        其后复用 :func:`destroy_ships` — 结束在主页面 (该入口的返回
+        无视 UI 栈, 解装页点返回直达主页, 不回战斗准备页)。
         ``False`` (默认) 走全局导航: 任意页面 → 建造页 (解体), 结束回主页面。
 
     Returns
@@ -107,36 +105,26 @@ def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
             return False
 
     if from_dialog:
-        destroy_ships_from_dialog(
-            ctx,
-            ship_types,
-            remove_equipment=cfg.remove_equipment_mode,
-        )
-    else:
-        destroy_ships(
-            ctx,
-            ship_types=ship_types,
-            remove_equipment=cfg.remove_equipment_mode,
-        )
+        _enter_destroy_page_from_dialog(ctx)
+    destroy_ships(
+        ctx,
+        ship_types=ship_types,
+        remove_equipment=cfg.remove_equipment_mode,
+    )
     return True
 
 
-def destroy_ships_from_dialog(
-    ctx: GameContext,
-    ship_types: list[ShipType] | None,
-    *,
-    remove_equipment: bool,
-) -> None:
-    """船坞满弹窗直达解装: 弹窗「解装」→ 解体标签 → 解装 → 回战斗准备页。
+def _enter_destroy_page_from_dialog(ctx: GameContext) -> None:
+    """点船坞满弹窗「解装」按钮, 直达建造页解体标签。
 
-    游戏行为 (实机 UI 流): 战斗准备页点出征弹出船坞满弹窗, 其「解装」
-    按钮直达建造页解体标签; 解装完成后返回战斗准备页 (出征上下文仍在,
-    可直接重新点出征, 无需重新导航进图选节点)。
+    点击后游戏无视 UI 栈直达建造页 (不经过主菜单/侧边栏), 后续解装
+    复用 :func:`destroy_ships` — 其开头的 ``goto_page(BUILD)`` 幂等直达,
+    结尾 ``goto_page(MAIN)`` 即解装页返回的落点 (无视 UI 栈回主页)。
 
     Raises
     ------
     NavigationError
-        点弹窗按钮后未到达建造页, 或解装后未返回战斗准备页。
+        点弹窗按钮后未到达建造页。
     """
     _log.info('[OPS] 船坞满弹窗 → 直达解装')
     click_and_wait_for_page(
@@ -146,37 +134,3 @@ def destroy_ships_from_dialog(
         source='船坞满弹窗',
         target=PageName.BUILD,
     )
-    page = BuildPage(ctx)
-    page.switch_tab(BuildTab.DESTROY)
-    page.destroy_ships(ship_types, remove_equipment=remove_equipment)
-    _wait_battle_prep_return(ctx)
-    _log.info('[OPS] 解装完成, 已返回战斗准备页')
-
-
-def _wait_battle_prep_return(ctx: GameContext) -> None:
-    """等待返回战斗准备页: 先等游戏自动返回, 超时点建造页返回键兜底。
-
-    解装完成后游戏通常自动弹回战斗准备页; 若停在解体标签, 点返回键
-    沿进入链路 (弹窗直达) 回到战斗准备页。
-
-    Raises
-    ------
-    NavigationError
-        两轮等待后仍未到达战斗准备页。
-    """
-
-    def _poll(timeout: float) -> bool:
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if BattlePreparationPage.is_current_page(ctx.ctrl.screenshot()):
-                return True
-            time.sleep(0.5)
-        return False
-
-    if _poll(6.0):
-        return
-    _log.info('[OPS] 解装后未自动返回战斗准备页, 点击建造页返回键')
-    ctx.ctrl.click(*CLICK_BUILD_BACK)
-    if _poll(5.0):
-        return
-    raise NavigationError('解装后未返回战斗准备页', screen=ctx.ctrl.screenshot())

@@ -78,10 +78,6 @@ class NormalFightRunner:
         self._dock_full_destroy = ctx.config.dock_full_destroy
         self._destroy_ship_types = ctx.config.destroy_ship_types or None
 
-        # 船坞满弹窗直达解装后游戏停在战斗准备页 — 下轮 run 跳过进图
-        # 导航, 直接出征准备重新点出征 (不退出地图/活动重选节点)
-        self._at_battle_prep = False
-
         # chapter 为 E/H → 活动地图入口; 否则常规地图。仅靠 plan 决定导航,
         # event 与 normal 共用本 runner (融合), 复用 normal_fight 触发器。
         self._is_event = str(plan.chapter).upper() in ('E', 'H')
@@ -137,12 +133,8 @@ class NormalFightRunner:
             self._fleet_selection.source,
         )
 
-        # 1. 进入战斗地图 (弹窗解装后已在战斗准备页, 跳过导航直接出征准备)
-        if self._at_battle_prep:
-            self._at_battle_prep = False
-            _log.info('[OPS] 已在战斗准备页 (解装后重出击), 跳过地图导航')
-        else:
-            self._enter_fight()
+        # 1. 进入战斗地图
+        self._enter_fight()
 
         # 2. 出征准备
         ship_stats = self._prepare_for_battle()
@@ -449,9 +441,10 @@ class NormalFightRunner:
     def _handle_dock_full(self, result: CombatResult) -> None:
         """船坞已满: 按配置自动解装并重试，或保持 DOCK_FULL 标志。
 
-        解装走弹窗直达路线: 点弹窗「解装」按钮进解体标签, 解装完成
-        游戏返回战斗准备页 — 不退出地图/活动回主菜单绕侧边栏导航
-        (否则 event 重出击需重新选节点, 代价高且全局导航易失败)。
+        解装走弹窗直达路线: 点弹窗「解装」按钮直达解体标签 (不绕主
+        菜单/侧边栏导航 — 旧全局导航在 event 场景死循环, 2026-08-16
+        实机), 其后复用 destroy_ships, 结束在主页面, 下轮 run 重新
+        导航进图出击。
         """
         if self._dock_full_destroy:
             from autowsgr.ops.destroy import destroy_ships_auto
@@ -467,9 +460,8 @@ class NormalFightRunner:
                     _log.error('[OPS] 返回主页面失败: {}', back_err)
                 return  # result.flag 保持 DOCK_FULL, 由上层停止循环
             if destroyed:
-                # 解装成功且已回战斗准备页 — 下轮跳过进图导航直接重新出征
+                # 解装成功 (结束在主页面), 下轮 run 重新导航进图出击
                 result.flag = ConditionFlag.OPERATION_SUCCESS
-                self._at_battle_prep = True
             # destroyed=False: 白名单覆盖全部舰种, 无可解装对象, 保持 DOCK_FULL
             return
 

@@ -456,26 +456,22 @@ class TestEventFightRunnerCompat:
 
 
 class TestDockFullDialogRoute:
-    """船坞满弹窗直达解装: 不绕主菜单导航, 解装后跳过进图直接重出击。
+    """船坞满弹窗直达解装: 点弹窗「解装」直达解体标签, 不绕主菜单导航。
 
     正确 UI 路径 (实机): 战斗准备 → 点出征 → 船坞满弹窗 → 弹窗「解装」
-    按钮直达解体标签 → 解装完成回战斗准备页 → 重新点出征。
+    按钮直达建造页 (返回无视 UI 栈直达主页) → 复用 destroy_ships 解装,
+    结束在主页面, 下轮 run 重新导航进图出击。
     """
 
     @staticmethod
     def _make_runner(*, dock_full_destroy: bool = True) -> NormalFightRunner:
         cfg = SimpleNamespace(dock_full_destroy=dock_full_destroy, destroy_ship_types=None)
-        ctx = SimpleNamespace(
-            ctrl=None,
-            config=cfg,
-            sync_before_combat=MagicMock(),
-            sync_after_combat=MagicMock(),
-        )
+        ctx = SimpleNamespace(ctrl=None, config=cfg)
         plan = CombatPlan.from_dict({'chapter': 2, 'map': 1})
         return NormalFightRunner(ctx, plan, resolve_fleet_selection(plan))
 
-    def test_destroy_success_sets_prep_flag(self, monkeypatch: pytest.MonkeyPatch):
-        """解装成功 → flag 翻 SUCCESS + 标记下轮跳过进图导航。"""
+    def test_destroy_success_flips_flag(self, monkeypatch: pytest.MonkeyPatch):
+        """解装成功 → flag 翻 SUCCESS, 下轮 run 重新进图出击。"""
         import autowsgr.ops.destroy as destroy_module
 
         calls: list[bool] = []
@@ -491,7 +487,6 @@ class TestDockFullDialogRoute:
 
         assert calls == [True]  # 走弹窗直达路线
         assert result.flag is ConditionFlag.OPERATION_SUCCESS
-        assert runner._at_battle_prep is True
 
     def test_destroy_exhausted_whitelist_keeps_flag(self, monkeypatch: pytest.MonkeyPatch):
         """白名单覆盖全部舰种 → 无可解装对象 → 保持 DOCK_FULL。"""
@@ -504,7 +499,6 @@ class TestDockFullDialogRoute:
         runner._handle_dock_full(result)
 
         assert result.flag is ConditionFlag.DOCK_FULL
-        assert runner._at_battle_prep is False
 
     def test_nav_error_falls_back_to_main(self, monkeypatch: pytest.MonkeyPatch):
         """直达解装导航失败 → 回退主页面恢复已知态, 保持 DOCK_FULL。"""
@@ -512,7 +506,7 @@ class TestDockFullDialogRoute:
         from autowsgr.ui.utils import NavigationError
 
         def _raise(_ctx: object, **_k: object) -> None:
-            raise NavigationError('解装后未返回战斗准备页')
+            raise NavigationError('弹窗直达解装失败')
 
         monkeypatch.setattr(destroy_module, 'destroy_ships_auto', _raise)
 
@@ -526,39 +520,4 @@ class TestDockFullDialogRoute:
         runner._handle_dock_full(result)
 
         assert result.flag is ConditionFlag.DOCK_FULL
-        assert runner._at_battle_prep is False
         assert goto_calls == [PageName.MAIN]
-
-    def test_run_skips_enter_fight_after_dialog_destroy(self, monkeypatch: pytest.MonkeyPatch):
-        """解装后重出击: 已在战斗准备页 → 跳过进图导航, 直接出征准备。"""
-        runner = self._make_runner()
-        runner._at_battle_prep = True
-
-        entered: list[bool] = []
-        monkeypatch.setattr(runner, '_enter_fight', lambda: entered.append(True))
-        monkeypatch.setattr(runner, '_prepare_for_battle', list)
-
-        combat_results = [CombatResult()]
-        monkeypatch.setattr(runner, '_do_combat', lambda _stats: combat_results[0])
-        monkeypatch.setattr(runner, '_handle_result', lambda _result: None)
-
-        runner.run()
-
-        assert entered == []  # 未重新导航进图 (event 场景不退出活动)
-        assert runner._at_battle_prep is False  # 一次性标志已消费
-
-    def test_run_enters_fight_without_prep_flag(self, monkeypatch: pytest.MonkeyPatch):
-        """常规轮次 (无解装标记) → 照常进图导航。"""
-        runner = self._make_runner()
-
-        entered: list[bool] = []
-        monkeypatch.setattr(runner, '_enter_fight', lambda: entered.append(True))
-        monkeypatch.setattr(runner, '_prepare_for_battle', list)
-
-        combat_results = [CombatResult()]
-        monkeypatch.setattr(runner, '_do_combat', lambda _stats: combat_results[0])
-        monkeypatch.setattr(runner, '_handle_result', lambda _result: None)
-
-        runner.run()
-
-        assert entered == [True]
