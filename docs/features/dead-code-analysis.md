@@ -2,10 +2,12 @@
 
 ## 1. 分析范围
 
-- 分支：`refactor/fleet-change-modules`
-- 依赖基线：PR #537（`fix/smart-fleet-change-phase-1`，提交 `f4d584b`）
+- 分支：`ShiinaKuroko`
+- 基线提交：`3195808`
 - 扫描范围：`autowsgr/`、`testing/`、`examples/`、`tools/` 和 `docs/`
 - 目标：区分可安全删除的内部残留、必须保留的兼容接口，以及不能仅凭静态引用判断的公开 API
+
+工作区中的 scrcpy 实验改动、基准图片和未提交 OCR 文档不在本次分析范围内。
 
 ## 2. 分析方法
 

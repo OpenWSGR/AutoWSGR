@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 import autowsgr.ops.normal_fight as normal_fight_module
 from autowsgr import ops
-from autowsgr.combat import CombatResult
+from autowsgr.combat import CombatPlan, CombatResult
 from autowsgr.combat.fleet import FleetSelectionSource, ResolvedFleetSelection
 from autowsgr.server import main as server_main
 from autowsgr.server.device_lease import DeviceOperationBusyError
@@ -25,6 +25,7 @@ from autowsgr.server.schemas import (
     EventFightRequest,
     ExerciseRequest,
     FleetRuleRequest,
+    NodeDecisionRequest,
     NormalFightRequest,
     RoundResult,
     TaskStatusResponse,
@@ -104,6 +105,45 @@ def test_task_start_requires_system_context(monkeypatch: pytest.MonkeyPatch) -> 
         asyncio.run(task.task_start(ExerciseRequest()))
 
     assert exc_info.value.status_code == 503
+
+
+def test_campaign_route_preserves_out_of_times_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Campaign terminal reason reaches the task outcome consumed by the GUI."""
+    manager = _ExecutingTaskManager()
+
+    class CampaignRunnerStub:
+        def __init__(
+            self,
+            _ctx: object,
+            *,
+            campaign_name: str,
+            times: int,
+        ) -> None:
+            assert campaign_name == '困难航母'
+            assert times == 1
+
+        @staticmethod
+        def run() -> list[CombatResult]:
+            return [CombatResult(flag=ConditionFlag.BATTLE_TIMES_EXCEED)]
+
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'CampaignRunner', CampaignRunnerStub)
+
+    response = asyncio.run(
+        task._start_campaign(
+            object(),
+            CampaignRequest(campaign_name='困难航母', times=1),
+        )
+    )
+
+    assert response.success is True
+    assert manager.outcome is not None
+    assert manager.outcome.success is False
+    assert manager.outcome.results[0]['success'] is False
+    assert manager.outcome.results[0]['result'] == ConditionFlag.BATTLE_TIMES_EXCEED.value
+    assert manager.results == manager.outcome.results
 
 
 def test_task_start_reports_device_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -432,6 +472,75 @@ def test_event_route_top_level_fleet_id_overrides_api_plan(
     asyncio.run(task._start_event_fight(object(), request))
 
     assert captured[0].fleet_id == 5
+
+
+def test_normal_route_applies_explicit_node_overrides_to_yaml_plan(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """GUI 随请求发送的节点阵型应覆盖入队时生成的 YAML 快照。"""
+    manager = _ExecutingTaskManager()
+    captured: list[CombatPlan] = []
+
+    def run_normal_fight(
+        _ctx: object,
+        plan: CombatPlan,
+        *,
+        times: int,
+        fleet_selection: ResolvedFleetSelection,
+    ) -> list[CombatResult]:
+        assert times == 1
+        assert fleet_selection.fleet_id == 1
+        captured.append(plan)
+        return [CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)]
+
+    yaml_path = tmp_path / 'node-formation.yaml'
+    yaml_path.write_text(
+        '\n'.join(
+            [
+                'chapter: 7',
+                'map: 4',
+                'selected_nodes: [A, B]',
+                'node_defaults:',
+                '  formation: 2',
+                'node_args:',
+                '  B:',
+                '    formation: 3',
+                '    sl_when_detour_fails: false',
+                '',
+            ],
+        ),
+        encoding='utf-8',
+    )
+    request = NormalFightRequest(
+        plan_id=str(yaml_path),
+        plan=CombatPlanRequest(
+            node_defaults=NodeDecisionRequest(formation=2),
+            node_args={
+                'B': NodeDecisionRequest(
+                    formation=4,
+                    night=True,
+                    long_missile_support=True,
+                    proceed=False,
+                    SL_when_detour_fails=True,
+                )
+            },
+        ),
+    )
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'run_normal_fight', run_normal_fight)
+
+    response = asyncio.run(task._start_normal_fight(object(), request))
+
+    assert response.success is True
+    assert len(captured) == 1
+    decision = captured[0].get_node_decision('B')
+    assert decision.formation.value == 4
+    assert decision.night is True
+    assert decision.long_missile_support is True
+    assert decision.proceed is False
+    assert decision.SL_when_detour_fails is True
+    assert not hasattr(decision, 'sl_when_detour_fails')
 
 
 def test_normal_route_enters_real_runner_with_resolved_selection(

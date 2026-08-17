@@ -178,8 +178,18 @@ extend-safe-fixes = [
 "tools/**" = [
     "T201",    # print
 ]
+"tools/ocr_change_fleet_e2e/**" = [
+    "I001",    # import block (黑盒 E2E 框架保持原样)
+    "INP001",  # implicit-namespace-package
+    "RUF100",  # unused-noqa
+    "TC003",   # typing-only-standard-library-import
+]
 "examples/**" = [
     "T201",    # print
+]
+"scripts/**" = [
+    "T201",    # print
+    "INP001",  # implicit-namespace-package (运行时工具脚本, 无需 __init__.py)
 ]
 
 [tool.ruff.lint.mccabe]

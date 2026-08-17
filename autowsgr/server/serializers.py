@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
 
@@ -185,8 +186,89 @@ def build_combat_plan(request: Any) -> Any:
         selected_nodes=request.selected_nodes,
         default_node=NodeDecision.from_dict(node_defaults),
         nodes=node_args,
+        node_overrides={
+            node: node_request.model_dump(exclude_unset=True)
+            for node, node_request in request.node_args.items()
+        },
         event_name=request.event_name,
     )
+
+
+def _overlay_node_decision_data(base: Any, data: dict[str, Any]) -> Any:
+    """把明确提供的节点字段覆盖到默认决策。"""
+    from autowsgr.combat import NodeDecision
+
+    normalized_data = dict(data)
+    legacy_sl_key = 'sl_when_detour_fails'
+    canonical_sl_key = 'SL_when_detour_fails'
+    if legacy_sl_key in normalized_data:
+        normalized_data.setdefault(canonical_sl_key, normalized_data[legacy_sl_key])
+        del normalized_data[legacy_sl_key]
+
+    parsed = NodeDecision.from_dict(
+        {key: value for key, value in normalized_data.items() if value is not None},
+    )
+    result = copy.deepcopy(base)
+    attribute_names = {'enemy_formation_rules': 'formation_rules'}
+    for field_name, value in normalized_data.items():
+        attribute_name = attribute_names.get(field_name, field_name)
+        setattr(
+            result,
+            attribute_name,
+            None if value is None else copy.deepcopy(getattr(parsed, attribute_name)),
+        )
+    return result
+
+
+def _overlay_node_decision(base: Any, request: Any) -> Any:
+    """把请求中明确提供的字段覆盖到默认决策。"""
+    return _overlay_node_decision_data(
+        base,
+        request.model_dump(exclude_unset=True),
+    )
+
+
+def apply_combat_plan_overrides(
+    plan: CombatPlan,
+    request: CombatPlanRequest | None,
+) -> CombatPlan:
+    """把 API 中明确给出的节点配置应用到 YAML 计划。"""
+    if request is None:
+        return plan
+
+    fields = request.model_fields_set
+    if 'selected_nodes' in fields:
+        plan.selected_nodes = list(request.selected_nodes)
+
+    if 'node_defaults' in fields:
+        from autowsgr.combat import NodeDecision
+
+        plan.default_node = NodeDecision.from_dict(
+            request.node_defaults.model_dump(exclude_none=True),
+        )
+        plan.nodes = {
+            node: _overlay_node_decision_data(
+                plan.default_node,
+                plan.node_overrides.get(node, {}),
+            )
+            for node in plan.nodes
+        }
+        for node in plan.selected_nodes:
+            plan.nodes.setdefault(node, copy.deepcopy(plan.default_node))
+
+    if 'node_args' in fields:
+        plan.node_overrides = {
+            node: node_request.model_dump(exclude_unset=True)
+            for node, node_request in request.node_args.items()
+        }
+        plan.nodes = {
+            node: _overlay_node_decision(plan.default_node, node_request)
+            for node, node_request in request.node_args.items()
+        }
+        for node in plan.selected_nodes:
+            plan.nodes.setdefault(node, copy.deepcopy(plan.default_node))
+
+    return plan
 
 
 def build_fleet_selection(

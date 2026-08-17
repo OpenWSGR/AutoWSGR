@@ -320,6 +320,8 @@ class CombatPlan:
     fight_condition: FightCondition = FightCondition.aim
     selected_nodes: list[str] = field(default_factory=list)
     nodes: dict[str, NodeDecision] = field(default_factory=dict)
+    node_overrides: dict[str, dict[str, Any]] = field(default_factory=dict, repr=False)
+    """节点明确配置的原始字段，用于默认值更新后重新继承。"""
     default_node: NodeDecision = field(default_factory=NodeDecision)
     event_name: str | None = None
     """活动名称（如 ``"20260212"``），用于定位活动地图节点数据。
@@ -442,6 +444,10 @@ class CombatPlan:
         # 各节点配置
         nodes: dict[str, NodeDecision] = {}
         node_args_data = data.get('node_args', {})
+        node_overrides = {
+            node_name: copy.deepcopy(node_data or {})
+            for node_name, node_data in node_args_data.items()
+        }
         if node_args_data:
             for node_name, node_data in node_args_data.items():
                 # 合并默认配置和节点特有配置
@@ -470,6 +476,7 @@ class CombatPlan:
             fight_condition=fight_condition,
             selected_nodes=selected_nodes,
             nodes=nodes,
+            node_overrides=node_overrides,
             default_node=default_node,
             event_name=event_name,
         )
