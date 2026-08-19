@@ -38,6 +38,7 @@ dev = [
     "pytest-cov",
     "pytest-xdist",
     "requests>=2.32.5",
+    "httpx>=0.28.0",
     "beautifulsoup4",
 ]
 
@@ -52,7 +53,7 @@ path = "autowsgr/__init__.py"
 ignore-words = "docs/spelling_wordlist.txt"
 
 [tool.pytest.ini_options]
-testpaths = ["testing"]
+testpaths = ["tests/unit"]
 addopts = ["--import-mode=importlib"]
 
 [tool.ruff]
@@ -173,7 +174,7 @@ extend-safe-fixes = [
 "__init__.py" = [
     "F401",    # unused-import
 ]
-"testing/**" = [
+"tests/**" = [
     "T201",    # print
 ]
 "tools/**" = [
@@ -249,7 +250,7 @@ error-on-warning = false
 [[tool.ty.overrides]]
 # 测试代码大量使用 mock 替身 (_FakeCtx / SimpleNamespace 等)，放宽会误报的
 # 参数类型规则，避免噪音淹没真实类型错误。
-include = ["testing/**"]
+include = ["tests/unit/**", "tests/manual/**"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "warn"
