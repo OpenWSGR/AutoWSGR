@@ -27,12 +27,12 @@ from autowsgr.ui.map.data import (
 )
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
+    check_tabbed_page,
     get_active_tab_index,
-    identify_page_type,
     make_tab_checker,
 )
 from autowsgr.ui.utils import NavigationError, click_and_wait_for_page
-from autowsgr.vision import OCREngine, PixelChecker
+from autowsgr.vision import OCREngine, PageMatch, PixelChecker
 
 
 if TYPE_CHECKING:
@@ -70,9 +70,9 @@ class BaseMapPage:
     # ═══════════════════════════════════════════════════════════════════════
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
-        """判断截图是否为地图页面。"""
-        return identify_page_type(screen) == TabbedPageType.MAP
+    def is_current_page(screen: np.ndarray) -> PageMatch:
+        """判断截图是否为地图页面 (返回带覆盖度分数的 PageMatch)。"""
+        return check_tabbed_page(screen, TabbedPageType.MAP)
 
     # ═══════════════════════════════════════════════════════════════════════
     # 状态查询 — 面板

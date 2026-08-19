@@ -538,6 +538,8 @@ class NodeConfig(BaseModel):
     """是否前进"""
     proceed_stop: RepairMode | list[RepairMode] = RepairMode.severe_damage
     """达到指定破损状态时停止前进"""
+    grade: str = ''
+    """本节点要求的最低战果等级 (D/C/B/A/S/SS), 空 = 无要求"""
 
 
 class FightConfig(BaseModel):

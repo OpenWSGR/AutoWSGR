@@ -14,8 +14,10 @@ import cv2
 
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import PageName
 from autowsgr.vision import (
     MatchStrategy,
+    PageMatch,
     PixelChecker,
     PixelRule,
     PixelSignature,
@@ -153,12 +155,11 @@ class ChooseShipPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为选船页面。
 
-        .. warning::
-            尚未实现像素签名采集，当前始终返回 False。
-            选船页面识别由 ops 层通过图像模板匹配完成。
+        返回带匹配比例的 :class:`PageMatch` 供候选集排序
+        (``PageMatch.__bool__`` 保证旧式真值调用不变)。
 
         Parameters
         ----------
@@ -166,7 +167,11 @@ class ChooseShipPage:
             截图 (HxWx3, RGB)。
         """
         result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+        return PageMatch(
+            name=PageName.CHOOSE_SHIP.value,
+            matched=result.matched,
+            score=result.ratio,
+        )
 
     def _wait_leave_current_page(self, timeout: float = 5.0):
         wait_leave_page(

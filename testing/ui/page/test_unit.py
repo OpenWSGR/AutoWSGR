@@ -9,6 +9,7 @@ import pytest
 
 from autowsgr.emulator import AndroidController
 from autowsgr.ui.page import (
+    _OVERLAY_PAGES,
     _PAGE_REGISTRY,
     get_current_page,
     register_page,
@@ -17,6 +18,7 @@ from autowsgr.ui.utils import (
     NavigationError,
     wait_for_page,
 )
+from autowsgr.vision import PageMatch
 
 
 _W, _H = 960, 540
@@ -38,11 +40,14 @@ def _white() -> np.ndarray:
 class TestGetCurrentPage:
     def setup_method(self):
         self._backup = dict(_PAGE_REGISTRY)
+        self._backup_overlay = set(_OVERLAY_PAGES)
         _PAGE_REGISTRY.clear()
 
     def teardown_method(self):
         _PAGE_REGISTRY.clear()
         _PAGE_REGISTRY.update(self._backup)
+        _OVERLAY_PAGES.clear()
+        _OVERLAY_PAGES.update(self._backup_overlay)
 
     def test_returns_first_match(self):
         register_page('always_true', lambda _s: True)
@@ -66,6 +71,78 @@ class TestGetCurrentPage:
         register_page('bad', bad_checker)
         register_page('good', lambda _s: True)
         assert get_current_page(_blank()) == 'good'
+
+    def test_candidate_filtering(self):
+        """candidates 限制只评估候选页:未在候选集的真页不返回。"""
+        register_page('a', lambda _s: True)
+        register_page('b', lambda _s: True)
+        assert get_current_page(_blank(), candidates={'a'}) == 'a'
+        assert get_current_page(_blank(), candidates=set()) is None
+
+    def test_score_ranking(self):
+        """命中多页时按 score 降序取最高分(而非注册顺序)。"""
+        register_page('low', lambda _s: PageMatch(name='low', matched=True, score=0.5))
+        register_page('high', lambda _s: PageMatch(name='high', matched=True, score=0.9))
+        assert get_current_page(_blank()) == 'high'
+
+    def test_register_order_tiebreak(self):
+        """同分时按注册顺序(稳定排序)决胜。"""
+        register_page('first', lambda _s: PageMatch(name='first', matched=True, score=0.8))
+        register_page('second', lambda _s: PageMatch(name='second', matched=True, score=0.8))
+        assert get_current_page(_blank()) == 'first'
+
+    def test_bool_checker_normalized(self):
+        """旧式 bool checker 归一化:True→score=1.0,胜过低分 PageMatch。"""
+        register_page('bool_true', lambda _s: True)
+        register_page('low_score', lambda _s: PageMatch(name='low_score', matched=True, score=0.7))
+        assert get_current_page(_blank()) == 'bool_true'
+
+    def test_unregistered_candidate_ignored(self):
+        """候选集中未注册的名称被静默跳过。"""
+        register_page('only', lambda _s: True)
+        assert get_current_page(_blank(), candidates={'only', 'ghost'}) == 'only'
+
+    def test_overlay_page_wins_over_higher_score_base(self):
+        """覆盖型页面命中时优先于更高分的底页 (z-order 优先于分数)。
+
+        实机场景: 侧边栏抽屉打开时不遮挡主页面识别元素, 主页面 0.988 与
+        侧边栏 ~0.86 同时命中 — 纯分数排序误判为主页面, 导航反复点切换
+        按钮把侧边栏开了又关 (2026-08-16 解装导航死循环)。
+        """
+        register_page('base', lambda _s: PageMatch(name='base', matched=True, score=0.988))
+        register_page(
+            'drawer', lambda _s: PageMatch(name='drawer', matched=True, score=0.86), overlay=True
+        )
+        assert get_current_page(_blank()) == 'drawer'
+
+    def test_overlay_page_absent_falls_back_to_base(self):
+        """覆盖型页面未命中时正常回退底页最高分。"""
+        register_page('base', lambda _s: PageMatch(name='base', matched=True, score=0.988))
+        register_page(
+            'drawer', lambda _s: PageMatch(name='drawer', matched=False, score=0.0), overlay=True
+        )
+        assert get_current_page(_blank()) == 'base'
+
+    def test_overlay_pages_ranked_by_score(self):
+        """多个覆盖型同时命中时, 覆盖集内按分数降序。"""
+        register_page(
+            'drawer_low',
+            lambda _s: PageMatch(name='drawer_low', matched=True, score=0.82),
+            overlay=True,
+        )
+        register_page(
+            'drawer_high',
+            lambda _s: PageMatch(name='drawer_high', matched=True, score=0.86),
+            overlay=True,
+        )
+        assert get_current_page(_blank()) == 'drawer_high'
+
+    def test_overlay_flag_reregistration_updates(self):
+        """重注册同名页面时 overlay 标记同步更新 (先 overlay 后普通则移出集合)。"""
+        register_page('page', lambda _s: True, overlay=True)
+        assert 'page' in _OVERLAY_PAGES
+        register_page('page', lambda _s: True)
+        assert 'page' not in _OVERLAY_PAGES
 
 
 # ─────────────────────────────────────────────

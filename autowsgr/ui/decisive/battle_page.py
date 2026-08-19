@@ -27,6 +27,7 @@ from autowsgr.vision import (
     ImageChecker,
     MatchStrategy,
     OCREngine,
+    PageMatch,
     PixelChecker,
     PixelRule,
     PixelSignature,
@@ -163,9 +164,23 @@ class DecisiveBattlePage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
-        """判断截图是否为决战总览页。"""
-        return PixelChecker.check_signature(screen, PAGE_SIGNATURE).matched
+    def is_current_page(screen: np.ndarray) -> PageMatch:
+        """判断截图是否为决战总览页。
+
+        用总览页独有的入口状态图标 (4 种: 无法出击 / 挑战中 / 已刷新 / 可重置,
+        即 classic ``decisive_battle_image[3:7]``) 匹配, 命中任一即认定在总览页。
+        这些图标只在总览页出现 — 全截图交叉验证其他页置信度 < 0.7, 不误命中。
+        阈值 0.8 与 :meth:`detect_entry_status` 一致 (入口状态图标本身较小,
+        置信度约 0.8+)。旧像素签名 ``PAGE_SIGNATURE`` (4 个深色背景点, 曾在
+        深色活动主题页误命中) 保留备查, 不再参与判定。
+        """
+        result = ImageChecker.find_any(
+            screen, Templates.Decisive.entry_status_templates(), confidence=0.8
+        )
+        name = PageName.DECISIVE_BATTLE.value
+        if result is None:
+            return PageMatch(name=name, matched=False, score=0.0)
+        return PageMatch(name=name, matched=True, score=result.confidence)
 
     # ── 小关进度识别 ──────────────────────────────────────────────────────
 

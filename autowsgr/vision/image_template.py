@@ -234,6 +234,11 @@ class ImageRule:
         匹配置信度阈值 (0.0-1.0)。
     method:
         OpenCV 模板匹配方法，默认 ``cv2.TM_CCOEFF_NORMED``。
+    unmask_factor:
+        反蒙版还原系数 ``(0, 1]``, 默认 ``0.0`` (禁用)。``> 0`` 时对截图搜索区域
+        做 ``RGB /= factor`` 还原半透明黑罩压暗 (见
+        :meth:`~autowsgr.vision.image_matcher.ImageChecker._unmask`), 用于 overlay
+        场景下识别被压暗的基础页模板; 模板图本身不还原。
 
     Examples
     --------
@@ -250,6 +255,7 @@ class ImageRule:
     roi: ROI = field(default_factory=ROI.full)
     confidence: float = 0.85
     method: int = cv2.TM_CCOEFF_NORMED
+    unmask_factor: float = 0.0
 
     def __post_init__(self) -> None:
         if isinstance(self.templates, list):

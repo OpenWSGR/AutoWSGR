@@ -114,17 +114,6 @@ def _map_to_decisive(ctx: GameContext) -> None:
     MapPage(ctx).enter_decisive()
 
 
-def _battle_prep_to_map(ctx: GameContext) -> None:
-    from autowsgr.ui.battle.preparation import BattlePreparationPage
-
-    BattlePreparationPage(ctx).go_back()
-
-
-def _choose_ship_to_battle_prep(ctx: GameContext) -> None:
-    # 选船页面的返回按钮和出征准备页面位置一致
-    ctx.ctrl.click(0.022, 0.058)
-
-
 def _backyard_to_bath(ctx: GameContext) -> None:
     from autowsgr.ui.backyard_page import BackyardPage, BackyardTarget
 
@@ -219,11 +208,10 @@ NAV_GRAPH: list[NavEdge] = [
     NavEdge(PageName.SIDEBAR, PageName.MAIN, _sidebar_to_main, '侧边栏 → 主页面'),
     # ── 地图 → 子页面 ──
     NavEdge(PageName.MAP, PageName.DECISIVE_BATTLE, _map_to_decisive, '地图 → 决战'),
-    # ── 出征准备 ↔ 选船 ──
-    NavEdge(PageName.BATTLE_PREP, PageName.MAP, _battle_prep_to_map, '出征准备 → 地图'),
-    NavEdge(
-        PageName.CHOOSE_SHIP, PageName.BATTLE_PREP, _choose_ship_to_battle_prep, '选船 → 出征准备'
-    ),
+    # BATTLE_PREP / CHOOSE_SHIP 不入图: 出征准备与选船是战斗域的中转页
+    # (战斗结束跳过出征准备直接回准备页之前的 UI), 入口有 5 个 (战役/演习/
+    # 常规/决战/活动), 图上建边不可泛化。进入它们走 combat 流程的显式操作,
+    # 取消出征用 BattlePreparationPage.go_back (直接点击, 不经 find_path)。
     # ── 后院 ↔ 子页面 ──
     NavEdge(PageName.BACKYARD, PageName.BATH, _backyard_to_bath, '后院 → 浴室'),
     NavEdge(PageName.BACKYARD, PageName.CANTEEN, _backyard_to_canteen, '后院 → 食堂'),
@@ -284,3 +272,22 @@ def find_path(source: str, target: str) -> list[NavEdge] | None:
             queue.append((edge.target, new_path))
 
     return None
+
+
+def neighbors(page: str) -> set[str]:
+    """返回 *page* 经一条导航边可达的所有页面名(一步后继集合)。
+
+    供页面识别候选集约束使用:导航时从 *page* 执行任意动作后,
+    结果页面必在此集合(或 *page* 自身)内。
+
+    Parameters
+    ----------
+    page:
+        页面名称 (:class:`PageName` 或等价字符串)。
+
+    Returns
+    -------
+    set[str]
+        一步可达的页面名集合;无出边时返回空集。
+    """
+    return {str(e.target.value) for e in _adjacency.get(page, [])}

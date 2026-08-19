@@ -19,6 +19,8 @@ from autowsgr.types import ConditionFlag, ShipDamageState
 if TYPE_CHECKING:
     from autowsgr.context.ship import Ship
 
+    from .plan import GradeCondition
+
 
 _log = get_logger('combat')
 
@@ -179,6 +181,17 @@ class FightResult:
             return -1
 
 
+def grade_condition_met(condition: GradeCondition, result: CombatResult) -> bool:
+    """判定一次战斗结果是否满足 :class:`GradeCondition`。
+
+    在该节点 (可能多次经过) 的所有结算中取**最后一次**, 战果等级 ``>=``
+    条件等级即达标 (比较复用 :class:`FightResult` 的等级序)。空结果 /
+    节点未出现 / 未知等级 (等级序最末, 低于 D) 一律不达标。
+    """
+    matches = [fr for fr in result.fight_results if fr.node == condition.node]
+    return bool(matches) and matches[-1] >= condition.grade
+
+
 class CombatHistory:
     """一次完整战斗的事件历史记录。"""
 
@@ -282,6 +295,9 @@ class CombatResult:
         出击舰队 (含等级、血量等信息, 战斗准备页面识别)。
     ship_full:
         是否已获取满 500 船。
+    dock_full_destroyed:
+        本轮船坞满后已自动解装成功 (flag 仍为 ``DOCK_FULL`` — 该轮未开打,
+        不能翻成功标志污染触发器计数; 上层据本字段决定重试而非停止)。
     """
 
     flag: ConditionFlag = ConditionFlag.FIGHT_END
@@ -294,6 +310,7 @@ class CombatResult:
     ship_acquired_count: int | None = None
     fleet: list[Ship] | None = None
     ship_full: bool = False
+    dock_full_destroyed: bool = False
 
     @property
     def fight_results(self) -> list[FightResult]:

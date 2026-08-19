@@ -9,10 +9,11 @@ import time
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import ImageChecker
 
-from .constants import NavCoord, Sig, Target
+from .constants import NavCoord, Target
 from .overlays import detect_overlay, dismiss_overlay
 
 
@@ -76,7 +77,6 @@ def _try_navigate_to_event(
     bool
         ``True`` — 成功到达活动页面；``False`` — 本次失败。
     """
-    from autowsgr.vision import PixelChecker
 
     # ① 清除浮层
     screen = ctrl.screenshot()
@@ -88,7 +88,7 @@ def _try_navigate_to_event(
         screen = ctrl.screenshot()
 
     # 确认仍在主页面
-    if not PixelChecker.check_signature(screen, Sig.PAGE.ps).matched:
+    if not ImageChecker.template_exists(screen, Templates.MainPage.MAIN, confidence=0.85):
         _log.warning('[UI] 活动导航: 当前不在主页面基础态')
         return False
 

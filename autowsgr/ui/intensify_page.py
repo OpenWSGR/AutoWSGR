@@ -23,8 +23,8 @@ from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.tabbed_page import (
     TabbedPageType,
+    check_tabbed_page,
     get_active_tab_index,
-    identify_page_type,
     make_tab_checker,
 )
 from autowsgr.ui.utils import click_and_wait_for_page
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from autowsgr.context import GameContext
+    from autowsgr.vision import PageMatch
 
 
 _log = get_logger('ui')
@@ -99,17 +100,17 @@ class IntensifyPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为强化页面组 (含全部 3 个标签)。
 
-        通过统一标签页检测层识别。
+        通过统一标签页检测层识别,返回带覆盖度分数的 PageMatch。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        return identify_page_type(screen) == TabbedPageType.INTENSIFY
+        return check_tabbed_page(screen, TabbedPageType.INTENSIFY)
 
     @staticmethod
     def get_active_tab(screen: np.ndarray) -> IntensifyTab | None:

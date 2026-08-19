@@ -23,6 +23,7 @@ from autowsgr.types import PageName
 from autowsgr.ui.utils import click_and_wait_for_page
 from autowsgr.vision import (
     MatchStrategy,
+    PageMatch,
     PixelRule,
     PixelSignature,
 )
@@ -84,19 +85,19 @@ class FriendPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为好友页面。
 
-        通过标签页统一检测层判定 (4 标签 + 头部探测点较亮)。
+        通过标签页统一检测层判定 (4 标签 + 头部探测点较亮),返回带覆盖度分数的 PageMatch。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        from autowsgr.ui.tabbed_page import TabbedPageType, identify_page_type
+        from autowsgr.ui.tabbed_page import TabbedPageType, check_tabbed_page
 
-        return identify_page_type(screen) == TabbedPageType.FRIEND
+        return check_tabbed_page(screen, TabbedPageType.FRIEND)
 
     # ── 回退 ──────────────────────────────────────────────────────────────
 

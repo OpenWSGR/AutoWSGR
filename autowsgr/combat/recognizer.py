@@ -57,6 +57,11 @@ class PhaseSignature:
         图像模板列表 (不归属 :class:`TemplateKey` 体系的自定义模板, 如活动标题图)。
         ``template_key`` 与 ``pixel_signature`` 均为 ``None`` 时使用, ``find_any``
         命中任一即匹配。
+    exclude_template_key:
+        否决键: ``template_key`` 匹配成功后, 若此键对应的模板**也**命中则
+        整体判为不匹配。用于"共有元素 + 独有元素"区分结构相似页:
+        如 MVP 徽章在战果页/经验页都出现 (稳定 0.94+), 而评级字母仅
+        战果页出现 — "MVP 有 + 评级无" 即经验结算页。
     """
 
     template_key: TemplateKey | None
@@ -65,6 +70,7 @@ class PhaseSignature:
     after_match_delay: float = 0.0
     pixel_signature: PixelSignature | None = None
     image_templates: list[ImageTemplate] | None = None
+    exclude_template_key: TemplateKey | None = None
 
 
 def _get_event_map_title_templates() -> list[ImageTemplate]:
@@ -131,9 +137,23 @@ PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
         default_timeout=150.0,
         after_match_delay=1.75,
     ),
+    # 战果页判据用评级字母 (SS~D): 仅战果页出现 (经验页/出征准备页实测
+    # 噪声 ≤0.48)。旧判据 result_540p ("点击继续") 两页都有且被舰船立绘
+    # 遮挡致分数波动 (0.75~0.87), 无法区分还会误判。
     CombatPhase.RESULT: PhaseSignature(
-        template_key=TemplateKey.RESULT,
+        template_key=TemplateKey.RESULT_GRADES,
         default_timeout=90.0,
+        confidence=0.85,
+    ),
+    # 经验页判据: MVP 徽章 + 无评级字母。MVP 徽章在战果/经验两页必出现
+    # 于 6 个舰船行位之一 (左缘 x≈0.057, 实测 0.94+, 不受立绘遮挡),
+    # 评级字母仅在战果页出现 → 否决键排除战果页。旧判据 "升级剩余经验"
+    # 标签会被舰船背景干扰 (置信度波动 0.61~0.91), 弃用。
+    CombatPhase.EXP_SETTLEMENT: PhaseSignature(
+        template_key=TemplateKey.RESULT_PAGE,
+        exclude_template_key=TemplateKey.RESULT_GRADES,
+        default_timeout=7.5,
+        confidence=0.85,
     ),
     CombatPhase.GET_SHIP: PhaseSignature(
         template_key=TemplateKey.GET_SHIP_OR_ITEM,
@@ -232,7 +252,14 @@ class CombatRecognizer:
     ) -> bool:
         """检查截图是否匹配指定状态的视觉签名（模板、图像列表或像素）。"""
         if sig.template_key is not None:
-            return CombatRecognizer._match_template(screen, sig.template_key, sig.confidence)
+            if not CombatRecognizer._match_template(screen, sig.template_key, sig.confidence):
+                return False
+            # 否决键: 主键命中但排除键也命中 → 整体不匹配
+            if sig.exclude_template_key is None:
+                return True
+            return not CombatRecognizer._match_template(
+                screen, sig.exclude_template_key, sig.confidence
+            )
         if sig.image_templates is not None:
             return (
                 ImageChecker.find_any(screen, sig.image_templates, confidence=sig.confidence)

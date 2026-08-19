@@ -9,6 +9,7 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.battle.constants import (
@@ -24,9 +25,11 @@ from autowsgr.ui.battle.constants import (
     PANEL_ACTIVE,
     STATE_TOLERANCE,
 )
-from autowsgr.ui.utils import click_and_wait_leave_page
+from autowsgr.ui.utils import click_and_wait_for_page
 from autowsgr.vision import (
+    ImageChecker,
     MatchStrategy,
+    PageMatch,
     PixelChecker,
     PixelRule,
     PixelSignature,
@@ -137,10 +140,17 @@ class BaseBattlePreparation:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
-        """判断截图是否为出征准备页面。"""
-        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+    def is_current_page(screen: np.ndarray) -> PageMatch:
+        """判断截图是否为出征准备页面。
+
+        用出征准备页面独有特征模板匹配 (迁移自 classic ``fight_prepare_page``,
+        183x48 局部特征), 返回带置信度的 :class:`PageMatch` 供候选集排序。
+        """
+        result = ImageChecker.find_template(screen, Templates.Page.BATTLE_PREP, confidence=0.85)
+        name = PageName.BATTLE_PREP.value
+        if result is None:
+            return PageMatch(name=name, matched=False, score=0.0)
+        return PageMatch(name=name, matched=True, score=result.confidence)
 
     # ── 状态查询 — 舰队 / 面板 ────────────────────────────────────────────
 
@@ -171,11 +181,17 @@ class BaseBattlePreparation:
     # ── 动作 — 回退 / 出征 ───────────────────────────────────────────────
 
     def go_back(self) -> None:
-        """点击回退按钮 (◁)，返回地图页面。"""
+        """点击回退按钮 (◁)，返回地图页面。
+
+        用**到达验证** (:func:`click_and_wait_for_page`): 点击后确认真的到了
+        地图页面。此前用 ``wait_leave_page`` 语义 (checker 为 False 即"已离开")
+        存在假成功——点击后画面仍在出征准备页时, ``MapPage.is_current_page``
+        同样为 False, 第一帧就误判离开, 从未验证到达。
+        """
         from autowsgr.ui.map.page import MapPage
 
         _log.debug('[UI] 出征准备 → 回退')
-        click_and_wait_leave_page(
+        click_and_wait_for_page(
             self._ctrl,
             click_coord=CLICK_BACK,
             checker=MapPage.is_current_page,

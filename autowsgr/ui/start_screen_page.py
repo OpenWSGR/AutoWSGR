@@ -18,7 +18,13 @@ import time
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
-from autowsgr.vision import MatchStrategy, PixelChecker, PixelRule, PixelSignature
+from autowsgr.vision import (
+    MatchStrategy,
+    PageMatch,
+    PixelChecker,
+    PixelRule,
+    PixelSignature,
+)
 
 
 if TYPE_CHECKING:
@@ -81,17 +87,24 @@ class StartScreenPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为启动画面。
 
         通过底部横幅暖黄色调像素签名匹配判定。
+        返回带匹配比例的 :class:`PageMatch`
+        (``PageMatch.__bool__`` 保证旧式真值调用不变)。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        return PixelChecker.check_signature(screen, PAGE_SIGNATURE).matched
+        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
+        return PageMatch(
+            name=PAGE_SIGNATURE.name,
+            matched=result.matched,
+            score=result.ratio,
+        )
 
     # ── 操作动作 ──────────────────────────────────────────────────────────
 

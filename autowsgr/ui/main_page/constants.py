@@ -51,6 +51,7 @@ class OverlayKind(enum.Enum):
     NEWS = '新闻公告'
     SIGN = '每日签到'
     BOOKING = '活动预约'
+    USER_INFO = '提督信息'
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -100,6 +101,9 @@ class DismissCoord(enum.Enum):
 
     BOOKING = (0.618, 0.564)
     """预约页面关闭坐标。"""
+
+    USER_INFO_CLOSE = (0.877, 0.221)
+    """提督信息浮层关闭按钮 (右上角 X)"""
 
     @property
     def xy(self) -> tuple[float, float]:

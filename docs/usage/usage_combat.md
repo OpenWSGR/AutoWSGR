@@ -96,6 +96,27 @@ node_args:
 | `node_defaults` | dict | `{}` | 所有节点的默认决策 |
 | `node_args` | dict | `{}` | 各节点独立决策 (覆盖默认) |
 
+#### 战果要求 (node_args 的 grade)
+
+```yaml
+# 例: 6-1 的 F 点刷 S 胜, 达标场次才计入触发器次数
+node_args:
+  F:
+    grade: S    # 战果等级 (D/C/B/A/S/SS), 含义: >= 该等级
+```
+
+节点配置 `grade` 后自动生效两点:
+
+1. **慢速结算采集**: 该计划的战果/经验结算页入状态机逐页推进,
+   完整采集评级与 MVP (无要求的计划走快速穿行, 不停留)。
+2. **条件计数**: `auto_daily` 常规战触发器只把「所有配置 grade 的节点
+   战果全部达标」的场次计入 `times` 次数 (同一节点多次经过取最后一次
+   结算); 不达标的场次 (评级不足、SL 重开) 不计数, 触发器下轮继续
+   产出直到达标次数打满。
+
+`grade` 也可放 `node_defaults` — 会继承给 `selected_nodes` 的所有节点
+(全部节点都要求)。
+
 ### 节点决策字段
 
 | 字段 | 类型 | 默认值 | 说明 |
@@ -108,6 +129,7 @@ node_args:
 | `SL_when_spot_enemy_fails` | bool | `False` | 索敌失败时 SL |
 | `SL_when_enemy_ship_type` | list | `[]` | 遇到特定舰种 SL |
 | `proceed_stop` | list | `[]` | 中破停止位 (如 `[1,3]`) |
+| `grade` | str | `""` | 本节点要求的最低战果 (D/C/B/A/S/SS), 见下文 |
 
 ### 编程方式创建
 

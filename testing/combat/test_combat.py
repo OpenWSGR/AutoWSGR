@@ -11,8 +11,10 @@ from autowsgr.combat.fleet import FleetSlotRule, ShipSelector
 from autowsgr.combat.history import (
     CombatEvent,
     CombatHistory,
+    CombatResult,
     EventType,
     FightResult,
+    grade_condition_met,
 )
 from autowsgr.combat.node_tracker import (
     MapNodeData,
@@ -25,6 +27,7 @@ from autowsgr.combat.plan import (
     MODE_TRANSITIONS,
     CombatMode,
     CombatPlan,
+    GradeCondition,
     NodeDecision,
     parse_map_value,
 )
@@ -87,8 +90,41 @@ class TestResolveSuccessors:
 
     def test_exercise_transitions(self):
         exercise = MODE_TRANSITIONS[CombatMode.EXERCISE]
+        # 演习 (快速穿行): RESULT 直达结束页, 经验页同为终点
         result = resolve_successors(exercise, CombatPhase.RESULT, '')
-        assert CombatPhase.EXERCISE_PAGE in result
+        assert result == [CombatPhase.EXERCISE_PAGE]
+        result = resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '')
+        assert result == [CombatPhase.EXERCISE_PAGE]
+
+    def test_exercise_transitions_slow(self):
+        """慢速 (collect_result_info=True): 经验页入状态机逐页推进。"""
+        exercise = build_transitions(
+            ModeCategory.SINGLE, CombatPhase.EXERCISE_PAGE, collect_result_info=True
+        )
+        assert resolve_successors(exercise, CombatPhase.RESULT, '') == [CombatPhase.EXP_SETTLEMENT]
+        assert resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '') == [
+            CombatPhase.EXERCISE_PAGE
+        ]
+
+    def test_normal_result_passes_through_exp(self):
+        """MAP 类 (快速穿行): 经验页是过渡页, RESULT 的后继直达
+        掉落/继续前进/终态页, 不经过 EXP_SETTLEMENT。"""
+        normal = MODE_TRANSITIONS[CombatMode.NORMAL]
+        result = resolve_successors(normal, CombatPhase.RESULT, '')
+        assert CombatPhase.EXP_SETTLEMENT not in result
+        assert CombatPhase.PROCEED in result
+        assert CombatPhase.MAP_PAGE in result
+        assert CombatPhase.GET_SHIP in result
+
+    def test_normal_result_only_reaches_exp_when_slow(self):
+        """MAP 类 (慢速): RESULT 只到经验结算页, 掉落/前进/终态从经验页到达。"""
+        normal = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=True)
+        result = resolve_successors(normal, CombatPhase.RESULT, '')
+        assert result == [CombatPhase.EXP_SETTLEMENT]
+        after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
+        assert CombatPhase.PROCEED in after_exp
+        assert CombatPhase.MAP_PAGE in after_exp
+        assert CombatPhase.GET_SHIP in after_exp
 
     def test_unknown_phase_raises(self):
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
@@ -936,3 +972,111 @@ class TestLoadEvent:
 
     def test_missing_returns_none(self):
         assert MapNodeData.load_event('20260730', 'H', 99, 'a') is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GradeCondition + grade_condition_met (战果条件)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestGradeCondition:
+    """GradeCondition 构造校验 (由 node_args 的 grade 派生的值对象)。"""
+
+    def test_valid_normalizes_case(self):
+        cond = GradeCondition(node='f', grade='s')
+        assert cond.node == 'F'
+        assert cond.grade == 'S'
+
+    def test_invalid_node_rejected(self):
+        with pytest.raises(ValueError, match='节点名'):
+            GradeCondition(node='AB', grade='S')
+        with pytest.raises(ValueError, match='节点名'):
+            GradeCondition(node='1', grade='S')
+
+    def test_invalid_grade_rejected(self):
+        with pytest.raises(ValueError, match='战果要求'):
+            GradeCondition(node='F', grade='X')
+
+
+def _result_with_grades(*pairs: tuple[str, str]) -> CombatResult:
+    """构造带 RESULT 事件的 CombatResult (pairs: (node, grade))。"""
+    result = CombatResult()
+    for node, grade in pairs:
+        result.history.add(
+            CombatEvent(event_type=EventType.RESULT, node=node, result=grade),
+        )
+    return result
+
+
+class TestGradeConditionMet:
+    """grade_condition_met 谓词: 指定节点最后一次结算 >= 条件等级。"""
+
+    cond = GradeCondition(node='F', grade='S')
+
+    def test_met_when_grade_reached(self):
+        assert grade_condition_met(self.cond, _result_with_grades(('F', 'S'))) is True
+        assert grade_condition_met(self.cond, _result_with_grades(('F', 'SS'))) is True
+
+    def test_not_met_when_grade_below(self):
+        assert grade_condition_met(self.cond, _result_with_grades(('F', 'A'))) is False
+
+    def test_not_met_when_node_absent(self):
+        assert grade_condition_met(self.cond, _result_with_grades(('A', 'SS'))) is False
+
+    def test_not_met_when_no_fight_results(self):
+        assert grade_condition_met(self.cond, CombatResult()) is False
+
+    def test_multiple_visits_use_last(self):
+        """同一节点多次结算 (多次经过) 取最后一次。"""
+        result = _result_with_grades(('F', 'S'), ('F', 'A'))
+        assert grade_condition_met(self.cond, result) is False
+
+
+class TestCombatPlanConditions:
+    """node_args 的 grade → CombatPlan.conditions 派生慢/快速路径。"""
+
+    def test_node_args_grade_derives_conditions(self):
+        plan = CombatPlan.from_dict({'node_args': {'F': {'grade': 'S'}}})
+        assert plan.conditions == (GradeCondition('F', 'S'),)
+        assert plan.collect_result_info is True  # 派生慢速采集
+
+    def test_multiple_grades_collected(self):
+        plan = CombatPlan.from_dict(
+            {'node_args': {'F': {'grade': 'S'}, 'G': {'grade': 'A'}}},
+        )
+        assert plan.conditions == (GradeCondition('F', 'S'), GradeCondition('G', 'A'))
+
+    def test_node_defaults_grade_spreads_to_selected(self):
+        """grade 放 node_defaults → selected_nodes 的节点全部继承要求。"""
+        plan = CombatPlan.from_dict(
+            {'node_defaults': {'grade': 'S'}, 'selected_nodes': ['A', 'F']},
+        )
+        assert plan.conditions == (GradeCondition('A', 'S'), GradeCondition('F', 'S'))
+
+    def test_no_grade_fast_path(self):
+        plan = CombatPlan.from_dict({'node_args': {'F': {'night': True}}})
+        assert plan.conditions == ()
+        assert plan.collect_result_info is False
+
+    def test_invalid_grade_rejected_at_node_decision(self):
+        with pytest.raises(ValueError, match='node grade'):
+            CombatPlan.from_dict({'node_args': {'F': {'grade': 'X'}}})
+
+    def test_setter_forces_slow_without_conditions(self):
+        """兼容 setter: 运行时赋值 (run_for_times_condition) 只置内部开关。"""
+        plan = CombatPlan.from_dict({})
+        plan.collect_result_info = True
+        assert plan.conditions == ()
+        assert plan.collect_result_info is True
+        plan.collect_result_info = False
+        assert plan.collect_result_info is False
+
+    def test_conditions_plan_transitions_are_slow(self):
+        """配置 grade → transitions 走慢速 (RESULT 后继含经验页)。"""
+        plan = CombatPlan.from_dict({'node_args': {'F': {'grade': 'S'}}})
+        successors = resolve_successors(plan.transitions, CombatPhase.RESULT, '')
+        assert CombatPhase.EXP_SETTLEMENT in successors
+        # 快速路径 (无 grade) 则穿行直达, 不经过经验页
+        plain = CombatPlan.from_dict({})
+        plain_successors = resolve_successors(plain.transitions, CombatPhase.RESULT, '')
+        assert CombatPhase.EXP_SETTLEMENT not in plain_successors
