@@ -54,7 +54,12 @@ class Decisive:
 
     # ── 地图页 ──
     MAP_PAGE = LazyTemplate('decisive/decisive_map_540p.png', 'decisive_map_page')
-    """决战地图页特征 (classic ``decisive_map_entrance``, 247x133)。"""
+    """决战地图页特征: 右下角「编队+出征」按钮组 (classic ``decisive_battle_image/9``, 120x44)。
+
+    .. warning::
+        地图页上没有「剧情/奖励/说明」按钮组 — 那是入口/总览页元素，
+        曾被误用作本模板导致进图后永远识别失败 (Ex-6 NavError 超时)。
+    """
 
     # ── 浮层 ──
     FLEET_ACQUISITION = LazyTemplate(
