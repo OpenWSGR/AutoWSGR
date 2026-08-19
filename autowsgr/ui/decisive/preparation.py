@@ -20,8 +20,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.combat.fleet import exact_fleet_rules
+from autowsgr.infra.logger import get_logger
+from autowsgr.ui.battle.constants import CLICK_BACK
 from autowsgr.ui.battle.preparation import BattlePreparationPage
 from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
+from autowsgr.ui.decisive.overlay import is_decisive_map_page
+from autowsgr.ui.utils import click_and_wait_for_page
+from autowsgr.ui.utils.navigation import NavConfig
+
+
+_log = get_logger('ui.decisive')
 
 
 if TYPE_CHECKING:
@@ -71,3 +79,22 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
             rules = exact_fleet_rules([name for name in ship_names if name])
             return super().change_fleet(fleet_id, rules)
         return change_fleet_legacy(self, fleet_id, ship_names)
+
+    def go_back(self) -> None:
+        """点击回退按钮 (◁)，返回**决战地图页**。
+
+        基类 :meth:`BattlePreparationPage.go_back` 等待普通出征地图页
+        (``PageName.MAP``)，而决战准备页回退后是决战地图页（不在页面
+        注册表中，无 ``PageName``），沿用基类 checker 必然导航超时。
+        与 :meth:`DecisiveMapController.enter_formation` 对称：checker
+        直连 ``is_decisive_map_page``，source/target 仅作日志标签。
+        """
+        _log.debug('[UI] 决战出征准备 → 回退')
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=is_decisive_map_page,
+            config=NavConfig(timeout=10.0, interval=0.5, max_retries=3),
+            source='出征准备',
+            target='决战地图',
+        )
