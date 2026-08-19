@@ -21,7 +21,6 @@ from autowsgr.emulator import AndroidController
 from autowsgr.infra import DecisiveConfig
 from autowsgr.server.schemas import FleetRuleRequest
 from autowsgr.types import ShipDamageState, ShipType
-from autowsgr.ui.battle.base import PAGE_SIGNATURE
 from autowsgr.ui.battle.constants import (
     AUTO_SUPPLY_PROBE,
     CLICK_AUTO_SUPPLY,
@@ -156,9 +155,13 @@ def _make_screen(
     ax, ay = AUTO_SUPPLY_PROBE
     _set_pixel(screen, ax, ay, _AUTO_ON if auto_supply else _AUTO_OFF)
 
-    # 页面签名像素（使 is_current_page 返回 True）
-    for rule in PAGE_SIGNATURE.rules:
-        _set_pixel(screen, rule.x, rule.y, rule.color.as_rgb_tuple())
+    # 出征准备页面模板 (使 is_current_page 模板匹配命中)。
+    # 贴到右上角空白区, 避开舰队/面板/补给探测点 (均在中下及左侧)。
+    from autowsgr.image_resources._lazy import load_template
+
+    tmpl = load_template('page/fight_prepare_540p.png')
+    th, tw = tmpl.image.shape[:2]
+    screen[0:th, _W - tw : _W] = tmpl.image
 
     return screen
 
@@ -301,35 +304,42 @@ class TestLevelOCRRouting:
 
 
 class TestIsCurrentPage:
+    """is_current_page 用页面模板匹配, 不校验舰队/面板状态。
+
+    合成截图 _make_screen 已嵌入出征准备模板 (贴右上角), 故各状态变化下
+    is_current_page 仍命中; 状态查询 (get_selected_fleet / get_active_panel)
+    由专门的 Test 类覆盖。
+    """
+
     def test_default_state_detected(self):
         screen = _make_screen()
-        assert BattlePreparationPage.is_current_page(screen) is True
+        assert BattlePreparationPage.is_current_page(screen).matched
 
     def test_fleet_2_selected(self):
         screen = _make_screen(selected_fleet=2)
-        assert BattlePreparationPage.is_current_page(screen) is True
+        assert BattlePreparationPage.is_current_page(screen).matched
 
     def test_fleet_4_quick_repair(self):
         screen = _make_screen(selected_fleet=4, active_panel=Panel.QUICK_REPAIR)
-        assert BattlePreparationPage.is_current_page(screen) is True
+        assert BattlePreparationPage.is_current_page(screen).matched
 
     def test_blank_screen_not_detected(self):
-        # 缺少签名的屏幕不应被识别为出征准备页
+        # 缺少模板的屏幕不应被识别为出征准备页
         screen = np.zeros((_H, _W, 3), dtype=np.uint8)
-        assert BattlePreparationPage.is_current_page(screen) is False
+        assert not BattlePreparationPage.is_current_page(screen).matched
 
     def test_two_fleets_selected_still_detected(self):
-        """is_current_page 仅验证页面签名，不校验状态合法性。"""
+        """is_current_page 仅验证页面模板，不校验状态合法性。"""
         screen = _make_screen(selected_fleet=1)
         _set_pixel(screen, *FLEET_PROBE[2], _FLEET_SELECTED)
-        assert BattlePreparationPage.is_current_page(screen) is True
+        assert BattlePreparationPage.is_current_page(screen).matched
 
     def test_no_panel_selected_still_detected(self):
-        """is_current_page 仅验证页面签名，不校验面板状态。"""
+        """is_current_page 仅验证页面模板，不校验面板状态。"""
         screen = _make_screen()
-        # 把唯一选中的面板清掉，签名仍在
+        # 把唯一选中的面板清掉，模板仍在
         _set_pixel(screen, *PANEL_PROBE[Panel.STATS], _PANEL_UNSELECTED)
-        assert BattlePreparationPage.is_current_page(screen) is True
+        assert BattlePreparationPage.is_current_page(screen).matched
 
 
 # ─────────────────────────────────────────────
@@ -390,22 +400,49 @@ class TestActions:
         ctrl = MagicMock(spec=AndroidController)
         return BattlePreparationPage(_make_ctx(ctrl)), ctrl
 
-    def test_go_back(self, page: tuple[BattlePreparationPage, MagicMock]):
+    def test_go_back(
+        self,
+        page: tuple[BattlePreparationPage, MagicMock],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         pg, ctrl = page
-        # go_back 调用 click_and_wait_leave_page，会截图验证是否离开当前页
-        # mock screenshot 先返回当前页，再返回地图页
-        from autowsgr.ui.battle.base import PAGE_SIGNATURE as BATTLE_PREP_SIG
+        # go_back 用到达验证 (click_and_wait_for_page): 点击后需识别为 MAP 才算成功。
+        # MapPage 识别走 tabbed 模板匹配, 构造假帧太重, 直接 mock checker 命中。
+        from autowsgr.ui.map.page import MapPage
+        from autowsgr.ui.page import PageMatch
 
-        # 第一次：BATTLE_PREP（带签名）
-        screen_prep = np.zeros((540, 960, 3), dtype=np.uint8)
-        for rule in BATTLE_PREP_SIG.rules:
-            _set_pixel(screen_prep, rule.x, rule.y, rule.color.as_rgb_tuple())
-        # 第二次：空白页（无签名）
-        screen_blank = np.zeros((540, 960, 3), dtype=np.uint8)
-        ctrl.screenshot.side_effect = [screen_prep, screen_blank]
+        monkeypatch.setattr(
+            MapPage,
+            'is_current_page',
+            staticmethod(lambda _s: PageMatch(name='map', matched=True, score=0.9)),
+        )
+        ctrl.screenshot.return_value = np.zeros((540, 960, 3), dtype=np.uint8)
 
-        with patch(
-            'autowsgr.ui.utils.navigation.time.sleep',
+        with patch('autowsgr.ui.utils.navigation.time.sleep'):
+            pg.go_back()
+        ctrl.click.assert_called_with(*CLICK_BACK)
+
+    def test_go_back_raises_when_map_not_reached(
+        self,
+        page: tuple[BattlePreparationPage, MagicMock],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """到达验证: 点击后画面仍在准备页 (MAP 不命中) → NavigationError, 不再假成功。"""
+        pg, ctrl = page
+        from autowsgr.ui.map.page import MapPage
+        from autowsgr.ui.page import PageMatch
+        from autowsgr.ui.utils import NavigationError
+
+        monkeypatch.setattr(
+            MapPage,
+            'is_current_page',
+            staticmethod(lambda _s: PageMatch(name='map', matched=False, score=0.0)),
+        )
+        ctrl.screenshot.return_value = np.zeros((540, 960, 3), dtype=np.uint8)
+
+        with (
+            patch('autowsgr.ui.utils.navigation.time.sleep'),
+            pytest.raises(NavigationError),
         ):
             pg.go_back()
         ctrl.click.assert_called_with(*CLICK_BACK)
@@ -1371,7 +1408,6 @@ class TestDecisiveFleetChangeFeatureGate:
             assert page.change_fleet(None, ['A'])
 
         new_change.assert_called_once_with(None, exact_fleet_rules(['A']))
-
 
 # ─────────────────────────────────────────────
 # 智能换船

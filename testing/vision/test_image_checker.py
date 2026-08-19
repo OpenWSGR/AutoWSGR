@@ -9,6 +9,7 @@ from autowsgr.vision import (
     ImageChecker,
     ImageRule,
     ImageSignature,
+    ImageTemplate,
     MatchStrategy,
 )
 
@@ -491,3 +492,120 @@ class TestMultiResolutionScaling:
         # source_resolution=None → fallback to global (960,540)
         same2 = ImageChecker._scale_template_if_needed(tmpl_img, 960, 540)
         assert same2 is tmpl_img
+
+
+# ─────────────────────────────────────────────
+# ImageChecker._unmask — 反蒙版还原 (纯像素运算)
+# ─────────────────────────────────────────────
+
+
+class TestUnmask:
+    """_unmask 反蒙版还原算法。
+
+    还原半透明黑罩压暗的画面: ``RGB /= factor`` (clamp 255)。
+    纯像素运算, 与模板匹配无关; 匹配链中的透传见 :class:`TestUnmaskFactorPassthrough`。
+    """
+
+    def test_passthrough_when_factor_zero(self):
+        """factor<=0 时零拷贝透传原图。"""
+        import numpy as np
+
+        img = np.full((10, 20, 3), 100, dtype=np.uint8)
+        assert ImageChecker._unmask(img, 0.0) is img
+
+    def test_passthrough_when_factor_negative(self):
+        """负 factor 同样透传 (禁用语义)。"""
+        import numpy as np
+
+        img = np.full((10, 20, 3), 100, dtype=np.uint8)
+        assert ImageChecker._unmask(img, -1.0) is img
+
+    def test_scales_brightness(self):
+        """factor=0.5 → 像素值翻倍 (还原被压暗到一半的画面)。"""
+        import numpy as np
+
+        img = np.full((10, 20, 3), 100, dtype=np.uint8)
+        out = ImageChecker._unmask(img, 0.5)
+        assert out.dtype == np.uint8
+        assert (out == 200).all()
+
+    def test_clips_overflow_to_255(self):
+        """还原后超 255 的值 clamp 到 255。"""
+        import numpy as np
+
+        img = np.full((10, 20, 3), 200, dtype=np.uint8)
+        out = ImageChecker._unmask(img, 0.5)  # 200/0.5=400 -> 255
+        assert (out == 255).all()
+
+    def test_preserves_shape(self):
+        """输出保持 HxWx3 uint8 形状。"""
+        import numpy as np
+
+        img = np.zeros((30, 40, 3), dtype=np.uint8)
+        out = ImageChecker._unmask(img, 0.33)
+        assert out.shape == (30, 40, 3)
+
+
+# ─────────────────────────────────────────────
+# unmask_factor — 匹配链透传 (不破坏现有匹配)
+# ─────────────────────────────────────────────
+
+
+class TestUnmaskFactorPassthrough:
+    """unmask_factor 在模板匹配链中的透传。
+
+    .. note::
+
+        ``TM_CCOEFF_NORMED`` 对纯乘性压暗具有缩放不变性 — 压暗截图的模板匹配置信度
+        本就接近原图 (~0.998), 故 unmask 对模板匹配置信度几乎无影响。unmask 的真正
+        价值在**像素级对比 (MAE)** (边缘对比方案), 而非模板匹配; 此处仅保证
+        ``unmask_factor`` 接口在匹配链中安全透传、不破坏现有匹配。
+    """
+
+    def test_find_template_with_unmask_on_darkened_screen(self):
+        """压暗截图 + unmask 还原后仍能匹配。"""
+        import numpy as np
+
+        rng = np.random.RandomState(90)
+        tmpl_img = rng.randint(40, 120, (30, 40, 3)).astype(np.uint8)
+        tmpl = ImageTemplate(name='dark_tmpl', image=tmpl_img, source='test')
+        screen = solid_screen(120, 120, 120)
+        screen = embed_template_in_screen(screen, tmpl, x=200, y=150)
+        darkened = np.clip(screen.astype(np.float32) * 0.4, 0, 255).astype(np.uint8)
+        detail = ImageChecker.find_template(darkened, tmpl, confidence=0.85, unmask_factor=0.4)
+        assert detail is not None
+        assert detail.confidence > 0.85
+
+    def test_rule_unmask_factor_field_and_passthrough(self):
+        """ImageRule.unmask_factor 字段经 match_rule 透传不破坏匹配。"""
+        import numpy as np
+
+        rng = np.random.RandomState(50)
+        tmpl_img = rng.randint(0, 256, (50, 80, 3)).astype(np.uint8)
+        tmpl = ImageTemplate(name='btn', image=tmpl_img, source='test')
+        screen = solid_screen(150, 150, 150)
+        screen = embed_template_in_screen(screen, tmpl, x=100, y=100)
+        darkened = np.clip(screen.astype(np.float32) * 0.4, 0, 255).astype(np.uint8)
+        rule = ImageRule(name='r', templates=[tmpl], confidence=0.85, unmask_factor=0.4)
+        assert rule.unmask_factor == 0.4
+        result = ImageChecker.match_rule(darkened, rule)
+        assert result.matched
+
+    def test_find_all_occurrences_accepts_unmask(self):
+        """find_all_occurrences 支持 unmask_factor。"""
+        import numpy as np
+
+        screen = solid_screen(120, 120, 120)
+        tmpl = make_template(seed=60, h=20, w=30, name='icon')
+        screen = embed_template_in_screen(screen, tmpl, x=100, y=100)
+        screen = embed_template_in_screen(screen, tmpl, x=500, y=400)
+        darkened = np.clip(screen.astype(np.float32) * 0.4, 0, 255).astype(np.uint8)
+        results = ImageChecker.find_all_occurrences(
+            darkened, tmpl, confidence=0.9, min_distance=20, unmask_factor=0.4
+        )
+        assert len(results) >= 2
+
+    def test_unmask_factor_default_is_zero(self):
+        """ImageRule 默认 unmask_factor=0 (禁用)。"""
+        rule = ImageRule(name='r', templates=[make_template(seed=1)])
+        assert rule.unmask_factor == 0.0

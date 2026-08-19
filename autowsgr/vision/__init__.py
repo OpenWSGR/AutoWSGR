@@ -46,6 +46,7 @@ from .ocr import (
     ShipNameMismatchError,
     apply_ship_patches,
 )
+from .page_match import PageMatch
 from .pixel import (
     Color,
     CompositePixelSignature,
@@ -79,6 +80,7 @@ __all__ = [
     # ocr
     'OCREngine',
     'OCRResult',
+    'PageMatch',
     'PixelChecker',
     'PixelDetail',
     'PixelMatchResult',

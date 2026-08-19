@@ -4,6 +4,9 @@
 
 ``ship_types=None`` 表示不过滤舰种，全部解装；
 传入舰种列表则只解装指定舰种。
+
+船坞满弹窗的「解装」按钮可直达解体标签 (不绕主菜单导航),
+见 :func:`destroy_ships_auto` 的 ``from_dialog`` 参数。
 """
 
 from __future__ import annotations
@@ -13,12 +16,20 @@ from typing import TYPE_CHECKING
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import DestroyShipWorkMode, PageName, ShipType
+from autowsgr.ui.build_page import BuildPage, BuildTab
+from autowsgr.ui.utils import click_and_wait_for_page
 
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
 
 _log = get_logger('ops')
+
+CLICK_DOCK_DIALOG_DESTROY: tuple[float, float] = (0.38, 0.565)
+"""船坞满弹窗「解装」按钮 (底栏「解装|强化|扩充」三钮最左)。
+
+弹窗模板 365x145 居中于 960x540 时, 左钮中心 ≈ (0.374, 0.567);
+沿用 classic 实测坐标。点击后游戏直达建造页解体标签。"""
 
 
 def destroy_ships(
@@ -38,8 +49,6 @@ def destroy_ships(
     remove_equipment:
         是否在解装前卸下装备。默认 ``True``。
     """
-    from autowsgr.ui.build_page import BuildPage, BuildTab
-
     _log.info('[OPS] 开始解装')
     goto_page(ctx, PageName.BUILD)
 
@@ -51,7 +60,7 @@ def destroy_ships(
     _log.info('[OPS] 解装完成')
 
 
-def destroy_ships_auto(ctx: GameContext) -> bool:
+def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
     """按 ``ctx.config`` 的解装设置自动解装。
 
     供 normal_fight / event_fight / decisive 船坞满时调用, 统一读取配置。
@@ -64,6 +73,15 @@ def destroy_ships_auto(ctx: GameContext) -> bool:
     - ``exclude`` (白名单): 解装除 ``destroy_ship_types`` 外的所有舰种。
 
     ``remove_equipment`` 取自 ``remove_equipment_mode``。
+
+    Parameters
+    ----------
+    from_dialog:
+        ``True`` 时要求当前停在船坞满弹窗 (战斗准备页点出征后弹出):
+        先点弹窗「解装」按钮直达建造页 (不绕主菜单/侧边栏导航),
+        其后复用 :func:`destroy_ships` — 结束在主页面 (该入口的返回
+        无视 UI 栈, 解装页点返回直达主页, 不回战斗准备页)。
+        ``False`` (默认) 走全局导航: 任意页面 → 建造页 (解体), 结束回主页面。
 
     Returns
     -------
@@ -86,9 +104,33 @@ def destroy_ships_auto(ctx: GameContext) -> bool:
             _log.warning('[OPS] 白名单包含全部舰种, 无可解装对象, 跳过')
             return False
 
+    if from_dialog:
+        _enter_destroy_page_from_dialog(ctx)
     destroy_ships(
         ctx,
         ship_types=ship_types,
         remove_equipment=cfg.remove_equipment_mode,
     )
     return True
+
+
+def _enter_destroy_page_from_dialog(ctx: GameContext) -> None:
+    """点船坞满弹窗「解装」按钮, 直达建造页解体标签。
+
+    点击后游戏无视 UI 栈直达建造页 (不经过主菜单/侧边栏), 后续解装
+    复用 :func:`destroy_ships` — 其开头的 ``goto_page(BUILD)`` 幂等直达,
+    结尾 ``goto_page(MAIN)`` 即解装页返回的落点 (无视 UI 栈回主页)。
+
+    Raises
+    ------
+    NavigationError
+        点弹窗按钮后未到达建造页。
+    """
+    _log.info('[OPS] 船坞满弹窗 → 直达解装')
+    click_and_wait_for_page(
+        ctx.ctrl,
+        click_coord=CLICK_DOCK_DIALOG_DESTROY,
+        checker=BuildPage.is_current_page,
+        source='船坞满弹窗',
+        target=PageName.BUILD,
+    )

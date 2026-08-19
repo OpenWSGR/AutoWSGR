@@ -15,10 +15,12 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
+    ImageChecker,
+    ImageTemplate,
     MatchStrategy,
-    PixelChecker,
     PixelRule,
     PixelSignature,
 )
@@ -118,6 +120,13 @@ OVERLAY_SIGNATURES: list[tuple[DecisiveOverlay, PixelSignature]] = [
 ]
 
 _SIG_BY_TYPE: dict[DecisiveOverlay, PixelSignature] = dict(OVERLAY_SIGNATURES)
+
+# overlay → 识别模板映射 (图像模板匹配, 替代上方像素签名)
+_OVERLAY_TEMPLATE_MAP: dict[DecisiveOverlay, ImageTemplate] = {
+    DecisiveOverlay.FLEET_ACQUISITION: Templates.Decisive.FLEET_ACQUISITION,
+    DecisiveOverlay.CONFIRM_EXIT: Templates.Decisive.CONFIRM_EXIT,
+    DecisiveOverlay.ADVANCE_CHOICE: Templates.Decisive.ADVANCE_CHOICE,
+}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -219,8 +228,8 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
     DecisiveOverlay | None
         首个命中的弹窗类型；无弹窗则返回 ``None``。
     """
-    for overlay_type, sig in OVERLAY_SIGNATURES:
-        if PixelChecker.check_signature(screen, sig):
+    for overlay_type, tmpl in _OVERLAY_TEMPLATE_MAP.items():
+        if ImageChecker.template_exists(screen, tmpl, confidence=0.85):
             _log.debug('[决战] 检测到 overlay: {}', overlay_type.value)
             return overlay_type
     return None
@@ -228,24 +237,31 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
 
 def is_decisive_map_page(screen: np.ndarray) -> bool:
     """截图是否为决战地图页 (无 overlay 遮挡)。"""
-    return PixelChecker.check_signature(screen, SIG_MAP_PAGE).matched
+    return ImageChecker.template_exists(screen, Templates.Decisive.MAP_PAGE, confidence=0.85)
 
 
 def is_fleet_acquisition(screen: np.ndarray) -> bool:
     """截图是否为战备舰队获取 overlay。"""
-    return PixelChecker.check_signature(screen, SIG_FLEET_ACQUISITION).matched
+    return ImageChecker.template_exists(
+        screen, Templates.Decisive.FLEET_ACQUISITION, confidence=0.85
+    )
 
 
 def is_advance_choice(screen: np.ndarray) -> bool:
     """截图是否为选择前进点 overlay。"""
-    return PixelChecker.check_signature(screen, SIG_ADVANCE_CHOICE).matched
+    return ImageChecker.template_exists(screen, Templates.Decisive.ADVANCE_CHOICE, confidence=0.85)
 
 
 def is_confirm_exit(screen: np.ndarray) -> bool:
     """截图是否为确认退出 overlay。"""
-    return PixelChecker.check_signature(screen, SIG_CONFIRM_EXIT).matched
+    return ImageChecker.template_exists(screen, Templates.Decisive.CONFIRM_EXIT, confidence=0.85)
+
+
+def get_overlay_template(overlay: DecisiveOverlay) -> ImageTemplate:
+    """按类型获取对应的识别模板。"""
+    return _OVERLAY_TEMPLATE_MAP[overlay]
 
 
 def get_overlay_signature(overlay: DecisiveOverlay) -> PixelSignature:
-    """按类型获取对应的像素签名。"""
+    """按类型获取对应的像素签名 (保留备查, 不再参与判定)。"""
     return _SIG_BY_TYPE[overlay]

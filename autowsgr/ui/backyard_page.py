@@ -16,12 +16,14 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.utils import click_and_wait_for_page
 from autowsgr.vision import (
+    ImageChecker,
     MatchStrategy,
-    PixelChecker,
+    PageMatch,
     PixelRule,
     PixelSignature,
 )
@@ -103,18 +105,24 @@ class BackyardPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为后院页面。
 
-        通过 5 个特征像素点 (背景及装饰) 全部匹配判定。
+        用后院页面独有特征模板匹配 (迁移自 classic ``backyard_page``,
+        482x387 大区域模板, 区分度极高), 返回带置信度的
+        :class:`PageMatch` 供候选集排序。旧像素签名 ``PAGE_SIGNATURE``
+        保留备查, 不再参与判定。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        result = PixelChecker.check_signature(screen, PAGE_SIGNATURE)
-        return result.matched
+        result = ImageChecker.find_template(screen, Templates.Page.BACKYARD, confidence=0.85)
+        name = PageName.BACKYARD.value
+        if result is None:
+            return PageMatch(name=name, matched=False, score=0.0)
+        return PageMatch(name=name, matched=True, score=result.confidence)
 
     # ── 导航 ──────────────────────────────────────────────────────────────
 

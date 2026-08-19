@@ -1,7 +1,8 @@
 """战斗状态枚举与状态转移图。
 一次完整的 MAP 类战斗流程::
     PROCEED → FIGHT_CONDITION → SPOT_ENEMY_SUCCESS → FORMATION
-        → FIGHT_PERIOD → NIGHT_PROMPT → RESULT → GET_SHIP → PROCEED → ...
+        → FIGHT_PERIOD → NIGHT_PROMPT → RESULT → EXP_SETTLEMENT
+        → GET_SHIP → PROCEED → ...
 """
 
 from __future__ import annotations
@@ -55,6 +56,9 @@ class CombatPhase(Enum):
     RESULT = auto()
     """战果评价界面（S/A/B/C/D/SS）。"""
 
+    EXP_SETTLEMENT = auto()
+    """经验结算子页（战果页点击后，逐舰船显示经验增加/"升级剩余经验"）。"""
+
     # ── 掉落 ──
     GET_SHIP = auto()
     """获取舰船掉落。"""
@@ -102,6 +106,8 @@ class ModeCategory(Enum):
 def build_transitions(
     category: ModeCategory,
     end_page: CombatPhase | None,
+    *,
+    collect_result_info: bool = False,
 ) -> dict[CombatPhase, PhaseBranch]:
     """根据模式大类和结束页面自动构建状态转移图。
 
@@ -111,18 +117,24 @@ def build_transitions(
         ``MAP`` 或 ``SINGLE``。
     end_page:
         战斗结束游戏回到的页面状态。``None`` 表示以 ``RESULT`` 作为终止态。
+    collect_result_info:
+        是否在战果页停留采集评级/MVP (慢速通过)。``False`` (默认) 时经验
+        结算页是**过渡页** — RESULT 点击直接穿行直达后继, 不入状态机;
+        ``True`` 时经验页入状态机 (:attr:`CombatPhase.EXP_SETTLEMENT`),
+        处理器在 RESULT 页完成信息采集后再逐页推进。
 
     Returns
     -------
     dict[CombatPhase, PhaseBranch]
     """
     if category == ModeCategory.MAP:
-        return _build_map_transitions(end_page)
-    return _build_single_transitions(end_page)
+        return _build_map_transitions(end_page, collect_result_info)
+    return _build_single_transitions(end_page, collect_result_info)
 
 
 def _build_map_transitions(
     end_page: CombatPhase | None,
+    collect_result_info: bool = False,
 ) -> dict[CombatPhase, PhaseBranch]:
     """MAP 类：多节点地图战斗的完整转移图。"""
     ep = end_page  # 简写
@@ -193,9 +205,17 @@ def _build_map_transitions(
         'no': [CombatPhase.RESULT],
     }
 
-    t[CombatPhase.RESULT] = list(after_result)
+    # 战果页点击后必进经验结算子页 (游戏固定流转), 掉落/继续前进等
+    # 只能从经验页到达。快速模式 (默认) 经验页是过渡页, RESULT 的点击
+    # 循环直接穿行 (EXP_SETTLEMENT 不入状态机); 慢速模式为采集 grade/MVP
+    # 逐页推进
+    if collect_result_info:
+        t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
+    else:
+        t[CombatPhase.RESULT] = list(after_result)
+    t[CombatPhase.EXP_SETTLEMENT] = list(after_result)
 
-    # GET_SHIP 后继 = RESULT 后继 去掉 GET_SHIP 自身
+    # GET_SHIP 后继 = 经验结算后继 去掉 GET_SHIP 自身
     t[CombatPhase.GET_SHIP] = [p for p in after_result if p != CombatPhase.GET_SHIP]
 
     if ep is not None:
@@ -206,6 +226,7 @@ def _build_map_transitions(
 
 def _build_single_transitions(
     end_page: CombatPhase | None,
+    collect_result_info: bool = False,
 ) -> dict[CombatPhase, PhaseBranch]:
     """SINGLE 类：单点战斗的精简转移图。"""
     ep = end_page
@@ -233,8 +254,17 @@ def _build_single_transitions(
     }
 
     if ep is not None:
-        t[CombatPhase.RESULT] = [ep]
-    # ep is None → RESULT 为终止态，无后继
+        # 演习等: 慢速逐页 (战果→经验→结束), 快速穿行 (战果直达结束)
+        if collect_result_info:
+            t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
+            t[CombatPhase.EXP_SETTLEMENT] = [ep]
+        else:
+            t[CombatPhase.RESULT] = [ep]
+            t[CombatPhase.EXP_SETTLEMENT] = [ep]
+    else:
+        # ep is None (战役/决战) → RESULT 为终止态；引擎在 RESULT 即返回,
+        # 经验页由 _click_result_until_closed 的候选集合兜住, 无转移后继。
+        t[CombatPhase.EXP_SETTLEMENT] = []
 
     return t
 

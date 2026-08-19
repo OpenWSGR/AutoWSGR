@@ -103,7 +103,8 @@ class NormalFightRunner:
             self._entrance = None
             self._map_code = ''
 
-        # 首次执行检查难度/节点, 后续重复出征跳过 (仅 event 分支使用)
+        # 仅上一轮 OPERATION_SUCCESS (成功完成战斗, 战后回港必落关卡浮层态)
+        # 才跳过难度/节点检查直接出击; 中途打断/失败一律恢复完整检查 (仅 event 分支使用)
         self._skip_check = False
 
         self._results: list[CombatResult] = []
@@ -132,37 +133,43 @@ class NormalFightRunner:
             self._plan.name,
             self._fleet_selection.source,
         )
+        try:
+            # 1. 进入战斗地图
+            self._enter_fight()
 
-        # 1. 进入战斗地图
-        self._enter_fight()
+            # 2. 出征准备
+            ship_stats = self._prepare_for_battle()
 
-        # 2. 出征准备
-        ship_stats = self._prepare_for_battle()
+            # 同步战前信息到上下文
+            self._ctx.sync_before_combat(
+                self._fleet_id,
+                self._fleet_ships,
+                loot_count=self._loot_count,
+                ship_acquired_count=self._ship_acquired_count,
+            )
 
-        # 同步战前信息到上下文
-        self._ctx.sync_before_combat(
-            self._fleet_id,
-            self._fleet_ships,
-            loot_count=self._loot_count,
-            ship_acquired_count=self._ship_acquired_count,
-        )
+            # 3. 执行战斗
+            result = self._do_combat(ship_stats)
 
-        # 3. 执行战斗
-        result = self._do_combat(ship_stats)
+            # 赋值出征面板识别到的今日获取数量和舰队信息
+            result.loot_count = self._loot_count
+            result.ship_acquired_count = self._ship_acquired_count
+            result.fleet = self._fleet_ships
 
-        # 赋值出征面板识别到的今日获取数量和舰队信息
-        result.loot_count = self._loot_count
-        result.ship_acquired_count = self._ship_acquired_count
-        result.fleet = self._fleet_ships
+            # 同步战后信息到上下文
+            self._ctx.sync_after_combat(self._fleet_id, result)
 
-        # 同步战后信息到上下文
-        self._ctx.sync_after_combat(self._fleet_id, result)
+            # 4. 处理结果
+            self._handle_result(result)
+        except Exception:
+            # 中途打断 (导航/编队/出征异常): 战后浮层态前提不可知,
+            # 下一轮恢复完整检查 (选难度/节点/入口)
+            self._skip_check = False
+            raise
 
-        # 4. 处理结果
-        self._handle_result(result)
-
-        # 后续重复出征跳过难度/节点检查 (event 分支使用)
-        self._skip_check = True
+        # 仅成功完成一场战斗才允许下一轮跳过检查 (战后回港必落关卡浮层态);
+        # 其余 (DOCK_FULL 解装 / SL / 次数用尽 / 失败) 浮层态前提破坏, 重新检查
+        self._skip_check = result.flag == ConditionFlag.OPERATION_SUCCESS
         return result
 
     def run_for_times(
@@ -256,6 +263,8 @@ class NormalFightRunner:
         target_result_index = result_list.index(result.upper())
         start_time = time.time()
         self._results = []
+        # 按评级判定是否计入次数 → 战果页需完整采集 (grade/MVP, 慢速通过)
+        self._plan.collect_result_info = True
 
         while times > 0:
             _log.info('[OPS] 条件战斗，剩余次数：{}', times)
@@ -437,17 +446,34 @@ class NormalFightRunner:
         _log.info('[OPS] 常规战结果: {}', result.flag.value)
 
     def _handle_dock_full(self, result: CombatResult) -> None:
-        """船坞已满: 按配置自动解装并重试，或保持 DOCK_FULL 标志。"""
+        """船坞已满: 按配置自动解装，并保持 DOCK_FULL 标志。
+
+        解装走弹窗直达路线: 点弹窗「解装」按钮直达解体标签 (不绕主
+        菜单/侧边栏导航 — 旧全局导航在 event 场景死循环, 2026-08-16
+        实机), 其后复用 destroy_ships, 结束在主页面, 下轮 run 重新
+        导航进图出击。
+
+        解装成功**不翻 flag**: 本轮引擎未开打 (node_count=0), 翻成功
+        标志会让触发器把未打的轮次计入次数。改置 ``dock_full_destroyed``,
+        由触发器/调度器识别"解装完毕、可重试"与"无法解装、须停止"。
+        """
         if self._dock_full_destroy:
             from autowsgr.ops.destroy import destroy_ships_auto
 
-            _log.warning('[OPS] 船坞已满，执行自动解装')
-            # 点击弹窗确认按钮 (legacy 坐标)
-            self._ctrl.click(0.38, 0.565)
-            if destroy_ships_auto(self._ctx):
-                # 解装成功 (调用方可根据需要重试出征)
-                result.flag = ConditionFlag.OPERATION_SUCCESS
-            # 否则无可解装对象 (白名单覆盖全部舰种), 保持 DOCK_FULL
+            _log.warning('[OPS] 船坞已满，执行自动解装 (弹窗直达)')
+            try:
+                destroyed = destroy_ships_auto(self._ctx, from_dialog=True)
+            except NavigationError as e:
+                _log.error('[OPS] 弹窗直达解装失败: {}, 回退主页面', e)
+                try:
+                    goto_page(self._ctx, PageName.MAIN)
+                except NavigationError as back_err:
+                    _log.error('[OPS] 返回主页面失败: {}', back_err)
+                return  # 解装未执行, 保持 DOCK_FULL 且未置 destroyed, 由上层停止
+            if destroyed:
+                # 解装成功 (结束在主页面), 下轮 run 重新导航进图出击
+                result.dock_full_destroyed = True
+            # destroyed=False: 白名单覆盖全部舰种, 无可解装对象, 保持 DOCK_FULL
             return
 
         _log.warning('[OPS] 船坞已满, 未开启自动解装')

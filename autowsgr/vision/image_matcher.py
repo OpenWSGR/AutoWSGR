@@ -103,6 +103,36 @@ class ImageChecker:
         scaled = cv2.resize(template_img, (new_w, new_h), interpolation=interp)
         return scaled
 
+    # ── 反蒙版还原 ──
+
+    @staticmethod
+    def _unmask(img: np.ndarray, factor: float) -> np.ndarray:
+        """还原半透明黑罩压暗的画面 (反蒙版)。
+
+        overlay (半透明黑罩) 把整页按 ``factor`` 压暗后, RGB 的 uint8 量化
+        会压碎低亮度区的高频纹理, 导致基础页模板匹配失败。此处按
+        ``RGB /= factor`` 还原原始亮度 (clamp 255), 让被压暗的基础模板重新
+        可匹。**模板图本身未经压暗, 故 unmask 只作用于截图, 不作用于模板。**
+
+        Parameters
+        ----------
+        img:
+            截图区域 (HxWx3, RGB, uint8)。
+        factor:
+            压暗系数 ``(0, 1]``。``<= 0`` 时透传原图 (零拷贝, 不做任何处理);
+            典型值 ``0.33`` 表示画面被压暗到约 1/3 亮度。
+
+        Returns
+        -------
+        np.ndarray
+            还原后的图像 (uint8)。``factor <= 0`` 时原样返回原对象。
+        """
+        if factor <= 0:
+            return img
+        restored = img[..., :3].astype(np.float32) / factor
+        np.clip(restored, 0, 255, out=restored)
+        return restored.astype(np.uint8)
+
     # ── 核心匹配 ──
 
     @staticmethod
@@ -112,10 +142,14 @@ class ImageChecker:
         roi: ROI | None = None,
         confidence: float = 0.85,
         method: int = cv2.TM_CCOEFF_NORMED,
+        unmask_factor: float = 0.0,
     ) -> ImageMatchDetail | None:
         """对单个模板执行匹配（内部方法）。
 
         当截图分辨率与模板采集分辨率不同时，自动缩放模板。
+
+        ``unmask_factor > 0`` 时, 先对截图搜索区域做反蒙版还原 (见
+        :meth:`_unmask`), 再转灰度匹配; 模板图不还原。
         """
         h, w = screen.shape[:2]
         roi = roi or ROI.full()
@@ -142,6 +176,9 @@ class ImageChecker:
                 ch,
             )
             return None
+
+        # 反蒙版还原: 还原被半透明黑罩压暗的截图区域 (模板不还原)
+        cropped = ImageChecker._unmask(cropped, unmask_factor)
 
         screen_gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
         template_gray = cv2.cvtColor(tmpl_img, cv2.COLOR_RGB2GRAY)
@@ -202,6 +239,7 @@ class ImageChecker:
                 roi=rule.roi,
                 confidence=rule.confidence,
                 method=rule.method,
+                unmask_factor=rule.unmask_factor,
             )
             if detail is not None:
                 all_details.append(detail)
@@ -278,9 +316,12 @@ class ImageChecker:
         *,
         roi: ROI | None = None,
         confidence: float = 0.85,
+        unmask_factor: float = 0.0,
     ) -> ImageMatchDetail | None:
         """在截图中查找单个模板（等价于旧代码 ``locate_image_center``）。"""
-        return ImageChecker._match_single_template(screen, template, roi=roi, confidence=confidence)
+        return ImageChecker._match_single_template(
+            screen, template, roi=roi, confidence=confidence, unmask_factor=unmask_factor
+        )
 
     @staticmethod
     def find_any(
@@ -289,11 +330,12 @@ class ImageChecker:
         *,
         roi: ROI | None = None,
         confidence: float = 0.85,
+        unmask_factor: float = 0.0,
     ) -> ImageMatchDetail | None:
         """查找多个模板中的任意一个（等价于旧代码 ``image_exist``）。"""
         for tmpl in templates:
             detail = ImageChecker._match_single_template(
-                screen, tmpl, roi=roi, confidence=confidence
+                screen, tmpl, roi=roi, confidence=confidence, unmask_factor=unmask_factor
             )
             if detail is not None:
                 return detail
@@ -306,12 +348,13 @@ class ImageChecker:
         *,
         roi: ROI | None = None,
         confidence: float = 0.85,
+        unmask_factor: float = 0.0,
     ) -> ImageMatchDetail | None:
         """查找多个模板中置信度最高的一个。"""
         best: ImageMatchDetail | None = None
         for tmpl in templates:
             detail = ImageChecker._match_single_template(
-                screen, tmpl, roi=roi, confidence=confidence
+                screen, tmpl, roi=roi, confidence=confidence, unmask_factor=unmask_factor
             )
             if detail is not None and (best is None or detail.confidence > best.confidence):
                 best = detail
@@ -324,6 +367,7 @@ class ImageChecker:
         *,
         roi: ROI | None = None,
         confidence: float = 0.85,
+        unmask_factor: float = 0.0,
     ) -> list[ImageMatchDetail]:
         """查找所有匹配的模板。"""
         return [
@@ -331,7 +375,11 @@ class ImageChecker:
             for tmpl in templates
             if (
                 d := ImageChecker._match_single_template(
-                    screen, tmpl, roi=roi, confidence=confidence
+                    screen,
+                    tmpl,
+                    roi=roi,
+                    confidence=confidence,
+                    unmask_factor=unmask_factor,
                 )
             )
             is not None
@@ -344,11 +392,17 @@ class ImageChecker:
         *,
         roi: ROI | None = None,
         confidence: float = 0.85,
+        unmask_factor: float = 0.0,
     ) -> bool:
         """判断模板是否存在于截图中（等价于旧代码 ``image_exist``）。"""
         if isinstance(templates, ImageTemplate):
             templates = [templates]
-        return ImageChecker.find_any(screen, templates, roi=roi, confidence=confidence) is not None
+        return (
+            ImageChecker.find_any(
+                screen, templates, roi=roi, confidence=confidence, unmask_factor=unmask_factor
+            )
+            is not None
+        )
 
     @staticmethod
     def identify(
@@ -375,10 +429,12 @@ class ImageChecker:
         confidence: float = 0.85,
         max_count: int = 20,
         min_distance: int = 10,
+        unmask_factor: float = 0.0,
     ) -> list[ImageMatchDetail]:
         """查找单个模板的所有出现位置（非极大值抑制去重）。
 
         当截图分辨率与模板采集分辨率不同时，自动缩放模板。
+        ``unmask_factor > 0`` 时对截图搜索区域做反蒙版还原 (模板不还原)。
         """
         h, w = screen.shape[:2]
         roi = roi or ROI.full()
@@ -396,6 +452,9 @@ class ImageChecker:
 
         if th > ch or tw_ > cw:
             return []
+
+        # 反蒙版还原 (同 _match_single_template)
+        cropped = ImageChecker._unmask(cropped, unmask_factor)
 
         screen_gray = cv2.cvtColor(cropped, cv2.COLOR_RGB2GRAY)
         template_gray = cv2.cvtColor(tmpl_img, cv2.COLOR_RGB2GRAY)

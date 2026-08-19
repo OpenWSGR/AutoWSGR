@@ -135,6 +135,7 @@ def convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:  # noq
     return {
         'round': round_num,
         'success': result.flag.value == 'success',
+        'dock_full_destroyed': bool(getattr(result, 'dock_full_destroyed', False)),
         'nodes': nodes,
         'mvp': mvp,
         'grade': grade,

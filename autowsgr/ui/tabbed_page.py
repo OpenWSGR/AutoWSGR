@@ -72,7 +72,7 @@ import cv2
 import numpy as np
 
 from autowsgr.types import PageName
-from autowsgr.vision import Color, PixelChecker
+from autowsgr.vision import Color, PageMatch, PixelChecker
 
 
 # from autowsgr.infra.logger import get_logger
@@ -248,7 +248,7 @@ def _coverage(test: np.ndarray, template: np.ndarray) -> float:
     return float((test & template).sum()) / test_sum
 
 
-def _match_page_type(screen: np.ndarray) -> TabbedPageType | None:
+def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
     """通过模板匹配识别标签页面类型。
 
     对标签栏区域二值化后，与 5 个参考模板逐一比较覆盖度，
@@ -261,8 +261,9 @@ def _match_page_type(screen: np.ndarray) -> TabbedPageType | None:
 
     Returns
     -------
-    TabbedPageType | None
-        覆盖度最高的页面类型，无模板时返回 ``None``。
+    tuple[TabbedPageType, float] | None
+        ``(页面类型, 覆盖度)``;覆盖度需 > 0.6 才视为命中。
+        无模板或无命中时返回 ``None``。
     """
     templates = _get_templates()
     if not templates:
@@ -276,7 +277,9 @@ def _match_page_type(screen: np.ndarray) -> TabbedPageType | None:
         if score > 0.6 and score > best_score:
             best_score = score
             best_type = page_type
-    return best_type
+    if best_type is None:
+        return None
+    return best_type, best_score
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -353,7 +356,8 @@ def identify_page_type(screen: np.ndarray) -> TabbedPageType | None:
     if not is_tabbed_page(screen):
         return None
 
-    return _match_page_type(screen)
+    matched = _match_page_type(screen)
+    return matched[0] if matched else None
 
 
 def make_tab_checker(
@@ -395,3 +399,32 @@ def make_page_checker(
         return identify_page_type(screen) == page_type
 
     return _check
+
+
+def check_tabbed_page(screen: np.ndarray, page_type: TabbedPageType) -> PageMatch:
+    """识别截图是否为指定标签页面类型,返回带覆盖度分数的 :class:`PageMatch`。
+
+    供 5 个标签页面 (地图/建造/强化/任务/好友) 的 ``is_current_page`` 注册到
+    :func:`~autowsgr.ui.page.register_page` 使用:把两层检测
+    (标签栏验证 + 模板覆盖度) 的结果统一为 ``score``,让页面注册中心
+    能在候选集内按分数排序、消歧。
+
+    Parameters
+    ----------
+    screen:
+        截图 (HxWx3, RGB)。
+    page_type:
+        期望的页面类型。
+
+    Returns
+    -------
+    PageMatch
+        ``matched=True`` 时 ``score`` 为该页面的模板覆盖度 (0.6, 1.0]。
+    """
+    page_name = str(page_type.value)
+    if not is_tabbed_page(screen):
+        return PageMatch(name=page_name, matched=False, score=0.0)
+    matched = _match_page_type(screen)
+    if matched is None or matched[0] != page_type:
+        return PageMatch(name=page_name, matched=False, score=0.0)
+    return PageMatch(name=page_name, matched=True, score=matched[1])

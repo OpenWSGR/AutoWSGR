@@ -29,24 +29,24 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
+from autowsgr.types import PageName
 from autowsgr.ui.bath_page.signatures import (
     BATH_FULL_TIMEOUT,
-    CHOOSE_REPAIR_OVERLAY_SIGNATURE,
     CLICK_BACK,
     CLICK_CHOOSE_REPAIR,
     CLICK_CLOSE_OVERLAY,
     CLICK_FIRST_REPAIR_SHIP,
     CLICK_REPAIR_ALL,
     CLOSE_OVERLAY_BUTTON_COLOR,
-    PAGE_SIGNATURE,
     REPAIR_ALL_BUTTON_COLOR,
     SWIPE_DELAY,
     SWIPE_DURATION,
     SWIPE_END,
     SWIPE_START,
 )
-from autowsgr.vision import Color, PixelChecker
+from autowsgr.vision import Color, ImageChecker, PageMatch, PixelChecker
 
 
 if TYPE_CHECKING:
@@ -139,21 +139,29 @@ class BathPage:
     # ── 页面识别 ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def is_current_page(screen: np.ndarray) -> bool:
+    def is_current_page(screen: np.ndarray) -> PageMatch:
         """判断截图是否为浴室页面 (含 overlay 状态)。
 
-        无论选择修理 overlay 是否打开，都识别为浴室页面。
+        基础检测用浴室页面独有特征模板匹配 (迁移自 classic ``bath_page``,
+        127x41 局部特征); "选择修理" overlay 打开时基础特征可能被遮挡,
+        回退到 overlay 模板补救。两种情况都识别为浴室页面, 返回带
+        置信度的 :class:`PageMatch`。
 
         Parameters
         ----------
         screen:
             截图 (HxWx3, RGB)。
         """
-        # 先检查基础浴室签名
-        if PixelChecker.check_signature(screen, PAGE_SIGNATURE).matched:
-            return True
-        # overlay 打开时基础签名可能被遮挡，单独检查 overlay 签名
-        return PixelChecker.check_signature(screen, CHOOSE_REPAIR_OVERLAY_SIGNATURE).matched
+        name = PageName.BATH.value
+        # 基础: 模板匹配
+        result = ImageChecker.find_template(screen, Templates.Bath.BATH, confidence=0.85)
+        if result is not None:
+            return PageMatch(name=name, matched=True, score=result.confidence)
+        # overlay 打开时基础特征被遮挡, 回退到 overlay 模板
+        overlay = ImageChecker.find_template(screen, Templates.Bath.CHOOSE_REPAIR, confidence=0.85)
+        if overlay is not None:
+            return PageMatch(name=name, matched=True, score=overlay.confidence)
+        return PageMatch(name=name, matched=False, score=0.0)
 
     @staticmethod
     def has_choose_repair_overlay(screen: np.ndarray) -> bool:
@@ -164,10 +172,7 @@ class BathPage:
         screen:
             截图 (HxWx3, RGB)。
         """
-        return PixelChecker.check_signature(
-            screen,
-            CHOOSE_REPAIR_OVERLAY_SIGNATURE,
-        ).matched
+        return ImageChecker.template_exists(screen, Templates.Bath.CHOOSE_REPAIR, confidence=0.85)
 
     # ── Overlay 操作 ──────────────────────────────────────────────────────
 
@@ -209,8 +214,7 @@ class BathPage:
         wait_for_page(
             self._ctrl,
             lambda s: (
-                PixelChecker.check_signature(s, PAGE_SIGNATURE).matched
-                and not BathPage.has_choose_repair_overlay(s)
+                BathPage.is_current_page(s).matched and not BathPage.has_choose_repair_overlay(s)
             ),
             source='选择修理 overlay',
             target='浴室',
@@ -441,8 +445,7 @@ class BathPage:
         wait_for_page(
             self._ctrl,
             lambda s: (
-                PixelChecker.check_signature(s, PAGE_SIGNATURE).matched
-                and not BathPage.has_choose_repair_overlay(s)
+                BathPage.is_current_page(s).matched and not BathPage.has_choose_repair_overlay(s)
             ),
             source='选择修理 overlay (自动关闭)',
             target='浴室',
@@ -460,9 +463,9 @@ class BathPage:
         deadline = time.monotonic() + BATH_FULL_TIMEOUT
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
-            if PixelChecker.check_signature(
-                screen, PAGE_SIGNATURE
-            ).matched and not BathPage.has_choose_repair_overlay(screen):
+            if BathPage.is_current_page(screen).matched and not BathPage.has_choose_repair_overlay(
+                screen
+            ):
                 return True
             time.sleep(0.5)
         return False
