@@ -107,9 +107,17 @@ class FleetChangeMixin(FleetAlignmentMixin):
                 option.min_level is not None or option.max_level is not None
             ) and ship_level is None:
                 result = '不通过: 等级未识别'
-            elif option.min_level is not None and ship_level < option.min_level:
+            elif (
+                option.min_level is not None
+                and ship_level is not None
+                and ship_level < option.min_level
+            ):
                 result = f'不通过: 等级{ship_level}低于{option.min_level}'
-            elif option.max_level is not None and ship_level > option.max_level:
+            elif (
+                option.max_level is not None
+                and ship_level is not None
+                and ship_level > option.max_level
+            ):
                 result = f'不通过: 等级{ship_level}高于{option.max_level}'
             else:
                 result = '通过'

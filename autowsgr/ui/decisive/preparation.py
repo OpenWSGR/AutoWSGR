@@ -58,10 +58,10 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
         ocr: OCREngine | None = None,
     ) -> None:
         super().__init__(ctx, ocr)
-        self._ocr: OCREngine = ocr or ctx.ocr  # type: ignore[assignment]
+        self._ocr: OCREngine = ocr or ctx.ocr  # ty: ignore[invalid-assignment]
         self._config = config
 
-    def change_fleet(
+    def change_fleet(  # ty: ignore[invalid-method-override]  # 决战页接收舰名，再转为规则
         self,
         fleet_id: int | None,
         ship_names: Sequence[str | None],

@@ -104,7 +104,7 @@ class TestColor:
     def test_immutable(self):
         c = Color.of(10, 20, 30)
         with pytest.raises((AttributeError, TypeError)):
-            c.r = 99  # type: ignore[misc]
+            c.r = 99  # type: ignore  # noqa: PGH003
 
 
 # ─────────────────────────────────────────────
@@ -156,7 +156,7 @@ class TestPixelRule:
     def test_immutable(self):
         r = PixelRule.of(0.0, 0.0, (0, 0, 0))
         with pytest.raises((AttributeError, TypeError)):
-            r.x = 99  # type: ignore[misc]
+            r.x = 99  # type: ignore  # noqa: PGH003
 
 
 # ─────────────────────────────────────────────

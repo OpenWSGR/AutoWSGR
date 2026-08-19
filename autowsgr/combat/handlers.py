@@ -163,7 +163,9 @@ class PhaseHandlersMixin:
         # ── 信息采集 ──
         mode = 'exercise' if self._plan.mode == CombatMode.EXERCISE else 'fight'
         enemies = get_enemy_info(self._device, mode=mode)
-        enemy_formation = get_enemy_formation(self._device, self._ocr)
+        enemy_formation = (
+            get_enemy_formation(self._device, self._ocr) if self._ocr is not None else ''
+        )
         _log.info('[Combat] 敌方编成: {} 阵型: {}', enemies, enemy_formation)
 
         decision = self._get_current_decision()
@@ -416,7 +418,7 @@ class PhaseHandlersMixin:
 
     def _handle_get_ship(self) -> ConditionFlag:
         """处理获取舰船。"""
-        ship_name = get_ship_drop(self._device, self._ocr)
+        ship_name = get_ship_drop(self._device, self._ocr) if self._ocr is not None else None
         if ship_name:
             _log.info('[Combat] 获得舰船: {}', ship_name)
 

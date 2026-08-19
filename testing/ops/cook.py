@@ -18,8 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
     if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')  # type: ignore  # noqa: PGH003
 except Exception:  # noqa: S110
     pass
 from loguru import logger
@@ -61,7 +61,7 @@ def main() -> None:
 
         from autowsgr.ops.cook import cook
 
-        result = cook(ctrl, position=recipe, force_cook=False)
+        result = cook(ctx, position=recipe, force_cook=False)
         logger.info(f'cook() 返回: {result}')
         print(f'  [OK] cook() = {result}')
     except Exception as exc:

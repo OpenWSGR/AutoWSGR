@@ -70,7 +70,7 @@ class GameContext:
 
     # ── 基础设施引用 (可选) ──
 
-    ocr: OCREngine
+    ocr: OCREngine | None = None
     """OCR 引擎实例 (章节/阵型识别等)。"""
     ship_ocr: OCREngine | None = None
     """增强船只识别 OCR 引擎 (FastOCR + PP-OCRv6-small, 可选)。

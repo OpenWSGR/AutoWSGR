@@ -45,6 +45,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -64,14 +65,14 @@ if TYPE_CHECKING:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+from autowsgr.ui.event.event_page import BaseEventPage
+
+
 def run_test(runner: UIControllerTestRunner) -> None:
     """执行活动地图页面控制器完整测试序列。"""
-    from autowsgr.context import GameContext
-    from autowsgr.infra import UserConfig
-    from autowsgr.ui.event.event_page import BaseEventPage
     from autowsgr.ui.main_page import MainPage
 
-    ctx = GameContext(ctrl=runner.ctrl, config=UserConfig())
+    ctx = _make_test_ctx(runner.ctrl)
     event_page = BaseEventPage(ctx)
     main_page = MainPage(ctx)
 
@@ -87,6 +88,14 @@ def run_test(runner: UIControllerTestRunner) -> None:
     )
     if runner.aborted:
         return
+
+    # ───── Step 2: 浮层检测 ──────────────────────────────────────────
+    runner.read_state(
+        '活动地图状态',
+        readers={
+            '浮层 (进入页弹窗)': event_page._detect_overlay,
+        },
+    )
 
     # ═══════════════════════════════════════════════════════════════════════
     # B. 难度系统
@@ -169,7 +178,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
     )
 
 
-def _try_enter_node(event_page: object, node_id: int) -> None:
+def _try_enter_node(event_page: BaseEventPage, node_id: int) -> None:
     """尝试选择一个节点。异常时静默处理（不中断测试）。"""
     try:
         event_page._enter_node(node_id)  # type: ignore[attr-defined]
@@ -184,8 +193,6 @@ def _try_enter_node(event_page: object, node_id: int) -> None:
 
 def _navigate_to(ctrl: AndroidController, pause: float) -> None:
     """从任意已知页面导航到活动地图页面。"""
-    from autowsgr.context import GameContext
-    from autowsgr.infra import UserConfig
     from autowsgr.ui.main_page import MainPage
 
     if not reset_to_main_page(ctrl, pause):
@@ -193,8 +200,7 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
     time.sleep(pause)
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        ctx = GameContext(ctrl=ctrl, config=UserConfig())
-        MainPage(ctx).navigate_to(MainPage.Target.EVENT)
+        MainPage(_make_test_ctx(ctrl)).navigate_to(MainPage.Target.EVENT)
         time.sleep(pause)
 
 
@@ -213,8 +219,6 @@ def main() -> None:
     from loguru import logger
 
     logger.info('=== 活动地图页面 e2e 测试开始 ===')
-
-    from autowsgr.ui.event.event_page import BaseEventPage
 
     if not ensure_page(
         ctrl,

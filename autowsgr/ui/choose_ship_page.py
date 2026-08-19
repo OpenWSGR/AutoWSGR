@@ -429,6 +429,7 @@ class ChooseShipPage:
         """
         assert self._ctx.ocr is not None
         ocr = self._preferred_ocr
+        assert ocr is not None
         use_level_filter = min_level is not None or max_level is not None
         use_card_constraints = ship_type is not None or use_level_filter
 

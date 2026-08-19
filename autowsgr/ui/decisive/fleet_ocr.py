@@ -58,7 +58,8 @@ def _prepare_text_roi(image: np.ndarray, *, scale: int = 4) -> np.ndarray:
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
     gray = cv2.GaussianBlur(gray, (3, 3), 0)
-    norm = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    norm = gray.copy()
+    cv2.normalize(gray, norm, 0, 255, cv2.NORM_MINMAX)
     binary = cv2.threshold(norm, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     return cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
 
@@ -125,7 +126,7 @@ def recognize_fleet_options(
     cost_img = cost_roi.crop(screen)
     cost_results = ocr.recognize(cost_img, allowlist='0123456789xX')
     # cost_results 按bbox[0]从小到大排序 保证顺序正确
-    cost_results.sort(key=lambda x: x.bbox[0])
+    cost_results.sort(key=lambda x: x.bbox[0] if x.bbox is not None else 0)
 
     costs: list[int] = []
     for r in cost_results:

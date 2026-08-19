@@ -1,0 +1,14 @@
+coverage:
+  status:
+    # 项目整体覆盖率基线（防止整体覆盖倒退）
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    # patch 状态：类型注解/重构类 PR 的 diff 多为不可测行，
+    # 阈值放宽避免误判；真实逻辑 PR 仍受 project 状态约束。
+    patch:
+      default:
+        target: auto
+        threshold: 25%
+        if_ci_failed: ignore

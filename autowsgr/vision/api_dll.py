@@ -24,7 +24,7 @@ class ApiDll:
                 (int(w * scale), _TARGET_H),
                 interpolation=cv2.INTER_LINEAR if scale > 1 else cv2.INTER_AREA,
             )
-        return recognize_map(image)
+        return recognize_map(image.astype(np.uint8))
 
 
 @lru_cache(maxsize=1)

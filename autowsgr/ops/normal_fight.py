@@ -94,10 +94,11 @@ class NormalFightRunner:
 
         if self._is_event:
             # 推导 UI 层入口 (a→alpha, b→beta) 与活动地图代号 (如 "H1")
-            self._entrance: Literal['alpha', 'beta'] | None = {
+            entrance_map: dict[str, Literal['alpha', 'beta']] = {
                 'a': 'alpha',
                 'b': 'beta',
-            }.get(plan.entrance or '')
+            }
+            self._entrance = entrance_map.get(plan.entrance or '')
             self._map_code: str = f'{str(plan.chapter).upper()}{plan.map_id}'
         else:
             self._entrance = None

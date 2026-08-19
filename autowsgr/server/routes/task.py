@@ -40,7 +40,7 @@ TaskRequestUnion = Annotated[
 
 
 @router.post('/start', response_model=ApiResponse)
-async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[arg-type]
+async def task_start(request: TaskRequestUnion) -> ApiResponse:
     """启动任务 (异步执行，立即返回)。"""
     async with lifecycle_lock:
         if task_manager.is_running:

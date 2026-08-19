@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -58,14 +59,12 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
     """从任意已知页面导航到好友页面。"""
     import time
 
-    from autowsgr.context import GameContext
-    from autowsgr.infra import UserConfig
     from autowsgr.ui.main_page import MainPage
     from autowsgr.ui.sidebar_page import SidebarPage
 
     if not reset_to_main_page(ctrl, pause):
         return
-    ctx = GameContext(ctrl=ctrl, config=UserConfig())
+    ctx = _make_test_ctx(ctrl)
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
         MainPage(ctx).navigate_to(MainPage.Target.SIDEBAR)

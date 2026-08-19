@@ -205,8 +205,8 @@ class DecisivePhaseHandlers(DecisiveBase):
     def _handle_dock_full(self) -> None:
         """船坞已满: 自动解装 → ENTER_MAP。"""
         _log.warning('[决战] 处理船坞已满')
-        self._do_dock_full_destroy()  # type: ignore[attr-defined]  # from DecisiveChapterOps
-        self._prepare_entry_state()  # type: ignore[attr-defined]  # from DecisiveChapterOps
+        self._do_dock_full_destroy()  # from DecisiveChapterOps
+        self._prepare_entry_state()  # from DecisiveChapterOps
         self._state.phase = DecisivePhase.ENTER_MAP
 
     # ── 舰队与地图 ────────────────────────────────────────────────────────

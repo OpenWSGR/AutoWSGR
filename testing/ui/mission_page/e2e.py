@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 from testing.ui._framework import (
     UIControllerTestRunner,
+    _make_test_ctx,
     connect_via_launcher,
     ensure_page,
     info,
@@ -40,7 +41,7 @@ def run_test(runner: UIControllerTestRunner) -> None:
     from autowsgr.ui.main_page import MainPage
     from autowsgr.ui.mission_page import MissionPage
 
-    mission_page = MissionPage(runner.ctrl)
+    mission_page = MissionPage(runner.ctx)
 
     runner.verify_current('初始验证: 任务页面', '任务页面', MissionPage.is_current_page)
     if runner.aborted:
@@ -64,7 +65,7 @@ def _navigate_to(ctrl: AndroidController, pause: float) -> None:
         return
     screen = ctrl.screenshot()
     if MainPage.is_current_page(screen):
-        MainPage(ctrl).navigate_to(MainPage.Target.TASK)
+        MainPage(_make_test_ctx(ctrl)).navigate_to(MainPage.Target.TASK)
         time.sleep(pause)
 
 

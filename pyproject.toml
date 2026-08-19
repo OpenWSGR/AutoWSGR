@@ -53,6 +53,7 @@ ignore-words = "docs/spelling_wordlist.txt"
 
 [tool.pytest.ini_options]
 testpaths = ["testing"]
+addopts = ["--import-mode=importlib"]
 
 [tool.ruff]
 target-version = "py312"
@@ -212,3 +213,46 @@ inline-quotes = "single"
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+exclude = [
+    ".venv/**",
+    "dist/**",
+    "build/**",
+    ".git/**",
+    ".pytest_cache/**",
+    ".ruff_cache/**",
+]
+
+[tool.ty.analysis]
+# C 扩展 (autowsgr_native, maa) 的子模块无法被静态解析，属预期行为。
+allowed-unresolved-imports = [
+    "autowsgr_native.**",
+    "maa.**",
+]
+
+[tool.ty.rules]
+# Treat unresolved-attribute as warning to reduce noise from platform-specific
+# modules (e.g. winreg on Linux) and third-party C extensions during beta.
+unresolved-attribute = "warn"
+# Ban invalid / unused type-ignore comments (ty 原生与 mypy 兼容格式都检查)。
+unused-type-ignore-comment = "error"
+unused-ignore-comment = "error"
+
+[tool.ty.terminal]
+# warning 级别诊断 (平台相关 winreg、mock 噪音等) 不阻塞 CI。
+error-on-warning = false
+
+[[tool.ty.overrides]]
+# 测试代码大量使用 mock 替身 (_FakeCtx / SimpleNamespace 等)，放宽会误报的
+# 参数类型规则，避免噪音淹没真实类型错误。
+include = ["testing/**"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "warn"
+not-subscriptable = "warn"
+invalid-assignment = "warn"
+call-non-callable = "warn"
