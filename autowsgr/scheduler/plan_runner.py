@@ -18,7 +18,11 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 
-from autowsgr.combat.fleet import resolve_fleet_selection
+from autowsgr.combat.fleet import (
+    FleetSelectionSource,
+    ResolvedFleetSelection,
+    resolve_fleet_selection,
+)
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.normal_fight import NormalFightRunner, get_normal_fight_plan
 from autowsgr.scheduler.scheduler import TaskScheduler
@@ -43,6 +47,7 @@ def run_yaml_plan(
     *,
     times: int = 1,
     fleet_id: int | None = None,
+    keep_fleet: bool = False,
     plan_root: str | Path | None = None,
 ) -> list[CombatResult]:
     """按 YAML 计划执行常规战, 打满达标次数后自动退出。
@@ -65,6 +70,10 @@ def run_yaml_plan(
         目标达标次数。
     fleet_id:
         出击舰队编号; ``None`` 则用 plan 内配置。
+    keep_fleet:
+        ``True`` 则忽略 plan 内的 ``fleet`` / ``fleet_presets`` 换船配置,
+        只选 *fleet_id* 舰队出征、不更换队伍编制 (沿用游戏内现有编成);
+        默认 ``False``, 按 plan 配置换船。
     plan_root:
         用户自定义计划根目录 (同 :func:`get_normal_fight_plan`)。
 
@@ -76,13 +85,20 @@ def run_yaml_plan(
     plan = get_normal_fight_plan(yaml_path, plan_root=plan_root)
     resolved_fleet_id = fleet_id or plan.fleet_id or 1
 
+    if keep_fleet:
+        # 无换船规则: 只选舰队编号, 不动编制 (source=NONE → runner 跳过 change_fleet)
+        selection = ResolvedFleetSelection(
+            fleet_id=resolved_fleet_id,
+            slot_rules=None,
+            plain_fleet=None,
+            source=FleetSelectionSource.NONE,
+        )
+    else:
+        selection = resolve_fleet_selection(plan, fleet_id=fleet_id)
+
     fight_plan = NormalFightPlan(
-        # 默认参数捕获 plan/fleet, 避免闭包晚绑定
-        factory=lambda c, p=plan, f=resolved_fleet_id: NormalFightRunner(
-            c,
-            p,
-            resolve_fleet_selection(p, fleet_id=f),
-        ),
+        # 默认参数捕获 selection, 避免闭包晚绑定
+        factory=lambda c, p=plan, s=selection: NormalFightRunner(c, p, s),
         name=str(yaml_path),
         fleet_id=resolved_fleet_id,
         target=times,
