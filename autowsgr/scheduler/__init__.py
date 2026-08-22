@@ -29,6 +29,7 @@ auto_daily 全天挂机::
 
 from .daily_plan import build_daily_plan
 from .launcher import Launcher, launch
+from .plan_runner import run_yaml_plan
 from .scheduler import BatchRunnerAdapter, FightTask, TaskScheduler
 
 
@@ -39,4 +40,5 @@ __all__ = [
     'TaskScheduler',
     'build_daily_plan',
     'launch',
+    'run_yaml_plan',
 ]

@@ -1,19 +1,19 @@
+"""周常任务示例 — 触发器模式 (一次性计划出击)。
+
+使用 ``run_yaml_plan`` 执行指定周常图:
+条件判定 (结束节点 + 评级) 由 YAML的 ``node_args`` 配置,
+不达标场次不计入次数并自动重打, 全部达标后自动退出。
+计划文件在包数据目录中查找 (如 ``1周常.yaml``)。
+"""
+
 import sys
 
-from autowsgr.combat.fleet import resolve_fleet_selection
-from autowsgr.ops.normal_fight import NormalFightRunner, get_normal_fight_plan
-from autowsgr.scheduler import launch
+from autowsgr.scheduler import launch, run_yaml_plan
 
 
-# run_for_times_condition的运行示例
-last_point = [None, 'A', 'F', 'I', 'I', 'I', 'J', 'M', 'L', 'O']
-i = int(float(sys.argv[1]))
-ctx = launch('./usersettings.yaml')
-# 这里修改为你自己的计划路径即可
-plan = get_normal_fight_plan('./week/' + sys.argv[1] + '.yaml')
-runner = NormalFightRunner(
-    ctx,
-    plan,
-    resolve_fleet_selection(plan, fleet_id=2),
-)
-runner.run_for_times_condition(1, last_point[i])
+# 1. 启动 (加载配置 → 连接模拟器 → 启动游戏)
+ctx = launch('./usersettings.full.yaml')
+
+# 2. 执行常规战 — 周常图, 按章节编号拼接策略名 (如 1 → 1周常)
+results = run_yaml_plan(ctx, sys.argv[1] + '周常', times=1, fleet_id=2)
+print(f'完成 {len(results)} 次常规战')

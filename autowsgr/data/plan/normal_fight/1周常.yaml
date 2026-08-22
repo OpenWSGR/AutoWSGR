@@ -18,3 +18,4 @@ node_defaults:
 node_args:
   B:
     night: True
+    grade: S
