@@ -62,6 +62,8 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     # 启动时: 设置事件循环引用
     loop = asyncio.get_running_loop()
     task_manager.set_loop(loop)
+    # 注册 WebSocket 日志 sink：把 INFO 级别以上的日志推送给 GUI
+    ws_manager.register_log_sink(loop)
     _log.info('[Server] HTTP Server 已启动')
 
     yield
