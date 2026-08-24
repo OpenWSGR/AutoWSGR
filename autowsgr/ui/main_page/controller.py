@@ -16,6 +16,7 @@ from .constants import (
     NavCoord,
     OverlayKind,
     ProbePoint,
+    Sig,
     Target,
     ThemeColor,
 )
@@ -112,6 +113,11 @@ class MainPage:
         )
         if overlay is not None:
             return PageMatch(name=name, matched=True, score=overlay.confidence)
+        # 像素签名兜底: 部分环境渲染差异会使模板得分略低于阈值 (实测远端 0.945 < 0.95),
+        # 底部栏 4 锚点像素签名可补充识别 (非主页面实测 ratio=0, 无误报风险)
+        pixel_result = PixelChecker.check_signature(screen, Sig.PAGE.ps)
+        if pixel_result.matched:
+            return PageMatch(name=name, matched=True, score=pixel_result.ratio)
         return PageMatch(name=name, matched=False, score=0.0)
 
     @staticmethod
