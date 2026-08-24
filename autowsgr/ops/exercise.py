@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from autowsgr.combat import CombatMode, CombatPlan, CombatResult, NodeDecision, run_combat
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
+from autowsgr.ops.startup import recover_to_main_or_restart
 from autowsgr.types import ConditionFlag, Formation, PageName, ShipDamageState
 from autowsgr.ui import BattlePreparationPage, MapPage, MapPanel
 
@@ -54,6 +55,9 @@ class ExerciseRunner:
         """
         self._results = []
         _log.info('[OPS] 开始演习流程')
+
+        # 0. 确保游戏处于可识别页面 (页面异常时先恢复/重启)
+        recover_to_main_or_restart(self._ctx, self._ctx.config.account.game_app)
 
         # 1. 导航到演习面板
         self._enter_exercise_page()
@@ -142,6 +146,9 @@ class ExerciseOnceRunner(ExerciseRunner):
 
     def run(self) -> CombatResult:  # type: ignore[override]
         """挑战下一个可用对手; 无对手返回 ``SKIP_FIGHT``。"""
+        # 确保游戏处于可识别页面 (页面异常时先恢复/重启)
+        recover_to_main_or_restart(self._ctx, self._ctx.config.account.game_app)
+
         self._enter_exercise_page()
         rivals_status = MapPage(self._ctx).get_exercise_rival_status()
         rivals = rivals_status.rivals
