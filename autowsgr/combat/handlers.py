@@ -395,6 +395,10 @@ class PhaseHandlersMixin:
         评级/MVP/血量并记录 :class:`FightResult` (供条件战斗按评级判定等),
         经验页入状态机逐页推进。
         """
+        # 硬等待: RESULT 页面动画 (结算界面滑入/文字淡入) 需要时间稳定,
+        # 远端卡顿机器上立即 OCR 会截到半渲染画面导致血量/评级/MVP 识别失败
+        time.sleep(1.5)
+
         # ── 血量采集 (快慢模式都做: 单次截图, sync_after_combat 全局依赖) ──
         self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
 
