@@ -59,14 +59,27 @@ def get_context() -> Any:
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
     """应用生命周期管理。"""
-    # 启动时: 设置事件循环引用
+    # 启动时: 设置事件循环引用 + 注册统计专用 WebSocket loguru sink
     loop = asyncio.get_running_loop()
     task_manager.set_loop(loop)
-    _log.info('[Server] HTTP Server 已启动')
+    from loguru import logger as _loguru_logger
+    _stats_sink_id = _loguru_logger.add(
+        ws_manager.build_log_sink(),
+        level='INFO',
+        filter=lambda r: True,  # 过滤由 build_log_sink 内部按白名单完成
+        backtrace=False,
+        diagnose=False,
+    )
+    _log.info('[Server] HTTP Server 已启动, GUI 统计日志 sink 已注册')
 
     yield
 
-    # 关闭时: 清理资源
+    # 关闭时: 清理 sink 与连接
+    try:
+        from loguru import logger as _loguru_logger2
+        _loguru_logger2.remove(_stats_sink_id)
+    except Exception:
+        pass
     if _ctx is not None:
         _log.info('[Server] 断开模拟器连接')
     _log.info('[Server] HTTP Server 已关闭')

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from autowsgr.infra.logger import get_logger
 
@@ -15,6 +16,26 @@ if TYPE_CHECKING:
 
 
 _log = get_logger('server.ws')
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GUI 统计所需日志白名单正则
+# ═══════════════════════════════════════════════════════════════════════════════
+# DailySortieStats.consume 从 WebSocket log 消息中解析统计数据（战斗/快修/泡澡/战利品/船数/掉落/远征）
+# 只推送匹配以下正则的日志，避免 GUI 收到全量 INFO 噪音。
+_STATS_LOG_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r'\[Combat\]\s*战果:.*评价'),  # 战斗评级 (battleCount/grades)
+    re.compile(r'\[Combat\]\s*获得舰船'),       # 舰船掉落 (shipCount/shipDrops)
+    re.compile(r'\[UI\]\s*战利品数量:\s*\d'),  # 战利品统计 (lootCount/lootLimit)
+    re.compile(r'\[UI\]\s*舰船数量:\s*\d'),     # 船坞容量统计 (shipCount/shipLimit)
+    re.compile(r'\[UI\]\s*修理位置:'),         # 快修使用 (quickRepairCount)
+    re.compile(r'\[OPS\]\s*浴室修理'),         # 泡澡修理 (bathRepairCount)
+    re.compile(r'\[UI\]\s*远征收取:\s*\d'),    # 远征完成 (expeditionCount)
+)
+
+
+def _is_stats_log(message: str) -> bool:
+    """判断日志内容是否为 GUI 统计所需。"""
+    return any(p.search(message) for p in _STATS_LOG_PATTERNS)
 
 
 class WebSocketManager:
@@ -112,6 +133,55 @@ class WebSocketManager:
                 'error': error,
             }
         )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 统计日志 sink (供 GUI DailySortieStats 消费)
+    # ══════════════════════════════════════════════════════════════════════
+
+    def build_log_sink(self) -> Callable[[dict[str, Any]], None]:
+        """构建 loguru sink 回调，仅推送 GUI 统计需要的日志。
+
+        只推送匹配 :data:`_STATS_LOG_PATTERNS` 白名单的消息；
+        普通点击/导航/初始化等 INFO 日志被过滤掉，避免 GUI 端日志面板噪音。
+        """
+        loop = asyncio.new_event_loop()
+
+        def _sink(message: Any) -> None:  # loguru.Message (avoid runtime import)
+            text = str(message.record.get('message', ''))
+            if not _is_stats_log(text):
+                return
+            raw_level = message.record.get('level', '')
+            level = raw_level.name if hasattr(raw_level, 'name') else str(raw_level)
+            ch = message.record.get('extra', {}).get('ch', '') or ''
+
+            async def _send() -> None:
+                await self.send_log(level, text, ch)
+
+            try:
+                running_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                running_loop = None
+
+            if running_loop is not None:
+                running_loop.create_task(_send())
+                return
+            # 执行线程中无事件循环 → 使用专用线程 loop
+            asyncio.run_coroutine_threadsafe(_send(), loop)
+
+        # 后台线程启动专用事件循环
+        import threading
+
+        def _run() -> None:
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        threading.Thread(
+            target=_run,
+            name='ws-stats-log-loop',
+            daemon=True,
+        ).start()
+
+        return _sink
 
 
 # 全局单例

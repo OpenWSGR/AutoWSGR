@@ -122,7 +122,9 @@ def convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:  # noq
                 'node': event.node,
                 'action': event.action,
             }
-            if event.result:
+            # 仅当 result 有有效值时写入：'' (空字符串) 和 None (未识别/默认值)
+            # 都视为无有效结果。注意: 不能用 `if event.result:`, 字符串'0'也能通过。
+            if event.result and event.result.strip():
                 ev['result'] = event.result
             if event.enemies:
                 ev['enemies'] = event.enemies
