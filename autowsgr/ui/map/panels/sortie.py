@@ -149,43 +149,70 @@ class SortiePanelMixin(BaseMapPage):
     # 章节 / 地图导航
     # ═══════════════════════════════════════════════════════════════════════
 
-    def click_chapter(self, num: int):
-        """点击侧边栏章节。
+    # click_chapter 内部「方向 fallback 探针」轮换使用的候选 y, 保证每次点不同位置避免死点同坐标
+    #  +1 (下一条): 中下半区;  -1 (上一条): 中上半区 (都在安全区 [0.16, 0.84] 内)
+    _PROBE_Y = {
+        1:  (0.700, 0.645, 0.755, 0.590),
+        -1: (0.300, 0.355, 0.245, 0.410),
+    }
 
-        若目标章在可视范围内则直接点击；否则先在侧边栏区域滑动将列表
-        滚动到目标章附近，再点击。滚动后重新识别高亮位置保证坐标有效。
+    def click_chapter(self, num: int, *, probe_cycle: int = 0) -> bool:
+        """点击侧边栏章节（单步跳转 ±1 最稳，num∈[-3,3]仅相邻可靠）。
+
+        优先使用高亮条 sel_y + CHAPTER_SPACING 并加微小抖动防死点；
+        若 sel_y 连续两次找不到 → 按方向用预定义的 4 个 fallback 探针
+        坐标轮换点击 (probe_cycle 传入 navigate 的点击次数累加即可)。
 
         Parameters
         ----------
         num:
-            跳转数量, 正数为向下跳转, 负数为向上跳转。
-            允许输入[-3, 3]。
+            跳转数量, 正数向下跳转, 负数向上跳转。单步 ±1 最可靠。
+        probe_cycle:
+            同一方向连续失败时用于轮换 fallback 探针位置, 0~3 自动取模。
+
+        Returns
+        -------
+        bool
+            True = 实际发生了点击; False = 未点击 (两步都没有 sel_y)。
         """
         if not -3 <= num <= 3:
             raise ValueError(f'跳转数量必须为 -3 到 3, 收到: {num}')
         if num == 0:
-            return
+            return False
 
         y_min, y_max = SIDEBAR_SCAN_Y_RANGE
-        safe_min = y_min + 0.04   # 安全上内边距 (避免点到边缘空白)
-        safe_max = y_max - 0.04   # 安全下内边距
+        safe_min = y_min + 0.04
+        safe_max = y_max - 0.04
+        direction = 1 if num > 0 else -1
+
+        def _jitter(base: float, amp: float = 0.006) -> float:
+            """给 base y 加微小均匀抖动 ±amp, 避免每次点同一像素无效。"""
+            offset = ((id(self) + probe_cycle * 37) % 100) / 100.0 * 2 - 1  # [-1, 1)
+            return max(safe_min, min(safe_max, base + offset * amp))
 
         # ── 第 1 轮: 截图定位当前选中章 ──
         screen = self._ctrl.screenshot()
         sel_y = self.find_selected_chapter_y(screen)
         if sel_y is None:
-            _log.warning('[UI] 无法定位选中章, 尝试先轻滑复位侧边栏')
-            # 无法定位时先小幅上下滑动让列表复位, 给一次重试机会
+            _log.debug('[UI] click_chapter 第1轮未找到高亮, 尝试复位侧边栏')
             if num > 0:
-                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.78, SIDEBAR_CLICK_X, 0.22, duration=0.35)
+                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.80, SIDEBAR_CLICK_X, 0.20, duration=0.35)
             else:
-                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.22, SIDEBAR_CLICK_X, 0.78, duration=0.35)
-            time.sleep(0.25)
+                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.20, SIDEBAR_CLICK_X, 0.80, duration=0.35)
+            time.sleep(0.30)
             screen = self._ctrl.screenshot()
             sel_y = self.find_selected_chapter_y(screen)
             if sel_y is None:
-                _log.warning('[UI] 侧边栏复位后仍无法定位选中章, 跳过跳转')
-                return
+                _log.warning(
+                    '[UI] click_chapter 复位后仍无高亮条, 启用方向探针 fallback (cycle=%d)',
+                    probe_cycle,
+                )
+                probes = self._PROBE_Y[direction]
+                probe_y = probes[probe_cycle % len(probes)]
+                target_y = _jitter(probe_y, amp=0.008)
+                self._ctrl.click(SIDEBAR_CLICK_X, target_y)
+                # fallback 探针一定是点击了, 不做点击成功与否判定 (由上层 OCR 回检兜底)
+                return True
 
         target_y = sel_y + num * CHAPTER_SPACING
         _log.info(
@@ -193,45 +220,43 @@ class SortiePanelMixin(BaseMapPage):
             num, sel_y, target_y,
         )
 
-        # ── 第 2 轮: 目标超出安全范围 → 先滑动侧边栏滚动列表 ──
+        # ── 第 2 轮: 目标超出安全范围 → 先 swipe 滚动侧边栏 ──
         if not (safe_min <= target_y <= safe_max):
             _log.debug(
-                '[UI] 目标 y={:.3f} 超出安全区 [{:.2f},{:.2f}], 先滑动侧边栏',
+                '[UI] 目标 y={:.3f} 超出安全区 [{:.2f},{:.2f}], 先 swipe 滚动列表',
                 target_y, safe_min, safe_max,
             )
-            direction = 1 if num > 0 else -1  # +1=想往下跳(列表需向上滚)
-            # 滑动幅度: 每条约 CHAPTER_SPACING, 再多滑一点作余量
-            delta_y = abs(num) * CHAPTER_SPACING + 0.04
+            delta_y = abs(num) * CHAPTER_SPACING + 0.06
             if direction == 1:
-                # 列表向上滚动: 手指从下向上滑
-                from_y = min(safe_max, sel_y + 0.08)
-                to_y = max(safe_min, from_y - delta_y - 0.02)
+                from_y = min(safe_max, sel_y + 0.10)
+                to_y = max(safe_min, from_y - delta_y - 0.04)
             else:
-                # 列表向下滚动: 手指从上向下滑
-                from_y = max(safe_min, sel_y - 0.08)
-                to_y = min(safe_max, from_y + delta_y + 0.02)
-
+                from_y = max(safe_min, sel_y - 0.10)
+                to_y = min(safe_max, from_y + delta_y + 0.04)
             self._ctrl.swipe(
                 SIDEBAR_CLICK_X, from_y,
                 SIDEBAR_CLICK_X, to_y,
-                duration=0.4,
+                duration=0.45,
             )
-            time.sleep(CHAPTER_NAV_DELAY)  # 等滚动动画停下
+            time.sleep(CHAPTER_NAV_DELAY + 0.10)
 
-            # 滑动后重新定位选中章
             screen = self._ctrl.screenshot()
-            sel_y = self.find_selected_chapter_y(screen)
-            if sel_y is None:
-                _log.warning('[UI] 滑动侧边栏后仍无法定位选中章, 点击屏幕中部附近兜底')
-                # 兜底: 按方向在安全区中部点击 (至少触发一次切换)
-                fallback_y = (safe_min + safe_max) / 2 + direction * CHAPTER_SPACING
-                self._ctrl.click(SIDEBAR_CLICK_X, fallback_y)
-                return
-            target_y = sel_y + num * CHAPTER_SPACING
-            # 滑动后再次截断到安全范围 (应已在范围内, 留双重保险)
+            sel_y2 = self.find_selected_chapter_y(screen)
+            if sel_y2 is None:
+                # swipe 后高亮还是看不清 → 改用 fallback 探针
+                probes = self._PROBE_Y[direction]
+                probe_y = probes[probe_cycle % len(probes)]
+                target_y = _jitter(probe_y, amp=0.010)
+                _log.warning('[UI] swipe 后无高亮条, 启用方向探针 y=%.3f', target_y)
+                self._ctrl.click(SIDEBAR_CLICK_X, target_y)
+                return True
+            target_y = sel_y2 + num * CHAPTER_SPACING
             target_y = max(safe_min, min(safe_max, target_y))
 
-        self._ctrl.click(SIDEBAR_CLICK_X, target_y)
+        # 加 ±0.006 抖动, 避免连续 9 次点到完全相同的像素
+        click_y = _jitter(target_y, amp=0.006)
+        self._ctrl.click(SIDEBAR_CLICK_X, click_y)
+        return True
 
     def navigate_to_chapter(self, target: int) -> int | None:
         """导航到指定章节 (通过 OCR 识别当前位置并批量点击)。
@@ -280,7 +305,14 @@ class SortiePanelMixin(BaseMapPage):
                 _log.warning('[UI] 章节导航: OCR 抖动 {}，本轮不点击', chapters)
             return candidate, last_screen, stable
 
+        def _quick_chapter() -> int | None:
+            """单次 OCR 快速回检 (用于点击后立即确认有没有真的切换章)。"""
+            screen = self._ctrl.screenshot()
+            info = self.recognize_map(screen, self._ocr)
+            return info.chapter if info is not None else None
+
         confirm_hits = 0
+        strategy_switches = 0  # 每 miss 一次就给 probe_cycle +1 (换探针位置)
 
         for attempt in range(CHAPTER_NAV_MAX_ATTEMPTS):
             current, screen, stable = _read_chapter()
@@ -315,12 +347,73 @@ class SortiePanelMixin(BaseMapPage):
             delta = target - current
             direction = 1 if delta > 0 else -1
             remaining = abs(delta)
-            while remaining > 0:
-                step = min(remaining, 3) * direction
-                self.click_chapter(step)
-                remaining -= abs(step)
-                _log.info(f'[UI] 章节导航: 跳转{step}章, 剩余{remaining}章')
-                time.sleep(CHAPTER_NAV_DELAY * abs(step))
+            consec_misses = 0      # click_chapter 没点的次数
+            consec_stuck = 0       # 点击后章没变的次数
+            MAX_MISSES = 6
+            MAX_STUCK = 3
+            steps_done = 0
+
+            while remaining > 0 and consec_misses < MAX_MISSES and consec_stuck < MAX_STUCK:
+                clicked = self.click_chapter(direction, probe_cycle=strategy_switches + steps_done)
+                if not clicked:
+                    consec_misses += 1
+                    _log.warning('[UI] 章节导航: click 无动作 %d/%d', consec_misses, MAX_MISSES)
+                    time.sleep(CHAPTER_NAV_DELAY)
+                    continue
+                steps_done += 1
+                consec_misses = 0
+                remaining -= 1
+                _log.info('[UI] 章节导航: 跳转{:+d}章, 剩余{}章 (已走{}步)'.format(direction, remaining, steps_done))
+                time.sleep(CHAPTER_NAV_DELAY)
+
+                # ── 每步回检 (单次OCR ~0.18s): 立即确认章号是否真的前进了 ──
+                qc = _quick_chapter()
+                if qc is None:
+                    continue  # OCR 偶发失败跳过 (下一轮 _read_chapter 会兜底)
+                if direction == 1 and qc <= current:
+                    # 本该往下跳 (+1) 但章号没涨 → 卡住 (允许 current 不变一次)
+                    if qc == current and consec_stuck == 0:
+                        consec_stuck = 1  # 第1次相等温和记录
+                    else:
+                        consec_stuck += 1
+                    _log.warning(
+                        '[UI] 章节导航: 跳+1后第{}章, 未前进 (cur={} stuck={}/{})',
+                        qc, current, consec_stuck, MAX_STUCK,
+                    )
+                elif direction == -1 and qc >= current:
+                    if qc == current and consec_stuck == 0:
+                        consec_stuck = 1
+                    else:
+                        consec_stuck += 1
+                    _log.warning(
+                        '[UI] 章节导航: 跳-1后第{}章, 未前进 (cur={} stuck={}/{})',
+                        qc, current, consec_stuck, MAX_STUCK,
+                    )
+                else:
+                    consec_stuck = 0
+                    current = qc  # 同步 OCR 锚点, 后续回检以此为基准
+                    remaining = abs(target - current)
+
+                # 卡住 ≥2 次 → 紧急策略调整: 强制 swipe 侧边栏 + 换探针
+                if consec_stuck >= 2:
+                    strategy_switches += 1
+                    _log.warning(
+                        '[UI] 章节导航: 连续 %d 次卡住 → 执行侧边栏重置 swipe',
+                        consec_stuck,
+                    )
+                    if direction == 1:
+                        # +1 卡住: 先从上往下扫一下 (把列表再拉到底一点)
+                        self._ctrl.swipe(SIDEBAR_CLICK_X, 0.25, SIDEBAR_CLICK_X, 0.80, duration=0.45)
+                    else:
+                        # -1 卡住: 从下往上扫 (把列表拉到顶一点)
+                        self._ctrl.swipe(SIDEBAR_CLICK_X, 0.80, SIDEBAR_CLICK_X, 0.25, duration=0.45)
+                    time.sleep(0.5)
+            if consec_misses >= MAX_MISSES:
+                _log.warning('[UI] 章节导航: 连续 %d 次无点击, 重启本层 attempt', consec_misses)
+                continue
+            if consec_stuck >= MAX_STUCK:
+                _log.warning('[UI] 章节导航: 连续 %d 次没前进, 重启本层 attempt (strategy_switches=%d)', consec_stuck, strategy_switches)
+                continue
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',

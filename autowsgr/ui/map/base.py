@@ -108,18 +108,15 @@ class BaseMapPage:
 
     @staticmethod
     def find_selected_chapter_y(screen: np.ndarray) -> float | None:
-        """扫描侧边栏, 定位选中章节高亮条的 y 坐标 (自适应+连续段算法)。
+        """扫描侧边栏, 定位选中章节高亮条的 y 坐标。
 
-        选中章节在侧边栏上呈现为一段**连续且明显亮于背景**的横向条带。
-        离散的文字像素 (每章标题字符) 亮度也高但不是连续段, 会被过滤。
-
-        算法步骤:
-          1. 沿 SIDEBAR_SCAN_X 列扫描 SIDEBAR_SCAN_Y_RANGE 区间, 记录每个 y 的亮度 (R+G+B)。
-          2. 自适应阈值 = max(峰值亮度 * 0.80, 平均亮度 + 120)。
-          3. 对达到阈值的 y, 按邻接关系分组为"连续段" (相邻 step 都亮即合并)。
-          4. 丢弃长度 < 3 个 step 的段 (典型为单个文字像素噪音)。
-          5. 取最长连续段作为选中章高亮条, 段的中心 y 即为结果。
-          6. 若最长段覆盖扫描范围 > 60% → 阈值被背景淹没, 返回 None。
+        单级算法: 自适应阈值 + 连续段 (中心加权)。
+          - 阈值 = max(峰值亮度×0.70, 均值+40), 放宽以兼容不同高亮主题;
+          - 邻接高亮点合并为「段」, 取最长段 (≥2 step 合格) 的亮度加权中心;
+          - 段覆盖 3%~60% 视为有效; 超出该范围直接返回 None。
+          - **不再使用 Top-K 均值降级**: 之前 12% 亮点加权均值实际等价
+            于「侧边栏所有文字像素亮度中心」≈ 屏幕 0.45~0.5 固定区域,
+            与真实选中章高亮位置完全无关, 导致 target_y 恒定跳错。
         """
         y_min, y_max = SIDEBAR_SCAN_Y_RANGE
         step = SIDEBAR_SCAN_STEP
@@ -148,24 +145,22 @@ class BaseMapPage:
 
         avg_bright = sum_bright / total_count
 
-        # ── 第 2 步: 自适应阈值 ──
-        adaptive_threshold = max(int(max_bright * 0.80), int(avg_bright) + 120)
+        # ── 第 2 步: 自适应阈值 (0.70*峰值 / 均值+40, 比旧版 avg+80 宽松 2x) ──
+        adaptive_threshold = max(int(max_bright * 0.70), int(avg_bright) + 40)
 
-        # ── 第 3 步: 连续段分组 (相邻 step 间距=step, 差值≤step 即连续) ──
-        segments: list[list[float]] = []  # 每段 = [y1, y2, ...]
-        current: list[float] = []
+        # ── 第 3 步: 连续段 (≥2 step 合格) ──
+        segments: list[list[tuple[float, int]]] = []  # [(y, brightness)]
+        current: list[tuple[float, int]] = []
         prev_y: float | None = None
 
         for yy, br in zip(ys, brights):
             if br >= adaptive_threshold:
                 if prev_y is not None and (yy - prev_y) <= step * 1.5:
-                    # 与上一个亮邻接 → 合并到当前段
-                    current.append(yy)
+                    current.append((yy, br))
                 else:
-                    # 新段
                     if current:
                         segments.append(current)
-                    current = [yy]
+                    current = [(yy, br)]
                 prev_y = yy
             else:
                 if current:
@@ -175,34 +170,42 @@ class BaseMapPage:
         if current:
             segments.append(current)
 
-        # ── 第 4 步: 按长度过滤, 取最长段 ──
-        MIN_SEGMENT_STEPS = 3  # 最少连续 3 个采样点才视为高亮条 (≈0.03 高度)
-        valid = [seg for seg in segments if len(seg) >= MIN_SEGMENT_STEPS]
+        MIN_SEG_STEPS = 2  # ≥2 个连续采样点 (≈0.02 高度) 才认为是高亮条
+        valid = [seg for seg in segments if len(seg) >= MIN_SEG_STEPS]
+        segs_info = sorted(
+            ((len(s), min(x[0] for x in s), max(x[0] for x in s)) for s in segments),
+            reverse=True,
+        )[:3]
 
         if not valid:
-            _log.warning(
-                '[UI] 侧边栏无有效高亮段 (segs={}, max_len={}, max_br={} avg_br={} th={})',
+            _log.debug(
+                '[UI] 侧边栏无有效高亮段 (segs={}, 最长段={}, max_br={} avg_br={} th={})',
                 len(segments),
-                max((len(s) for s in segments), default=0),
+                segs_info[0] if segs_info else 'none',
                 max_bright, int(avg_bright), adaptive_threshold,
             )
             return None
 
-        longest = max(valid, key=len)
-        cover_ratio = len(longest) / total_count
-        if cover_ratio > 0.60:
-            _log.warning(
-                '[UI] 侧边栏高亮段覆盖过大 ({:.0%}, len={}/{}), 疑似背景整体偏亮 (max={} th={}), 跳过',
-                cover_ratio, len(longest), total_count, max_bright, adaptive_threshold,
+        # 取最长段, 以亮度加权求中心 (比纯平均更贴近高亮条峰值位置)
+        longest = max(valid, key=lambda s: len(s))
+        cover = len(longest) / total_count
+        if not (0.03 <= cover <= 0.60):
+            _log.debug(
+                '[UI] 侧边栏高亮段覆盖异常 cover={:.0%} (segs={} valid={}), 放弃',
+                cover, len(segments), len(valid),
             )
             return None
 
-        center = sum(longest) / len(longest)
-        y_start, y_end = longest[0], longest[-1]
+        total_w = sum(x[1] for x in longest)
+        if total_w <= 0:
+            return None
+        center = sum(x[0] * x[1] for x in longest) / total_w
+        y_start = longest[0][0]
+        y_end = longest[-1][0]
         _log.debug(
             '[UI] 侧边栏选中章 y={:.3f} (段长{}点 {:.3f}-{:.3f}, max_br={} avg_br={} th={} cover={:.0%})',
             center, len(longest), y_start, y_end,
-            max_bright, int(avg_bright), adaptive_threshold, cover_ratio,
+            max_bright, int(avg_bright), adaptive_threshold, cover,
         )
         return center
 
