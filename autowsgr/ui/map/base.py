@@ -108,31 +108,101 @@ class BaseMapPage:
 
     @staticmethod
     def find_selected_chapter_y(screen: np.ndarray) -> float | None:
-        """扫描侧边栏, 定位选中章节的 y 坐标。
+        """扫描侧边栏, 定位选中章节高亮条的 y 坐标 (自适应+连续段算法)。
 
-        通过在固定 x 列上逐行扫描像素亮度, 找到高亮选中条的中心 y。
-        选中章节在侧边栏中显示为高亮带, 像素亮度 (R+G+B) 显著高于未选中条目。
+        选中章节在侧边栏上呈现为一段**连续且明显亮于背景**的横向条带。
+        离散的文字像素 (每章标题字符) 亮度也高但不是连续段, 会被过滤。
+
+        算法步骤:
+          1. 沿 SIDEBAR_SCAN_X 列扫描 SIDEBAR_SCAN_Y_RANGE 区间, 记录每个 y 的亮度 (R+G+B)。
+          2. 自适应阈值 = max(峰值亮度 * 0.80, 平均亮度 + 120)。
+          3. 对达到阈值的 y, 按邻接关系分组为"连续段" (相邻 step 都亮即合并)。
+          4. 丢弃长度 < 3 个 step 的段 (典型为单个文字像素噪音)。
+          5. 取最长连续段作为选中章高亮条, 段的中心 y 即为结果。
+          6. 若最长段覆盖扫描范围 > 60% → 阈值被背景淹没, 返回 None。
         """
         y_min, y_max = SIDEBAR_SCAN_Y_RANGE
-        bright_ys: list[float] = []
+        step = SIDEBAR_SCAN_STEP
+
+        # ── 第 1 步: 全量扫描亮度 ──
+        ys: list[float] = []
+        brights: list[int] = []
+        max_bright = 0
+        sum_bright = 0
 
         y = y_min
         while y <= y_max:
             c = PixelChecker.get_pixel(screen, SIDEBAR_SCAN_X, y)
             brightness = c.r + c.g + c.b
-            if brightness >= SIDEBAR_BRIGHTNESS_THRESHOLD:
-                bright_ys.append(y)
-            y += SIDEBAR_SCAN_STEP
+            ys.append(y)
+            brights.append(brightness)
+            if brightness > max_bright:
+                max_bright = brightness
+            sum_bright += brightness
+            y += step
 
-        if not bright_ys:
-            _log.warning('[UI] 侧边栏未找到选中章节高亮带')
+        total_count = len(ys)
+        if total_count == 0:
+            _log.warning('[UI] 侧边栏扫描采样为空')
             return None
 
-        center = sum(bright_ys) / len(bright_ys)
+        avg_bright = sum_bright / total_count
+
+        # ── 第 2 步: 自适应阈值 ──
+        adaptive_threshold = max(int(max_bright * 0.80), int(avg_bright) + 120)
+
+        # ── 第 3 步: 连续段分组 (相邻 step 间距=step, 差值≤step 即连续) ──
+        segments: list[list[float]] = []  # 每段 = [y1, y2, ...]
+        current: list[float] = []
+        prev_y: float | None = None
+
+        for yy, br in zip(ys, brights):
+            if br >= adaptive_threshold:
+                if prev_y is not None and (yy - prev_y) <= step * 1.5:
+                    # 与上一个亮邻接 → 合并到当前段
+                    current.append(yy)
+                else:
+                    # 新段
+                    if current:
+                        segments.append(current)
+                    current = [yy]
+                prev_y = yy
+            else:
+                if current:
+                    segments.append(current)
+                    current = []
+                prev_y = None
+        if current:
+            segments.append(current)
+
+        # ── 第 4 步: 按长度过滤, 取最长段 ──
+        MIN_SEGMENT_STEPS = 3  # 最少连续 3 个采样点才视为高亮条 (≈0.03 高度)
+        valid = [seg for seg in segments if len(seg) >= MIN_SEGMENT_STEPS]
+
+        if not valid:
+            _log.warning(
+                '[UI] 侧边栏无有效高亮段 (segs={}, max_len={}, max_br={} avg_br={} th={})',
+                len(segments),
+                max((len(s) for s in segments), default=0),
+                max_bright, int(avg_bright), adaptive_threshold,
+            )
+            return None
+
+        longest = max(valid, key=len)
+        cover_ratio = len(longest) / total_count
+        if cover_ratio > 0.60:
+            _log.warning(
+                '[UI] 侧边栏高亮段覆盖过大 ({:.0%}, len={}/{}), 疑似背景整体偏亮 (max={} th={}), 跳过',
+                cover_ratio, len(longest), total_count, max_bright, adaptive_threshold,
+            )
+            return None
+
+        center = sum(longest) / len(longest)
+        y_start, y_end = longest[0], longest[-1]
         _log.debug(
-            '[UI] 侧边栏选中章节: y_center={:.3f} ({}个亮点)',
-            center,
-            len(bright_ys),
+            '[UI] 侧边栏选中章 y={:.3f} (段长{}点 {:.3f}-{:.3f}, max_br={} avg_br={} th={} cover={:.0%})',
+            center, len(longest), y_start, y_end,
+            max_bright, int(avg_bright), adaptive_threshold, cover_ratio,
         )
         return center
 

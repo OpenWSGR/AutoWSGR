@@ -149,27 +149,88 @@ class SortiePanelMixin(BaseMapPage):
     # ═══════════════════════════════════════════════════════════════════════
 
     def click_chapter(self, num: int):
-        """点击侧边栏章节
+        """点击侧边栏章节。
+
+        若目标章在可视范围内则直接点击；否则先在侧边栏区域滑动将列表
+        滚动到目标章附近，再点击。滚动后重新识别高亮位置保证坐标有效。
 
         Parameters
         ----------
         num:
-            跳转数量, 正数为向下跳转, 负数为向上跳转
-            允许输入[-3, 3]
+            跳转数量, 正数为向下跳转, 负数为向上跳转。
+            允许输入[-3, 3]。
         """
         if not -3 <= num <= 3:
             raise ValueError(f'跳转数量必须为 -3 到 3, 收到: {num}')
         if num == 0:
             return
+
+        y_min, y_max = SIDEBAR_SCAN_Y_RANGE
+        safe_min = y_min + 0.04   # 安全上内边距 (避免点到边缘空白)
+        safe_max = y_max - 0.04   # 安全下内边距
+
+        # ── 第 1 轮: 截图定位当前选中章 ──
         screen = self._ctrl.screenshot()
         sel_y = self.find_selected_chapter_y(screen)
         if sel_y is None:
-            _log.warning('[UI] 无法定位选中章节, 跳过跳转')
-            return
+            _log.warning('[UI] 无法定位选中章, 尝试先轻滑复位侧边栏')
+            # 无法定位时先小幅上下滑动让列表复位, 给一次重试机会
+            if num > 0:
+                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.78, SIDEBAR_CLICK_X, 0.22, duration=0.35)
+            else:
+                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.22, SIDEBAR_CLICK_X, 0.78, duration=0.35)
+            time.sleep(0.25)
+            screen = self._ctrl.screenshot()
+            sel_y = self.find_selected_chapter_y(screen)
+            if sel_y is None:
+                _log.warning('[UI] 侧边栏复位后仍无法定位选中章, 跳过跳转')
+                return
+
         target_y = sel_y + num * CHAPTER_SPACING
-        _log.info('[UI] 地图页面 -> 跳转章节 {} (y={:.3f})', num, target_y)
+        _log.info(
+            '[UI] 地图页面→跳转章节 {}  sel_y={:.3f}→target_y={:.3f}',
+            num, sel_y, target_y,
+        )
+
+        # ── 第 2 轮: 目标超出安全范围 → 先滑动侧边栏滚动列表 ──
+        if not (safe_min <= target_y <= safe_max):
+            _log.debug(
+                '[UI] 目标 y={:.3f} 超出安全区 [{:.2f},{:.2f}], 先滑动侧边栏',
+                target_y, safe_min, safe_max,
+            )
+            direction = 1 if num > 0 else -1  # +1=想往下跳(列表需向上滚)
+            # 滑动幅度: 每条约 CHAPTER_SPACING, 再多滑一点作余量
+            delta_y = abs(num) * CHAPTER_SPACING + 0.04
+            if direction == 1:
+                # 列表向上滚动: 手指从下向上滑
+                from_y = min(safe_max, sel_y + 0.08)
+                to_y = max(safe_min, from_y - delta_y - 0.02)
+            else:
+                # 列表向下滚动: 手指从上向下滑
+                from_y = max(safe_min, sel_y - 0.08)
+                to_y = min(safe_max, from_y + delta_y + 0.02)
+
+            self._ctrl.swipe(
+                SIDEBAR_CLICK_X, from_y,
+                SIDEBAR_CLICK_X, to_y,
+                duration=0.4,
+            )
+            time.sleep(CHAPTER_NAV_DELAY)  # 等滚动动画停下
+
+            # 滑动后重新定位选中章
+            screen = self._ctrl.screenshot()
+            sel_y = self.find_selected_chapter_y(screen)
+            if sel_y is None:
+                _log.warning('[UI] 滑动侧边栏后仍无法定位选中章, 点击屏幕中部附近兜底')
+                # 兜底: 按方向在安全区中部点击 (至少触发一次切换)
+                fallback_y = (safe_min + safe_max) / 2 + direction * CHAPTER_SPACING
+                self._ctrl.click(SIDEBAR_CLICK_X, fallback_y)
+                return
+            target_y = sel_y + num * CHAPTER_SPACING
+            # 滑动后再次截断到安全范围 (应已在范围内, 留双重保险)
+            target_y = max(safe_min, min(safe_max, target_y))
+
         self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-        return
 
     def navigate_to_chapter(self, target: int) -> int | None:
         """导航到指定章节 (通过 OCR 识别当前位置并批量点击)。
