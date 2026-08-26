@@ -254,7 +254,7 @@ class SortiePanelMixin(BaseMapPage):
                 self.click_chapter(step)
                 remaining -= abs(step)
                 _log.info(f'[UI] 章节导航: 跳转{step}章, 剩余{remaining}章')
-                time.sleep(CHAPTER_NAV_DELAY * abs(step))
+                time.sleep(2.0)  # 硬等待: 远端机器较卡, 侧边栏滑动动画需要更长时间稳定
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
@@ -289,6 +289,8 @@ class SortiePanelMixin(BaseMapPage):
     def get_loot_and_ship_count(
         self,
         screen: np.ndarray | None = None,
+        *,
+        read_loot: bool = True,
     ) -> LootShipCount:
         """读取出征面板右上角的已获取舰船/战利品数量。
 
@@ -298,13 +300,17 @@ class SortiePanelMixin(BaseMapPage):
         ----------
         screen:
             截图，为 ``None`` 时自动截取。
+        read_loot:
+            是否识别战利品 (胖次) 数量。仅在 YAML 开启 ``stop_max_loot``
+            (战利品检查) 时为 True; 无战利品活动时置 False 跳过该区域 OCR,
+            避免对不存在的计数器进行无效识别。
         """
         if self._ocr is None:
             raise RuntimeError('需要 OCR 引擎才能读取掉落数量')
         if screen is None:
             screen = self._ctrl.screenshot()
 
-        loot = recognize_loot_count(screen, self._ocr)
+        loot = recognize_loot_count(screen, self._ocr) if read_loot else None
         ship = recognize_ship_count(screen, self._ocr)
 
         return LootShipCount(loot=loot, ship=ship)

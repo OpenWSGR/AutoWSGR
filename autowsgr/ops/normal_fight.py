@@ -324,8 +324,12 @@ class NormalFightRunner:
         # 在出征面板读取今日已获取数量
         map_page.ensure_panel(MapPanel.SORTIE)
         time.sleep(0.25)
+        # 战利品 OCR 与 YAML 联动: 仅在开启 stop_max_loot (战利品检查) 时识别,
+        # 无战利品活动时跳过该区域避免无效 OCR 报警
+        da = self._ctx.config.daily_automation
+        read_loot = bool(da and da.stop_max_loot)
         try:
-            counts = map_page.get_loot_and_ship_count()
+            counts = map_page.get_loot_and_ship_count(read_loot=read_loot)
             self._loot_count = counts.loot
             self._ship_acquired_count = counts.ship
         except RuntimeError:

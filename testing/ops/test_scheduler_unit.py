@@ -467,10 +467,11 @@ class _FakeSortiePage:
     def ensure_panel(self, _panel: object) -> None:
         return None
 
-    def get_loot_and_ship_count(self) -> types.SimpleNamespace:
+    def get_loot_and_ship_count(self, *, read_loot: bool = True) -> types.SimpleNamespace:
         if self._raises is not None:
             raise self._raises('OCR 不可用')
-        return types.SimpleNamespace(ship=self._ship, loot=self._loot)
+        loot = self._loot if read_loot else None
+        return types.SimpleNamespace(ship=self._ship, loot=loot)
 
 
 def _patch_ctx_sortie(monkeypatch: pytest.MonkeyPatch, page: _FakeSortiePage) -> None:
@@ -485,7 +486,13 @@ def _patch_ctx_sortie(monkeypatch: pytest.MonkeyPatch, page: _FakeSortiePage) ->
 
 
 def _make_ctx() -> GameContext:
-    return GameContext(ctrl=object(), config=types.SimpleNamespace(), ocr=object())  # type: ignore[arg-type]
+    # 提供 daily_automation 配置 (stop_max_loot=True) 以使战利品 OCR 联动逻辑生效
+    da = types.SimpleNamespace(stop_max_loot=True, stop_max_ship=True)
+    return GameContext(
+        ctrl=object(),
+        config=types.SimpleNamespace(daily_automation=da),
+        ocr=object(),
+    )  # type: ignore[arg-type]
 
 
 def test_ctx_sync_drop_counts_writes_both(monkeypatch: pytest.MonkeyPatch):
@@ -523,6 +530,24 @@ def test_ctx_sync_drop_counts_raises_on_ocr_unavailable(monkeypatch: pytest.Monk
         ctx.sync_daily_drop_counts()
     assert ctx.dropped_ship_count == 0  # 未同步
     assert ctx.dropped_loot_count == 0
+
+
+def test_ctx_sync_drop_counts_skips_loot_when_stop_max_loot_off(monkeypatch: pytest.MonkeyPatch):
+    """stop_max_loot 关闭 → 不识别战利品 (loot=None), 仅同步舰船数。
+
+    YAML 未开启战利品检查 (无战利品活动) 时, 战利品 OCR 区域无效,
+    联动逻辑跳过该区域 OCR, 避免无效报警。
+    """
+    _patch_ctx_sortie(monkeypatch, _FakeSortiePage(ship=100, loot=50))
+    ctx = _make_ctx()
+    # 关闭 stop_max_loot (模拟无战利品活动)
+    ctx.config.daily_automation.stop_max_loot = False  # type: ignore[attr-defined]
+    ctx.dropped_ship_count = 0
+    ctx.dropped_loot_count = 0
+
+    ctx.sync_daily_drop_counts()
+    assert ctx.dropped_ship_count == 100  # 舰船仍识别
+    assert ctx.dropped_loot_count == 0  # 战利品未识别, 不覆盖
 
 
 # ── NormalFightTrigger.disable ──

@@ -264,8 +264,12 @@ class GameContext:
         map_page = MapPage(self)
         map_page.ensure_panel(MapPanel.SORTIE)
         time.sleep(0.25)
+        # 战利品 OCR 与 YAML 联动: 仅在开启 stop_max_loot (战利品检查) 时识别,
+        # 无战利品活动时跳过该区域避免无效 OCR 报警
+        da = self.config.daily_automation
+        read_loot = bool(da and da.stop_max_loot)
         # OCR 引擎不可用时 get_loot_and_ship_count 抛 RuntimeError — 不吞, 上抛
-        counts = map_page.get_loot_and_ship_count()
+        counts = map_page.get_loot_and_ship_count(read_loot=read_loot)
         if counts.ship is not None:
             self.dropped_ship_count = counts.ship
         if counts.loot is not None:
