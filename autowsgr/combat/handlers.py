@@ -385,48 +385,48 @@ class PhaseHandlersMixin:
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_result(self) -> ConditionFlag:
-        """处理战果结算 -- 更新血量, 按 ``collect_result_info`` 决定采集与通过速度。
+        """处理战果结算 -- 采集评级/MVP/血量并关闭界面。
 
-        快速穿行 (默认): 血量检测 (单次截图, 全局舰队状态同步需要) 后点击
-        穿行, 经验结算页 (:attr:`CombatPhase.EXP_SETTLEMENT`) 作为过渡页直接
-        点过, 不入状态机。
+        始终采集完整战果信息 (评级/MVP/血量): 触发器计数、条件战斗判定、
+        掉落统计均依赖 FightResult 数据, 快速模式不采集会导致计数器不工作。
 
-        慢速 (:attr:`CombatPlan.collect_result_info`): RESULT 页停留采集
-        评级/MVP/血量并记录 :class:`FightResult` (供条件战斗按评级判定等),
-        经验页入状态机逐页推进。
+        ``collect_result_info`` 仅影响页面通过策略:
+        慢速 (有战果条件): 经验页入状态机逐页推进;
+        快速 (默认): 经验页是过渡页, 点击直接穿行。
         """
         # 硬等待: RESULT 页面动画 (结算界面滑入/文字淡入) 需要时间稳定,
         # 远端卡顿机器上立即 OCR 会截到半渲染画面导致血量/评级/MVP 识别失败
         time.sleep(1.5)
 
-        # ── 血量采集 (快慢模式都做: 单次截图, sync_after_combat 全局依赖) ──
+        # ── 信息采集 (始终采集: 计数器/触发器/掉落统计依赖) ──
+        grade = detect_result_grade(self._device)
         self._ship_stats = detect_ship_stats(self._device, self._ship_stats)
+        screen = self._device.screenshot()
+        mvp = detect_mvp(screen)
 
-        if self._plan.collect_result_info:
-            # ── 慢速: 完整采集 (评级/MVP) ──
-            grade = detect_result_grade(self._device)
-            screen = self._device.screenshot()
-            mvp = detect_mvp(screen)
-
-            fight_result = FightResult(
+        fight_result = FightResult(
+            node=self._node,
+            mvp=mvp,
+            grade=grade,
+            ship_stats=self._ship_stats[:],
+        )
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.RESULT,
                 node=self._node,
-                mvp=mvp,
-                grade=grade,
+                result=grade,
                 ship_stats=self._ship_stats[:],
+                extra={'mvp': mvp},
             )
-            self._history.add(
-                CombatEvent(
-                    event_type=EventType.RESULT,
-                    node=self._node,
-                    result=grade,
-                    ship_stats=self._ship_stats[:],
-                    extra={'mvp': mvp},
-                )
-            )
-            _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
+        )
+        _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
+
+        # ── 关闭结算界面 ──
+        if self._plan.collect_result_info:
+            # 慢速: 经验页入状态机逐页推进
             self._click_result_until_closed(CombatPhase.RESULT)
         else:
-            # ── 快速: 经验页是过渡页, 点击直接穿行 ──
+            # 快速: 经验页是过渡页, 点击直接穿行
             self._click_result_until_closed(
                 CombatPhase.RESULT,
                 pass_through=(CombatPhase.EXP_SETTLEMENT,),

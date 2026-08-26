@@ -26,13 +26,6 @@ def test_create_ship_ocr_disabled_uses_default_easyocr():
 
 
 def test_create_ship_ocr_enabled_uses_fastocr():
+    """enhanced_ship_ocr=True 时默认 OCR 已是 FastOCR, ship_ocr 返回 None。"""
     launcher = _launcher_with_enhanced_ship_ocr(True)
-    fastocr = MagicMock()
-
-    with patch(
-        'autowsgr.scheduler.launcher.OCREngine.create',
-        return_value=fastocr,
-    ) as create:
-        assert launcher.create_ship_ocr() is fastocr
-
-    create.assert_called_once_with(engine='fastocr', gpu=False)
+    assert launcher.create_ship_ocr() is None

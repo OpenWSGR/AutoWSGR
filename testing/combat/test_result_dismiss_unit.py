@@ -169,7 +169,7 @@ class TestHandleResultModes:
         monkeypatch.setattr(handlers_mod, 'detect_mvp', lambda *_a, **_k: '鲃鱼')
 
     def test_fast_passes_through_exp(self):
-        """快速: 不采集评级/MVP, 不记录战果事件, 经验页穿行 (pass_through)。"""
+        """快速: 仍采集评级/MVP (始终采集), 但经验页穿行 (pass_through)。"""
         host, device, _ = _make_host(
             [CombatPhase.EXP_SETTLEMENT, CombatPhase.PROCEED],
             collect_result_info=False,
@@ -177,7 +177,8 @@ class TestHandleResultModes:
         host._handle_result()
         # 经验页命中后继续点击, 直到 PROCEED 才停 → 2 次点击
         assert device.click.call_count == 2
-        host._history.add.assert_not_called()
+        # 始终采集: 快速模式也记录战果事件 (计数器/触发器依赖)
+        host._history.add.assert_called_once()
 
     def test_slow_collects_grade_mvp_and_records(self):
         """慢速: 采集评级/MVP 记入战斗历史, 经验页是到达点 (只点一次)。"""

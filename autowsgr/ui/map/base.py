@@ -20,6 +20,10 @@ from autowsgr.ui.map.data import (
     EXPEDITION_TOLERANCE,
     PANEL_LIST,
     PANEL_TO_INDEX,
+    SIDEBAR_BRIGHTNESS_THRESHOLD,
+    SIDEBAR_SCAN_STEP,
+    SIDEBAR_SCAN_X,
+    SIDEBAR_SCAN_Y_RANGE,
     TITLE_CROP_REGION,
     MapIdentity,
     MapPanel,
@@ -103,9 +107,34 @@ class BaseMapPage:
     # ═══════════════════════════════════════════════════════════════════════
 
     @staticmethod
-    def find_selected_chapter_y() -> float | None:
-        """扫描侧边栏，定位选中章节的 y 坐标。"""
-        return 0.556
+    def find_selected_chapter_y(screen: np.ndarray) -> float | None:
+        """扫描侧边栏, 定位选中章节的 y 坐标。
+
+        通过在固定 x 列上逐行扫描像素亮度, 找到高亮选中条的中心 y。
+        选中章节在侧边栏中显示为高亮带, 像素亮度 (R+G+B) 显著高于未选中条目。
+        """
+        y_min, y_max = SIDEBAR_SCAN_Y_RANGE
+        bright_ys: list[float] = []
+
+        y = y_min
+        while y <= y_max:
+            c = PixelChecker.get_pixel(screen, SIDEBAR_SCAN_X, y)
+            brightness = c.r + c.g + c.b
+            if brightness >= SIDEBAR_BRIGHTNESS_THRESHOLD:
+                bright_ys.append(y)
+            y += SIDEBAR_SCAN_STEP
+
+        if not bright_ys:
+            _log.warning('[UI] 侧边栏未找到选中章节高亮带')
+            return None
+
+        center = sum(bright_ys) / len(bright_ys)
+        _log.debug(
+            '[UI] 侧边栏选中章节: y_center={:.3f} ({}个亮点)',
+            center,
+            len(bright_ys),
+        )
+        return center
 
     # ═══════════════════════════════════════════════════════════════════════
     # 状态查询 — 地图 OCR

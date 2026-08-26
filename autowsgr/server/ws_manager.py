@@ -7,8 +7,6 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from loguru import logger
-
 from autowsgr.infra.logger import get_logger
 
 
@@ -28,40 +26,6 @@ class WebSocketManager:
     def __init__(self) -> None:
         self._connections: set[WebSocket] = set()
         self._lock = asyncio.Lock()
-        # loguru sink 的 handler id (None 表示未注册)
-        self._log_sink_handler_id: int | None = None
-
-    def register_log_sink(
-        self,
-        loop: asyncio.AbstractEventLoop,
-        level: str = 'INFO',
-    ) -> None:
-        """注册 loguru sink，把日志通过 WebSocket 推送给 GUI。
-
-        loguru sink 是同步函数，但 ``send_log`` 是 async；通过
-        ``run_coroutine_threadsafe`` 把协程提交到 lifespan 保存的事件循环，
-        避免在日志调用方阻塞或抛 RuntimeError。
-
-        Parameters
-        ----------
-        loop:
-            事件循环引用 (由 FastAPI lifespan 提供)。
-        level:
-            最低日志级别，默认 INFO。DEBUG 不推送，避免大量噪音推送给 GUI。
-        """
-        # 防止重复注册 (开发期间 hot reload 场景)
-        if self._log_sink_handler_id is not None:
-            return
-
-        def sink(message: Any) -> None:
-            """loguru sink：把日志提交到事件循环异步推送。"""
-            record = message.record
-            asyncio.run_coroutine_threadsafe(
-                self.send_log(record['level'].name, record['message']),
-                loop,
-            )
-
-        self._log_sink_handler_id = logger.add(sink, level=level)
 
     async def connect(self, websocket: WebSocket) -> None:
         """接受新连接。"""

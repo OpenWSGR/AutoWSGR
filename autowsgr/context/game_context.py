@@ -175,10 +175,10 @@ class GameContext:
         # 同步每日计数器
         if loot_count is not None:
             self.dropped_loot_count = loot_count
-            _log.info('[Context] 今日战利品数: {}', loot_count)
+            _log.debug('[Context] 今日战利品数: {}', loot_count)
         if ship_acquired_count is not None:
             self.dropped_ship_count = ship_acquired_count
-            _log.info('[Context] 今日舰船数: {}', ship_acquired_count)
+            _log.debug('[Context] 今日舰船数: {}', ship_acquired_count)
 
         # 同步出击舰队信息
         if ships is not None:

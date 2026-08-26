@@ -161,7 +161,11 @@ class SortiePanelMixin(BaseMapPage):
             raise ValueError(f'跳转数量必须为 -3 到 3, 收到: {num}')
         if num == 0:
             return
-        sel_y = self.find_selected_chapter_y()
+        screen = self._ctrl.screenshot()
+        sel_y = self.find_selected_chapter_y(screen)
+        if sel_y is None:
+            _log.warning('[UI] 无法定位选中章节, 跳过跳转')
+            return
         target_y = sel_y + num * CHAPTER_SPACING
         _log.info('[UI] 地图页面 -> 跳转章节 {} (y={:.3f})', num, target_y)
         self._ctrl.click(SIDEBAR_CLICK_X, target_y)
@@ -254,7 +258,7 @@ class SortiePanelMixin(BaseMapPage):
                 self.click_chapter(step)
                 remaining -= abs(step)
                 _log.info(f'[UI] 章节导航: 跳转{step}章, 剩余{remaining}章')
-                time.sleep(2.0)  # 硬等待: 远端机器较卡, 侧边栏滑动动画需要更长时间稳定
+                time.sleep(CHAPTER_NAV_DELAY * abs(step))
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
