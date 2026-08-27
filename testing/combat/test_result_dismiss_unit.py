@@ -20,6 +20,7 @@ import pytest
 
 from autowsgr.combat import handlers as handlers_mod
 from autowsgr.combat.handlers import PhaseHandlersMixin
+from autowsgr.combat.history import CombatEvent, CombatHistory, EventType
 from autowsgr.combat.state import CombatPhase
 
 
@@ -35,6 +36,7 @@ class _Host(PhaseHandlersMixin):
     ) -> None:
         self._device = device
         self._recognizer = recognizer
+        self._ocr = None
         plan = MagicMock()
         plan.end_phase = end_phase
         plan.collect_result_info = collect_result_info
@@ -190,3 +192,66 @@ class TestHandleResultModes:
         assert event.event_type.name == 'RESULT'
         assert event.result == 'S'
         assert event.extra == {'mvp': '鲃鱼'}
+
+
+class TestDropCapture:
+    """掉落捕获: 幂等 + 点击穿行时兜底捕获。"""
+
+    @pytest.fixture(autouse=True)
+    def _stub_ocr(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._ocr_calls: list = []
+        monkeypatch.setattr(
+            handlers_mod,
+            'get_ship_drop',
+            lambda *_a, **_k: self._ocr_calls.append(1) or 'SKR6',
+        )
+
+    def _make_host_with_history(self, *args, **kwargs):
+        host, device, recognizer = _make_host(*args, **kwargs)
+        host._history = CombatHistory()
+        return host, device
+
+    def test_capture_is_idempotent(self):
+        """同节点已记录掉落 → 复用历史结果, 不重复 OCR。"""
+        host, _ = self._make_host_with_history([CombatPhase.PROCEED])
+        host._history.add(
+            CombatEvent(event_type=EventType.GET_SHIP, node='A', result='SKR6'),
+        )
+        result = host._capture_get_ship()
+        assert result == 'SKR6'
+        assert self._ocr_calls == []
+
+    def test_capture_records_new_drop(self):
+        """首次捕获: OCR 识别 + 记录历史 + 返回舰名。"""
+        host, _ = self._make_host_with_history([CombatPhase.PROCEED])
+        result = host._capture_get_ship()
+        assert result == 'SKR6'
+        assert self._ocr_calls == [1]
+        event = host._history.get_event(EventType.GET_SHIP, 'A')
+        assert event is not None and event.result == 'SKR6'
+
+    def test_result_dismiss_captures_on_get_ship(self):
+        """点击穿行命中 GET_SHIP → 立即幂等捕获掉落, 主循环不再重复 OCR。"""
+        host, device = self._make_host_with_history(
+            [CombatPhase.GET_SHIP, CombatPhase.PROCEED],
+            collect_result_info=False,
+        )
+        host._click_result_until_closed(CombatPhase.RESULT)
+        assert device.click.call_count == 1
+        event = host._history.get_event(EventType.GET_SHIP, 'A')
+        assert event is not None and event.result == 'SKR6'
+        # 主循环重新派发 _handle_get_ship 时走幂等分支, 不重复 OCR
+        host._handle_get_ship()
+        assert self._ocr_calls == [1]
+
+    def test_pixel_fallback_captures_on_transition(self):
+        """模板未命中 (None 过渡帧) 但掉落页像素签名命中 → 兜底捕获。"""
+        host, device = self._make_host_with_history(
+            [None],
+            collect_result_info=False,
+        )
+        host._is_get_ship_page = lambda _screen: True
+        host._click_result_until_closed(CombatPhase.RESULT)
+        assert device.click.call_count == 1
+        event = host._history.get_event(EventType.GET_SHIP, 'A')
+        assert event is not None and event.result == 'SKR6'

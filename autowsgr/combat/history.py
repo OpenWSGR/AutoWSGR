@@ -203,6 +203,22 @@ class CombatHistory:
         self.events.append(event)
         _log.debug('[History] 记录事件: {}', event)
 
+    def get_event(
+        self,
+        event_type: EventType,
+        node: str = '',
+    ) -> CombatEvent | None:
+        """按事件类型（可选限定节点）查找**最近一次**事件。
+
+        用于幂等捕获：同一节点的掉落事件已记录过时不再重复 OCR。
+        """
+        for event in reversed(self.events):
+            if event.event_type == event_type and (
+                not node or event.node == node
+            ):
+                return event
+        return None
+
     def reset(self) -> None:
         """清空历史。"""
         count = len(self.events)

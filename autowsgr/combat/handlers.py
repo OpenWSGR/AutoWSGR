@@ -11,6 +11,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from autowsgr.combat.actions import (
     check_blood,
     click_enter_fight,
@@ -29,7 +31,11 @@ from autowsgr.combat.actions import (
     get_ship_drop,
     image_exist,
 )
-from autowsgr.combat.recognition import detect_mvp
+from autowsgr.combat.recognition import (
+    SHIP_DROP_PAGE_SIGNATURE,
+    detect_mvp,
+)
+from autowsgr.combat.recognizer import CombatRecognizer
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, Formation, ShipDamageState
@@ -43,7 +49,6 @@ from .state import CombatPhase
 
 
 if TYPE_CHECKING:
-    from autowsgr.combat.recognizer import CombatRecognizer
     from autowsgr.emulator import AndroidController
     from autowsgr.vision import OCREngine
 
@@ -482,7 +487,20 @@ class PhaseHandlersMixin:
                 screen = self._device.screenshot()
                 current = self._recognizer.identify_current(screen, candidates)
                 if current is None:
-                    continue  # 过渡帧: 只等待, 不点击 (防穿透/误触)
+                    # 过渡帧: 只等待, 不点击 (防穿透/误触)。GET_SHIP 模板
+                    # 可能因页面动画/字体渲染未命中, 用掉落页像素签名兜底探测,
+                    # 防止快速穿行把掉落页直接点过去导致漏统计。
+                    if (
+                        CombatPhase.GET_SHIP in candidates
+                        and self._is_get_ship_page(screen)
+                    ):
+                        _log.debug(
+                            '[Combat] {} 过渡帧命中掉落页像素签名, 捕获掉落',
+                            phase.name,
+                        )
+                        self._capture_get_ship()
+                        return
+                    continue
                 if current in pass_through:
                     _log.debug(
                         '[Combat] {} 到达过渡页 {} (第 {} 次点击), 继续点击跳过',
@@ -496,6 +514,9 @@ class PhaseHandlersMixin:
                         '[Combat] {} 页面未关闭 (第 {} 次点击), 延迟重试', phase.name, attempt
                     )
                     break  # 确认被吞 → 重试点击
+                if current == CombatPhase.GET_SHIP:
+                    # 点击穿透到掉落页: 立即幂等捕获掉落, 不依赖主循环重新派发
+                    self._capture_get_ship()
                 _log.debug('[Combat] {} 已推进到 {}', phase.name, current.name)
                 return
             else:
@@ -538,11 +559,23 @@ class PhaseHandlersMixin:
         return ConditionFlag.FIGHT_CONTINUE
 
     def _handle_get_ship(self) -> ConditionFlag:
-        """处理获取舰船。"""
+        """处理获取舰船 — 幂等捕获掉落并关闭页面。"""
+        self._capture_get_ship()
+        self._click_result_until_closed(CombatPhase.GET_SHIP)
+        return ConditionFlag.FIGHT_CONTINUE
+
+    def _capture_get_ship(self) -> str | None:
+        """幂等捕获掉落舰船: OCR 识别 + 记录历史。
+
+        同一节点已捕获过 (如点击穿行时已记录) 则直接复用历史结果,
+        避免主循环重新派发时重复 OCR。
+        """
+        existing = self._history.get_event(EventType.GET_SHIP, self._node)
+        if existing is not None:
+            return existing.result or None
         ship_name = get_ship_drop(self._device, self._ocr)
         if ship_name:
             _log.info('[Combat] 获得舰船: {}', ship_name)
-
         self._history.add(
             CombatEvent(
                 event_type=EventType.GET_SHIP,
@@ -550,8 +583,15 @@ class PhaseHandlersMixin:
                 result=ship_name or '',
             )
         )
-        self._click_result_until_closed(CombatPhase.GET_SHIP)
-        return ConditionFlag.FIGHT_CONTINUE
+        return ship_name
+
+    def _is_get_ship_page(self, screen: np.ndarray) -> bool:
+        """兜底判定: GET_SHIP 模板未命中时用掉落页像素签名探测。
+
+        掉落页有稳定的像素特征 (标题横幅/边框配色), 模板因动画或字体
+        渲染未命中时仍可借此避免穿透点击跳过掉落页。
+        """
+        return CombatRecognizer._match_pixel(screen, SHIP_DROP_PAGE_SIGNATURE)
 
     def _handle_proceed(self) -> ConditionFlag:
         """处理继续前进 / 回港决策。
