@@ -68,20 +68,27 @@ def test_system_start_publishes_launched_context(
     """A successful start publishes the launched context exactly once."""
     launched_context = object()
     launch_calls: list[str] = []
+    startup_steps: list[str] = []
     scheduler_module = types.ModuleType('autowsgr.scheduler')
 
     def launch(config_path: str) -> object:
         launch_calls.append(config_path)
+        startup_steps.append('launch')
         return launched_context
+
+    def register_stats_log_sink(_: asyncio.AbstractEventLoop) -> None:
+        startup_steps.append('sink')
 
     scheduler_module.launch = launch  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, 'autowsgr.scheduler', scheduler_module)
     monkeypatch.setattr(server_main, '_ctx', None)
+    monkeypatch.setattr(server_main, 'register_stats_log_sink', register_stats_log_sink)
 
     response = asyncio.run(system.system_start(system.SystemStartRequest(config_path='test.yaml')))
 
     assert response.success is True
     assert launch_calls == ['test.yaml']
+    assert startup_steps == ['launch', 'sink']
     assert server_main._ctx is launched_context
 
 

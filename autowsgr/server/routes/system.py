@@ -45,6 +45,7 @@ async def system_start(request: SystemStartRequest) -> ApiResponse:
             config_path = request.config_path or 'usersettings.yaml'
             _log.info('[System] 正在启动, 配置: {}', config_path)
             _main._ctx = await asyncio.to_thread(launch, config_path=config_path)
+            _main.register_stats_log_sink(asyncio.get_running_loop())
             _log.info('[System] 启动成功')
 
             return ApiResponse(success=True, message='系统启动成功')

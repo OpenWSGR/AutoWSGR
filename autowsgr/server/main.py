@@ -24,6 +24,7 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger as _loguru_logger
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.server.task_manager import task_manager
@@ -42,6 +43,7 @@ _ctx: Any = None
 
 # 序列化系统上下文的发布、任务准入和回收。
 lifecycle_lock = asyncio.Lock()
+_stats_sink_id: int | None = None
 
 
 def get_context() -> Any:
@@ -49,6 +51,41 @@ def get_context() -> Any:
     if _ctx is None:
         raise RuntimeError('系统未启动，请先调用 POST /api/system/start')
     return _ctx
+
+
+def register_stats_log_sink(loop: asyncio.AbstractEventLoop) -> None:
+    """Register the GUI stats sink after logging has been configured."""
+    global _stats_sink_id
+
+    if _stats_sink_id is not None:
+        try:
+            _loguru_logger.remove(_stats_sink_id)
+        except ValueError:
+            # setup_logger() removes every Loguru handler, including this stale sink.
+            pass
+
+    _stats_sink_id = _loguru_logger.add(
+        ws_manager.build_log_sink(loop),
+        level='INFO',
+        filter=lambda r: True,  # 过滤由 build_log_sink 内部按白名单完成
+        backtrace=False,
+        diagnose=False,
+    )
+
+
+def remove_stats_log_sink() -> None:
+    """Remove the currently registered GUI stats sink."""
+    global _stats_sink_id
+
+    if _stats_sink_id is None:
+        return
+
+    try:
+        _loguru_logger.remove(_stats_sink_id)
+    except ValueError:
+        # A later setup_logger() call may already have removed this sink.
+        pass
+    _stats_sink_id = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -62,27 +99,17 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     # 启动时: 设置事件循环引用 + 注册统计专用 WebSocket loguru sink
     loop = asyncio.get_running_loop()
     task_manager.set_loop(loop)
-    from loguru import logger as _loguru_logger
-    _stats_sink_id = _loguru_logger.add(
-        ws_manager.build_log_sink(),
-        level='INFO',
-        filter=lambda r: True,  # 过滤由 build_log_sink 内部按白名单完成
-        backtrace=False,
-        diagnose=False,
-    )
+    register_stats_log_sink(loop)
     _log.info('[Server] HTTP Server 已启动, GUI 统计日志 sink 已注册')
 
-    yield
-
-    # 关闭时: 清理 sink 与连接
     try:
-        from loguru import logger as _loguru_logger2
-        _loguru_logger2.remove(_stats_sink_id)
-    except Exception:
-        pass
-    if _ctx is not None:
-        _log.info('[Server] 断开模拟器连接')
-    _log.info('[Server] HTTP Server 已关闭')
+        yield
+    finally:
+        # 关闭时: 清理 sink 与连接
+        remove_stats_log_sink()
+        if _ctx is not None:
+            _log.info('[Server] 断开模拟器连接')
+        _log.info('[Server] HTTP Server 已关闭')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

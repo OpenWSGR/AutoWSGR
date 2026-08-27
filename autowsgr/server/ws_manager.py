@@ -138,14 +138,12 @@ class WebSocketManager:
     # 统计日志 sink (供 GUI DailySortieStats 消费)
     # ══════════════════════════════════════════════════════════════════════
 
-    def build_log_sink(self) -> Callable[[dict[str, Any]], None]:
+    def build_log_sink(self, loop: asyncio.AbstractEventLoop) -> Callable[[dict[str, Any]], None]:
         """构建 loguru sink 回调，仅推送 GUI 统计需要的日志。
 
         只推送匹配 :data:`_STATS_LOG_PATTERNS` 白名单的消息；
         普通点击/导航/初始化等 INFO 日志被过滤掉，避免 GUI 端日志面板噪音。
         """
-        loop = asyncio.new_event_loop()
-
         def _sink(message: Any) -> None:  # loguru.Message (avoid runtime import)
             text = str(message.record.get('message', ''))
             if not _is_stats_log(text):
@@ -154,32 +152,8 @@ class WebSocketManager:
             level = raw_level.name if hasattr(raw_level, 'name') else str(raw_level)
             ch = message.record.get('extra', {}).get('ch', '') or ''
 
-            async def _send() -> None:
-                await self.send_log(level, text, ch)
-
-            try:
-                running_loop = asyncio.get_running_loop()
-            except RuntimeError:
-                running_loop = None
-
-            if running_loop is not None:
-                running_loop.create_task(_send())
-                return
-            # 执行线程中无事件循环 → 使用专用线程 loop
-            asyncio.run_coroutine_threadsafe(_send(), loop)
-
-        # 后台线程启动专用事件循环
-        import threading
-
-        def _run() -> None:
-            asyncio.set_event_loop(loop)
-            loop.run_forever()
-
-        threading.Thread(
-            target=_run,
-            name='ws-stats-log-loop',
-            daemon=True,
-        ).start()
+            if not loop.is_closed():
+                asyncio.run_coroutine_threadsafe(self.send_log(level, text, ch), loop)
 
         return _sink
 
