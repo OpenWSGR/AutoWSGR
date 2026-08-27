@@ -213,9 +213,33 @@ destroy_ship_types:
         assert cfg.destroy_ship_work_mode == DestroyShipWorkMode.include
         assert len(cfg.destroy_ship_types) == 2
 
+    @pytest.mark.parametrize(
+        ('field', 'value'),
+        [
+            ('operation_delay_min', -0.1),
+            ('operation_delay_max', -0.1),
+            ('operation_delay_min', float('nan')),
+            ('operation_delay_max', float('inf')),
+        ],
+    )
+    def test_operation_delay_rejects_negative_or_nonfinite_values(
+        self,
+        field: str,
+        value: float,
+    ) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            UserConfig(
+                emulator=EmulatorConfig(
+                    serial='emulator-5554',
+                    path='/fake/dnplayer.exe',
+                ),
+                **{field: value},
+            )
+
 
 # ── FightConfig ──
-
 
 class TestFightConfig:
     def test_repair_mode_expanded(self):
@@ -475,6 +499,7 @@ class TestPlanCompat:
         from autowsgr.infra.config_compat import detect_legacy_plan
 
         assert detect_legacy_plan({'fleet': ['吹雪', '明斯克']}) == []
+        assert detect_legacy_plan({'fleet': []}) == []
         assert detect_legacy_plan({}) == []
 
     def test_detect_leading_empty_fleet(self):

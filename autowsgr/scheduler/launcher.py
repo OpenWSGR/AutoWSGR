@@ -248,12 +248,18 @@ class Launcher:
             完全就绪的游戏上下文。
         """
         self.load_config()
-        self.connect()
-        ctx = self.build_context()
-        if ensure_game:
-            self.ensure_ready(ctx)
-        _log.info('[Launcher] 启动完成，游戏已就绪')
-        return ctx
+        try:
+            self.connect()
+            ctx = self.build_context()
+            if ensure_game:
+                self.ensure_ready(ctx)
+        except Exception:
+            if self._ctrl is not None:
+                self._ctrl.disconnect()
+            raise
+        else:
+            _log.info('[Launcher] 启动完成，游戏已就绪')
+            return ctx
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

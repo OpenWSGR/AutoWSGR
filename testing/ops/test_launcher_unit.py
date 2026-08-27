@@ -3,7 +3,29 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from autowsgr.scheduler.launcher import Launcher
+
+
+def test_launch_disconnects_controller_after_connect_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A partially connected controller is released when launch fails."""
+    launcher = Launcher()
+    ctrl = MagicMock()
+
+    def fail_connect() -> None:
+        launcher._ctrl = ctrl
+        raise RuntimeError('connect failed')
+
+    monkeypatch.setattr(launcher, 'load_config', lambda: None)
+    monkeypatch.setattr(launcher, 'connect', fail_connect)
+
+    with pytest.raises(RuntimeError, match='connect failed'):
+        launcher.launch()
+
+    ctrl.disconnect.assert_called_once_with()
 
 
 def _launcher_with_enhanced_ship_ocr(enabled: bool) -> Launcher:
@@ -158,4 +180,3 @@ def test_gui_runtime_contract_probe_compatible():
             os.environ.pop(gpu_key, None)
         else:
             os.environ[gpu_key] = previous_gpu
-

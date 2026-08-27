@@ -20,7 +20,7 @@ from autowsgr.server.ws_manager import ws_manager
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Coroutine
 
 
 _log = get_logger('server.task')
@@ -146,6 +146,20 @@ class TaskManager:
         """设置事件循环引用，用于从线程中调用 async 函数。"""
         self._loop = loop
 
+    def _submit_to_loop(self, coroutine: Coroutine[Any, Any, Any]) -> None:
+        """Submit a notification unless application shutdown closed the loop."""
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            coroutine.close()
+            return
+
+        try:
+            asyncio.run_coroutine_threadsafe(coroutine, loop)
+        except RuntimeError:
+            coroutine.close()
+            if not loop.is_closed():
+                raise
+
     def start_task(
         self,
         task_type: str,
@@ -211,34 +225,32 @@ class TaskManager:
 
         try:
             outcome = executor(task)
-            task.results = outcome.results
+            with self._lock:
+                task.results = outcome.results
 
-            # 检查是否被请求停止
-            if task.stop_requested:
-                task.status = TaskStatus.STOPPED
-            elif outcome.success:
-                task.status = TaskStatus.COMPLETED
-            else:
-                task.status = TaskStatus.FAILED
-                task.error = outcome.error
+                # 检查是否被请求停止
+                if task.stop_requested:
+                    task.status = TaskStatus.STOPPED
+                elif outcome.success:
+                    task.status = TaskStatus.COMPLETED
+                else:
+                    task.status = TaskStatus.FAILED
+                    task.error = outcome.error
 
-            task.finished_at = datetime.now(UTC).isoformat()
+                task.finished_at = datetime.now(UTC).isoformat()
             _log.info('[Task] 任务完成: {} ({})', task.task_id, task.status.value)
 
         except Exception as e:
-            task.status = TaskStatus.FAILED
-            task.error = str(e)
-            task.finished_at = datetime.now(UTC).isoformat()
+            with self._lock:
+                task.status = TaskStatus.FAILED
+                task.error = str(e)
+                task.finished_at = datetime.now(UTC).isoformat()
             _log.error('[Task] 任务失败: {} - {}', task.task_id, e)
 
         finally:
             self._device_lease.release(lease_token)
             # 通过事件循环发送 WebSocket 通知
-            if self._loop:
-                asyncio.run_coroutine_threadsafe(
-                    self._notify_completion(task),
-                    self._loop,
-                )
+            self._submit_to_loop(self._notify_completion(task))
 
     async def _notify_completion(self, task: TaskInfo) -> None:
         """发送任务完成通知。"""
@@ -295,15 +307,13 @@ class TaskManager:
             self._current_task.current_node = current_node
 
         # 通过事件循环发送 WebSocket 更新
-        if self._loop:
-            asyncio.run_coroutine_threadsafe(
-                ws_manager.send_task_update(
-                    task_id=self._current_task.task_id,
-                    status='running',
-                    progress=self._current_task.progress,
-                ),
-                self._loop,
+        self._submit_to_loop(
+            ws_manager.send_task_update(
+                task_id=self._current_task.task_id,
+                status='running',
+                progress=self._current_task.progress,
             )
+        )
 
     def add_result(self, result: dict[str, Any]) -> None:
         """添加一轮结果 (从执行线程调用)。"""

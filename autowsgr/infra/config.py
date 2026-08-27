@@ -384,9 +384,9 @@ class UserConfig(BaseModel):
     # 新版用 operation_delay_min/max 字段, 由 _apply_operation_delay 写回模块
     # 全局 OPERATION_DELAY_MIN/MAX (供 operation_delay() 读取)。
     # check_page 功能已由 launcher.ensure_ready 覆盖。
-    operation_delay_min: float = 0.0
+    operation_delay_min: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     """UI 操作后随机延迟下界 (秒)。兼容层把 classic 的 delay 同时迁为本字段与 _max。"""
-    operation_delay_max: float = 0.0
+    operation_delay_max: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     """UI 操作后随机延迟上界 (秒)。"""
     dock_full_destroy: bool = False
     """船坞满时自动清空"""

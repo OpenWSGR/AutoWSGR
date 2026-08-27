@@ -21,6 +21,96 @@ def _wait_until_finished(manager: TaskManager, timeout: float = 1.0) -> None:
     assert manager.is_running is False
 
 
+def test_stop_request_wins_over_worker_finalization() -> None:
+    """A confirmed stop request cannot be overwritten by completion."""
+    manager = TaskManager()
+    executor_ready = threading.Event()
+    release_executor = threading.Event()
+    worker_at_finalize = threading.Event()
+    release_finalizer = threading.Event()
+    worker_threads: list[threading.Thread] = []
+    results = [{'round': 1, 'success': True}]
+
+    class _FinalizationGate:
+        def __init__(self) -> None:
+            self._lock = threading.Lock()
+
+        def __enter__(self) -> None:
+            if threading.current_thread() is worker_threads[0]:
+                worker_at_finalize.set()
+                assert release_finalizer.wait(timeout=1)
+            self._lock.acquire()
+
+        def __exit__(
+            self,
+            _exc_type: object,
+            _exc_value: object,
+            _traceback: object,
+        ) -> None:
+            self._lock.release()
+
+    def executor(_task: object) -> TaskOutcome:
+        worker_threads.append(threading.current_thread())
+        executor_ready.set()
+        assert release_executor.wait(timeout=1)
+        return TaskOutcome.from_results(results)
+
+    manager.start_task(task_type='normal_fight', total_rounds=1, executor=executor)
+    try:
+        assert executor_ready.wait(timeout=1)
+        manager._lock = _FinalizationGate()
+        release_executor.set()
+        assert worker_at_finalize.wait(timeout=1)
+        assert manager.stop_task() is True
+    finally:
+        release_executor.set()
+        release_finalizer.set()
+
+    assert manager.wait_for_completion(timeout=1)
+    assert manager.current_task is not None
+    assert manager.current_task.status is TaskStatus.STOPPED
+    assert manager.current_task.results == results
+    assert manager.get_status()['status'] == TaskStatus.STOPPED.value
+
+
+def test_closed_loop_drops_worker_notifications_without_task_failure() -> None:
+    """Shutdown cannot turn an already stopped task into a worker exception."""
+    manager = TaskManager()
+    loop = asyncio.new_event_loop()
+    manager.set_loop(loop)
+    worker_ready = threading.Event()
+    release_worker = threading.Event()
+    thread_errors: list[object] = []
+    original_excepthook = threading.excepthook
+
+    def capture_thread_error(args: object) -> None:
+        thread_errors.append(args.exc_value)
+
+    def executor(_task: object) -> TaskOutcome:
+        worker_ready.set()
+        assert release_worker.wait(timeout=1)
+        manager.update_progress(current_round=1)
+        return TaskOutcome.from_results([{'round': 1, 'success': True}])
+
+    threading.excepthook = capture_thread_error
+    try:
+        manager.start_task(task_type='normal_fight', total_rounds=1, executor=executor)
+        assert worker_ready.wait(timeout=1)
+        assert manager.stop_task() is True
+        loop.close()
+        release_worker.set()
+        assert manager.wait_for_completion(timeout=1)
+    finally:
+        release_worker.set()
+        if not loop.is_closed():
+            loop.close()
+        threading.excepthook = original_excepthook
+
+    assert thread_errors == []
+    assert manager.current_task is not None
+    assert manager.current_task.status is TaskStatus.STOPPED
+
+
 def test_failed_round_marks_task_failed_and_preserves_details() -> None:
     """A handled round failure must not be broadcast as task success."""
     manager = TaskManager()
