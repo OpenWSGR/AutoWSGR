@@ -214,3 +214,11 @@ uv build
 - `.github/workflows/**` 定义实际自动化；修改前必须说明权限、Secret、触发条件和发布影响。
 - 工具入口只指向本文件，不复制整套规则；阶段性迁移清单、历史事故和已结束的单次分工放入对应任务文档，不写入长期 Agent 约束。
 - 修改本文件前必须先审查当前代码和门禁；新增、删除或降低规则前，先向用户列明具体动作、原因和影响并取得确认。
+
+## 11. Project Worktree Coordination
+
+When this repository is inside a parent project containing a coordination `AGENTS.md`, read the parent policy before writing. The parent meta repository owns the `planning-with-files` task files; this repository owns only backend code, tests, and backend-specific release artifacts.
+
+- The current project policy explicitly authorizes local task branches and worktrees for parallel work. This does not authorize remote branch, push, tag, or release operations.
+- Work only in the child worktree assigned to the matching `codex/<task-id>` branch. Do not switch the shared `ShiinaKuroko` or `main` checkout to another task branch.
+- Keep backend commits and verification in this repository, and record the resulting SHA in the parent meta task's `progress.md`.
