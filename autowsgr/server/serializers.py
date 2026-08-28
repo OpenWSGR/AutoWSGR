@@ -98,25 +98,21 @@ def convert_combat_result(result: Any, round_num: int) -> dict[str, Any]:  # noq
     events: list[dict[str, Any]] = []
 
     if result.history:
+        fight_results = result.history.get_fight_results()
+        fight_results_iter = (
+            fight_results.values()
+            if isinstance(fight_results, dict)
+            else fight_results
+        )
+        for fr in fight_results_iter:
+            if fr.mvp and fr.mvp > 0 and mvp is None:
+                mvp = f'位置{fr.mvp}'
+            if fr.grade and grade is None:
+                grade = fr.grade
+
         for event in result.history.events:
             if event.node and event.node not in nodes:
                 nodes.append(event.node)
-
-        fight_results = result.history.get_fight_results()
-        if isinstance(fight_results, dict):
-            for fr in fight_results.values():
-                if fr.mvp and fr.mvp > 0 and mvp is None:
-                    mvp = f'位置{fr.mvp}'
-                if fr.grade and grade is None:
-                    grade = fr.grade
-        elif isinstance(fight_results, list):
-            for fr in fight_results:
-                if fr.mvp and fr.mvp > 0 and mvp is None:
-                    mvp = f'位置{fr.mvp}'
-                if fr.grade and grade is None:
-                    grade = fr.grade
-
-        for event in result.history.events:
             ev: dict[str, Any] = {
                 'type': event.event_type.name,
                 'node': event.node,
