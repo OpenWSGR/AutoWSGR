@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.server.device_lease import exclusive_device_operation
@@ -17,6 +17,7 @@ from autowsgr.server.serializers import (
 )
 
 from ..main import get_context
+from . import require_context
 
 
 _log = get_logger('server')
@@ -31,10 +32,7 @@ async def game_acquisition() -> ApiResponse:
 
     仅在空闲时可用 (需要控制画面导航到出征面板)。
     """
-    try:
-        ctx = get_context()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+    ctx = require_context(get_context)
 
     from autowsgr.ops.navigate import goto_page
     from autowsgr.ui.map.page import MapPage
@@ -65,10 +63,7 @@ async def game_context_info() -> ApiResponse:
     包含资源、舰队、远征、建造等完整游戏状态数据。
     不需要截图或画面操作，直接读取内存中的状态。
     """
-    try:
-        ctx = get_context()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+    ctx = require_context(get_context)
 
     return ApiResponse(
         success=True,
@@ -88,10 +83,7 @@ async def game_context_info() -> ApiResponse:
 @router.get('/api/expedition/status', response_model=ApiResponse)
 async def expedition_status() -> ApiResponse:
     """查询远征槽位状态（4 个槽位的章节、节点、剩余时间等）。"""
-    try:
-        ctx = get_context()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+    ctx = require_context(get_context)
 
     return ApiResponse(
         success=True,
@@ -102,10 +94,7 @@ async def expedition_status() -> ApiResponse:
 @router.get('/api/build/status', response_model=ApiResponse)
 async def build_status() -> ApiResponse:
     """查询建造队列状态。"""
-    try:
-        ctx = get_context()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
+    ctx = require_context(get_context)
 
     return ApiResponse(
         success=True,

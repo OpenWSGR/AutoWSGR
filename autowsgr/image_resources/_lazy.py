@@ -69,7 +69,6 @@ class LazyTemplate:
         self._template: ImageTemplate | None = None
 
     def __set_name__(self, owner: type, name: str) -> None:
-        self._attr_name = name
         if self._name is None:
             self._name = name.lower()
 

@@ -40,9 +40,6 @@ from autowsgr.types import Formation
 # 允许在规则中出现的舰种标识符
 _log = get_logger('combat.recognition')
 
-_SHIP_TYPE_PATTERN = re.compile(
-    rf'\b({"|".join(re.escape(vessel_type.native.as_english()) for vessel_type in FLEET_VESSEL_TYPES)})\b',
-)
 _RULE_FIELD_CODES = {vessel_type.native.as_english() for vessel_type in FLEET_VESSEL_TYPES} | {
     'ALL'
 }

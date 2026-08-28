@@ -5,14 +5,19 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
+from fastapi import WebSocketDisconnect
 
 from autowsgr.server import main as server_main
 from autowsgr.server.ws_manager import WebSocketManager
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import pytest
 
 
 class _FakeLoguru:
@@ -47,6 +52,22 @@ class _FakeWebSocket:
         self.delivered.set()
 
 
+class _DisconnectingWebSocket:
+    async def receive_text(self) -> str:
+        raise WebSocketDisconnect(code=1000)
+
+
+class _StreamSpy:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    async def connect(self, _websocket: object, stream: str) -> None:
+        self.calls.append(('connect', stream))
+
+    async def disconnect(self, _websocket: object, stream: str) -> None:
+        self.calls.append(('disconnect', stream))
+
+
 def test_ship_drop_sink_reregisters_and_dispatches_from_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -56,7 +77,7 @@ def test_ship_drop_sink_reregisters_and_dispatches_from_worker(
         manager = WebSocketManager()
         delivered = asyncio.Event()
         websocket = _FakeWebSocket(delivered)
-        await manager.connect(websocket)  # type: ignore[arg-type]
+        await manager.connect(websocket, 'logs')  # type: ignore[arg-type]
 
         loguru = _FakeLoguru()
         monkeypatch.setattr(server_main, '_loguru_logger', loguru)
@@ -89,5 +110,45 @@ def test_ship_drop_sink_reregisters_and_dispatches_from_worker(
         assert websocket.messages[0]['type'] == 'log'
         assert websocket.messages[0]['message'] == '[Combat] 获得舰船: 测试舰'
         assert websocket.messages[0]['channel'] == 'combat.handlers'
+
+    asyncio.run(exercise())
+
+
+def test_messages_stay_within_their_stream() -> None:
+    async def exercise() -> None:
+        manager = WebSocketManager()
+        log_websocket = _FakeWebSocket(asyncio.Event())
+        task_websocket = _FakeWebSocket(asyncio.Event())
+        await manager.connect(log_websocket, 'logs')  # type: ignore[arg-type]
+        await manager.connect(task_websocket, 'task')  # type: ignore[arg-type]
+
+        await manager.send_log('INFO', '[Combat] 获得舰船: 测试舰')
+        await manager.send_task_update('task_1', 'running')
+        await manager.send_task_completed('task_1', True)
+
+        assert [message['type'] for message in log_websocket.messages] == ['log']
+        assert [message['type'] for message in task_websocket.messages] == [
+            'task_update',
+            'task_completed',
+        ]
+
+    asyncio.run(exercise())
+
+
+def test_websocket_endpoints_use_matching_streams(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def exercise() -> None:
+        spy = _StreamSpy()
+        websocket = _DisconnectingWebSocket()
+        monkeypatch.setattr(server_main, 'ws_manager', spy)
+
+        await server_main.ws_logs(websocket)  # type: ignore[arg-type]
+        await server_main.ws_task(websocket)  # type: ignore[arg-type]
+
+        assert spy.calls == [
+            ('connect', 'logs'),
+            ('disconnect', 'logs'),
+            ('connect', 'task'),
+            ('disconnect', 'task'),
+        ]
 
     asyncio.run(exercise())

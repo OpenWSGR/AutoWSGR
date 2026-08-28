@@ -52,27 +52,17 @@ from autowsgr.ui.battle.fleet_change import FleetChangeMixin
 
 | 模块 | 可删除对象 |
 | --- | --- |
-| `combat/actions.py` | `FLAGSHIP_CONFIRM`、`click_start_march` |
-| `combat/fleet.py` | `NATIVE_FLEET_VESSEL_TYPES` |
-| `combat/recognition.py` | `_SHIP_TYPE_DISPLAY_MAP` |
-| `combat/rules.py` | `_SHIP_TYPE_PATTERN` |
-| `ops/normal_fight.py` | `self._destroy_ship_types` 赋值 |
-| `ops/startup.py` | `_OVERLAY_DISMISS_TIMEOUT`、`_OVERLAY_DISMISS_DELAY` |
-| `emulator/controller/scrcpy.py` | `_TYPE_INJECT_SCROLL_EVENT` |
-| `ui/bath_page/recognition.py` | `_TIME_Y_MIN` |
-| `ui/decisive/fleet_ocr.py` | `_prepare_name_roi` |
-| `ui/decisive/overlay.py` | `CLICK_BUY_EXP`、`CLICK_SKILL`、`is_advance_choice`、`is_confirm_exit` |
+| `combat/actions.py` | `FLAGSHIP_CONFIRM` |
 | `ui/main_page/constants.py` | `EVENT_SIDEBAR_BG` |
-| `ui/map/data.py` | `EXPEDITION_IDLE_COLOR`、`SIDEBAR_SCAN_*`、`RIVAL_POSITIONS`、`CLICK_CHALLENGE` |
+| `ui/map/data.py` | `SIDEBAR_SCAN_*` |
 | `ui/tabbed_page.py` | `TAB_DARK` |
-| `ui/utils/ship_list.py` | `_center_x` |
-| `vision/ocr_rules.py` | `LEVEL_LABEL_PATTERN` |
-| `server/schemas.py` | `SystemStatusResponse`、`LogMessage`，以及随之失去引用的 `LogLevel` |
 | `server/ws_manager.py` | `send_log`，以及仅由它使用的 `UTC`、`datetime` 导入 |
-| `image_resources/_lazy.py` | 未被读取的 `self._attr_name` 赋值 |
 
-这些项目适合后续按模块分批删除，并为对应模块执行聚焦测试。本次提交不同时清理，
-以便将旧模块删除与其他行为变化隔离。
+本次精简批次已删除前表中已移除的私有死代码：`click_start_march`、
+`_SHIP_TYPE_DISPLAY_MAP`、`_SHIP_TYPE_PATTERN`、`self._destroy_ship_types` 赋值、
+两个未使用的启动常量、scrcpy 滚动消息常量、浴室时间常量、舰队 OCR 名称预处理
+helper、舰船列表中心点 helper、等级标签正则，以及 `LazyTemplate` 未读取的属性赋值。
+删除前均通过全仓引用扫描确认无调用。剩余项目继续按模块分批删除，并执行对应聚焦测试。
 
 ## 5. 必须保留的兼容接口
 

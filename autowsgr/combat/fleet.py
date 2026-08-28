@@ -25,9 +25,6 @@ if TYPE_CHECKING:
     from autowsgr.combat.plan import CombatPlan
 
 
-NATIVE_FLEET_VESSEL_TYPES = tuple(vessel_type.native for vessel_type in FLEET_VESSEL_TYPES)
-"""由公共 native 契约提供的普通舰种。"""
-
 _NATIVE_CODE_TO_SHIP_TYPE: Mapping[str, ShipType] = MappingProxyType(
     {
         'cv': ShipType.CV,

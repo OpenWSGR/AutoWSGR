@@ -6,16 +6,19 @@ import asyncio
 import json
 import re
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 from autowsgr.infra.logger import get_logger
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from fastapi import WebSocket
 
 
 _log = get_logger('server.ws')
+Stream = Literal['logs', 'task']
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GUI 统计所需日志白名单正则
@@ -45,32 +48,32 @@ class WebSocketManager:
     """
 
     def __init__(self) -> None:
-        self._connections: set[WebSocket] = set()
+        self._connections: dict[Stream, set[WebSocket]] = {'logs': set(), 'task': set()}
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket) -> None:
+    async def connect(self, websocket: WebSocket, stream: Stream) -> None:
         """接受新连接。"""
         await websocket.accept()
         async with self._lock:
-            self._connections.add(websocket)
-        _log.info('[WS] 新连接, 当前连接数: {}', len(self._connections))
+            self._connections[stream].add(websocket)
+        _log.info('[WS] {} 新连接, 当前连接数: {}', stream, len(self._connections[stream]))
 
-    async def disconnect(self, websocket: WebSocket) -> None:
+    async def disconnect(self, websocket: WebSocket, stream: Stream) -> None:
         """断开连接。"""
         async with self._lock:
-            self._connections.discard(websocket)
-        _log.info('[WS] 断开连接, 当前连接数: {}', len(self._connections))
+            self._connections[stream].discard(websocket)
+        _log.info('[WS] {} 断开连接, 当前连接数: {}', stream, len(self._connections[stream]))
 
-    async def broadcast(self, message: dict[str, Any]) -> None:
+    async def broadcast(self, stream: Stream, message: dict[str, Any]) -> None:
         """广播消息到所有连接。"""
-        if not self._connections:
+        if not self._connections[stream]:
             return
 
         data = json.dumps(message, ensure_ascii=False)
         dead_connections = []
 
         async with self._lock:
-            for ws in list(self._connections):
+            for ws in list(self._connections[stream]):
                 try:
                     await ws.send_text(data)
                 except Exception:
@@ -78,7 +81,7 @@ class WebSocketManager:
 
             # 清理断开的连接
             for ws in dead_connections:
-                self._connections.discard(ws)
+                self._connections[stream].discard(ws)
 
     async def send_log(
         self,
@@ -88,6 +91,7 @@ class WebSocketManager:
     ) -> None:
         """发送日志消息。"""
         await self.broadcast(
+            'logs',
             {
                 'type': 'log',
                 'timestamp': datetime.now(UTC).isoformat(),
@@ -114,7 +118,7 @@ class WebSocketManager:
             payload['progress'] = progress
         if result:
             payload['result'] = result
-        await self.broadcast(payload)
+        await self.broadcast('task', payload)
 
     async def send_task_completed(
         self,
@@ -125,6 +129,7 @@ class WebSocketManager:
     ) -> None:
         """发送任务完成通知。"""
         await self.broadcast(
+            'task',
             {
                 'type': 'task_completed',
                 'task_id': task_id,

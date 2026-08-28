@@ -144,13 +144,6 @@ CLICK_SORTIE: tuple[float, float] = (900 / 960, 500 / 540)
 CLICK_FORMATION: tuple[float, float] = (700 / 960, 500 / 540)
 """右下角「编队」按钮 — 进入编队页面。"""
 
-CLICK_BUY_EXP: tuple[float, float] = (75 / 960, 500 / 540)
-"""左下角「购买经验值」按钮。"""
-
-CLICK_SKILL: tuple[float, float] = (0.2143, 0.894)
-"""副官技能按钮。"""
-
-
 # ── 战备舰队获取 overlay ──
 
 CLICK_FLEET_REFRESH: tuple[float, float] = (380 / 960, 500 / 540)
@@ -245,16 +238,6 @@ def is_fleet_acquisition(screen: np.ndarray) -> bool:
     return ImageChecker.template_exists(
         screen, Templates.Decisive.FLEET_ACQUISITION, confidence=0.85
     )
-
-
-def is_advance_choice(screen: np.ndarray) -> bool:
-    """截图是否为选择前进点 overlay。"""
-    return ImageChecker.template_exists(screen, Templates.Decisive.ADVANCE_CHOICE, confidence=0.85)
-
-
-def is_confirm_exit(screen: np.ndarray) -> bool:
-    """截图是否为确认退出 overlay。"""
-    return ImageChecker.template_exists(screen, Templates.Decisive.CONFIRM_EXIT, confidence=0.85)
 
 
 def get_overlay_template(overlay: DecisiveOverlay) -> ImageTemplate:

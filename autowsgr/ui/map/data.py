@@ -128,9 +128,6 @@ EXPEDITION_TOLERANCE = 40.0
 EXPEDITION_READY_COLOR = Color.of(253, 228, 66)
 """远征槽位就绪颜色 — 黄色 (表示该槽位远征已完成)。"""
 
-EXPEDITION_IDLE_COLOR = Color.of(38, 147, 250)
-"""远征槽位空闲颜色 — 蓝色 (表示该槽位无远征或进行中)。"""
-
 DIFFICULTY_EASY_COLOR = Color.of(29, 139, 234)
 """难度按钮「简单」状态颜色 — 蓝色。"""
 
@@ -345,19 +342,6 @@ MAP_NODE_POSITIONS: dict[int, tuple[float, float]] = {
     5: (0.500, 0.800),
 }
 """出征面板中各地图节点的点击位置 (1-5, 从上到下)。"""
-
-# ── 演习坐标 ──
-
-RIVAL_POSITIONS: list[tuple[float, float]] = [
-    (0.800, 0.222),
-    (0.800, 0.444),
-    (0.800, 0.667),
-    (0.800, 0.889),
-]
-"""演习面板中 4 个对手位置的「挑战」按钮。"""
-
-CLICK_CHALLENGE: tuple[float, float] = (0.800, 0.500)
-"""演习面板 — 通用挑战按钮。"""
 
 # ── 演习 — 对手挑战状态检测 ──
 

@@ -148,6 +148,10 @@ class GameContext:
     def update_ship_damage(self, name: str, state: ShipDamageState) -> None:
         """更新舰船的破损状态。"""
         self.get_ship(name).damage_state = state
+        for fleet in self.fleets:
+            for ship in fleet.ships:
+                if ship.name == name:
+                    ship.damage_state = state
 
     # ── 战斗上下文同步 ──
 
@@ -189,7 +193,7 @@ class GameContext:
                 if s.name:
                     registered = self.get_ship(s.name)
                     registered.level = s.level or registered.level
-                    registered.damage_state = s.damage_state
+                    self.update_ship_damage(s.name, s.damage_state)
             _log.info(
                 '[Context] 舰队 {} 出击编成: {}',
                 fleet_id,
@@ -224,9 +228,10 @@ class GameContext:
             if i < len(result.ship_stats):
                 state = result.ship_stats[i]
                 if state != ShipDamageState.NO_SHIP:
-                    ship.damage_state = state
                     if ship.name:
-                        self.get_ship(ship.name).damage_state = state
+                        self.update_ship_damage(ship.name, state)
+                    else:
+                        ship.damage_state = state
 
         # 统计本次掉落舰船数
         fight_results = result.fight_results

@@ -27,6 +27,7 @@ from autowsgr.server.serializers import (
 from autowsgr.server.task_manager import TaskOutcome, task_manager
 
 from ..main import get_context, lifecycle_lock
+from . import require_context
 
 
 _log = get_logger('server')
@@ -40,6 +41,23 @@ TaskRequestUnion = Annotated[
 ]
 
 
+def _start_task(
+    task_type: str,
+    total_rounds: int,
+    executor: Any,
+) -> ApiResponse:
+    task_id = task_manager.start_task(
+        task_type=task_type,
+        total_rounds=total_rounds,
+        executor=executor,
+    )
+    return ApiResponse(
+        success=True,
+        data={'task_id': task_id, 'status': 'running'},
+        message='任务已启动',
+    )
+
+
 @router.post('/start', response_model=ApiResponse)
 async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[arg-type]
     """启动任务 (异步执行，立即返回)。"""
@@ -47,10 +65,7 @@ async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[
         if task_manager.is_running:
             raise HTTPException(status_code=409, detail='已有任务正在运行')
 
-        try:
-            ctx = get_context()
-        except RuntimeError as e:
-            raise HTTPException(status_code=503, detail=str(e)) from e
+        ctx = require_context(get_context)
 
         ctx.stop_event = task_manager.stop_event
 
@@ -144,17 +159,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
 
         return TaskOutcome.from_results(results)
 
-    task_id = task_manager.start_task(
-        task_type='normal_fight',
-        total_rounds=request.times,
-        executor=executor,
-    )
-
-    return ApiResponse(
-        success=True,
-        data={'task_id': task_id, 'status': 'running'},
-        message='任务已启动',
-    )
+    return _start_task('normal_fight', request.times, executor)
 
 
 async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiResponse:
@@ -202,17 +207,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
 
         return TaskOutcome.from_results(results)
 
-    task_id = task_manager.start_task(
-        task_type='event_fight',
-        total_rounds=request.times,
-        executor=executor,
-    )
-
-    return ApiResponse(
-        success=True,
-        data={'task_id': task_id, 'status': 'running'},
-        message='任务已启动',
-    )
+    return _start_task('event_fight', request.times, executor)
 
 
 async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
@@ -247,17 +242,7 @@ async def _start_campaign(ctx: Any, request: CampaignRequest) -> ApiResponse:
 
         return TaskOutcome.from_results(results)
 
-    task_id = task_manager.start_task(
-        task_type='campaign',
-        total_rounds=request.times,
-        executor=executor,
-    )
-
-    return ApiResponse(
-        success=True,
-        data={'task_id': task_id, 'status': 'running'},
-        message='任务已启动',
-    )
+    return _start_task('campaign', request.times, executor)
 
 
 async def _start_exercise(ctx: Any, request: ExerciseRequest) -> ApiResponse:
@@ -276,17 +261,7 @@ async def _start_exercise(ctx: Any, request: ExerciseRequest) -> ApiResponse:
         except Exception as e:
             return TaskOutcome.from_results([{'round': 1, 'success': False, 'error': str(e)}])
 
-    task_id = task_manager.start_task(
-        task_type='exercise',
-        total_rounds=1,
-        executor=executor,
-    )
-
-    return ApiResponse(
-        success=True,
-        data={'task_id': task_id, 'status': 'running'},
-        message='任务已启动',
-    )
+    return _start_task('exercise', 1, executor)
 
 
 async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
@@ -337,14 +312,4 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
 
         return TaskOutcome.from_results(results, error=task_error)
 
-    task_id = task_manager.start_task(
-        task_type='decisive',
-        total_rounds=request.decisive_rounds,
-        executor=executor,
-    )
-
-    return ApiResponse(
-        success=True,
-        data={'task_id': task_id, 'status': 'running'},
-        message='任务已启动',
-    )
+    return _start_task('decisive', request.decisive_rounds, executor)

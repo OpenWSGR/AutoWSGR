@@ -55,12 +55,6 @@ _STARTUP_TIMEOUT: float = 120.0
 _STARTUP_POLL_INTERVAL: float = 1.0
 """加载等待轮询间隔 (秒)。"""
 
-_OVERLAY_DISMISS_TIMEOUT: float = 10.0
-"""等待浮层出现并消除的超时 (秒)。"""
-
-_OVERLAY_DISMISS_DELAY: float = 1.0
-"""消除浮层后的等待时间 (秒)。"""
-
 _OVERLAY_DISMISS_MAX: int = 5
 """每日浮层消除的最大尝试次数 (新闻 → 签到 → 确认 → 二次确认 → 兜底)。"""
 

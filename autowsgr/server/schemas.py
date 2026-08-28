@@ -35,15 +35,6 @@ class TaskStatusEnum(StrEnum):
     STOPPED = 'stopped'
 
 
-class LogLevel(StrEnum):
-    """日志级别。"""
-
-    DEBUG = 'DEBUG'
-    INFO = 'INFO'
-    WARNING = 'WARNING'
-    ERROR = 'ERROR'
-
-
 type FormationAction = Annotated[int, Field(strict=True, ge=1, le=5)]
 type RuleSpec = tuple[str, Literal['retreat', 'detour'] | FormationAction]
 """HTTP rule item: condition expression plus retreat/detour/formation action."""
@@ -385,24 +376,6 @@ class TaskStatusResponse(BaseModel):
     progress: TaskProgress | None = Field(default=None, description='进度')
     result: TaskResult | None = Field(default=None, description='结果')
     error: str | None = Field(default=None, description='错误信息')
-
-
-class SystemStatusResponse(BaseModel):
-    """系统状态响应。"""
-
-    status: TaskStatusEnum = Field(description='系统状态')
-    emulator_connected: bool = Field(default=False, description='模拟器已连接')
-    game_running: bool = Field(default=False, description='游戏运行中')
-    current_task: str | None = Field(default=None, description='当前任务ID')
-
-
-class LogMessage(BaseModel):
-    """日志消息。"""
-
-    timestamp: str = Field(description='时间戳 ISO 8601')
-    level: LogLevel = Field(description='日志级别')
-    channel: str = Field(default='', description='日志通道')
-    message: str = Field(description='日志内容')
 
 
 class ApiResponse[ResponseDataT](BaseModel):
