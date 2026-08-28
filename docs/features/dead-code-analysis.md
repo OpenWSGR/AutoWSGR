@@ -53,7 +53,6 @@ from autowsgr.ui.battle.fleet_change import FleetChangeMixin
 | 模块 | 可删除对象 |
 | --- | --- |
 | `combat/actions.py` | `FLAGSHIP_CONFIRM` |
-| `combat/fleet.py` | `NATIVE_FLEET_VESSEL_TYPES` |
 | `ui/decisive/overlay.py` | `CLICK_BUY_EXP`、`CLICK_SKILL`、`is_advance_choice`、`is_confirm_exit` |
 | `ui/main_page/constants.py` | `EVENT_SIDEBAR_BG` |
 | `ui/map/data.py` | `EXPEDITION_IDLE_COLOR`、`SIDEBAR_SCAN_*`、`RIVAL_POSITIONS`、`CLICK_CHALLENGE` |
