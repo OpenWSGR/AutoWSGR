@@ -228,9 +228,10 @@ class GameContext:
             if i < len(result.ship_stats):
                 state = result.ship_stats[i]
                 if state != ShipDamageState.NO_SHIP:
-                    ship.damage_state = state
                     if ship.name:
-                        self.get_ship(ship.name).damage_state = state
+                        self.update_ship_damage(ship.name, state)
+                    else:
+                        ship.damage_state = state
 
         # 统计本次掉落舰船数
         fight_results = result.fight_results

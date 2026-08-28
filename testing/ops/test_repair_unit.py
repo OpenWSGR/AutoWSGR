@@ -10,9 +10,10 @@ from __future__ import annotations
 import types
 from typing import TYPE_CHECKING
 
+from autowsgr.combat.history import CombatResult
 from autowsgr.context import GameContext, Ship
 from autowsgr.context.bathroom import BathRoom
-from autowsgr.types import ShipDamageState
+from autowsgr.types import ConditionFlag, ShipDamageState
 
 
 if TYPE_CHECKING:
@@ -139,6 +140,24 @@ def test_batch_repair_does_not_guess_ship_state(monkeypatch: pytest.MonkeyPatch)
     assert fleet_ship.damage_state is ShipDamageState.SEVERE
     assert registry_ship.repair_end_time == 0
     assert fleet_ship.repair_end_time == 0
+
+
+def test_sync_after_combat_uses_shared_damage_sync() -> None:
+    ctx, registry_ship, fleet_ship = _context_with_ship()
+    duplicate_fleet_ship = Ship(name='测试舰', damage_state=ShipDamageState.SEVERE)
+    ctx.fleets[1].ships = [duplicate_fleet_ship]
+
+    ctx.sync_after_combat(
+        1,
+        CombatResult(
+            flag=ConditionFlag.FIGHT_END,
+            ship_stats=[ShipDamageState.NORMAL],
+        ),
+    )
+
+    assert registry_ship.damage_state is ShipDamageState.NORMAL
+    assert fleet_ship.damage_state is ShipDamageState.NORMAL
+    assert duplicate_fleet_ship.damage_state is ShipDamageState.NORMAL
 
 
 def test_fills_all_free_slots_then_stops(monkeypatch: pytest.MonkeyPatch):
