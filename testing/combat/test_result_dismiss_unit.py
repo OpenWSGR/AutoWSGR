@@ -6,8 +6,8 @@
      **经验结算子页** (无对应 CombatPhase 状态): 复检在该页误判成功提前
      返回, 引擎等待 PROCEED/GET_SHIP 等状态 7.5s 全落空 → 恢复失败 →
      强制重启游戏。
-现行判据是**到达验证**: 在 ``[phase] + 后继状态`` 集合上识别,
-命中后继才算成功, 识别不到任何状态 (未知中间页) 则继续点击推进。
+   现行判据是**到达验证**: 在 ``[phase] + 后继状态`` 集合上识别,
+   命中后继才算成功, 识别不到任何状态 (未知中间页) 则交外层状态机确认。
 经验结算子页后正式注册为 ``CombatPhase.EXP_SETTLEMENT``, 不再是盲点。
 """
 
@@ -73,15 +73,14 @@ class TestClickResultUntilClosed:
         assert device.click.call_count == 1
         recognizer.identify_current.assert_called_once()
 
-    def test_intermediate_page_keeps_clicking(self):
-        """整个复检窗口识别不到任何状态 (过渡帧) → 窗口耗尽后继续点击直到后继。
-
-        这是问题2的核心回归: 旧判据 (签名消失即成功) 在这里会提前返回。
-        窗口内只等待不点击 (防穿透); 4 次 None 耗尽 polls 后才第二次点击。
-        """
-        host, device, _ = _make_host([None, None, None, None, CombatPhase.GET_SHIP])
+    def test_intermediate_page_waits_for_confirmation(self):
+        """过渡帧未确认时只等待, 不盲点跳过尚未识别的掉落页。"""
+        host, device, recognizer = _make_host(
+            [None, None, None, None, CombatPhase.GET_SHIP]
+        )
         host._click_result_until_closed(CombatPhase.RESULT)
-        assert device.click.call_count == 2
+        assert device.click.call_count == 1
+        assert recognizer.identify_current.call_count == 4
 
     def test_retries_while_signature_remains(self):
         """前两次点击被吞 (签名仍在) → 第三次到后继, 共点 3 次。"""

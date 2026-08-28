@@ -461,9 +461,9 @@ class PhaseHandlersMixin:
           - 命中 *pass_through* 中的页面 (如快速穿行模式的经验页) →
             视为未到达, 继续点击跳过;
           - 命中 *phase* → 点击被动画吞掉, 立即重试点击 (重试即动画等待);
-          - 识别不到 (过渡帧/页面渐变中) → **只等待不点击**: 对切换中的
-            页面盲目连点会穿透中间页, 落点若是 PROCEED 对话框还可能误触
-            按钮。轮询窗口耗尽仍认不出才继续点击推进 (真正的未知页)。
+           - 识别不到 (过渡帧/页面渐变中) → **只等待不点击**: 对切换中的
+             页面盲目连点会穿透中间页, 落点若是 PROCEED 对话框还可能误触
+             按钮。轮询窗口耗尽仍认不出则交由外层状态机确认, 不再盲目点击。
 
         Parameters
         ----------
@@ -520,10 +520,13 @@ class PhaseHandlersMixin:
                 _log.debug('[Combat] {} 已推进到 {}', phase.name, current.name)
                 return
             else:
-                # 整个轮询窗口都无法识别 → 未知页, 继续点击推进
+                # 整个轮询窗口都无法识别 → 交外层状态机继续确认, 避免跳过掉落页
                 _log.debug(
-                    '[Combat] {} 点击后持续无法识别 (第 {} 次), 继续点击', phase.name, attempt
+                    '[Combat] {} 点击后持续无法识别 (第 {} 次), 等待外层状态机确认',
+                    phase.name,
+                    attempt,
                 )
+                return
         _log.error('[Combat] {} 页面点击 {} 次仍未推进, 继续执行', phase.name, attempts)
 
     def _result_successors(self, phase: CombatPhase) -> list[CombatPhase]:
