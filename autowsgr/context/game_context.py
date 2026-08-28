@@ -193,7 +193,7 @@ class GameContext:
                 if s.name:
                     registered = self.get_ship(s.name)
                     registered.level = s.level or registered.level
-                    registered.damage_state = s.damage_state
+                    self.update_ship_damage(s.name, s.damage_state)
             _log.info(
                 '[Context] 舰队 {} 出击编成: {}',
                 fleet_id,

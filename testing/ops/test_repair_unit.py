@@ -160,6 +160,19 @@ def test_sync_after_combat_uses_shared_damage_sync() -> None:
     assert duplicate_fleet_ship.damage_state is ShipDamageState.NORMAL
 
 
+def test_sync_before_combat_uses_shared_damage_sync() -> None:
+    ctx, registry_ship, _ = _context_with_ship()
+    duplicate_fleet_ship = Ship(name='测试舰', damage_state=ShipDamageState.SEVERE)
+    ctx.fleets[1].ships = [duplicate_fleet_ship]
+    new_fleet_ship = Ship(name='测试舰', damage_state=ShipDamageState.NORMAL)
+
+    ctx.sync_before_combat(1, [new_fleet_ship])
+
+    assert registry_ship.damage_state is ShipDamageState.NORMAL
+    assert new_fleet_ship.damage_state is ShipDamageState.NORMAL
+    assert duplicate_fleet_ship.damage_state is ShipDamageState.NORMAL
+
+
 def test_fills_all_free_slots_then_stops(monkeypatch: pytest.MonkeyPatch):
     """两空闲槽 → 连续派修两艘, 槽填满后停止 (不死循环)。"""
     import autowsgr.ops.repair as mod
