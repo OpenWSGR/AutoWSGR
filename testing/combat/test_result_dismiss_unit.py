@@ -6,8 +6,8 @@
      **经验结算子页** (无对应 CombatPhase 状态): 复检在该页误判成功提前
      返回, 引擎等待 PROCEED/GET_SHIP 等状态 7.5s 全落空 → 恢复失败 →
      强制重启游戏。
-现行判据是**到达验证**: 在 ``[phase] + 后继状态`` 集合上识别,
-命中后继才算成功, 识别不到任何状态 (未知中间页) 则继续点击推进。
+   现行判据是**到达验证**: 在 ``[phase] + 后继状态`` 集合上识别,
+   命中后继才算成功, 识别不到任何状态 (未知中间页) 则交外层状态机确认。
 经验结算子页后正式注册为 ``CombatPhase.EXP_SETTLEMENT``, 不再是盲点。
 """
 
@@ -73,15 +73,14 @@ class TestClickResultUntilClosed:
         assert device.click.call_count == 1
         recognizer.identify_current.assert_called_once()
 
-    def test_intermediate_page_keeps_clicking(self):
-        """整个复检窗口识别不到任何状态 (过渡帧) → 窗口耗尽后继续点击直到后继。
-
-        这是问题2的核心回归: 旧判据 (签名消失即成功) 在这里会提前返回。
-        窗口内只等待不点击 (防穿透); 4 次 None 耗尽 polls 后才第二次点击。
-        """
-        host, device, _ = _make_host([None, None, None, None, CombatPhase.GET_SHIP])
+    def test_intermediate_page_waits_for_confirmation(self):
+        """过渡帧未确认时只等待, 不盲点跳过尚未识别的掉落页。"""
+        host, device, recognizer = _make_host(
+            [None, None, None, None, CombatPhase.GET_SHIP]
+        )
         host._click_result_until_closed(CombatPhase.RESULT)
-        assert device.click.call_count == 2
+        assert device.click.call_count == 1
+        assert recognizer.identify_current.call_count == 4
 
     def test_retries_while_signature_remains(self):
         """前两次点击被吞 (签名仍在) → 第三次到后继, 共点 3 次。"""
@@ -243,6 +242,41 @@ class TestDropCapture:
         # 主循环重新派发 _handle_get_ship 时走幂等分支, 不重复 OCR
         host._handle_get_ship()
         assert self._ocr_calls == [1]
+
+    def test_result_dismiss_retries_unrecognized_get_ship(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """快速捕获失败后, GET_SHIP 处理器应在稳定页面重试 OCR。"""
+        results = iter([None, 'SKR6'])
+        monkeypatch.setattr(
+            handlers_mod,
+            'get_ship_drop',
+            lambda *_a, **_k: self._ocr_calls.append(1) or next(results),
+        )
+        host, _ = self._make_host_with_history(
+            [CombatPhase.GET_SHIP, CombatPhase.PROCEED],
+            collect_result_info=False,
+        )
+
+        host._click_result_until_closed(CombatPhase.RESULT)
+        assert host._history.get_event(EventType.GET_SHIP, 'A') is None
+
+        host._handle_get_ship()
+
+        assert self._ocr_calls == [1, 1]
+        event = host._history.get_event(EventType.GET_SHIP, 'A')
+        assert event is not None
+        assert event.result == 'SKR6'
+
+    def test_get_ship_clicks_after_ocr_exhaustion(self, monkeypatch: pytest.MonkeyPatch):
+        """掉落/上限提示页 OCR 无结果后仍应点击离开。"""
+        monkeypatch.setattr(handlers_mod, 'get_ship_drop', lambda *_a, **_k: None)
+        host, device = self._make_host_with_history([CombatPhase.PROCEED])
+
+        host._handle_get_ship()
+
+        assert device.click.call_count == 1
 
     def test_pixel_fallback_captures_on_transition(self):
         """模板未命中 (None 过渡帧) 但掉落页像素签名命中 → 兜底捕获。"""
