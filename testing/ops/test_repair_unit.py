@@ -10,7 +10,9 @@ from __future__ import annotations
 import types
 from typing import TYPE_CHECKING
 
+from autowsgr.context import GameContext, Ship
 from autowsgr.context.bathroom import BathRoom
+from autowsgr.types import ShipDamageState
 
 
 if TYPE_CHECKING:
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
 class _FakeBathPage:
     """BathPage 替身: 按预设序列返回 repair_longest 结果。"""
 
-    def __init__(self, results: list[int]) -> None:
+    def __init__(self, results: list[tuple[str, int]]) -> None:
         self._results = list(results)
         self.repair_longest_calls = 0
         self.go_to_choose_repair_calls = 0
@@ -31,9 +33,15 @@ class _FakeBathPage:
     def go_to_choose_repair(self) -> None:
         self.go_to_choose_repair_calls += 1
 
-    def repair_longest(self, blacklist: set[str] | None = None) -> int:  # noqa: ARG002  # 签名匹配真实接口 (调用方按关键字传 blacklist=)
+    def repair_longest(
+        self,
+        blacklist: set[str] | None = None,  # noqa: ARG002  # 签名匹配真实接口 (调用方按关键字传 blacklist=)
+    ) -> tuple[str, int]:
         self.repair_longest_calls += 1
-        return self._results.pop(0) if self._results else -1
+        return self._results.pop(0) if self._results else ('', -1)
+
+    def click_repair_all(self) -> None:
+        return None
 
 
 class _FakeCtx:
@@ -42,6 +50,28 @@ class _FakeCtx:
     def __init__(self, slot_count: int) -> None:
         self.bathroom = BathRoom(slot_count=slot_count)
         self.config = types.SimpleNamespace(bathroom_count=slot_count)
+        self.ship_registry: dict[str, Ship] = {}
+
+    def get_ship(self, name: str) -> Ship:
+        if name not in self.ship_registry:
+            self.ship_registry[name] = Ship(name=name)
+        return self.ship_registry[name]
+
+    def update_ship_damage(self, name: str, state: ShipDamageState) -> None:
+        self.get_ship(name).damage_state = state
+
+
+def _context_with_ship() -> tuple[GameContext, Ship, Ship]:
+    ctx = GameContext(
+        ctrl=object(),
+        config=types.SimpleNamespace(bathroom_count=1),
+        ocr=object(),
+    )
+    registry_ship = Ship(name='测试舰', damage_state=ShipDamageState.SEVERE)
+    fleet_ship = Ship(name='测试舰', damage_state=ShipDamageState.SEVERE)
+    ctx.ship_registry['测试舰'] = registry_ship
+    ctx.fleets[0].ships = [fleet_ship]
+    return ctx, registry_ship, fleet_ship
 
 
 def _patch_repair(monkeypatch: pytest.MonkeyPatch, fake_page: _FakeBathPage) -> None:
@@ -56,11 +86,66 @@ def _patch_repair(monkeypatch: pytest.MonkeyPatch, fake_page: _FakeBathPage) -> 
 # ── 循环填满 ──
 
 
+def test_named_repair_syncs_fleet_damage_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    import autowsgr.ops.repair as mod
+
+    class _NamedRepairPage:
+        def go_to_choose_repair(self) -> None:
+            return None
+
+        def repair_ship(self, ship_name: str) -> int:
+            assert ship_name == '测试舰'
+            return 120
+
+    monkeypatch.setattr(mod, 'goto_page', lambda *_a, **_kw: None)
+    monkeypatch.setattr(mod, 'BathPage', lambda _ctx: _NamedRepairPage())
+
+    ctx, registry_ship, fleet_ship = _context_with_ship()
+    assert mod.repair_ship_by_name(ctx, '测试舰') == 120
+
+    assert registry_ship.damage_state is ShipDamageState.NORMAL
+    assert fleet_ship.damage_state is ShipDamageState.NORMAL
+    assert registry_ship.repair_end_time > 0
+    assert fleet_ship.repair_end_time == 0
+
+
+def test_automatic_repair_syncs_known_ship_damage_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import autowsgr.ops.repair as mod
+
+    fake = _FakeBathPage([('测试舰', 120)])
+    _patch_repair(monkeypatch, fake)
+    ctx, registry_ship, fleet_ship = _context_with_ship()
+
+    assert mod.repair_one_available(ctx) is True
+
+    assert registry_ship.damage_state is ShipDamageState.NORMAL
+    assert fleet_ship.damage_state is ShipDamageState.NORMAL
+    assert registry_ship.repair_end_time > 0
+    assert fleet_ship.repair_end_time == 0
+
+
+def test_batch_repair_does_not_guess_ship_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    import autowsgr.ops.repair as mod
+
+    fake = _FakeBathPage([])
+    _patch_repair(monkeypatch, fake)
+    ctx, registry_ship, fleet_ship = _context_with_ship()
+
+    assert mod.repair_in_bath(ctx) is None
+
+    assert registry_ship.damage_state is ShipDamageState.SEVERE
+    assert fleet_ship.damage_state is ShipDamageState.SEVERE
+    assert registry_ship.repair_end_time == 0
+    assert fleet_ship.repair_end_time == 0
+
+
 def test_fills_all_free_slots_then_stops(monkeypatch: pytest.MonkeyPatch):
     """两空闲槽 → 连续派修两艘, 槽填满后停止 (不死循环)。"""
     import autowsgr.ops.repair as mod
 
-    fake = _FakeBathPage([100, 200])  # 两次都派单成功
+    fake = _FakeBathPage([('测试舰1', 100), ('测试舰2', 200)])  # 两次都派单成功
     _patch_repair(monkeypatch, fake)
 
     ctx = _FakeCtx(slot_count=2)
@@ -75,7 +160,7 @@ def test_partial_fill_then_no_candidates(monkeypatch: pytest.MonkeyPatch):
     """修一艘后剩余无可修候选 (secs==-1): 派 1 艘后停止, 仍留 1 空闲槽。"""
     import autowsgr.ops.repair as mod
 
-    fake = _FakeBathPage([100, -1])
+    fake = _FakeBathPage([('测试舰', 100), ('', -1)])
     _patch_repair(monkeypatch, fake)
 
     ctx = _FakeCtx(slot_count=2)
@@ -89,7 +174,7 @@ def test_no_candidates_first_try(monkeypatch: pytest.MonkeyPatch):
     """首次即无可修候选 (secs==-1): 不占用任何槽, 返回 False。"""
     import autowsgr.ops.repair as mod
 
-    fake = _FakeBathPage([-1])
+    fake = _FakeBathPage([('', -1)])
     _patch_repair(monkeypatch, fake)
 
     ctx = _FakeCtx(slot_count=2)
@@ -103,7 +188,7 @@ def test_bath_full_marks_unknown(monkeypatch: pytest.MonkeyPatch):
     """浴场满 (secs==-2): mark_unknown 退避, 返回 False。"""
     import autowsgr.ops.repair as mod
 
-    fake = _FakeBathPage([-2])
+    fake = _FakeBathPage([('', -2)])
     _patch_repair(monkeypatch, fake)
 
     ctx = _FakeCtx(slot_count=2)

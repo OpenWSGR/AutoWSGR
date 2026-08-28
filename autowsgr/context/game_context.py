@@ -148,6 +148,10 @@ class GameContext:
     def update_ship_damage(self, name: str, state: ShipDamageState) -> None:
         """更新舰船的破损状态。"""
         self.get_ship(name).damage_state = state
+        for fleet in self.fleets:
+            for ship in fleet.ships:
+                if ship.name == name:
+                    ship.damage_state = state
 
     # ── 战斗上下文同步 ──
 
