@@ -57,7 +57,6 @@ from autowsgr.ui.battle.fleet_change import FleetChangeMixin
 | `ui/main_page/constants.py` | `EVENT_SIDEBAR_BG` |
 | `ui/map/data.py` | `EXPEDITION_IDLE_COLOR`、`SIDEBAR_SCAN_*`、`RIVAL_POSITIONS`、`CLICK_CHALLENGE` |
 | `ui/tabbed_page.py` | `TAB_DARK` |
-| `server/schemas.py` | `SystemStatusResponse`、`LogMessage`，以及随之失去引用的 `LogLevel` |
 | `server/ws_manager.py` | `send_log`，以及仅由它使用的 `UTC`、`datetime` 导入 |
 
 本次精简批次已删除前表中已移除的私有死代码：`click_start_march`、
