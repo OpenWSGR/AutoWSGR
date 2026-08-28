@@ -86,6 +86,22 @@ class _ExecutingTaskManager:
         return 'task_test'
 
 
+def test_task_stop_reports_idle_when_atomic_stop_loses_race(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The stop route reports no active task when finalization wins the race."""
+
+    def stop_task() -> bool:
+        return False
+
+    monkeypatch.setattr(task, 'task_manager', SimpleNamespace(stop_task=stop_task))
+
+    response = asyncio.run(task.task_stop())
+
+    assert response.success is True
+    assert response.data is None
+
+
 def test_task_start_rejects_concurrent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     """Task admission rejects a second running task under the lifecycle lock."""
     monkeypatch.setattr(task, 'task_manager', _TaskManager(is_running=True))

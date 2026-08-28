@@ -81,6 +81,12 @@ async def system_stop() -> ApiResponse:
         except DeviceOperationBusyError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
         try:
+            ctx = _main._ctx
+            await asyncio.to_thread(ctx.ctrl.disconnect)
+        except Exception as error:
+            _log.error('[System] 断开模拟器连接失败: {}', error)
+            return ApiResponse(success=False, error=str(error))
+        else:
             _main._ctx = None
             _log.info('[System] 系统已停止')
             return ApiResponse(success=True, message='系统已停止')

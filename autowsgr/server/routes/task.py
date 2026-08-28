@@ -74,21 +74,17 @@ async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[
 @router.post('/stop', response_model=ApiResponse)
 async def task_stop() -> ApiResponse:
     """停止当前任务。"""
-    if not task_manager.is_running:
+    if not task_manager.stop_task():
         return ApiResponse(success=True, message='没有正在运行的任务')
 
-    success = task_manager.stop_task()
-    if success:
-        return ApiResponse(
-            success=True,
-            data={
-                'task_id': task_manager.current_task.task_id,
-                'status': 'stopped',
-            },
-            message='已请求停止任务',
-        )
-    else:
-        return ApiResponse(success=False, error='停止失败')
+    return ApiResponse(
+        success=True,
+        data={
+            'task_id': task_manager.current_task.task_id,
+            'status': 'stopped',
+        },
+        message='已请求停止任务',
+    )
 
 
 @router.get(

@@ -105,11 +105,14 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
     try:
         yield
     finally:
-        # 关闭时: 清理 sink 与连接
-        remove_stats_log_sink()
-        if _ctx is not None:
-            _log.info('[Server] 断开模拟器连接')
-        _log.info('[Server] HTTP Server 已关闭')
+        try:
+            if _ctx is not None:
+                from autowsgr.server.routes.system import system_stop
+
+                await system_stop()
+        finally:
+            remove_stats_log_sink()
+            _log.info('[Server] HTTP Server 已关闭')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

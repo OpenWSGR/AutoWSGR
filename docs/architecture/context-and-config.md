@@ -100,6 +100,10 @@ UserConfig (顶层)
 └── remove_equipment_mode: bool  # 解装前卸装备
 ```
 
+### 延迟边界
+
+`operation_delay_min` 与 `operation_delay_max` 均为非负有限秒数。无效值在配置加载时被拒绝，避免设备操作阶段传给 `time.sleep()` 后才失败。
+
 ### 子配置详解
 
 #### EmulatorConfig
