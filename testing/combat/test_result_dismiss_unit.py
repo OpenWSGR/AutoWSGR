@@ -269,6 +269,15 @@ class TestDropCapture:
         assert event is not None
         assert event.result == 'SKR6'
 
+    def test_get_ship_clicks_after_ocr_exhaustion(self, monkeypatch: pytest.MonkeyPatch):
+        """掉落/上限提示页 OCR 无结果后仍应点击离开。"""
+        monkeypatch.setattr(handlers_mod, 'get_ship_drop', lambda *_a, **_k: None)
+        host, device = self._make_host_with_history([CombatPhase.PROCEED])
+
+        host._handle_get_ship()
+
+        assert device.click.call_count == 1
+
     def test_pixel_fallback_captures_on_transition(self):
         """模板未命中 (None 过渡帧) 但掉落页像素签名命中 → 兜底捕获。"""
         host, device = self._make_host_with_history(
