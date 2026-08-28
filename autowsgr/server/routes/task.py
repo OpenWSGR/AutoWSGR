@@ -27,6 +27,7 @@ from autowsgr.server.serializers import (
 from autowsgr.server.task_manager import TaskOutcome, task_manager
 
 from ..main import get_context, lifecycle_lock
+from . import require_context
 
 
 _log = get_logger('server')
@@ -64,10 +65,7 @@ async def task_start(request: TaskRequestUnion) -> ApiResponse:  # type: ignore[
         if task_manager.is_running:
             raise HTTPException(status_code=409, detail='已有任务正在运行')
 
-        try:
-            ctx = get_context()
-        except RuntimeError as e:
-            raise HTTPException(status_code=503, detail=str(e)) from e
+        ctx = require_context(get_context)
 
         ctx.stop_event = task_manager.stop_event
 

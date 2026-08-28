@@ -7,3 +7,15 @@
 - ops: 操作端点 (/api/expedition/check, /api/build/*, /api/reward/*, /api/cook, /api/repair/*, /api/destroy)
 - health: 健康检查 (/api/health)
 """
+
+from collections.abc import Callable
+from typing import Any
+
+from fastapi import HTTPException
+
+
+def require_context(getter: Callable[[], Any]) -> Any:
+    try:
+        return getter()
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
