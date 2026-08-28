@@ -155,10 +155,8 @@ app.include_router(health_router)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-@app.websocket('/ws/logs')
-async def ws_logs(websocket: WebSocket):
-    """实时日志流。"""
-    await ws_manager.connect(websocket, 'logs')
+async def _serve_websocket(websocket: WebSocket, stream: str) -> None:
+    await ws_manager.connect(websocket, stream)
     try:
         while True:
             data = await websocket.receive_text()
@@ -169,24 +167,19 @@ async def ws_logs(websocket: WebSocket):
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
-        await ws_manager.disconnect(websocket, 'logs')
+        await ws_manager.disconnect(websocket, stream)
+
+
+@app.websocket('/ws/logs')
+async def ws_logs(websocket: WebSocket):
+    """实时日志流。"""
+    await _serve_websocket(websocket, 'logs')
 
 
 @app.websocket('/ws/task')
 async def ws_task(websocket: WebSocket):
     """任务状态更新流。"""
-    await ws_manager.connect(websocket, 'task')
-    try:
-        while True:
-            data = await websocket.receive_text()
-            try:
-                msg = json.loads(data)
-                if msg.get('type') == 'ping':
-                    await websocket.send_text(json.dumps({'type': 'pong'}))
-            except json.JSONDecodeError:
-                pass
-    except WebSocketDisconnect:
-        await ws_manager.disconnect(websocket, 'task')
+    await _serve_websocket(websocket, 'task')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
