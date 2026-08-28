@@ -244,6 +244,32 @@ class TestDropCapture:
         host._handle_get_ship()
         assert self._ocr_calls == [1]
 
+    def test_result_dismiss_retries_unrecognized_get_ship(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """快速捕获失败后, GET_SHIP 处理器应在稳定页面重试 OCR。"""
+        results = iter([None, 'SKR6'])
+        monkeypatch.setattr(
+            handlers_mod,
+            'get_ship_drop',
+            lambda *_a, **_k: self._ocr_calls.append(1) or next(results),
+        )
+        host, _ = self._make_host_with_history(
+            [CombatPhase.GET_SHIP, CombatPhase.PROCEED],
+            collect_result_info=False,
+        )
+
+        host._click_result_until_closed(CombatPhase.RESULT)
+        assert host._history.get_event(EventType.GET_SHIP, 'A') is None
+
+        host._handle_get_ship()
+
+        assert self._ocr_calls == [1, 1]
+        event = host._history.get_event(EventType.GET_SHIP, 'A')
+        assert event is not None
+        assert event.result == 'SKR6'
+
     def test_pixel_fallback_captures_on_transition(self):
         """模板未命中 (None 过渡帧) 但掉落页像素签名命中 → 兜底捕获。"""
         host, device = self._make_host_with_history(

@@ -567,20 +567,21 @@ class PhaseHandlersMixin:
     def _capture_get_ship(self) -> str | None:
         """幂等捕获掉落舰船: OCR 识别 + 记录历史。
 
-        同一节点已捕获过 (如点击穿行时已记录) 则直接复用历史结果,
-        避免主循环重新派发时重复 OCR。
+        同一节点已成功识别掉落 (如点击穿行时已记录) 则直接复用历史结果,
+        避免主循环重新派发时重复 OCR。未识别结果不入历史, 让稳定页面重试。
         """
         existing = self._history.get_event(EventType.GET_SHIP, self._node)
         if existing is not None:
             return existing.result or None
         ship_name = get_ship_drop(self._device, self._ocr)
-        if ship_name:
-            _log.info('[Combat] 获得舰船: {}', ship_name)
+        if not ship_name:
+            return None
+        _log.info('[Combat] 获得舰船: {}', ship_name)
         self._history.add(
             CombatEvent(
                 event_type=EventType.GET_SHIP,
                 node=self._node,
-                result=ship_name or '',
+                result=ship_name,
             )
         )
         return ship_name
