@@ -54,7 +54,7 @@ from autowsgr.ui.battle.fleet_change import FleetChangeMixin
 | --- | --- |
 | `combat/actions.py` | `FLAGSHIP_CONFIRM` |
 | `ui/main_page/constants.py` | `EVENT_SIDEBAR_BG` |
-| `ui/map/data.py` | `EXPEDITION_IDLE_COLOR`、`SIDEBAR_SCAN_*`、`RIVAL_POSITIONS`、`CLICK_CHALLENGE` |
+| `ui/map/data.py` | `SIDEBAR_SCAN_*` |
 | `ui/tabbed_page.py` | `TAB_DARK` |
 | `server/ws_manager.py` | `send_log`，以及仅由它使用的 `UTC`、`datetime` 导入 |
 
