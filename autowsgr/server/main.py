@@ -158,7 +158,7 @@ app.include_router(health_router)
 @app.websocket('/ws/logs')
 async def ws_logs(websocket: WebSocket):
     """实时日志流。"""
-    await ws_manager.connect(websocket)
+    await ws_manager.connect(websocket, 'logs')
     try:
         while True:
             data = await websocket.receive_text()
@@ -169,13 +169,13 @@ async def ws_logs(websocket: WebSocket):
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
-        await ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket, 'logs')
 
 
 @app.websocket('/ws/task')
 async def ws_task(websocket: WebSocket):
     """任务状态更新流。"""
-    await ws_manager.connect(websocket)
+    await ws_manager.connect(websocket, 'task')
     try:
         while True:
             data = await websocket.receive_text()
@@ -186,7 +186,7 @@ async def ws_task(websocket: WebSocket):
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:
-        await ws_manager.disconnect(websocket)
+        await ws_manager.disconnect(websocket, 'task')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
