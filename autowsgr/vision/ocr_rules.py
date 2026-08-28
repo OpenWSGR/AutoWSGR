@@ -161,7 +161,6 @@ LEVEL_NOISY_PATTERN = re.compile(
 )
 # EasyOCR 在极窄等级区域中偶尔只保留 ``L.``，丢失中间的 ``V``。
 LEVEL_SHORT_PATTERN = re.compile(r'[Ll][\.:]?\s*([0-9ILilOoDdSsBb]{1,6})')
-LEVEL_LABEL_PATTERN = re.compile(r'[LlIi1O0][VvYy1Ii]')
 
 
 def set_user_ship_name_corrections(corrections: Mapping[str, str]) -> int:

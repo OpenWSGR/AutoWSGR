@@ -89,11 +89,6 @@ class Coords:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def click_start_march(device: AndroidController) -> None:
-    """点击出征按钮。"""
-    device.click(*Coords.START_MARCH)
-
-
 def click_retreat(device: AndroidController) -> None:
     """点击撤退按钮（索敌成功界面）。"""
     device.click(*Coords.RETREAT)

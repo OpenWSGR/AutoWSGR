@@ -63,19 +63,6 @@ def _prepare_text_roi(image: np.ndarray, *, scale: int = 4) -> np.ndarray:
     return cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
 
 
-def _prepare_name_roi(image: np.ndarray) -> np.ndarray:
-    """舰名区域做温和增强，保留字形细节。"""
-    if image.size == 0:
-        return image
-
-    enlarged = cv2.resize(image, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-    lab = cv2.cvtColor(enlarged, cv2.COLOR_RGB2LAB)
-    lightness_channel, a, b = cv2.split(lab)
-    lightness_channel = cv2.equalizeHist(lightness_channel)
-    enhanced = cv2.merge((lightness_channel, a, b))
-    return cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
-
-
 def recognize_fleet_options(
     ocr: OCREngine,
     screen: np.ndarray,

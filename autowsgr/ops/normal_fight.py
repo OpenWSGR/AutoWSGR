@@ -76,7 +76,6 @@ class NormalFightRunner:
 
         # 从 config 读取拆船配置
         self._dock_full_destroy = ctx.config.dock_full_destroy
-        self._destroy_ship_types = ctx.config.destroy_ship_types or None
 
         # chapter 为 E/H → 活动地图入口; 否则常规地图。仅靠 plan 决定导航,
         # event 与 normal 共用本 runner (融合), 复用 normal_fight 触发器。

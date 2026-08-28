@@ -288,13 +288,6 @@ def _parse_bare_level(text: str, confidence: float) -> int | None:
     return value if is_valid_ship_level(value) else None
 
 
-def _center_x(bbox: tuple[int, int, int, int] | None, width: int) -> float:
-    if bbox is None:
-        return width / 2
-    x1, _, x2, _ = bbox
-    return (x1 + x2) / 2
-
-
 def _probe_level_near_name(
     ocr: OCREngine,
     screen: np.ndarray,
