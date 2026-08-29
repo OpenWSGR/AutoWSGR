@@ -90,11 +90,9 @@ class IntensifySnapshotNavigator:
 
     def _require(self, expected: IntensifyUiState) -> None:
         try:
-            actual = self._recognition.state()
-        except IntensifyWorkflowError as error:
-            raise IntensifySnapshotNavigationError('无法识别强化扫描页面状态') from error
-        if actual != expected:
-            raise IntensifySnapshotNavigationError(f'强化扫描页面状态不是 {expected}')
+            self._wait(expected)
+        except IntensifySnapshotNavigationError as error:
+            raise IntensifySnapshotNavigationError(f'强化扫描页面状态不是 {expected}') from error
 
     def _wait(self, expected: IntensifyUiState) -> None:
         deadline = time.monotonic() + self._timeout
@@ -145,6 +143,7 @@ def scan_intensify_inventory_pair(
     max_material_viewports: int = 24,
 ) -> tuple[TargetInventorySnapshot, MaterialInventorySnapshot]:
     """Create both complete snapshots before returning either to the server store."""
+    device.verify_cetus()
     navigator = IntensifySnapshotNavigator(device)
     navigator.enter_home_from_main()
     navigator.open_target_selector()

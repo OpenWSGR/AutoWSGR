@@ -3,6 +3,8 @@
 ## 状态
 
 - `autowsgr/ui/material_first_intensify.py` 提供从主页面安全进入素材选择页的导航。
+- `testing/fixtures/intensify-navigation/` 固定 Cetus 1920×1080 的主页面与素材选择页
+  实机证据，专项测试同时验证唯一起点和素材页三组正向视觉证据。
 - `autowsgr/ui/material_inventory_scanner.py` 已实现 Cetus 上的完整只读库存扫描。
 - `autowsgr/ui/intensify_workflow.py` 已实现与识别方法解耦的强化规划、dry-run、一次性
   授权、操作状态机和事后校验契约；完整语义识别端口仍由当前或未来识别库实现。

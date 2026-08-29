@@ -68,6 +68,28 @@ def test_navigator_fails_before_input_when_starting_state_is_wrong(
     device.key_event.assert_not_called()
 
 
+def test_pair_scan_verifies_device_before_constructing_navigator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    device = MagicMock()
+    navigator_type = MagicMock()
+    monkeypatch.setattr(intensify_snapshot_scan, 'IntensifySnapshotNavigator', navigator_type)
+
+    device.verify_cetus.side_effect = RuntimeError('wrong device')
+    with pytest.raises(RuntimeError, match='wrong device'):
+        scan_intensify_inventory_pair(
+            device,
+            MagicMock(),
+            scroll_input=MagicMock(),
+            ocr=MagicMock(),
+            max_resolver=MagicMock(),
+        )
+
+    navigator_type.assert_not_called()
+    device.click.assert_not_called()
+    device.key_event.assert_not_called()
+
+
 def test_pair_scan_publishes_nothing_and_orders_both_complete_scans(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

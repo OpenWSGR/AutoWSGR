@@ -1,15 +1,31 @@
 from __future__ import annotations
 
 from collections import deque
+from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 
 from autowsgr.ui.material_first_intensify import (
     MaterialFirstIntensifyController,
     MaterialFirstNavigationError,
+    is_intensify_home_screen,
+    is_intensify_submenu_screen,
+    is_main_screen,
     is_material_selector_screen,
+    is_sidebar_screen,
+    material_selector_evidence,
 )
+
+
+_FIXTURES = Path(__file__).parents[1] / 'fixtures' / 'intensify-navigation'
+
+
+def _fixture(name: str) -> np.ndarray:
+    screen = cv2.imread(str(_FIXTURES / name), cv2.IMREAD_COLOR)
+    assert screen is not None
+    return cv2.cvtColor(screen, cv2.COLOR_BGR2RGB)
 
 
 def _screen(kind: str) -> np.ndarray:
@@ -59,17 +75,63 @@ class _Controller:
         self.clicks.append((x, y))
 
 
+def test_cetus_main_fixture_is_accepted_as_the_only_start_state() -> None:
+    screen = _fixture('cetus-main.png')
+
+    assert is_main_screen(screen)
+    assert not is_sidebar_screen(screen)
+    assert not is_intensify_home_screen(screen)
+    assert not is_material_selector_screen(screen)
+
+
+def test_cetus_sidebar_and_intensify_submenu_fixtures_are_distinct() -> None:
+    sidebar = _fixture('cetus-sidebar.png')
+    submenu = _fixture('cetus-intensify-submenu.png')
+
+    assert is_sidebar_screen(sidebar)
+    assert not is_intensify_submenu_screen(sidebar)
+    assert is_sidebar_screen(submenu)
+    assert is_intensify_submenu_screen(submenu)
+
+
+def test_cetus_intensify_home_fixture_requires_the_intensify_page_type() -> None:
+    screen = _fixture('cetus-intensify-home.png')
+    generic_tabs = np.zeros_like(screen)
+    for x, y, color in (
+        (0.1539, 0.0472, (15, 132, 228)),
+        (0.2719, 0.0625, (22, 37, 62)),
+        (0.4039, 0.0528, (22, 37, 62)),
+    ):
+        generic_tabs[round(y * screen.shape[0]), round(x * screen.shape[1])] = color
+
+    assert is_intensify_home_screen(screen)
+    assert not is_intensify_home_screen(generic_tabs)
+
+
+def test_cetus_material_selector_fixture_has_strong_positive_evidence() -> None:
+    screen = _fixture('cetus-material-selector.png')
+    evidence = material_selector_evidence(screen)
+
+    assert is_material_selector_screen(screen)
+    assert not is_main_screen(screen)
+    assert not is_sidebar_screen(screen)
+    assert not is_intensify_home_screen(screen)
+    assert evidence.cyan_edge_pixels == 697_112
+    assert evidence.confirm_blue_ratio == pytest.approx(0.508634554035171)
+    assert evidence.panel_dark_ratio == pytest.approx(0.8955318959183587)
+
+
 def test_enters_intensify_home_and_stops(monkeypatch: pytest.MonkeyPatch) -> None:
     ctrl = _Controller(
         [
-            _screen('main'),
-            _screen('main'),
-            _screen('sidebar'),
-            _screen('sidebar'),
-            _screen('intensify'),
-            _screen('intensify'),
-            _screen('intensify'),
-            _screen('intensify'),
+            _fixture('cetus-main.png'),
+            _fixture('cetus-main.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-intensify-submenu.png'),
+            _fixture('cetus-intensify-submenu.png'),
+            _fixture('cetus-intensify-home.png'),
+            _fixture('cetus-intensify-home.png'),
         ]
     )
     monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.sleep', lambda _seconds: None)
@@ -80,7 +142,6 @@ def test_enters_intensify_home_and_stops(monkeypatch: pytest.MonkeyPatch) -> Non
         (0.0490, 0.8981),
         (0.1563, 0.5000),
         (0.3750, 0.5000),
-        (0.1875, 0.0463),
     ]
     assert len(ctrl.screens) == 1
 
@@ -88,16 +149,16 @@ def test_enters_intensify_home_and_stops(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_enters_material_selector_without_target(monkeypatch: pytest.MonkeyPatch) -> None:
     ctrl = _Controller(
         [
-            _screen('main'),
-            _screen('main'),
-            _screen('sidebar'),
-            _screen('sidebar'),
-            _screen('intensify'),
-            _screen('intensify'),
-            _screen('intensify'),
-            _screen('intensify'),
-            _screen('material'),
-            _screen('material'),
+            _fixture('cetus-main.png'),
+            _fixture('cetus-main.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-intensify-submenu.png'),
+            _fixture('cetus-intensify-submenu.png'),
+            _fixture('cetus-intensify-home.png'),
+            _fixture('cetus-intensify-home.png'),
+            _fixture('cetus-material-selector.png'),
+            _fixture('cetus-material-selector.png'),
         ]
     )
     monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.sleep', lambda _seconds: None)
@@ -121,6 +182,31 @@ def test_target_selector_is_not_material_selector() -> None:
     screen[135:260, 1580] = (192, 193, 195)
 
     assert not is_material_selector_screen(screen)
+
+
+def test_fails_closed_before_submenu_click_when_submenu_is_not_proven(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctrl = _Controller(
+        [
+            _fixture('cetus-main.png'),
+            _fixture('cetus-main.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-sidebar.png'),
+        ]
+    )
+    ticks = iter([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 10.0])
+    monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.monotonic', lambda: next(ticks))
+    monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.sleep', lambda _seconds: None)
+
+    with pytest.raises(MaterialFirstNavigationError, match='intensify_submenu'):
+        MaterialFirstIntensifyController(ctrl, timeout=1.0).enter_intensify_home_from_main()
+
+    assert ctrl.clicks == [
+        (0.0490, 0.8981),
+        (0.1563, 0.5000),
+    ]
 
 
 def test_fails_closed_before_any_click_when_main_is_unknown(

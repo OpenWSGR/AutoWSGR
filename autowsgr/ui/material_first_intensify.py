@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
+from autowsgr.ui.tabbed_page import TabbedPageType, get_active_tab_index, identify_page_type
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
 class MaterialFirstState(StrEnum):
     MAIN = 'main'
     SIDEBAR = 'sidebar'
+    INTENSIFY_SUBMENU = 'intensify_submenu'
     INTENSIFY_HOME = 'intensify_home'
     MATERIAL_SELECTOR = 'material_selector'
 
@@ -43,7 +46,6 @@ class MaterialSelectorEvidence:
 _CLICK_OPEN_SIDEBAR = (0.0490, 0.8981)
 _CLICK_SIDEBAR_INTENSIFY = (0.1563, 0.5000)
 _CLICK_INTENSIFY_SUBMENU = (0.3750, 0.5000)
-_CLICK_INTENSIFY_TAB = (0.1875, 0.0463)
 _CLICK_MATERIAL_SLOT = (0.2630, 0.3380)
 
 _MAIN_PROBES = (
@@ -60,7 +62,6 @@ _SIDEBAR_PROBES = (
     (0.0396, 0.6028),
     (0.0432, 0.7231),
 )
-_TAB_PROBES = ((0.1539, 0.0472), (0.2719, 0.0625), (0.4039, 0.0528))
 
 
 def _pixel(screen: np.ndarray, x: float, y: float) -> np.ndarray:
@@ -89,12 +90,29 @@ def is_sidebar_screen(screen: np.ndarray) -> bool:
     return matches >= 5
 
 
+def is_intensify_submenu_screen(screen: np.ndarray) -> bool:
+    """Recognize the open intensify submenu before its first option is clicked."""
+    height, width = screen.shape[:2]
+    first_option = screen[
+        round(height * 0.46) : round(height * 0.54),
+        round(width * 0.305) : round(width * 0.475),
+    ]
+    second_option = screen[
+        round(height * 0.565) : round(height * 0.645),
+        round(width * 0.305) : round(width * 0.475),
+    ]
+    first_white_ratio = float(np.mean(np.min(first_option, axis=2) > 200))
+    second_white_ratio = float(np.mean(np.min(second_option, axis=2) > 200))
+    return is_sidebar_screen(screen) and first_white_ratio >= 0.60 and second_white_ratio >= 0.60
+
+
 def is_intensify_home_screen(screen: np.ndarray) -> bool:
     """Recognize the first intensify tab before opening either selector."""
-    first, second, third = (_pixel(screen, *point) for point in _TAB_PROBES)
-    first_blue = _near(first, (15, 132, 228), 35.0)
-    others_dark = int(second.max()) < 80 and int(third.max()) < 80
-    return first_blue and others_dark and not is_material_selector_screen(screen)
+    return (
+        identify_page_type(screen) == TabbedPageType.INTENSIFY
+        and get_active_tab_index(screen) == 0
+        and not is_material_selector_screen(screen)
+    )
 
 
 def material_selector_evidence(screen: np.ndarray) -> MaterialSelectorEvidence:
@@ -186,11 +204,11 @@ class MaterialFirstIntensifyController:
         self._wait_stable(MaterialFirstState.SIDEBAR, is_sidebar_screen)
 
         self._ctrl.click(*_CLICK_SIDEBAR_INTENSIFY)
-        time.sleep(1.0)
+        self._wait_stable(
+            MaterialFirstState.INTENSIFY_SUBMENU,
+            is_intensify_submenu_screen,
+        )
         self._ctrl.click(*_CLICK_INTENSIFY_SUBMENU)
-        self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
-
-        self._ctrl.click(*_CLICK_INTENSIFY_TAB)
         return self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
 
     def enter_material_selector_from_main(self) -> MaterialSelectorEvidence:
