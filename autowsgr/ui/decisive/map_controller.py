@@ -378,6 +378,7 @@ class DecisiveMapController:
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
             if not is_fleet_acquisition(screen):
+                time.sleep(0.2) # 等待动画完成
                 return True
             time.sleep(0.2)
         _log.warning('[地图控制器] 关闭战备舰队弹窗后仍停留在原界面')
