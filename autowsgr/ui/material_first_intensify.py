@@ -179,10 +179,14 @@ class MaterialFirstIntensifyController:
         self,
         state: MaterialFirstState,
         predicate: Callable[[np.ndarray], bool],
+        *,
+        initial_screen: np.ndarray | None = None,
     ) -> np.ndarray:
         deadline = time.monotonic() + self._timeout
-        stable = 0
-        last: np.ndarray | None = None
+        stable = 1 if initial_screen is not None and predicate(initial_screen) else 0
+        last = initial_screen if stable else None
+        if stable >= self._stable_frames:
+            return last
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
             if predicate(screen):
@@ -200,6 +204,11 @@ class MaterialFirstIntensifyController:
         """Execute only MAIN -> sidebar -> intensify home, then stop."""
         self._wait_stable(MaterialFirstState.MAIN, is_main_screen)
 
+        return self._enter_intensify_home_after_main()
+
+    def _enter_intensify_home_after_main(self) -> np.ndarray:
+        """Continue the verified navigation after MAIN has already been proven."""
+
         self._ctrl.click(*_CLICK_OPEN_SIDEBAR)
         self._wait_stable(MaterialFirstState.SIDEBAR, is_sidebar_screen)
 
@@ -210,6 +219,32 @@ class MaterialFirstIntensifyController:
         )
         self._ctrl.click(*_CLICK_INTENSIFY_SUBMENU)
         return self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
+
+    def ensure_intensify_home(self) -> np.ndarray:
+        """Accept an existing intensify home or use the verified MAIN navigation path."""
+        screen = self._ctrl.screenshot()
+        if is_intensify_home_screen(screen):
+            return self._wait_stable(
+                MaterialFirstState.INTENSIFY_HOME,
+                is_intensify_home_screen,
+                initial_screen=screen,
+            )
+        # 如果当前由于上次异常停留在选择页（目标页/素材页），先点击左上角返回强化首页
+        from autowsgr.ui.live_intensify import is_target_selector
+        if is_target_selector(screen) or is_material_selector_screen(screen):
+            self._ctrl.click(0.048, 0.088)
+            time.sleep(0.5)
+            screen = self._ctrl.screenshot()
+            if is_intensify_home_screen(screen):
+                return self._wait_stable(
+                    MaterialFirstState.INTENSIFY_HOME,
+                    is_intensify_home_screen,
+                    initial_screen=screen,
+                )
+        if is_main_screen(screen):
+            self._wait_stable(MaterialFirstState.MAIN, is_main_screen, initial_screen=screen)
+            return self._enter_intensify_home_after_main()
+        raise MaterialFirstNavigationError('强化扫描起始页面既不是 main 也不是 intensify_home')
 
     def enter_material_selector_from_main(self) -> MaterialSelectorEvidence:
         """Enter the material selector directly without requiring a target ship."""

@@ -204,26 +204,21 @@ def test_reader_fails_closed_when_target_identity_result_is_empty() -> None:
     assert len(identities.images) == 2
 
 
-def test_reader_uses_name_constrained_portrait_only_for_failed_identity() -> None:
+def test_reader_never_uses_ocr_or_portrait_for_failed_identity() -> None:
     screen = np.zeros((500, 800, 3), dtype=np.uint8)
     cards = (CardRect(10, 20, 202, 425), CardRect(220, 20, 412, 425))
     identities = _RecordingIdentities([ShipCardIdentity(1, '甲', ShipType.DD, 0.8, '1.png'), None])
     portraits = _NamedPortraits()
 
     ocr = _FallbackOcr()
-    results = CetusTargetCardReader(
-        identities,
-        ocr=ocr,
-        named_portraits=portraits,
-    ).identify_all(screen, cards)
+    with pytest.raises(TargetInventoryScanError, match='未识别完整卡片'):
+        CetusTargetCardReader(
+            identities,
+            ocr=ocr,
+        ).identify_all(screen, cards)
 
-    assert [result.ship_id for result in results] == [1, 1238]
-    assert results[0].identity_match_key == '1.png'
-    assert results[1].identity_match_key == 'portrait:1238.webp'
-    assert len(portraits.calls) == 1
-    assert portraits.calls[0][0].shape == (146, 192, 3)
-    assert portraits.calls[0][1] == '约克'
-    assert ocr.ship_name_candidates == portraits.search_names
+    assert portraits.calls == []
+    assert ocr.ship_name_candidates is None
 
 
 def test_target_scan_device_returns_exact_frame_after_one_scroll_quantum() -> None:
@@ -237,19 +232,46 @@ def test_target_scan_device_returns_exact_frame_after_one_scroll_quantum() -> No
         scroll_input=scroll,
         scroll_amount=-0.25,
     )
+    baseline = np.zeros((10, 10, 3), dtype=np.uint8)
     screen = np.full((10, 10, 3), 7, dtype=np.uint8)
-    adapter.screenshot = MagicMock(side_effect=(screen.copy(), screen.copy()))
+    adapter.screenshot = MagicMock(side_effect=(baseline, screen.copy(), screen.copy()))
 
     result = adapter.advance_target_list()
 
     assert np.array_equal(result, screen)
-    scroll.scroll.assert_called_once_with(
+    assert scroll.scroll.call_count >= 1
+    scroll.scroll.assert_any_call(
         0.5,
         0.5,
         vertical=-0.25,
         delay=False,
     )
-    assert adapter.screenshot.call_count == 2
+    assert adapter.screenshot.call_count == 3
+
+
+def test_target_scan_device_waits_for_delayed_content_movement() -> None:
+    device = SimpleNamespace(
+        screenshot=lambda: np.zeros((1080, 1920, 3), dtype=np.uint8),
+        resolution=(1920, 1080),
+    )
+    scroll = SimpleNamespace(scroll=MagicMock())
+    adapter = CetusTargetScanDevice(device, scroll_input=scroll, scroll_amount=-0.25)
+    unchanged = np.zeros((10, 10, 3), dtype=np.uint8)
+    moved = np.ones((10, 10, 3), dtype=np.uint8)
+    adapter.screenshot = MagicMock(
+        side_effect=(
+            unchanged.copy(),
+            unchanged.copy(),
+            unchanged.copy(),
+            moved.copy(),
+            moved.copy(),
+        )
+    )
+
+    result = adapter.advance_target_list()
+
+    assert np.array_equal(result, moved)
+    assert adapter.screenshot.call_count == 5
 
 
 def test_live_target_scan_returns_formal_snapshot_after_reverifying_device(

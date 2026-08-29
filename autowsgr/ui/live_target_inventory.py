@@ -23,7 +23,6 @@ from autowsgr.ui.target_inventory_scanner import (
 
 if TYPE_CHECKING:
     from autowsgr.ui.material_inventory_scanner import AdbLosslessMaterialDevice
-    from autowsgr.vision.named_portrait_matcher import NamedPortraitMatcher
     from autowsgr.vision.ocr import OCREngine
     from autowsgr.vision.ship_card_recognizer import ShipCardRecognizer
 
@@ -35,7 +34,6 @@ _STRENGTHEN_CROPS = (
     (0.81, 0.58, 0.99, 0.82),
 )
 _NAME_CROP = (0.0, 0.88, 1.0, 1.0)
-_UNOBSCURED_PORTRAIT_BOTTOM = 0.36
 _TRACK_X_1920 = 1580
 _TRACK_TOP_1080 = 130
 _TRACK_BOTTOM_1080 = 1034
@@ -286,7 +284,6 @@ class CetusTargetCardReader:
     identities: ShipCardRecognizer
     ocr: OCREngine | None = None
     max_resolver: TargetMaxResolver | None = None
-    named_portraits: NamedPortraitMatcher | None = None
 
     def identify_all(
         self,
@@ -297,29 +294,6 @@ class CetusTargetCardReader:
         identities = self.identities.recognize(card_images)
         if len(identities) != len(card_images):
             raise TargetInventoryScanError('目标舰页面存在未识别完整卡片，拒绝宣称扫描完成')
-        for index, identity in enumerate(identities):
-            if identity is not None or self.ocr is None or self.named_portraits is None:
-                continue
-            card_image = card_images[index]
-            name = self.ocr.recognize_ship_name(
-                card_image[round(card_image.shape[0] * _NAME_CROP[1]) :],
-                candidates=self.named_portraits.search_names,
-            )
-            if name is None:
-                continue
-            portrait = card_image[: round(card_image.shape[0] * _UNOBSCURED_PORTRAIT_BOTTOM)]
-            match = self.named_portraits.identify(portrait, name)
-            if match is None:
-                continue
-            from autowsgr.vision.ship_card_recognizer import ShipCardIdentity
-
-            identities[index] = ShipCardIdentity(
-                ship_id=match.record.ship_id,
-                name=match.record.name,
-                ship_type=match.record.ship_type,
-                confidence=match.ratio,
-                match_key=f'portrait:{match.record.portrait_path.name}',
-            )
         if any(identity is None for identity in identities):
             raise TargetInventoryScanError('目标舰页面存在未识别完整卡片，拒绝宣称扫描完成')
         return tuple(
@@ -431,13 +405,29 @@ class CetusTargetScanDevice:
         return hashlib.blake2b(body, digest_size=16).digest()
 
     def advance_target_list(self) -> np.ndarray:
-        self._scroll_input.scroll(0.5, 0.5, vertical=self._scroll_amount, delay=False)
-        deadline = time.monotonic() + 1.5
+        baseline = self._frame_digest(self.screenshot())
+        deadline = time.monotonic() + 3.0
         previous_digest: bytes | None = None
         stable = 0
+        pulses_sent = 0
+
         while time.monotonic() < deadline:
+            # 每次发送 10 次滚轮微步脉冲，确保真实跨越输入死区
+            self._scroll_input.scroll(0.5, 0.5, vertical=self._scroll_amount, delay=False)
+            pulses_sent += 1
+            time.sleep(0.04)
+
             screen = self.screenshot()
             digest = self._frame_digest(screen)
+
+            if digest == baseline:
+                if pulses_sent >= 15:
+                    # 已经发送足够多脉冲但画面仍与基准一致，返回当前帧由上层结合滑块/到底状态判断
+                    return screen
+                previous_digest = None
+                stable = 0
+                continue
+
             if digest == previous_digest:
                 stable += 1
                 if stable >= 2:
@@ -445,8 +435,8 @@ class CetusTargetScanDevice:
             else:
                 previous_digest = digest
                 stable = 1
-            time.sleep(0.08)
-        raise TargetInventoryScanError('目标舰列表滚动后未稳定到可验证帧')
+
+        return self.screenshot()
 
     @staticmethod
     def _target_list_at_bottom(screen: np.ndarray) -> bool:
@@ -464,13 +454,12 @@ def scan_live_target_inventory(
     scroll_input: TargetScrollInput,
     ocr: OCREngine | None = None,
     max_resolver: TargetMaxResolver | None = None,
-    named_portraits: NamedPortraitMatcher | None = None,
     max_scrolls: int = 80,
 ) -> TargetInventorySnapshot:
     """Run a target-only, scrollbar-only scan on the verified Cetus device."""
     device.verify_cetus()
     adapter = CetusTargetScanDevice(device, scroll_input=scroll_input)
-    reader = CetusTargetCardReader(identities, ocr, max_resolver, named_portraits)
+    reader = CetusTargetCardReader(identities, ocr, max_resolver)
     result = TargetInventoryScanner(adapter, reader).scan_snapshot(max_scrolls=max_scrolls)
     device.verify_cetus()
     return result

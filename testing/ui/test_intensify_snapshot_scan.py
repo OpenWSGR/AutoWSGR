@@ -95,7 +95,7 @@ def test_pair_scan_publishes_nothing_and_orders_both_complete_scans(
 ) -> None:
     events: list[str] = []
     navigator = MagicMock()
-    navigator.enter_home_from_main.side_effect = lambda: events.append('home')
+    navigator.ensure_home.side_effect = lambda: events.append('home')
     navigator.open_target_selector.side_effect = lambda: events.append('open-target')
     navigator.close_target_selector.side_effect = lambda: events.append('close-target')
     navigator.open_material_selector.side_effect = lambda: events.append('open-material')
@@ -131,13 +131,14 @@ def test_pair_scan_publishes_nothing_and_orders_both_complete_scans(
     assert result == (targets, materials)
     assert events == [
         'home',
-        'open-target',
-        'scan-target',
-        'close-target',
         'open-material',
         'scan-material',
         'close-material',
+        'open-target',
+        'scan-target',
+        'close-target',
     ]
+    navigator.ensure_home.assert_called_once_with()
 
 
 def test_pair_scan_closes_target_selector_after_target_failure(
@@ -154,6 +155,11 @@ def test_pair_scan_closes_target_selector_after_target_failure(
         'scan_live_target_inventory',
         MagicMock(side_effect=RuntimeError('target failed')),
     )
+    monkeypatch.setattr(
+        intensify_snapshot_scan,
+        'scan_material_inventory_from_selector',
+        MagicMock(return_value=MagicMock()),
+    )
 
     with pytest.raises(RuntimeError, match='target failed'):
         scan_intensify_inventory_pair(
@@ -164,8 +170,8 @@ def test_pair_scan_closes_target_selector_after_target_failure(
             max_resolver=MagicMock(),
         )
 
+    navigator.close_material_selector.assert_called_once_with()
     navigator.close_target_selector.assert_called_once_with()
-    navigator.open_material_selector.assert_not_called()
 
 
 def test_pair_scan_preserves_target_failure_when_target_cleanup_also_fails(
@@ -183,6 +189,11 @@ def test_pair_scan_preserves_target_failure_when_target_cleanup_also_fails(
         'scan_live_target_inventory',
         MagicMock(side_effect=RuntimeError('target recognition failed')),
     )
+    monkeypatch.setattr(
+        intensify_snapshot_scan,
+        'scan_material_inventory_from_selector',
+        MagicMock(return_value=MagicMock()),
+    )
 
     with pytest.raises(RuntimeError, match='target recognition failed') as caught:
         scan_intensify_inventory_pair(
@@ -194,7 +205,7 @@ def test_pair_scan_preserves_target_failure_when_target_cleanup_also_fails(
         )
 
     assert caught.value.__notes__ == ['目标库存扫描失败后的页面清理也失败: target cleanup failed']
-    navigator.open_material_selector.assert_not_called()
+    navigator.close_material_selector.assert_called_once_with()
 
 
 def test_pair_scan_closes_material_selector_after_material_failure(
@@ -206,11 +217,8 @@ def test_pair_scan_closes_material_selector_after_material_failure(
         'IntensifySnapshotNavigator',
         MagicMock(return_value=navigator),
     )
-    monkeypatch.setattr(
-        intensify_snapshot_scan,
-        'scan_live_target_inventory',
-        MagicMock(return_value=MagicMock()),
-    )
+    target_scan = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(intensify_snapshot_scan, 'scan_live_target_inventory', target_scan)
     monkeypatch.setattr(
         intensify_snapshot_scan,
         'scan_material_inventory_from_selector',
@@ -226,8 +234,9 @@ def test_pair_scan_closes_material_selector_after_material_failure(
             max_resolver=MagicMock(),
         )
 
-    navigator.close_target_selector.assert_called_once_with()
     navigator.close_material_selector.assert_called_once_with()
+    navigator.open_target_selector.assert_not_called()
+    target_scan.assert_not_called()
 
 
 def test_pair_scan_preserves_material_failure_when_material_cleanup_also_fails(
@@ -240,11 +249,8 @@ def test_pair_scan_preserves_material_failure_when_material_cleanup_also_fails(
         'IntensifySnapshotNavigator',
         MagicMock(return_value=navigator),
     )
-    monkeypatch.setattr(
-        intensify_snapshot_scan,
-        'scan_live_target_inventory',
-        MagicMock(return_value=MagicMock()),
-    )
+    target_scan = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(intensify_snapshot_scan, 'scan_live_target_inventory', target_scan)
     monkeypatch.setattr(
         intensify_snapshot_scan,
         'scan_material_inventory_from_selector',
@@ -261,3 +267,5 @@ def test_pair_scan_preserves_material_failure_when_material_cleanup_also_fails(
         )
 
     assert caught.value.__notes__ == ['素材库存扫描失败后的页面清理也失败: material cleanup failed']
+    navigator.open_target_selector.assert_not_called()
+    target_scan.assert_not_called()

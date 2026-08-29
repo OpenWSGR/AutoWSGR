@@ -69,20 +69,17 @@ def get_intensify_snapshot_scan_service(context: object) -> IntensifySnapshotSca
         from autowsgr.ui.intensify_snapshot_scan import scan_intensify_inventory_pair
         from autowsgr.ui.material_inventory_scanner import AdbLosslessMaterialDevice
         from autowsgr.ui.target_strengthen_max import TargetStrengthenMaxResolver
-        from autowsgr.vision.named_portrait_matcher import NamedPortraitMatcher
         from autowsgr.vision.ship_card_recognizer import load_default_ship_card_recognizer
 
         device = AdbLosslessMaterialDevice(serial.strip())
         identities = load_default_ship_card_recognizer()
         max_resolver = TargetStrengthenMaxResolver.from_source(Path(strengthen_value))
-        named_portraits = NamedPortraitMatcher(Path(library_value))
         return scan_intensify_inventory_pair(
             device,
             identities,
             scroll_input=ctrl,
             ocr=getattr(context, 'ocr', None),
             max_resolver=max_resolver,
-            named_portraits=named_portraits,
         )
 
     return IntensifySnapshotScanService(get_intensify_snapshot_store(), scan)

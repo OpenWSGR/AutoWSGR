@@ -449,6 +449,10 @@ class AdbScrollbarStepper:
         self._x = x
         self._step_pixels = step_pixels
 
+    @staticmethod
+    def _track_bounds(screen_height: int) -> tuple[int, int]:
+        return round(0.12 * screen_height), round(1034 * screen_height / 1080)
+
     def thumb_bounds(self, screen: np.ndarray) -> tuple[int, int]:
         """Locate the light-grey scrollbar thumb on its fixed vertical track."""
         height, width = screen.shape[:2]
@@ -458,22 +462,21 @@ class AdbScrollbarStepper:
         # while the underlying track is dark grey around RGB 65-80.
         neutral = np.max(column, axis=1) - np.min(column, axis=1) <= 8
         light = np.min(column, axis=1) >= 160
-        track_top = round(0.12 * height)
-        track_bottom = round(1034 * height / 1080)
+        track_top, track_bottom = self._track_bounds(height)
         mask = neutral & light
         mask[:track_top] = False
         mask[track_bottom:] = False
         runs: list[tuple[int, int]] = []
         start: int | None = None
+        minimum_run = max(2, round(3 * height / 1080))
         for y, present in enumerate(mask):
             if present and start is None:
                 start = y
             elif not present and start is not None:
-                minimum = 150 if y == track_bottom else 250
-                if y - start >= round(minimum * height / 1080):
+                if y - start >= minimum_run:
                     runs.append((start, y))
                 start = None
-        if start is not None and track_bottom - start >= round(150 * height / 1080):
+        if start is not None and track_bottom - start >= minimum_run:
             runs.append((start, track_bottom))
         if len(runs) != 1:
             raise MaterialInventoryScanError(f'滚动条滑块定位不唯一: {runs}')
@@ -484,19 +487,25 @@ class AdbScrollbarStepper:
 
     def is_top(self, screen: np.ndarray) -> bool:
         top, _bottom = self.thumb_bounds(screen)
-        return top <= round(140 * screen.shape[0] / 1080)
+        track_top, _track_bottom = self._track_bounds(screen.shape[0])
+        return top <= track_top + round(10 * screen.shape[0] / 1080)
 
     def is_bottom(self, screen: np.ndarray) -> bool:
         _top, bottom = self.thumb_bounds(screen)
-        return bottom >= round(1024 * screen.shape[0] / 1080)
+        _track_top, track_bottom = self._track_bounds(screen.shape[0])
+        return bottom >= track_bottom - round(10 * screen.shape[0] / 1080)
 
-    def advance(self, *, thumb_bottom: int, screen_height: int) -> None:
-        half_thumb = round(142 * screen_height / 1080)
-        start_y = max(round(130 * screen_height / 1080), thumb_bottom - half_thumb)
-        end_y = min(screen_height - 1, start_y + self._step_pixels)
+    def advance(self, *, thumb_bounds: tuple[int, int], screen_height: int) -> None:
+        track_top, track_bottom = self._track_bounds(screen_height)
+        thumb_top, thumb_bottom = thumb_bounds
+        usable_top = max(track_top, thumb_top)
+        usable_bottom = min(track_bottom, thumb_bottom)
+        if usable_bottom - usable_top < 2:
+            raise MaterialInventoryScanError(f'滚动条滑块边界异常: {thumb_bounds}')
+        start_y = min(usable_bottom - 2, max(usable_top, (thumb_top + thumb_bottom) // 2))
         x = round(self._x * self._ctrl.resolution[0] / 1920)
         step = max(1, round(self._step_pixels * screen_height / 1080))
-        end_y = min(screen_height - 1, start_y + step)
+        end_y = min(usable_bottom - 1, start_y + step)
         self._ctrl.shell(f'input swipe {x} {start_y} {x} {end_y} 300')
 
 
@@ -604,8 +613,9 @@ class MaterialInventoryScanner:
             if viewport_count == 1 and not self._stepper.is_top(screen):
                 raise MaterialInventoryScanError('素材扫描必须从滚动条顶部开始')
             captured = self._reader.capture_best(stable_screens)
-            thumb = self._stepper.thumb_bottom(screen)
-            no_thumb_move = previous_thumb is not None and thumb == previous_thumb
+            thumb_bounds = self._stepper.thumb_bounds(screen)
+            thumb_bottom = thumb_bounds[1]
+            no_thumb_move = previous_thumb is not None and thumb_bottom == previous_thumb
             at_bottom = self._stepper.is_bottom(screen)
             if no_thumb_move and not at_bottom:
                 raise MaterialInventoryScanError('滚动条在未到底时没有移动')
@@ -649,9 +659,9 @@ class MaterialInventoryScanner:
                     len(viewports),
                     refs,
                 )
-            self._stepper.advance(thumb_bottom=thumb, screen_height=screen.shape[0])
+            self._stepper.advance(thumb_bounds=thumb_bounds, screen_height=screen.shape[0])
             time.sleep(self._settle_seconds)
-            previous_thumb = thumb
+            previous_thumb = thumb_bottom
         raise MaterialInventoryScanError(f'超过最大视口数 {max_viewports}，无法证明素材列表到底')
 
 

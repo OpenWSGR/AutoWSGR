@@ -108,6 +108,15 @@ def test_cetus_intensify_home_fixture_requires_the_intensify_page_type() -> None
     assert not is_intensify_home_screen(generic_tabs)
 
 
+def test_empty_cetus_intensify_home_is_directly_recognized() -> None:
+    screen = _fixture('cetus-intensify-home-empty.png')
+
+    assert is_intensify_home_screen(screen)
+    assert not is_main_screen(screen)
+    assert not is_sidebar_screen(screen)
+    assert not is_material_selector_screen(screen)
+
+
 def test_cetus_material_selector_fixture_has_strong_positive_evidence() -> None:
     screen = _fixture('cetus-material-selector.png')
     evidence = material_selector_evidence(screen)
@@ -144,6 +153,62 @@ def test_enters_intensify_home_and_stops(monkeypatch: pytest.MonkeyPatch) -> Non
         (0.3750, 0.5000),
     ]
     assert len(ctrl.screens) == 1
+
+
+def test_accepts_existing_intensify_home_without_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctrl = _Controller(
+        [
+            _fixture('cetus-intensify-home.png'),
+            _fixture('cetus-intensify-home.png'),
+        ]
+    )
+    monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.sleep', lambda _seconds: None)
+
+    MaterialFirstIntensifyController(ctrl).ensure_intensify_home()
+
+    assert ctrl.clicks == []
+
+
+def test_accepts_existing_empty_intensify_home_without_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctrl = _Controller(
+        [
+            _fixture('cetus-intensify-home-empty.png'),
+            _fixture('cetus-intensify-home-empty.png'),
+        ]
+    )
+    monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.sleep', lambda _seconds: None)
+
+    MaterialFirstIntensifyController(ctrl).ensure_intensify_home()
+
+    assert ctrl.clicks == []
+
+
+def test_ensure_intensify_home_preserves_verified_main_navigation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctrl = _Controller(
+        [
+            _fixture('cetus-main.png'),
+            _fixture('cetus-main.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-sidebar.png'),
+            _fixture('cetus-intensify-submenu.png'),
+            _fixture('cetus-intensify-submenu.png'),
+            _fixture('cetus-intensify-home.png'),
+            _fixture('cetus-intensify-home.png'),
+        ]
+    )
+    monkeypatch.setattr('autowsgr.ui.material_first_intensify.time.sleep', lambda _seconds: None)
+
+    MaterialFirstIntensifyController(ctrl).ensure_intensify_home()
+
+    assert ctrl.clicks == [
+        (0.0490, 0.8981),
+        (0.1563, 0.5000),
+        (0.3750, 0.5000),
+    ]
 
 
 def test_enters_material_selector_without_target(monkeypatch: pytest.MonkeyPatch) -> None:

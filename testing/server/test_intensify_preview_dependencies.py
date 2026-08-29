@@ -114,7 +114,6 @@ def test_scan_service_composes_only_trusted_context_and_environment_inputs(
     device = MagicMock()
     identities = MagicMock()
     resolver = MagicMock()
-    portraits = MagicMock()
     scan_pair = MagicMock(return_value=(MagicMock(), MagicMock()))
     monkeypatch.setenv('AUTOWSGR_STRENGTHEN_DATA', str(strengthen))
     monkeypatch.setenv('AUTOWSGR_SHIP_LIBRARY', str(tmp_path / 'ship-library'))
@@ -131,10 +130,6 @@ def test_scan_service_composes_only_trusted_context_and_environment_inputs(
         MagicMock(return_value=resolver),
     )
     monkeypatch.setattr(
-        'autowsgr.vision.named_portrait_matcher.NamedPortraitMatcher',
-        MagicMock(return_value=portraits),
-    )
-    monkeypatch.setattr(
         'autowsgr.ui.intensify_snapshot_scan.scan_intensify_inventory_pair', scan_pair
     )
 
@@ -148,5 +143,4 @@ def test_scan_service_composes_only_trusted_context_and_environment_inputs(
         scroll_input=context.ctrl,
         ocr=context.ocr,
         max_resolver=resolver,
-        named_portraits=portraits,
     )

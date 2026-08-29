@@ -253,14 +253,78 @@ def test_overlap_merge_appends_disconnected_next_sorted_groups() -> None:
     assert merged == ('A', 'B', 'C', 'D')
 
 
-def test_adb_stepper_only_drags_inside_right_scrollbar_thumb() -> None:
+@pytest.mark.parametrize(
+    ('thumb_bounds', 'expected_start', 'expected_end'),
+    [
+        ((130, 420), 275, 286),
+        ((400, 620), 510, 521),
+        ((850, 1034), 942, 953),
+        ((1024, 1034), 1029, 1033),
+    ],
+)
+def test_adb_stepper_only_drags_inside_observed_scrollbar_thumb(
+    thumb_bounds: tuple[int, int],
+    expected_start: int,
+    expected_end: int,
+) -> None:
     ctrl = MagicMock()
     ctrl.resolution = (1920, 1080)
     stepper = AdbScrollbarStepper(ctrl, x=1580, step_pixels=11)
 
-    stepper.advance(thumb_bottom=440, screen_height=1080)
+    stepper.advance(thumb_bounds=thumb_bounds, screen_height=1080)
 
-    ctrl.shell.assert_called_once_with('input swipe 1580 298 1580 309 300')
+    ctrl.shell.assert_called_once_with(
+        f'input swipe 1580 {expected_start} 1580 {expected_end} 300'
+    )
+    assert thumb_bounds[0] <= expected_start < expected_end < thumb_bounds[1]
+
+
+def test_adb_stepper_top_and_bottom_detection_do_not_depend_on_thumb_length() -> None:
+    stepper = AdbScrollbarStepper(MagicMock())
+    screen = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    stepper.thumb_bounds = MagicMock(side_effect=[(130, 420), (130, 300), (750, 1034), (900, 1034)])
+
+    assert stepper.is_top(screen)
+    assert stepper.is_top(screen)
+    assert stepper.is_bottom(screen)
+    assert stepper.is_bottom(screen)
+
+
+@pytest.mark.parametrize('thumb_bounds', [(130, 170), (200, 1000)])
+def test_adb_stepper_detects_inventory_sized_synthetic_thumbs(
+    thumb_bounds: tuple[int, int],
+) -> None:
+    screen = np.full((1080, 1920, 3), 70, dtype=np.uint8)
+    screen[thumb_bounds[0] : thumb_bounds[1], 1580] = (185, 186, 187)
+
+    assert AdbScrollbarStepper(MagicMock()).thumb_bounds(screen) == thumb_bounds
+
+
+@pytest.mark.parametrize('screen_size', [(540, 960), (1080, 1920), (2160, 3840)])
+def test_adb_stepper_ignores_scale_safe_isolated_track_noise(
+    screen_size: tuple[int, int],
+) -> None:
+    height, width = screen_size
+    x = round(1580 * width / 1920)
+    thumb_bounds = (round(350 * height / 1080), round(430 * height / 1080))
+    noise_y = round(600 * height / 1080)
+    screen = np.full((height, width, 3), 70, dtype=np.uint8)
+    screen[thumb_bounds[0] : thumb_bounds[1], x] = (185, 186, 187)
+    screen[noise_y, x] = (185, 186, 187)
+
+    assert AdbScrollbarStepper(MagicMock()).thumb_bounds(screen) == thumb_bounds
+
+
+def test_adb_stepper_rejects_multiple_neutral_light_runs_as_ambiguous() -> None:
+    screen = np.full((1080, 1920, 3), 70, dtype=np.uint8)
+    screen[250:290, 1580] = (185, 186, 187)
+    screen[700:750, 1580] = (185, 186, 187)
+
+    with pytest.raises(MaterialInventoryScanError, match='定位不唯一') as error:
+        AdbScrollbarStepper(MagicMock()).thumb_bounds(screen)
+
+    assert '(250, 290)' in str(error.value)
+    assert '(700, 750)' in str(error.value)
 
 
 def test_adb_device_accepts_explicit_serial_and_verifies_cetus_identity() -> None:
@@ -319,7 +383,7 @@ def test_scanner_merges_views_and_stops_after_stagnation() -> None:
         ),
     ][: len(captures)]
     stepper = MagicMock()
-    stepper.thumb_bottom.side_effect = [100, 200, 200]
+    stepper.thumb_bounds.side_effect = [(10, 100)] * 3 + [(110, 200)] * 6
     stepper.is_top.return_value = True
     stepper.is_bottom.side_effect = [False, True, True]
     scanner = MaterialInventoryScanner(
@@ -354,7 +418,7 @@ def test_scanner_rejects_same_name_different_id_boundary_as_ambiguous() -> None:
         MagicMock(names=('同名',), ship_ids=(2,), positions=((0, 0, 0.2, 0.3),)),
     ]
     stepper = MagicMock()
-    stepper.thumb_bottom.side_effect = [100, 200, 200]
+    stepper.thumb_bounds.side_effect = [(10, 100)] * 3 + [(110, 200)] * 6
     stepper.is_top.return_value = True
     stepper.is_bottom.side_effect = [False, True, True]
     scanner = MaterialInventoryScanner(
@@ -393,7 +457,6 @@ def test_scanner_samples_multiple_frames_per_scroll_position() -> None:
     ]
     stepper = MagicMock()
     stepper.thumb_bounds.return_value = (10, 20)
-    stepper.thumb_bottom.return_value = 20
     stepper.is_top.return_value = True
     stepper.is_bottom.return_value = True
     scanner = MaterialInventoryScanner(
@@ -502,7 +565,7 @@ def test_scanner_rejects_stuck_scrollbar_before_bottom() -> None:
     stepper = MagicMock()
     stepper.is_top.return_value = True
     stepper.is_bottom.return_value = False
-    stepper.thumb_bottom.side_effect = [100, 100]
+    stepper.thumb_bounds.return_value = (10, 100)
     scanner = MaterialInventoryScanner(
         ctrl,
         reader,

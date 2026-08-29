@@ -21,6 +21,9 @@ class TargetInventoryScanError(RuntimeError):
     """Raised when the complete target inventory cannot be proven."""
 
 
+TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS = 240
+
+
 @dataclass(frozen=True, slots=True)
 class CardRect:
     left: int
@@ -213,6 +216,22 @@ def target_viewport_rows(
     return tuple(tuple(row) for row in rows)
 
 
+def target_card_rows(cards: tuple[CardRect, ...]) -> tuple[tuple[CardRect, ...], ...]:
+    """Group complete card rectangles without performing identity recognition."""
+    if not cards:
+        return ()
+    tolerance = max(1, round(max(card.bottom - card.top for card in cards) * 0.08))
+    rows: list[list[CardRect]] = []
+    row_top: int | None = None
+    for card in cards:
+        if row_top is None or abs(card.top - row_top) > tolerance:
+            rows.append([card])
+            row_top = card.top
+        else:
+            rows[-1].append(card)
+    return tuple(tuple(row) for row in rows)
+
+
 def matching_target_row_index(
     rows: tuple[tuple[TargetShipSnapshot, ...], ...],
     anchor: tuple[TargetShipSnapshot, ...],
@@ -311,8 +330,20 @@ class TargetInventoryScanner:
         self._reader = reader
         self._settle_seconds = settle_seconds
 
-    def read_viewport(self, screen: np.ndarray, *, scan_step: int) -> list[TargetShipSnapshot]:
-        cards = detect_complete_target_cards(screen)
+    @staticmethod
+    def detect_complete_cards(screen: np.ndarray) -> tuple[CardRect, ...]:
+        """Return only cards whose full frame is visible; this never invokes identity work."""
+        return detect_complete_target_cards(screen)
+
+    def observe_viewport(
+        self,
+        screen: np.ndarray,
+        *,
+        scan_step: int,
+        cards: tuple[CardRect, ...] | None = None,
+    ) -> list[TargetShipSnapshot]:
+        """Read geometry and WSG-NCC identities without invoking strengthen OCR."""
+        cards = self.detect_complete_cards(screen) if cards is None else cards
         if not cards:
             raise TargetInventoryScanError('无法定位目标舰完整卡片')
         identities = self._reader.identify_all(screen, cards)
@@ -320,16 +351,13 @@ class TargetInventoryScanner:
             raise TargetInventoryScanError('目标舰页面存在未识别完整卡片，拒绝宣称扫描完成')
         snapshots: list[TargetShipSnapshot] = []
         for card, identity in zip(cards, identities, strict=True):
-            levels = self._reader.read_levels(screen, card, identity)
-            if levels is None:
-                raise TargetInventoryScanError('目标舰页面存在未识别完整卡片，拒绝宣称扫描完成')
             snapshots.append(
                 TargetShipSnapshot(
                     ref=SelectionRef('unassigned'),
                     ship_id=identity.ship_id,
                     name=identity.name,
                     ship_type=identity.ship_type,
-                    levels=levels,
+                    levels=ShipStats(),
                     card=card,
                     visual_hash=identity.visual_hash,
                     identity_confidence=identity.identity_confidence,
@@ -339,12 +367,87 @@ class TargetInventoryScanner:
             )
         return snapshots
 
+    def complete_viewport(
+        self,
+        screen: np.ndarray,
+        observed: list[TargetShipSnapshot],
+        *,
+        inherited_prefix: list[TargetShipSnapshot] | None = None,
+    ) -> list[TargetShipSnapshot]:
+        """Read levels once for new cards after one logical viewport is accepted."""
+        inherited = inherited_prefix or []
+        if len(inherited) > len(observed):
+            raise TargetInventoryScanError('目标舰继承重叠长度超过当前视口')
+        completed: list[TargetShipSnapshot] = []
+        for index, item in enumerate(observed):
+            if index < len(inherited):
+                previous = inherited[index]
+                if not same_target_card(previous, item):
+                    raise TargetInventoryScanError('目标舰继承重叠身份不一致')
+                completed.append(replace(item, levels=previous.levels))
+                continue
+            identity = TargetCardIdentity(
+                item.ship_id,
+                item.name,
+                item.ship_type,
+                item.visual_hash,
+                item.identity_confidence,
+                item.identity_match_key,
+            )
+            levels = self._reader.read_levels(screen, item.card, identity)
+            if levels is None:
+                raise TargetInventoryScanError(
+                    '目标舰页面完整卡片强化属性读取失败，'
+                    f'拒绝宣称扫描完成: {item.ship_id}/{item.name}/'
+                    f'{item.identity_match_key}'
+                )
+            completed.append(replace(item, levels=levels))
+        return completed
+
+    def observe_new_complete_cards(
+        self,
+        screen: np.ndarray,
+        previous: list[TargetShipSnapshot],
+        cards: tuple[CardRect, ...],
+        *,
+        scan_step: int,
+    ) -> tuple[list[TargetShipSnapshot], int]:
+        """Reuse the previous anchor row and identify only newly complete cards."""
+        previous_rows = target_viewport_rows(previous)
+        card_rows = target_card_rows(cards)
+        if not previous_rows or not card_rows:
+            raise TargetInventoryScanError('目标舰视口缺少可继承的完整行')
+        anchor = previous_rows[-1]
+        inherited_cards = card_rows[0]
+        if len(inherited_cards) != len(anchor):
+            raise TargetInventoryScanError('目标舰新视口首行与上一完整锚点行列数不一致')
+        horizontal_tolerance = max(
+            1,
+            round(max(card.right - card.left for card in inherited_cards) * 0.12),
+        )
+        if any(
+            abs(old.card.center[0] - new.center[0]) > horizontal_tolerance
+            for old, new in zip(anchor, inherited_cards, strict=True)
+        ):
+            raise TargetInventoryScanError('目标舰新视口首行与上一完整锚点行横向位置不一致')
+        inherited = [replace(old, card=new, scan_step=scan_step) for old, new in zip(anchor, inherited_cards, strict=True)]
+        new_cards = tuple(card for row in card_rows[1:] for card in row)
+        if not new_cards:
+            raise TargetInventoryScanError('目标舰滚动后没有新完整卡片')
+        newly_identified = self.observe_viewport(screen, scan_step=scan_step, cards=new_cards)
+        return [*inherited, *newly_identified], len(inherited)
+
+    def read_viewport(self, screen: np.ndarray, *, scan_step: int) -> list[TargetShipSnapshot]:
+        """Read one accepted viewport, including strengthen levels."""
+        observed = self.observe_viewport(screen, scan_step=scan_step)
+        return self.complete_viewport(screen, observed)
+
     def advance_overlapping_viewport(
         self,
         previous: list[TargetShipSnapshot],
         *,
         scan_step: int,
-        max_attempts: int = 12,
+        max_attempts: int = TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS,
     ) -> tuple[list[TargetShipSnapshot], np.ndarray]:
         """Advance within a bounded physical-input budget to one logical viewport."""
         if max_attempts < 1:
@@ -355,9 +458,45 @@ class TargetInventoryScanner:
         anchor = previous_rows[-1]
         last_anchor_index = len(previous_rows) - 1
         last_anchor_top = anchor[0].card.top
+        observed_progress = False
+        last_complete_count = len(previous)
+        consecutive_same_count = 0
+        recognition_interval = 8  # 连续若干次相同完整卡片数时触发一次 WSG-NCC 识别
+
         for _attempt in range(max_attempts):
             screen = self._device.advance_target_list()
-            current = self.read_viewport(screen, scan_step=scan_step)
+            cards = self.detect_complete_cards(screen)
+            at_bottom = self._device.target_list_at_bottom(screen)
+            if not cards:
+                if at_bottom:
+                    raise TargetInventoryScanError('目标舰列表到底前没有完整卡片')
+                continue
+
+            complete_count = len(cards)
+            should_recognize = False
+
+            if complete_count > last_complete_count:
+                should_recognize = True
+                consecutive_same_count = 0
+            else:
+                consecutive_same_count += 1
+                if consecutive_same_count >= recognition_interval:
+                    should_recognize = True
+                    consecutive_same_count = 0
+
+            if not should_recognize:
+                last_complete_count = complete_count
+                if at_bottom:
+                    raise TargetInventoryScanError('目标舰列表到底前未出现新的完整卡片')
+                continue
+
+            current, overlap = self.observe_new_complete_cards(
+                screen,
+                previous,
+                cards,
+                scan_step=scan_step,
+            )
+            last_complete_count = complete_count
             current_rows = target_viewport_rows(current)
             anchor_index = matching_target_row_index(current_rows, anchor)
             if anchor_index is None:
@@ -365,16 +504,22 @@ class TargetInventoryScanner:
             current_anchor_top = current_rows[anchor_index][0].card.top
             progressed = anchor_index < last_anchor_index or current_anchor_top < last_anchor_top
             if not progressed:
-                if max_attempts == 12:
-                    raise TargetInventoryScanError('目标舰列表滚动没有产生可观测进度')
                 continue
-            overlap = target_page_overlap_size(previous, current)
+            observed_progress = True
             if anchor_index == 0 and len(current) > overlap:
-                return current, screen
-            if self._device.target_list_at_bottom(screen):
+                return self.complete_viewport(
+                    screen,
+                    current,
+                    inherited_prefix=previous[-overlap:],
+                ), screen
+            if at_bottom:
                 raise TargetInventoryScanError('目标舰列表到底前未形成完整重叠视口')
             last_anchor_index = anchor_index
             last_anchor_top = current_anchor_top
+        if not observed_progress:
+            raise TargetInventoryScanError(
+                f'目标舰列表滚动没有产生可观测进度，物理滚动尝试次数: {max_attempts}'
+            )
         raise TargetInventoryScanError(f'目标舰逻辑视口超过物理滚动尝试次数: {max_attempts}')
 
     def navigate_to_viewport(self, viewport_steps: int) -> list[TargetShipSnapshot]:
@@ -383,7 +528,7 @@ class TargetInventoryScanner:
             raise ValueError('目标舰视口步数不能为负数')
         self._device.rewind_target_list()
         time.sleep(self._settle_seconds)
-        previous = self.read_viewport(self._device.screenshot(), scan_step=0)
+        previous = self.observe_viewport(self._device.screenshot(), scan_step=0)
         for scan_step in range(1, viewport_steps + 1):
             previous, _screen = self.advance_overlapping_viewport(
                 previous,

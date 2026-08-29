@@ -10,6 +10,7 @@ import pytest
 from autowsgr.types import ShipType
 from autowsgr.ui.intensify_workflow import SelectionRef, ShipStats
 from autowsgr.ui.target_inventory_scanner import (
+    TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS,
     CardRect,
     TargetCardIdentity,
     TargetInventoryScanError,
@@ -52,6 +53,10 @@ def _rows(*rows: tuple[int, ...]) -> list[TargetShipSnapshot]:
         for row_index, row in enumerate(rows)
         for column, ship_id in enumerate(row)
     ]
+
+
+def _cards(items: list[TargetShipSnapshot]) -> tuple[CardRect, ...]:
+    return tuple(item.card for item in items)
 
 
 def test_detects_complete_cards_and_excludes_clipped_card() -> None:
@@ -212,6 +217,132 @@ def test_viewport_fails_when_any_complete_card_is_unidentified() -> None:
         scanner.read_viewport(screen, scan_step=0)
 
 
+def test_viewport_reports_identity_when_strength_levels_fail() -> None:
+    screen = np.zeros((1000, 1600, 3), dtype=np.uint8)
+    cyan = cv2.cvtColor(np.uint8([[[104, 230, 230]]]), cv2.COLOR_HSV2RGB)[0, 0].tolist()
+    cv2.rectangle(screen, (80, 100), (239, 473), cyan, 4)
+    reader = _Reader()
+    reader.read_levels = MagicMock(return_value=None)
+    scanner = TargetInventoryScanner(object(), reader, settle_seconds=0)
+
+    with pytest.raises(
+        TargetInventoryScanError,
+        match=r'强化属性读取失败.*1/舰/gallery/ship\.png',
+    ):
+        scanner.read_viewport(screen, scan_step=0)
+
+
+def test_observe_viewport_never_reads_strength_levels() -> None:
+    screen = np.zeros((1000, 1600, 3), dtype=np.uint8)
+    cyan = cv2.cvtColor(np.uint8([[[104, 230, 230]]]), cv2.COLOR_HSV2RGB)[0, 0].tolist()
+    cv2.rectangle(screen, (80, 100), (239, 473), cyan, 4)
+    reader = _Reader()
+    reader.read_levels = MagicMock(side_effect=AssertionError('scroll phase must not read levels'))
+    scanner = TargetInventoryScanner(object(), reader, settle_seconds=0)
+
+    observed = scanner.observe_viewport(screen, scan_step=3)
+
+    assert len(observed) == 1
+    assert observed[0].scan_step == 3
+    assert observed[0].levels == ShipStats()
+    reader.read_levels.assert_not_called()
+
+
+def test_scroll_geometry_does_not_call_wsg_ncc_until_complete_card_count_increases() -> None:
+    previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    one_row_cards = tuple(item.card for item in _rows(tuple(range(8, 15))))
+    two_row_cards = tuple(item.card for item in _rows(tuple(range(8, 15)), tuple(range(15, 22))))
+    current = _rows(tuple(range(8, 15)), tuple(range(15, 22)))
+    screens = [
+        np.zeros((1080, 1920, 3), dtype=np.uint8),
+        np.ones((1080, 1920, 3), dtype=np.uint8),
+        np.full((1080, 1920, 3), 2, dtype=np.uint8),
+    ]
+    device = MagicMock()
+    device.advance_target_list.side_effect = screens
+    device.target_list_at_bottom.return_value = False
+    reader = _Reader()
+    reader.identify_all = MagicMock(return_value=())
+    scanner = TargetInventoryScanner(device, reader, settle_seconds=0)
+    scanner.detect_complete_cards = MagicMock(
+        side_effect=(one_row_cards, one_row_cards, two_row_cards)
+    )
+    scanner.observe_new_complete_cards = MagicMock(return_value=(current, 7))
+
+    result, result_screen = scanner.advance_overlapping_viewport(previous, scan_step=1)
+
+    assert result == current
+    assert result_screen is screens[-1]
+    assert scanner.observe_new_complete_cards.call_count == 1
+    assert scanner.observe_new_complete_cards.call_args.args[2] == two_row_cards
+    assert device.advance_target_list.call_count == 3
+
+
+def test_scroll_geometry_never_submits_incomplete_cards_to_wsg_ncc() -> None:
+    screen = np.zeros((1000, 1600, 3), dtype=np.uint8)
+    cyan = cv2.cvtColor(np.uint8([[[104, 230, 230]]]), cv2.COLOR_HSV2RGB)[0, 0].tolist()
+    cv2.rectangle(screen, (80, 100), (239, 473), cyan, 4)
+    cv2.rectangle(screen, (80, 750), (239, 999), cyan, 4)
+    reader = _Reader()
+    reader.identify_all = MagicMock(
+        return_value=(TargetCardIdentity(1, '舰', ShipType.DD, 1, 0.9, 'gallery/ship.png'),)
+    )
+    scanner = TargetInventoryScanner(object(), reader, settle_seconds=0)
+
+    observed = scanner.observe_viewport(screen, scan_step=0)
+
+    assert len(observed) == 1
+    submitted_cards = reader.identify_all.call_args.args[1]
+    assert submitted_cards == (CardRect(78, 98, 242, 476),)
+
+
+def test_new_complete_row_only_submits_new_cards_to_wsg_ncc() -> None:
+    previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    cards = _cards(_rows(tuple(range(8, 15)), tuple(range(15, 22))))
+    reader = _Reader()
+    reader.identify_all = MagicMock(
+        return_value=tuple(
+            TargetCardIdentity(ship_id, f'舰{ship_id}', ShipType.DD, ship_id, 0.9, f'{ship_id}.png')
+            for ship_id in range(15, 22)
+        )
+    )
+    scanner = TargetInventoryScanner(object(), reader, settle_seconds=0)
+    screen = np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+    current, overlap = scanner.observe_new_complete_cards(
+        screen,
+        previous,
+        cards,
+        scan_step=1,
+    )
+
+    assert overlap == 7
+    assert [item.ship_id for item in current] == list(range(8, 22))
+    submitted_cards = reader.identify_all.call_args.args[1]
+    assert submitted_cards == cards[7:]
+    assert len(submitted_cards) == 7
+
+
+def test_complete_viewport_reuses_overlap_levels_and_reads_only_new_cards() -> None:
+    previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    observed = _rows(tuple(range(8, 15)), tuple(range(15, 22)))
+    previous = [replace(item, levels=ShipStats(firepower=item.ship_id)) for item in previous]
+    reader = _Reader()
+    reader.read_levels = MagicMock(
+        side_effect=lambda _screen, _card, identity: ShipStats(firepower=identity.ship_id)
+    )
+    scanner = TargetInventoryScanner(object(), reader, settle_seconds=0)
+
+    completed = scanner.complete_viewport(
+        np.zeros((1080, 1920, 3), dtype=np.uint8),
+        observed,
+        inherited_prefix=previous[-7:],
+    )
+
+    assert [item.levels.firepower for item in completed] == list(range(8, 22))
+    assert reader.read_levels.call_count == 7
+
+
 def test_viewport_rows_preserve_short_final_row() -> None:
     viewport = _rows((1, 2, 3), (4, 5))
 
@@ -223,33 +354,117 @@ def test_viewport_rows_preserve_short_final_row() -> None:
 
 def test_advance_accepts_previous_lower_row_with_new_complete_content() -> None:
     previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    clipped = _rows(tuple(range(8, 15)))
     current = _rows(tuple(range(8, 15)), tuple(range(15, 22)))
-    screen = np.zeros((1, 1, 3), dtype=np.uint8)
+    screens = [np.zeros((1, 1, 3), dtype=np.uint8), np.ones((1, 1, 3), dtype=np.uint8)]
     device = MagicMock()
-    device.advance_target_list.return_value = screen
+    device.advance_target_list.side_effect = screens
     device.target_list_at_bottom.return_value = False
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
-    scanner.read_viewport = MagicMock(return_value=current)
+    scanner.detect_complete_cards = MagicMock(side_effect=(_cards(clipped), _cards(current)))
+    scanner.observe_new_complete_cards = MagicMock(return_value=(current, 7))
 
     result, result_screen = scanner.advance_overlapping_viewport(previous, scan_step=1)
 
-    assert result is current
-    assert result_screen is screen
-    device.advance_target_list.assert_called_once_with()
+    assert result == current
+    assert result_screen is screens[-1]
+    assert device.advance_target_list.call_count == 2
+
+
+def test_advance_consumes_initial_no_op_scrolls_before_valid_movement() -> None:
+    previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    current = _rows(tuple(range(8, 15)), tuple(range(15, 22)))
+    screens = [
+        np.zeros((1, 1, 3), dtype=np.uint8),
+        np.ones((1, 1, 3), dtype=np.uint8),
+        np.full((1, 1, 3), 2, dtype=np.uint8),
+    ]
+    device = MagicMock()
+    device.advance_target_list.side_effect = screens
+    device.target_list_at_bottom.return_value = False
+    scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
+    clipped = _rows(tuple(range(8, 15)))
+    scanner.detect_complete_cards = MagicMock(
+        side_effect=(_cards(previous), _cards(clipped), _cards(current))
+    )
+    scanner.observe_new_complete_cards = MagicMock(return_value=(current, 7))
+
+    result, result_screen = scanner.advance_overlapping_viewport(previous, scan_step=1)
+
+    assert result == current
+    assert result_screen is screens[-1]
+    assert device.advance_target_list.call_count == 3
+
+
+def test_advance_default_budget_forms_viewport_from_incremental_anchor_progress() -> None:
+    previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    anchor = _rows(tuple(range(8, 15)))
+    current = _rows(tuple(range(8, 15)), tuple(range(15, 22)))
+    screens = [
+        np.full((1, 1, 3), attempt % 256, dtype=np.uint8)
+        for attempt in range(TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS)
+    ]
+    device = MagicMock()
+    device.advance_target_list.side_effect = screens
+    device.target_list_at_bottom.return_value = False
+    scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
+    # 前 239 次只有 7 张完整卡，最后一次变为 14 张完整卡
+    scanner.detect_complete_cards = MagicMock(
+        side_effect=(*(_cards(anchor) for _ in range(TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS - 1)), _cards(current))
+    )
+    # 模拟定期触发 WSG-NCC 时返回 anchor 且 top 不断向上移动产生 progress
+    def fake_observe(screen, prev, cards, scan_step=1):
+        if int(screen[0, 0, 0]) == 7:  # 第 8 次识别时满足 anchor_index == 0
+            return (current, 7)
+        # 产生一个位置逐渐变小的 anchor 行
+        shifted_anchor = [
+            TargetShipSnapshot(
+                ref=c.ref,
+                ship_id=c.ship_id,
+                name=c.name,
+                ship_type=c.ship_type,
+                levels=c.levels,
+                card=c.card.__class__(
+                    c.card.left,
+                    max(10, 480 - int(screen[0, 0, 0]) * 2),
+                    c.card.right,
+                    max(10, 480 - int(screen[0, 0, 0]) * 2) + 200,
+                ),
+                visual_hash=c.visual_hash,
+                identity_confidence=c.identity_confidence,
+                identity_match_key=c.identity_match_key,
+            )
+            for c in anchor
+        ]
+        return (shifted_anchor, 0)
+
+    scanner.observe_new_complete_cards = MagicMock(side_effect=fake_observe)
+
+    result, result_screen = scanner.advance_overlapping_viewport(previous, scan_step=1)
+
+    assert result == current
+    assert result_screen is not None
+    assert device.advance_target_list.call_count >= 1
 
 
 def test_advance_rejects_wholly_new_two_row_viewport() -> None:
     previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    clipped = _rows(tuple(range(8, 15)))
     current = _rows(tuple(range(15, 22)), tuple(range(22, 29)))
     device = MagicMock()
-    device.advance_target_list.return_value = np.zeros((1, 1, 3), dtype=np.uint8)
+    device.advance_target_list.side_effect = (
+        np.zeros((1, 1, 3), dtype=np.uint8),
+        np.ones((1, 1, 3), dtype=np.uint8),
+    )
+    device.target_list_at_bottom.return_value = False
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
-    scanner.read_viewport = MagicMock(return_value=current)
+    scanner.detect_complete_cards = MagicMock(side_effect=(_cards(clipped), _cards(current)))
+    scanner.observe_new_complete_cards = MagicMock(return_value=(current, 7))
 
     with pytest.raises(TargetInventoryScanError, match='丢失完整锚点行'):
         scanner.advance_overlapping_viewport(previous, scan_step=1)
 
-    device.advance_target_list.assert_called_once_with()
+    assert device.advance_target_list.call_count == 2
 
 
 def test_intermediate_clipped_observation_does_not_consume_logical_scan_step() -> None:
@@ -265,15 +480,38 @@ def test_intermediate_clipped_observation_does_not_consume_logical_scan_step() -
     device.advance_target_list.side_effect = screens
     device.target_list_at_bottom.return_value = False
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
-    scanner.read_viewport = MagicMock(side_effect=(clipped, current))
+    scanner.detect_complete_cards = MagicMock(side_effect=(_cards(clipped), _cards(current)))
+    scanner.observe_new_complete_cards = MagicMock(return_value=(current, 7))
 
     result, _screen = scanner.advance_overlapping_viewport(previous, scan_step=1)
 
-    assert result is current
+    assert result == current
     assert device.advance_target_list.call_count == 2
     assert {item.scan_step for item in result} == {0}
-    assert scanner.read_viewport.call_args_list[0].kwargs['scan_step'] == 1
-    assert scanner.read_viewport.call_args_list[1].kwargs['scan_step'] == 1
+    assert scanner.observe_new_complete_cards.call_count == 1
+    assert scanner.observe_new_complete_cards.call_args.kwargs['scan_step'] == 1
+
+
+def test_intermediate_two_row_progress_waits_until_anchor_reaches_first_row() -> None:
+    previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
+    clipped = _rows(tuple(range(8, 15)))
+    current = _rows(tuple(range(8, 15)), tuple(range(15, 22)))
+    screens = [
+        np.zeros((1, 1, 3), dtype=np.uint8),
+        np.ones((1, 1, 3), dtype=np.uint8),
+    ]
+    device = MagicMock()
+    device.advance_target_list.side_effect = screens
+    device.target_list_at_bottom.return_value = False
+    scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
+    scanner.detect_complete_cards = MagicMock(side_effect=(_cards(clipped), _cards(current)))
+    scanner.observe_new_complete_cards = MagicMock(return_value=(current, 7))
+
+    result, result_screen = scanner.advance_overlapping_viewport(previous, scan_step=1)
+
+    assert result == current
+    assert result_screen is screens[-1]
+    assert device.advance_target_list.call_count == 2
 
 
 def test_advance_attempt_budget_bounds_physical_scroll_inputs() -> None:
@@ -283,8 +521,10 @@ def test_advance_attempt_budget_bounds_physical_scroll_inputs() -> None:
     device = MagicMock()
     device.advance_target_list.return_value = np.zeros((1, 1, 3), dtype=np.uint8)
     device.target_list_at_bottom.return_value = False
+    device.target_list_at_bottom.return_value = False
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
-    scanner.read_viewport = MagicMock(return_value=first_row)
+    scanner.detect_complete_cards = MagicMock(return_value=_cards(first_row))
+    scanner.observe_viewport = MagicMock(return_value=first_row)
 
     with pytest.raises(TargetInventoryScanError, match='物理滚动尝试次数: 2'):
         scanner.advance_overlapping_viewport(previous, scan_step=1, max_attempts=2)
@@ -296,13 +536,15 @@ def test_advance_rejects_unchanged_non_bottom_viewport() -> None:
     previous = _rows(tuple(range(1, 8)), tuple(range(8, 15)))
     device = MagicMock()
     device.advance_target_list.return_value = np.zeros((1, 1, 3), dtype=np.uint8)
+    device.target_list_at_bottom.return_value = False
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
-    scanner.read_viewport = MagicMock(return_value=previous)
+    scanner.detect_complete_cards = MagicMock(return_value=_cards(previous))
+    scanner.observe_viewport = MagicMock(return_value=previous)
 
-    with pytest.raises(TargetInventoryScanError, match='没有产生可观测进度'):
-        scanner.advance_overlapping_viewport(previous, scan_step=1)
+    with pytest.raises(TargetInventoryScanError, match=r'没有产生可观测进度.*3'):
+        scanner.advance_overlapping_viewport(previous, scan_step=1, max_attempts=3)
 
-    device.advance_target_list.assert_called_once_with()
+    assert device.advance_target_list.call_count == 3
 
 
 def test_navigate_to_viewport_reuses_identity_gated_logical_steps() -> None:
@@ -311,7 +553,7 @@ def test_navigate_to_viewport_reuses_identity_gated_logical_steps() -> None:
     device = MagicMock()
     device.screenshot.return_value = np.zeros((1, 1, 3), dtype=np.uint8)
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
-    scanner.read_viewport = MagicMock(return_value=initial)
+    scanner.observe_viewport = MagicMock(return_value=initial)
     scanner.advance_overlapping_viewport = MagicMock(return_value=(next_viewport, object()))
 
     result = scanner.navigate_to_viewport(1)

@@ -105,7 +105,7 @@ def test_wsg_ncc_adapter_skips_noncanonical_top_match(tmp_path: Path) -> None:
     assert identity.ship_id == 84
 
 
-def test_wsg_ncc_adapter_retries_only_empty_normal_results_with_masked_parameters(
+def test_wsg_ncc_adapter_retries_all_unresolved_normal_results_with_masked_parameters(
     tmp_path: Path,
 ) -> None:
     engine = MagicMock()
@@ -113,9 +113,12 @@ def test_wsg_ncc_adapter_retries_only_empty_normal_results_with_masked_parameter
         [
             [(None, 0.93, '1/84/XM_NORMAL_84.png')],
             [],
-            [(None, 0.91, '1/84/XM_NORMAL_84.png')],
+            [(None, 0.91, 'unknown.png')],
         ],
-        [[(None, 0.95, '1/84/XM_NORMAL_84.png')]],
+        [
+            [(None, 0.95, '1/84/XM_NORMAL_84.png')],
+            [(None, 0.94, '1/84/XM_NORMAL_84.png')],
+        ],
     ]
     recognizer = WsgNccShipCardRecognizer('unused', _metadata(tmp_path), engine=engine)
     images = [np.zeros((405, 192, 3), dtype=np.uint8) for _ in range(3)]
@@ -125,7 +128,7 @@ def test_wsg_ncc_adapter_retries_only_empty_normal_results_with_masked_parameter
     assert [item.ship_id if item is not None else None for item in result] == [84, 84, 84]
     assert engine.recognize.call_count == 2
     assert engine.recognize.call_args_list[0].args == (images,)
-    assert engine.recognize.call_args_list[1].args == ([images[1]],)
+    assert engine.recognize.call_args_list[1].args == ([images[1], images[2]],)
     assert engine.recognize.call_args_list[1].kwargs == {
         'k': 5,
         'min_confidence': 0.7,
@@ -269,20 +272,160 @@ def test_wsg_ncc_adapter_enriches_private_metadata_from_manifest(tmp_path: Path)
     assert identity.ship_type is ShipType.DD
 
 
-def test_wsg_ncc_metadata_rejects_identity_missing_from_manifest(tmp_path: Path) -> None:
+def test_wsg_ncc_adapter_maps_costume_identity_to_canonical_ship(tmp_path: Path) -> None:
     metadata = tmp_path / 'gallery_meta.json'
     metadata.write_text(
-        json.dumps({'1/9999/XM_NORMAL_9999.png': {'shipIndex': 9999, 'title': None}}),
+        json.dumps(
+            {
+                '1/84_1/XM_NORMAL_84_1.png': {'shipIndex': 841, 'title': '天后'},
+            },
+            ensure_ascii=False,
+        ),
+        encoding='utf-8',
+    )
+    engine = MagicMock()
+    engine.recognize.return_value = [[(None, 0.93, '1/84_1/XM_NORMAL_84_1.png')]]
+    recognizer = WsgNccShipCardRecognizer(
+        'unused',
+        metadata,
+        manifest_path=_manifest(tmp_path),
+        engine=engine,
+    )
+
+    identity = recognizer.recognize([np.zeros((405, 192, 3), dtype=np.uint8)])[0]
+
+    assert identity is not None
+    assert identity.ship_id == 84
+    assert identity.name == '天后'
+    assert identity.ship_type is ShipType.DD
+
+
+def test_wsg_ncc_adapter_uses_costume_key_when_title_is_legacy_alias(tmp_path: Path) -> None:
+    metadata = tmp_path / 'gallery_meta.json'
+    metadata.write_text(
+        json.dumps(
+            {'1/84_1/XM_NORMAL_84_1.png': {'shipIndex': 841, 'title': '标枪'}},
+            ensure_ascii=False,
+        ),
         encoding='utf-8',
     )
 
-    with pytest.raises(ShipCardRecognitionError, match='不在规范 manifest'):
+    engine = MagicMock()
+    engine.recognize.return_value = [[(None, 0.93, '1/84_1/XM_NORMAL_84_1.png')]]
+    recognizer = WsgNccShipCardRecognizer(
+        'unused',
+        metadata,
+        manifest_path=_manifest(tmp_path),
+        engine=engine,
+    )
+
+    identity = recognizer.recognize([np.zeros((405, 192, 3), dtype=np.uint8)])[0]
+
+    assert identity is not None
+    assert identity.ship_id == 84
+    assert identity.name == '天后'
+
+
+def test_wsg_ncc_metadata_rejects_costume_id_mismatching_resource_key(tmp_path: Path) -> None:
+    metadata = tmp_path / 'gallery_meta.json'
+    metadata.write_text(
+        json.dumps({'1/84_1/XM_NORMAL_84_1.png': {'shipIndex': 842, 'title': '天后'}}),
+        encoding='utf-8',
+    )
+
+    with pytest.raises(ShipCardRecognitionError, match='换装 ID 与资源 key 不一致'):
         WsgNccShipCardRecognizer(
             'unused',
             metadata,
             manifest_path=_manifest(tmp_path),
             engine=MagicMock(),
         )
+
+
+def test_wsg_ncc_adapter_maps_special_identity_by_unique_exact_canonical_name(
+    tmp_path: Path,
+) -> None:
+    metadata = tmp_path / 'gallery_meta.json'
+    metadata.write_text(
+        json.dumps({'1/8084/XM_NORMAL_8084.png': {'shipIndex': 8084, 'title': '天后'}}),
+        encoding='utf-8',
+    )
+    engine = MagicMock()
+    engine.recognize.return_value = [[(None, 0.93, '1/8084/XM_NORMAL_8084.png')]]
+    recognizer = WsgNccShipCardRecognizer(
+        'unused',
+        metadata,
+        manifest_path=_manifest(tmp_path),
+        engine=engine,
+    )
+
+    identity = recognizer.recognize([np.zeros((405, 192, 3), dtype=np.uint8)])[0]
+
+    assert identity is not None
+    assert identity.ship_id == 84
+    assert identity.name == '天后'
+
+
+@pytest.mark.parametrize('title', [None, '未知'])
+def test_wsg_ncc_metadata_ignores_non_ship_gallery_entries(
+    tmp_path: Path,
+    title: str | None,
+) -> None:
+    metadata = tmp_path / 'gallery_meta.json'
+    metadata.write_text(
+        json.dumps(
+            {
+                '1/9998/XM_NORMAL_9998.png': {'shipIndex': 9998, 'title': title},
+                '1/84/XM_NORMAL_84.png': {'shipIndex': 84, 'title': '天后'},
+            },
+            ensure_ascii=False,
+        ),
+        encoding='utf-8',
+    )
+    engine = MagicMock()
+    engine.recognize.return_value = [
+        [
+            (None, 0.95, '1/9998/XM_NORMAL_9998.png'),
+            (None, 0.93, '1/84/XM_NORMAL_84.png'),
+        ]
+    ]
+    recognizer = WsgNccShipCardRecognizer(
+        'unused',
+        metadata,
+        manifest_path=_manifest(tmp_path),
+        engine=engine,
+    )
+
+    identity = recognizer.recognize([np.zeros((405, 192, 3), dtype=np.uint8)])[0]
+
+    assert identity is not None
+    assert identity.ship_id == 84
+
+
+def test_wsg_ncc_metadata_ignores_identity_missing_from_manifest(tmp_path: Path) -> None:
+    metadata = tmp_path / 'gallery_meta.json'
+    metadata.write_text(
+        json.dumps(
+            {
+                '1/9999/XM_NORMAL_9999.png': {
+                    'shipIndex': 9999,
+                    'title': '调谐舰Ⅳ型',
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding='utf-8',
+    )
+    engine = MagicMock()
+    engine.recognize.return_value = [[(None, 0.99, '1/9999/XM_NORMAL_9999.png')]]
+    recognizer = WsgNccShipCardRecognizer(
+        'unused',
+        metadata,
+        manifest_path=_manifest(tmp_path),
+        engine=engine,
+    )
+
+    assert recognizer.recognize([np.zeros((405, 192, 3), dtype=np.uint8)]) == [None]
 
 
 def test_wsg_ncc_data_zip_loader_reads_codebook_and_metadata(tmp_path: Path) -> None:
