@@ -49,7 +49,7 @@ def plan_ordered_intensify_batches(
     inventory: MaterialInventoryObservation,
     policy: IntensifyPolicy,
     *,
-    maximum_rarity: int = 3,
+    maximum_rarity: int = 6,
 ) -> IntensifyPlanningResult:
     """Allocate ordered material occurrences once across ordered targets.
 
@@ -120,39 +120,64 @@ def _select_batch(
     if not candidates:
         return ()
     limit = min(maximum_materials, len(candidates))
-    complete: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
-    partial: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
-    for size in range(1, limit + 1):
-        for selected in combinations(candidates, size):
-            contribution = _sum_stats(item.contribution for item in selected)
-            indices = tuple(item.index for item in selected)
-            if _meets(contribution, need):
-                excess = _excess(contribution, need)
-                complete.append(
-                    (
+    if limit <= 6:
+        complete: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
+        partial: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
+        for size in range(1, limit + 1):
+            for selected in combinations(candidates, size):
+                contribution = _sum_stats(item.contribution for item in selected)
+                indices = tuple(item.index for item in selected)
+                if _meets(contribution, need):
+                    excess = _excess(contribution, need)
+                    complete.append(
                         (
-                            size,
-                            _total(excess),
-                            excess.firepower,
-                            excess.torpedo,
-                            excess.armor,
-                            excess.anti_air,
-                            indices,
-                        ),
-                        selected,
+                            (
+                                size,
+                                _total(excess),
+                                excess.firepower,
+                                excess.torpedo,
+                                excess.armor,
+                                excess.anti_air,
+                                indices,
+                            ),
+                            selected,
+                        )
                     )
-                )
+                    continue
+                useful = _useful(contribution, need)
+                if useful == 0:
+                    continue
+                waste = _total(contribution) - useful
+                partial.append(((-useful, waste, size, indices), selected))
+        if complete:
+            return min(complete, key=lambda item: item[0])[1]
+        if partial:
+            return min(partial, key=lambda item: item[0])[1]
+        return ()
+
+    selected_list: list[MaterialOccurrence] = []
+    current_need = need
+    remaining_candidates = list(candidates)
+
+    while remaining_candidates and len(selected_list) < limit and current_need != ShipStats():
+        best_cand = None
+        best_score = None
+        for cand in remaining_candidates:
+            u = _useful(cand.contribution, current_need)
+            if u == 0:
                 continue
-            useful = _useful(contribution, need)
-            if useful == 0:
-                continue
-            waste = _total(contribution) - useful
-            partial.append(((-useful, waste, size, indices), selected))
-    if complete:
-        return min(complete, key=lambda item: item[0])[1]
-    if partial:
-        return min(partial, key=lambda item: item[0])[1]
-    return ()
+            w = _total(cand.contribution) - u
+            score = (-u, w, cand.index)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_cand = cand
+        if best_cand is None:
+            break
+        selected_list.append(best_cand)
+        remaining_candidates.remove(best_cand)
+        current_need = _remaining_need(current_need, best_cand.contribution)
+
+    return tuple(selected_list)
 
 
 def _sum_stats(values: object) -> ShipStats:

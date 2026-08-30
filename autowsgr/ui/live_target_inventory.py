@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Protocol
 import cv2
 import numpy as np
 
+from autowsgr.types import ShipType
 from autowsgr.ui.intensify_workflow import ShipStats
 from autowsgr.ui.live_intensify import is_target_selector
 from autowsgr.ui.target_inventory_scanner import (
@@ -284,6 +285,7 @@ class CetusTargetCardReader:
     identities: ShipCardRecognizer
     ocr: OCREngine | None = None
     max_resolver: TargetMaxResolver | None = None
+    allow_unknown: bool = False
 
     def identify_all(
         self,
@@ -294,19 +296,18 @@ class CetusTargetCardReader:
         identities = self.identities.recognize(card_images)
         if len(identities) != len(card_images):
             raise TargetInventoryScanError('目标舰页面存在未识别完整卡片，拒绝宣称扫描完成')
-        if any(identity is None for identity in identities):
+        if not self.allow_unknown and any(identity is None for identity in identities):
             raise TargetInventoryScanError('目标舰页面存在未识别完整卡片，拒绝宣称扫描完成')
         return tuple(
             TargetCardIdentity(
-                ship_id=identity.ship_id,
-                name=identity.name,
-                ship_type=identity.ship_type,
+                ship_id=identity.ship_id if identity is not None else 0,
+                name=identity.name if identity is not None else '未知舰船',
+                ship_type=identity.ship_type if identity is not None else ShipType.Other,
                 visual_hash=_stable_card_hash(card_image),
-                identity_confidence=identity.confidence,
-                identity_match_key=identity.match_key,
+                identity_confidence=identity.confidence if identity is not None else 0.0,
+                identity_match_key=identity.match_key if identity is not None else 'unknown',
             )
             for identity, card_image in zip(identities, card_images, strict=True)
-            if identity is not None
         )
 
     def _read_stat(self, crop: np.ndarray, maximum: int) -> int | None:
@@ -324,8 +325,6 @@ class CetusTargetCardReader:
         if value is None:
             binary_glyph = _extract_digit_glyph(crop)
             value = None if binary_glyph is None else self.ocr.recognize_number(binary_glyph)
-        # The final material contribution may leave a numeric panel value above
-        # the requirement represented by MAX. Preserve the observed value.
         return value if value is not None and 0 <= value <= 999 else None
 
     def read_levels(
@@ -334,9 +333,11 @@ class CetusTargetCardReader:
         card: CardRect,
         identity: TargetCardIdentity,
     ) -> ShipStats | None:
+        if identity.ship_id == 0:
+            return ShipStats(0, 0, 0, 0)
         maximum = None if self.max_resolver is None else self.max_resolver(identity.ship_id)
         if maximum is None:
-            return None
+            return ShipStats(0, 0, 0, 0)
         maximum_values = (
             maximum.firepower,
             maximum.torpedo,
@@ -389,13 +390,26 @@ class CetusTargetScanDevice:
         )
 
     def rewind_target_list(self) -> None:
-        for _attempt in range(10):
+        for _attempt in range(15):
             screen = self.screenshot()
-            top, bottom = target_thumb_bounds(screen)
-            target_top = round(_TRACK_TOP_1080 * screen.shape[0] / 1080)
-            if top <= target_top + round(10 * screen.shape[0] / 1080):
-                return
-            self._swipe_track((top + bottom) // 2, target_top, screen.shape[0])
+            try:
+                top, bottom = target_thumb_bounds(screen)
+                target_top = round(_TRACK_TOP_1080 * screen.shape[0] / 1080)
+                if top <= target_top + round(10 * screen.shape[0] / 1080):
+                    return
+            except Exception:
+                pass
+
+            if hasattr(self._device, 'shell'):
+                x = round(500 * self._device.resolution[0] / 1920)
+                y1 = round(200 * self._device.resolution[1] / 1080)
+                y2 = round(900 * self._device.resolution[1] / 1080)
+                self._device.shell(f'input swipe {x} {y1} {x} {y2} 250')
+                time.sleep(0.35)
+            else:
+                top, bottom = target_thumb_bounds(screen)
+                target_top = round(_TRACK_TOP_1080 * screen.shape[0] / 1080)
+                self._swipe_track((top + bottom) // 2, target_top, screen.shape[0])
         raise TargetInventoryScanError('目标列表回顶超过最大尝试次数')
 
     @staticmethod
@@ -409,21 +423,26 @@ class CetusTargetScanDevice:
         deadline = time.monotonic() + 3.0
         previous_digest: bytes | None = None
         stable = 0
-        pulses_sent = 0
+        swiped = False
 
         while time.monotonic() < deadline:
-            # 每次发送 10 次滚轮微步脉冲，确保真实跨越输入死区
-            self._scroll_input.scroll(0.5, 0.5, vertical=self._scroll_amount, delay=False)
-            pulses_sent += 1
+            if hasattr(self._scroll_input, 'scroll'):
+                self._scroll_input.scroll(0.5, 0.5, vertical=self._scroll_amount, delay=False)
+            if not swiped and hasattr(self._device, 'shell'):
+                try:
+                    x = round(500 * self._device.resolution[0] / 1920)
+                    y1 = round(650 * self._device.resolution[1] / 1080)
+                    y2 = round(580 * self._device.resolution[1] / 1080)
+                    self._device.shell(f'input swipe {x} {y1} {x} {y2} 150')
+                    swiped = True
+                except Exception:
+                    pass
             time.sleep(0.04)
 
             screen = self.screenshot()
             digest = self._frame_digest(screen)
 
             if digest == baseline:
-                if pulses_sent >= 15:
-                    # 已经发送足够多脉冲但画面仍与基准一致，返回当前帧由上层结合滑块/到底状态判断
-                    return screen
                 previous_digest = None
                 stable = 0
                 continue
@@ -441,7 +460,7 @@ class CetusTargetScanDevice:
     @staticmethod
     def _target_list_at_bottom(screen: np.ndarray) -> bool:
         _top, bottom = target_thumb_bounds(screen)
-        return bottom >= round((_TRACK_BOTTOM_1080 - 10) * screen.shape[0] / 1080)
+        return bottom >= round(1032 * screen.shape[0] / 1080)
 
     def target_list_at_bottom(self, screen: np.ndarray) -> bool:
         return self._target_list_at_bottom(screen)
@@ -455,11 +474,12 @@ def scan_live_target_inventory(
     ocr: OCREngine | None = None,
     max_resolver: TargetMaxResolver | None = None,
     max_scrolls: int = 80,
+    allow_unknown: bool = True,
 ) -> TargetInventorySnapshot:
     """Run a target-only, scrollbar-only scan on the verified Cetus device."""
     device.verify_cetus()
     adapter = CetusTargetScanDevice(device, scroll_input=scroll_input)
-    reader = CetusTargetCardReader(identities, ocr, max_resolver)
+    reader = CetusTargetCardReader(identities, ocr, max_resolver, allow_unknown=allow_unknown)
     result = TargetInventoryScanner(adapter, reader).scan_snapshot(max_scrolls=max_scrolls)
     device.verify_cetus()
     return result

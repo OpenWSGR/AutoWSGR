@@ -77,7 +77,14 @@ def _near(actual: np.ndarray, expected: tuple[int, int, int], tolerance: float) 
 
 def is_main_screen(screen: np.ndarray) -> bool:
     """Recognize the clean main screen from four independent RGB probes."""
-    return all(_near(_pixel(screen, x, y), color, 30.0) for x, y, color in _MAIN_PROBES)
+    if all(_near(_pixel(screen, x, y), color, 30.0) for x, y, color in _MAIN_PROBES):
+        return True
+    try:
+        from autowsgr.ui.main_page import MainPage
+        match = MainPage.is_current_page(screen)
+        return bool(match.matched)
+    except Exception:
+        return False
 
 
 def is_sidebar_screen(screen: np.ndarray) -> bool:
@@ -87,7 +94,13 @@ def is_sidebar_screen(screen: np.ndarray) -> bool:
         value = _pixel(screen, x, y)
         if _near(value, (57, 57, 57), 30.0) or _near(value, (0, 160, 232), 30.0):
             matches += 1
-    return matches >= 5
+    if matches >= 5:
+        return True
+    try:
+        from autowsgr.ui.sidebar_page import SidebarPage
+        return bool(SidebarPage.is_current_page(screen).matched)
+    except Exception:
+        return False
 
 
 def is_intensify_submenu_screen(screen: np.ndarray) -> bool:

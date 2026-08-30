@@ -96,8 +96,15 @@ class AdbLosslessMaterialDevice:
         self._resolution: tuple[int, int] | None = None
 
     def screenshot(self) -> np.ndarray:
-        image = self._device.screenshot(error_ok=False).convert('RGB')
-        return np.asarray(image, dtype=np.uint8)
+        last_error = None
+        for _ in range(3):
+            try:
+                image = self._device.screenshot(error_ok=False).convert('RGB')
+                return np.asarray(image, dtype=np.uint8)
+            except Exception as err:
+                last_error = err
+                time.sleep(0.1)
+        raise MaterialInventoryScanError(f'ADB 截图失败: {last_error}') from last_error
 
     def shell(self, command: str) -> str:
         result = self._device.shell(command)

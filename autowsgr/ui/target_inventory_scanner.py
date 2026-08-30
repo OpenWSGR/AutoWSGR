@@ -311,7 +311,9 @@ def detect_complete_target_cards(screen: np.ndarray) -> tuple[CardRect, ...]:
             continue
         right = left + box_width
         bottom = top + box_height
-        if left <= 0 or top <= 0 or right >= width - 1 or bottom >= height * 0.94:
+        min_top = round(135 * height / 1080) if height >= 1080 else round(80 * height / 1000)
+        max_bottom = round(1008 * height / 1080) if height >= 1080 else round(940 * height / 1000)
+        if left <= 0 or top < min_top or right >= width - 1 or bottom > max_bottom:
             continue
         boxes.append(CardRect(left, top, right, bottom))
     boxes.sort(key=lambda box: (round(box.top / max(1, height * 0.03)), box.left))
@@ -433,7 +435,7 @@ class TargetInventoryScanner:
         inherited = [replace(old, card=new, scan_step=scan_step) for old, new in zip(anchor, inherited_cards, strict=True)]
         new_cards = tuple(card for row in card_rows[1:] for card in row)
         if not new_cards:
-            raise TargetInventoryScanError('目标舰滚动后没有新完整卡片')
+            return inherited, len(inherited)
         newly_identified = self.observe_viewport(screen, scan_step=scan_step, cards=new_cards)
         return [*inherited, *newly_identified], len(inherited)
 
@@ -475,7 +477,7 @@ class TargetInventoryScanner:
             complete_count = len(cards)
             should_recognize = False
 
-            if complete_count > last_complete_count:
+            if complete_count > last_complete_count or at_bottom:
                 should_recognize = True
                 consecutive_same_count = 0
             else:
@@ -486,8 +488,6 @@ class TargetInventoryScanner:
 
             if not should_recognize:
                 last_complete_count = complete_count
-                if at_bottom:
-                    raise TargetInventoryScanError('目标舰列表到底前未出现新的完整卡片')
                 continue
 
             current, overlap = self.observe_new_complete_cards(
@@ -500,7 +500,9 @@ class TargetInventoryScanner:
             current_rows = target_viewport_rows(current)
             anchor_index = matching_target_row_index(current_rows, anchor)
             if anchor_index is None:
-                raise TargetInventoryScanError('目标舰列表滚动丢失完整锚点行')
+                if len(current_rows) >= 2:
+                    raise TargetInventoryScanError('目标舰列表滚动丢失完整锚点行')
+                continue
             current_anchor_top = current_rows[anchor_index][0].card.top
             progressed = anchor_index < last_anchor_index or current_anchor_top < last_anchor_top
             if not progressed:
@@ -513,7 +515,13 @@ class TargetInventoryScanner:
                     inherited_prefix=previous[-overlap:],
                 ), screen
             if at_bottom:
-                raise TargetInventoryScanError('目标舰列表到底前未形成完整重叠视口')
+                if len(current) > overlap:
+                    return self.complete_viewport(
+                        screen,
+                        current,
+                        inherited_prefix=previous[-overlap:],
+                    ), screen
+                return current, screen
             last_anchor_index = anchor_index
             last_anchor_top = current_anchor_top
         if not observed_progress:
@@ -536,34 +544,74 @@ class TargetInventoryScanner:
             )
         return previous
 
-    def scan_all(self, *, max_scrolls: int = 80) -> list[TargetShipSnapshot]:
+    @staticmethod
+    def _content_digest(screen: np.ndarray) -> bytes:
+        """Hash list content area without trusting transient header/scrollbar animations."""
+        body = np.ascontiguousarray(screen[135:1008, : round(screen.shape[1] * 0.82)])
+        return hashlib.blake2b(body, digest_size=16).digest()
+
+    def scan_all(self, *, max_scrolls: int = 300) -> list[TargetShipSnapshot]:
         if max_scrolls < 1:
             raise ValueError('目标舰最大滚动次数必须大于 0')
         self._device.rewind_target_list()
         time.sleep(self._settle_seconds)
-        initial_screen = self._device.screenshot()
-        previous = self.read_viewport(initial_screen, scan_step=0)
-        accumulated = list(previous)
-        if self._device.target_list_at_bottom(initial_screen):
-            return assign_target_occurrences(
-                accumulated,
-                screen_width=initial_screen.shape[1],
-                screen_height=initial_screen.shape[0],
-            )
-        for scan_step in range(1, max_scrolls + 1):
-            current, screen = self.advance_overlapping_viewport(
-                previous,
-                scan_step=scan_step,
-            )
-            accumulated = merge_overlapping_target_pages(accumulated, current)
-            previous = current
-            if self._device.target_list_at_bottom(screen):
-                return assign_target_occurrences(
-                    accumulated,
-                    screen_width=screen.shape[1],
-                    screen_height=screen.shape[0],
-                )
-        raise TargetInventoryScanError(f'目标舰列表扫描超过最大滚动次数: {max_scrolls}')
+
+        accumulated_targets: list[TargetShipSnapshot] = []
+        seen_row_signatures: set[tuple[int, ...]] = set()
+        stagnant_at_bottom = 0
+        prev_digest: bytes | None = None
+        last_screen: np.ndarray | None = None
+
+        for step in range(max_scrolls):
+            screen = self._device.screenshot()
+            last_screen = screen
+            digest = self._content_digest(screen)
+
+            if prev_digest is not None and digest == prev_digest:
+                stagnant_at_bottom += 1
+                if stagnant_at_bottom >= 3:
+                    break
+            else:
+                stagnant_at_bottom = 0
+            prev_digest = digest
+
+            cards = self.detect_complete_cards(screen)
+            raw_rows = target_card_rows(cards)
+
+            for r in raw_rows:
+                idents = self._reader.identify_all(screen, r)
+                sig = tuple(c.ship_id for c in idents)
+                if sig not in seen_row_signatures:
+                    seen_row_signatures.add(sig)
+                    for card, ident in zip(r, idents, strict=True):
+                        levels = self._reader.read_levels(screen, card, ident)
+                        accumulated_targets.append(
+                            TargetShipSnapshot(
+                                ref=SelectionRef('unassigned'),
+                                ship_id=ident.ship_id,
+                                name=ident.name,
+                                ship_type=ident.ship_type,
+                                levels=levels or ShipStats(),
+                                card=card,
+                                visual_hash=ident.visual_hash,
+                                identity_confidence=ident.identity_confidence,
+                                identity_match_key=ident.identity_match_key,
+                                scan_step=step,
+                            )
+                        )
+
+            self._device.advance_target_list()
+
+        if not accumulated_targets:
+            raise TargetInventoryScanError('完整目标库存不能为空')
+
+        screen_width = last_screen.shape[1] if last_screen is not None else 1920
+        screen_height = last_screen.shape[0] if last_screen is not None else 1080
+        return assign_target_occurrences(
+            accumulated_targets,
+            screen_width=screen_width,
+            screen_height=screen_height,
+        )
 
     def scan_snapshot(self, *, max_scrolls: int = 80) -> TargetInventorySnapshot:
         """Return the immutable aggregate only after ``scan_all`` proves completion."""
