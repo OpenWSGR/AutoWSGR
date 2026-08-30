@@ -133,10 +133,55 @@ async def intensify_snapshot_preview(
 
 @router.post('/api/intensify', response_model=ApiResponse)
 @exclusive_device_operation('api:intensify')
-async def intensify_action(request: IntensifyRequest) -> ApiResponse:
-    """Fail closed until all irreversible-operation semantic evidence is available."""
-    _log.warning('[API] 强化执行被安全边界拒绝: target={}', request.target_ship)
-    return ApiResponse(success=False, error=_INTENSIFY_UNAVAILABLE)
+async def intensify_action(request: IntensifyRequest | None = None) -> ApiResponse:
+    """执行自动强化流程（持有设备独占 Lease）。"""
+    try:
+        ctx = get_context()
+    except RuntimeError:
+        return ApiResponse(success=False, error=_INTENSIFY_UNAVAILABLE)
+
+    from autowsgr.ops.intensify import auto_intensify
+
+    try:
+        result = await asyncio.to_thread(auto_intensify, ctx)
+        return ApiResponse(
+            success=result.success,
+            data={
+                'totalBatches': result.total_batches,
+                'totalMaterialsUsed': result.total_materials_used,
+                'elapsedSeconds': result.elapsed_seconds,
+                'batches': [
+                    {
+                        'targetName': b.target_name,
+                        'targetIndex': b.target_index,
+                        'materials': b.materials,
+                        'gains': {
+                            'firepower': b.gains.firepower,
+                            'torpedo': b.gains.torpedo,
+                            'armor': b.gains.armor,
+                            'antiAir': b.gains.anti_air,
+                        },
+                        'statsBefore': {
+                            'firepower': b.stats_before.firepower,
+                            'torpedo': b.stats_before.torpedo,
+                            'armor': b.stats_before.armor,
+                            'antiAir': b.stats_before.anti_air,
+                        },
+                        'statsAfter': {
+                            'firepower': b.stats_after.firepower,
+                            'torpedo': b.stats_after.torpedo,
+                            'armor': b.stats_after.armor,
+                            'antiAir': b.stats_after.anti_air,
+                        },
+                    }
+                    for b in result.batches
+                ],
+            },
+            message=result.message,
+        )
+    except Exception as e:
+        _log.opt(exception=True).warning('[API] 自动强化失败: {}', e)
+        return ApiResponse(success=False, error=str(e))
 
 
 # ── 远征收取 ──
