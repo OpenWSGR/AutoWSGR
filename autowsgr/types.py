@@ -382,6 +382,19 @@ class DestroyShipWorkMode(IntEnum):
     """拆除指定舰种以外的所有舰种"""
 
 
+class DockFullAction(IntEnum):
+    """船坞满处理模式。"""
+
+    disable = 0
+    """关闭（不处理）"""
+    destroy = 1
+    """自动解装"""
+    intensify = 2
+    """自动强化"""
+    auto = 3
+    """自动混合（先强化后解装）"""
+
+
 class ConditionFlag(StrEnum):
     """战斗流程状态标记。"""
 

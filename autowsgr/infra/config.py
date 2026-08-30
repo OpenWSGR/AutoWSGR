@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import (
     DestroyShipWorkMode,
+    DockFullAction,
     EmulatorType,
     GameAPP,
     OcrMirror,
@@ -388,12 +389,39 @@ class UserConfig(BaseModel):
     """UI 操作后随机延迟下界 (秒)。兼容层把 classic 的 delay 同时迁为本字段与 _max。"""
     operation_delay_max: float = 0.0
     """UI 操作后随机延迟上界 (秒)。"""
+    dock_full_mode: DockFullAction = DockFullAction.auto
+    """船坞满处理模式: 0=关闭, 1=解装, 2=强化, 3=自动(先强化后解装)"""
     dock_full_destroy: bool = True
-    """船坞满时自动清空"""
+    """兼容旧版布尔字段"""
     repair_manually: bool = False
     """是否手动修理"""
     bathroom_count: int = 2
     """修理位置总数 (≤12)。预留:智能浴场空位调度用。"""
+
+    @field_validator('dock_full_mode', mode='before')
+    @classmethod
+    def _coerce_dock_full_mode(cls, v: object) -> object:
+        """允许用中文别名或英文成员名指定船坞满处理模式。"""
+        _alias: dict[str, int] = {
+            '关闭': 0,
+            'disable': 0,
+            '解装': 1,
+            'destroy': 1,
+            '强化': 2,
+            'intensify': 2,
+            '自动': 3,
+            'auto': 3,
+            '混合': 3,
+        }
+        if isinstance(v, bool):
+            return 1 if v else 0
+        if isinstance(v, str):
+            key = v.strip()
+            if key in _alias:
+                return _alias[key]
+            if key.isdigit():
+                return int(key)
+        return v
 
     # 解装设置
     destroy_ship_work_mode: DestroyShipWorkMode = DestroyShipWorkMode.disable

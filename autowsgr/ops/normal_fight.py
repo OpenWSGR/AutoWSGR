@@ -457,26 +457,45 @@ class NormalFightRunner:
         标志会让触发器把未打的轮次计入次数。改置 ``dock_full_destroyed``,
         由触发器/调度器识别"解装完毕、可重试"与"无法解装、须停止"。
         """
-        if self._dock_full_destroy:
+        mode = getattr(self._ctx.config, 'dock_full_mode', None)
+        if mode is None:
+            mode = 1 if self._dock_full_destroy else 0
+        mode_val = int(mode)
+
+        if mode_val == 0:
+            _log.warning('[OPS] 船坞已满, 未开启自动处理')
+            return
+
+        # 模式 2 (强化) 或 模式 3 (自动/先强化后解装): 先执行自动强化
+        if mode_val in (2, 3):
+            from autowsgr.ops.intensify import auto_intensify
+
+            _log.warning('[OPS] 船坞已满，执行自动强化...')
+            try:
+                intensify_res = auto_intensify(self._ctx)
+                if intensify_res.total_materials_used > 0:
+                    _log.info('[OPS] 自动强化完成，消耗 {} 艘素材', intensify_res.total_materials_used)
+                    result.dock_full_destroyed = True
+            except Exception as e:
+                _log.warning('[OPS] 自动强化失败或无可消耗素材: {}', e)
+
+        # 模式 1 (解装) 或 模式 3 (自动/混合): 执行自动解装
+        if mode_val in (1, 3):
             from autowsgr.ops.destroy import destroy_ships_auto
 
-            _log.warning('[OPS] 船坞已满，执行自动解装 (弹窗直达)')
+            _log.warning('[OPS] 执行自动解装 (弹窗直达)...')
             try:
                 destroyed = destroy_ships_auto(self._ctx, from_dialog=True)
+                if destroyed:
+                    result.dock_full_destroyed = True
             except NavigationError as e:
                 _log.error('[OPS] 弹窗直达解装失败: {}, 回退主页面', e)
                 try:
                     goto_page(self._ctx, PageName.MAIN)
                 except NavigationError as back_err:
                     _log.error('[OPS] 返回主页面失败: {}', back_err)
-                return  # 解装未执行, 保持 DOCK_FULL 且未置 destroyed, 由上层停止
-            if destroyed:
-                # 解装成功 (结束在主页面), 下轮 run 重新导航进图出击
-                result.dock_full_destroyed = True
-            # destroyed=False: 白名单覆盖全部舰种, 无可解装对象, 保持 DOCK_FULL
+                return
             return
-
-        _log.warning('[OPS] 船坞已满, 未开启自动解装')
         # result.flag 保持 DOCK_FULL, 由 run_for_times 终止循环
 
 
