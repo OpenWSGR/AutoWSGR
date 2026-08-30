@@ -252,7 +252,7 @@ class FixedMaterialOperator:
         for _step in range(parsed.viewport_steps):
             screen = self._device.screenshot()
             thumb = self._stepper.thumb_bounds(screen)
-            self._stepper.advance(thumb_bottom=thumb[1], screen_height=screen.shape[0])
+            self._stepper.advance(thumb_bounds=thumb, screen_height=screen.shape[0])
             time.sleep(0.8)
             moved = self._device.screenshot()
             if not is_material_selector_screen(moved) or has_selected_material(moved):
