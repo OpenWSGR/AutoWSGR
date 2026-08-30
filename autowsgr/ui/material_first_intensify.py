@@ -116,7 +116,21 @@ def is_intensify_submenu_screen(screen: np.ndarray) -> bool:
     ]
     first_white_ratio = float(np.mean(np.min(first_option, axis=2) > 200))
     second_white_ratio = float(np.mean(np.min(second_option, axis=2) > 200))
-    return is_sidebar_screen(screen) and first_white_ratio >= 0.60 and second_white_ratio >= 0.60
+    return is_sidebar_screen(screen) and (first_white_ratio >= 0.40 and second_white_ratio >= 0.40)
+
+
+def _enter_intensify_home_after_main(self) -> np.ndarray:
+    """Continue the verified navigation after MAIN has already been proven."""
+    self._ctrl.click(*_CLICK_OPEN_SIDEBAR)
+    self._wait_stable(MaterialFirstState.SIDEBAR, is_sidebar_screen)
+
+    self._ctrl.click(*_CLICK_SIDEBAR_INTENSIFY)
+    self._wait_stable(
+        MaterialFirstState.INTENSIFY_SUBMENU,
+        is_intensify_submenu_screen,
+    )
+    self._ctrl.click(*_CLICK_INTENSIFY_SUBMENU)
+    return self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
 
 
 def is_intensify_home_screen(screen: np.ndarray) -> bool:
@@ -223,14 +237,17 @@ class MaterialFirstIntensifyController:
         """Continue the verified navigation after MAIN has already been proven."""
 
         self._ctrl.click(*_CLICK_OPEN_SIDEBAR)
+        time.sleep(0.3)
         self._wait_stable(MaterialFirstState.SIDEBAR, is_sidebar_screen)
 
         self._ctrl.click(*_CLICK_SIDEBAR_INTENSIFY)
+        time.sleep(0.5)
         self._wait_stable(
             MaterialFirstState.INTENSIFY_SUBMENU,
             is_intensify_submenu_screen,
         )
         self._ctrl.click(*_CLICK_INTENSIFY_SUBMENU)
+        time.sleep(1.0)
         return self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
 
     def ensure_intensify_home(self) -> np.ndarray:
