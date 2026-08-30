@@ -97,8 +97,10 @@ def auto_intensify(
 
     # 1. 准备环境依赖
     serial = getattr(ctx.config.emulator, 'serial', None)
-    if not serial:
-        raise RuntimeError('自动强化必须配置明确的 emulator.serial')
+    if (not isinstance(serial, str) or not serial.strip()) and ctx.ctrl is not None:
+        serial = getattr(ctx.ctrl, 'serial', None)
+    if not isinstance(serial, str) or not serial.strip():
+        raise RuntimeError('自动强化必须连接有效的模拟器设备')
 
     device = AdbLosslessMaterialDevice(serial)
     device.verify_cetus()

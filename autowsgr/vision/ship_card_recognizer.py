@@ -311,6 +311,9 @@ class WsgNccShipCardRecognizer:
         use_gpu: bool = False,
     ) -> WsgNccShipCardRecognizer:
         root = Path(data_root)
+        python_pkg = root / 'python'
+        if python_pkg.is_dir() and str(python_pkg) not in sys.path:
+            sys.path.insert(0, str(python_pkg))
         if root.is_file() and root.suffix.lower() == '.zip':
             with zipfile.ZipFile(root) as archive:
                 try:
@@ -342,9 +345,17 @@ def load_default_ship_card_recognizer() -> WsgNccShipCardRecognizer:
     data_root = os.getenv('AUTOWSGR_WSG_NCC_DATA', '').strip()
     library_root = os.getenv('AUTOWSGR_SHIP_LIBRARY', '').strip()
     if not data_root:
-        raise ShipCardRecognitionError('未设置 AUTOWSGR_WSG_NCC_DATA')
+        default_ncc = Path(r'E:\wsgrgui\resource\wsg-ncc')
+        if default_ncc.is_dir():
+            data_root = str(default_ncc)
+        else:
+            raise ShipCardRecognitionError('未设置 AUTOWSGR_WSG_NCC_DATA')
     if not library_root:
-        raise ShipCardRecognitionError('未设置 AUTOWSGR_SHIP_LIBRARY')
+        default_lib = Path(r'E:\wsgrgui\resource\ship-library')
+        if default_lib.is_dir():
+            library_root = str(default_lib)
+        else:
+            raise ShipCardRecognitionError('未设置 AUTOWSGR_SHIP_LIBRARY')
     use_gpu = os.getenv('AUTOWSGR_WSG_NCC_GPU', '').strip().lower() in {'1', 'true', 'yes'}
     return WsgNccShipCardRecognizer.from_data_root(
         data_root,
