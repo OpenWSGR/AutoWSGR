@@ -620,8 +620,19 @@ class MaterialInventoryScanner:
         for viewport_count in range(1, max_viewports + 1):
             stable_screens = self._stable_screens()
             screen = stable_screens[-1]
-            if viewport_count == 1 and not self._stepper.is_top(screen):
-                raise MaterialInventoryScanError('素材扫描必须从滚动条顶部开始')
+            if viewport_count == 1:
+                # 检查素材库是否为空（0 艘素材）
+                if not self._reader.locate_name_bands(screen):
+                    _log.info('[OPS] 素材库当前为空 (0 艘素材)')
+                    return MaterialInventorySnapshot(
+                        names=(),
+                        ship_ids=(),
+                        total=0,
+                        viewport_count=0,
+                        refs=(),
+                    )
+                if not self._stepper.is_top(screen):
+                    raise MaterialInventoryScanError('素材扫描必须从滚动条顶部开始')
             captured = self._reader.capture_best(stable_screens)
             thumb_bounds = self._stepper.thumb_bounds(screen)
             thumb_bottom = thumb_bounds[1]
