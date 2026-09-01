@@ -32,8 +32,8 @@ class IntensifySnapshotScanService:
         try:
             targets, materials = self.scan_inventory_pair()
         except (OSError, RuntimeError, TypeError, ValueError) as error:
-            raise IntensifySnapshotScanError('强化双库存扫描失败，未创建快照会话') from error
+            raise IntensifySnapshotScanError(f'强化双库存扫描失败 ({error})，未创建快照会话') from error
         try:
             return self.snapshot_store.create(targets, materials)
         except (TypeError, ValueError) as error:
-            raise IntensifySnapshotScanError('强化库存快照无效，未创建快照会话') from error
+            raise IntensifySnapshotScanError(f'强化库存快照无效 ({error})，未创建快照会话') from error

@@ -83,6 +83,7 @@ def get_intensify_snapshot_scan_service(context: object) -> IntensifySnapshotSca
             scroll_input=ctrl,
             ocr=getattr(context, 'ocr', None),
             max_resolver=max_resolver,
+            ctx=context,
         )
 
     return IntensifySnapshotScanService(get_intensify_snapshot_store(), scan)

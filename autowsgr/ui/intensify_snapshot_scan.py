@@ -53,13 +53,13 @@ class IntensifySnapshotNavigator:
         self._interval = interval
         self._stable_frames = stable_frames
 
-    def ensure_home(self) -> None:
+    def ensure_home(self, ctx: object | None = None) -> None:
         MaterialFirstIntensifyController(
             self._device,
             timeout=self._timeout,
             interval=self._interval,
             stable_frames=self._stable_frames,
-        ).ensure_intensify_home()
+        ).ensure_intensify_home(ctx=ctx)
 
     def open_target_selector(self) -> None:
         self._transition_from_home(self._TARGET_SLOT, IntensifyUiState.TARGET_SELECTOR)
@@ -139,11 +139,12 @@ def scan_intensify_inventory_pair(
     max_resolver: TargetMaxResolver,
     max_target_scrolls: int = 80,
     max_material_viewports: int = 24,
+    ctx: object | None = None,
 ) -> tuple[TargetInventorySnapshot, MaterialInventorySnapshot]:
     """Create both complete snapshots before returning either to the server store."""
     device.verify_cetus()
     navigator = IntensifySnapshotNavigator(device)
-    navigator.ensure_home()
+    navigator.ensure_home(ctx=ctx)
     navigator.open_material_selector()
     materials = _scan_and_close_selector(
         lambda: scan_material_inventory_from_selector(
