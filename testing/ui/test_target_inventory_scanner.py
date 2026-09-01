@@ -410,10 +410,20 @@ def test_advance_default_budget_forms_viewport_from_incremental_anchor_progress(
     scanner = TargetInventoryScanner(device, _Reader(), settle_seconds=0)
     # 前 239 次只有 7 张完整卡，最后一次变为 14 张完整卡
     scanner.detect_complete_cards = MagicMock(
-        side_effect=(*(_cards(anchor) for _ in range(TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS - 1)), _cards(current))
+        side_effect=(
+            *(_cards(anchor) for _ in range(TARGET_LOGICAL_VIEWPORT_MAX_PHYSICAL_INPUTS - 1)),
+            _cards(current),
+        )
     )
+
     # 模拟定期触发 WSG-NCC 时返回 anchor 且 top 不断向上移动产生 progress
-    def fake_observe(screen, prev, cards, scan_step=1):
+    def fake_observe(
+        screen: np.ndarray,
+        prev: object,
+        cards: object,
+        scan_step: int = 1,
+    ) -> tuple[list[TargetShipSnapshot], int]:
+        _ = (prev, cards, scan_step)
         if int(screen[0, 0, 0]) == 7:  # 第 8 次识别时满足 anchor_index == 0
             return (current, 7)
         # 产生一个位置逐渐变小的 anchor 行

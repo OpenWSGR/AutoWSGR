@@ -242,9 +242,7 @@ def test_adb_stepper_only_drags_inside_observed_scrollbar_thumb(
 
     stepper.advance(thumb_bounds=thumb_bounds, screen_height=1080)
 
-    ctrl.shell.assert_called_once_with(
-        f'input swipe 1580 {expected_start} 1580 {expected_end} 300'
-    )
+    ctrl.shell.assert_called_once_with(f'input swipe 1580 {expected_start} 1580 {expected_end} 300')
     assert thumb_bounds[0] <= expected_start < expected_end < thumb_bounds[1]
 
 

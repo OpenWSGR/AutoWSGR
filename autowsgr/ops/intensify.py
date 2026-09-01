@@ -40,6 +40,7 @@ from autowsgr.ui.intensify_workflow import (
     TargetObservation,
 )
 from autowsgr.ui.live_intensify import (
+    IntensifyHomePanelObservation,
     is_intensify_confirmation,
     read_intensify_home_panel,
 )
@@ -57,6 +58,7 @@ from autowsgr.vision.ship_card_recognizer import load_default_ship_card_recogniz
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
+    from autowsgr.ui.target_inventory_scanner import TargetInventorySnapshot
 
 _log = get_logger('ops.intensify')
 
@@ -153,7 +155,7 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
     maximum_rarity: int = 6,
 ) -> AutoIntensifyExecutionResult:
     """执行完整的自动化强化全流程。"""
-    global _session_target_inventory_baseline
+    global _session_target_inventory_baseline  # noqa: PLW0603
     t_start = time.monotonic()
     _log.info('[OPS] 开始自动强化')
 
@@ -167,8 +169,12 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
     device = AdbLosslessMaterialDevice(serial)
     device.verify_cetus()
 
-    strengthen_data_path = Path(os.getenv('AUTOWSGR_STRENGTHEN_DATA', r'E:\wsgrgui\resource\strengthen.json'))
-    ship_library_path = Path(os.getenv('AUTOWSGR_SHIP_LIBRARY', r'E:\wsgrgui\resource\ship-library'))
+    strengthen_data_path = Path(
+        os.getenv('AUTOWSGR_STRENGTHEN_DATA', r'E:\wsgrgui\resource\strengthen.json')
+    )
+    ship_library_path = Path(
+        os.getenv('AUTOWSGR_SHIP_LIBRARY', r'E:\wsgrgui\resource\ship-library')
+    )
 
     identities = load_default_ship_card_recognizer(
         use_gpu=resolve_ocr_gpu_enabled(ctx.config.ocr.gpu)
@@ -188,7 +194,9 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
         maximum_materials = saved_policy.max_materials
     if isinstance(protected_material_identities, _UnsetPolicyOption):
         protected_material_identities = frozenset(saved_policy.protected_ships)
-    if not reuse_target_inventory_baseline and getattr(saved_policy, 'reuse_target_inventory_baseline', False):
+    if not reuse_target_inventory_baseline and getattr(
+        saved_policy, 'reuse_target_inventory_baseline', False
+    ):
         reuse_target_inventory_baseline = True
 
     # 2. 导航到强化首页
@@ -202,7 +210,9 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
         and _session_target_inventory_baseline.targets
     ):
         targets_snapshot = _session_target_inventory_baseline
-        _log.info('[OPS] 复用目标库扫描基线 (共 {} 艘目标)，执行素材库单扫描...', targets_snapshot.total)
+        _log.info(
+            '[OPS] 复用目标库扫描基线 (共 {} 艘目标)，执行素材库单扫描...', targets_snapshot.total
+        )
         from autowsgr.ui.intensify_snapshot_scan import (
             IntensifySnapshotNavigator,
             _scan_and_close_selector,
@@ -216,7 +226,11 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
             nav.close_material_selector,
             label='素材库存',
         )
-        _log.info('[OPS] 素材库单扫描完成: 目标 {} 艘(复用), 素材 {} 艘', targets_snapshot.total, materials_snapshot.total)
+        _log.info(
+            '[OPS] 素材库单扫描完成: 目标 {} 艘(复用), 素材 {} 艘',
+            targets_snapshot.total,
+            materials_snapshot.total,
+        )
     else:
         _log.info('[OPS] 执行双库存全量扫描...')
         targets_snapshot, materials_snapshot = scan_intensify_inventory_pair(
@@ -403,7 +417,9 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
 
             if not is_intensify_home_screen(device.screenshot()):
                 # 容错：如果该目标处于远征中不可选，则跳过该目标
-                _log.warning('[OPS] 目标 {} 无法选中 (可能在远征中)，跳过该目标', batch.target.identity)
+                _log.warning(
+                    '[OPS] 目标 {} 无法选中 (可能在远征中)，跳过该目标', batch.target.identity
+                )
                 planning_targets = [t for t in planning_targets if t.index != batch.target_index]
                 navigator.close_target_selector()
                 current_selected_target_index = None
@@ -415,10 +431,10 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
         time.sleep(0.5)
 
         from autowsgr.ui.material_inventory_scanner import (
-            MaterialViewportReader,
-            _COLUMN_LEFTS_1920,
-            _CARD_WIDTH_1920,
             _CARD_HEIGHT_1080,
+            _CARD_WIDTH_1920,
+            _COLUMN_LEFTS_1920,
+            MaterialViewportReader,
         )
 
         reader = MaterialViewportReader(identities)
@@ -467,7 +483,9 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
                     vps = reader.recognize_captures([cap])
                     if vps and vps[0].positions:
                         vp = vps[0]
-                        for pos, name, _sid in zip(vp.positions, vp.names, vp.ship_ids):
+                        for pos, name, _sid in zip(
+                            vp.positions, vp.names, vp.ship_ids, strict=False
+                        ):
                             if name == m.identity and m not in selected_this_batch:
                                 _r, _c, x, y = pos
                                 device.click(x, y)
@@ -475,8 +493,8 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
                                 selected_this_batch.append(m)
                                 clicked = True
                                 break
-                except Exception:
-                    pass
+                except Exception as err:
+                    _log.debug('素材本地兜底匹配异常: {}', err)
 
         device.click(*_CLICK_MATERIAL_CONFIRM)
         time.sleep(1.2)
@@ -555,17 +573,21 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
         max_stats = max_resolver(targets_snapshot.targets[batch.target_index].ship_id)
         from autowsgr.ui.live_intensify import is_home_target_fully_maxed
 
-        fully_maxed = (
-            max_stats is not None
-            and is_home_target_fully_maxed(s_final, max_stats, ctx.ocr)
+        fully_maxed = max_stats is not None and is_home_target_fully_maxed(
+            s_final, max_stats, ctx.ocr
         )
 
-        current_target_item = next((t for t in planning_targets if t.index == batch.target_index), None)
+        current_target_item = next(
+            (t for t in planning_targets if t.index == batch.target_index), None
+        )
         if current_target_item is not None:
             actual_contribution = _sum_stats(m.contribution for m in actual_mats)
             req = _remaining_need(current_target_item.required_contribution, actual_contribution)
             if fully_maxed or req == ShipStats(0, 0, 0, 0):
-                _log.info('[OPS] 目标 {} 全部属性已强化满（右侧面板全部 MAX），从目标列表中移出', batch.target.identity)
+                _log.info(
+                    '[OPS] 目标 {} 全部属性已强化满（右侧面板全部 MAX），从目标列表中移出',
+                    batch.target.identity,
+                )
                 maxed_index = batch.target_index
                 planning_targets = [
                     replace(t, index=t.index - 1) if t.index > maxed_index else t

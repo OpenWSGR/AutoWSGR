@@ -15,13 +15,13 @@ from autowsgr.infra import (
     OCRConfig,
     UserConfig,
 )
+from autowsgr.infra.config import resolve_ocr_gpu_enabled
 from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
     OSType,
     RepairMode,
 )
-from autowsgr.infra.config import resolve_ocr_gpu_enabled
 
 
 @pytest.fixture(autouse=True)

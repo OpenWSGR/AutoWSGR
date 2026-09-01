@@ -13,6 +13,7 @@ import numpy as np
 from autowsgr.infra.logger import get_logger
 from autowsgr.ui.intensify_workflow import SelectionRef, ShipStats
 
+
 _log = get_logger('ops.intensify')
 
 
@@ -437,7 +438,10 @@ class TargetInventoryScanner:
             for old, new in zip(anchor, inherited_cards, strict=True)
         ):
             raise TargetInventoryScanError('目标舰新视口首行与上一完整锚点行横向位置不一致')
-        inherited = [replace(old, card=new, scan_step=scan_step) for old, new in zip(anchor, inherited_cards, strict=True)]
+        inherited = [
+            replace(old, card=new, scan_step=scan_step)
+            for old, new in zip(anchor, inherited_cards, strict=True)
+        ]
         new_cards = tuple(card for row in card_rows[1:] for card in row)
         if not new_cards:
             return inherited, len(inherited)
@@ -449,7 +453,7 @@ class TargetInventoryScanner:
         observed = self.observe_viewport(screen, scan_step=scan_step)
         return self.complete_viewport(screen, observed)
 
-    def advance_overlapping_viewport(
+    def advance_overlapping_viewport(  # noqa: PLR0912
         self,
         previous: list[TargetShipSnapshot],
         *,
@@ -592,7 +596,10 @@ class TargetInventoryScanner:
                     if callable(reader_batch):
                         row_levels = reader_batch(screen, r, idents)
                     else:
-                        row_levels = [self._reader.read_levels(screen, c, i) for c, i in zip(r, idents, strict=True)]
+                        row_levels = [
+                            self._reader.read_levels(screen, c, i)
+                            for c, i in zip(r, idents, strict=True)
+                        ]
                     for card, ident, levels in zip(r, idents, row_levels, strict=True):
                         accumulated_targets.append(
                             TargetShipSnapshot(
@@ -611,7 +618,11 @@ class TargetInventoryScanner:
                         )
 
             if step % 3 == 0 or stagnant_at_bottom > 0:
-                _log.info('[OPS] 扫描目标库存: 滚动第 {} 步, 已识别 {} 艘目标', step + 1, len(accumulated_targets))
+                _log.info(
+                    '[OPS] 扫描目标库存: 滚动第 {} 步, 已识别 {} 艘目标',
+                    step + 1,
+                    len(accumulated_targets),
+                )
 
             self._device.advance_target_list()
 

@@ -69,7 +69,7 @@ def _install_auto_intensify_fakes(
         def __init__(self, _device: object) -> None:
             return None
 
-        def ensure_intensify_home(self, ctx: object | None = None) -> None:
+        def ensure_intensify_home(self, ctx: object | None = None) -> None:  # noqa: ARG002
             return None
 
     class FakeSnapshotNavigator:
@@ -95,7 +95,9 @@ def _install_auto_intensify_fakes(
 
     monkeypatch.setattr(intensify, 'AdbLosslessMaterialDevice', lambda _serial: FakeDevice())
     monkeypatch.setattr(intensify, 'MaterialFirstIntensifyController', FakeNavigationController)
-    monkeypatch.setattr(intensify_snapshot_scan, 'IntensifySnapshotNavigator', FakeSnapshotNavigator)
+    monkeypatch.setattr(
+        intensify_snapshot_scan, 'IntensifySnapshotNavigator', FakeSnapshotNavigator
+    )
     recognized_gpu_modes: list[bool] = []
 
     def load_recognizer(*, use_gpu: bool) -> object:
@@ -131,7 +133,9 @@ def _install_auto_intensify_fakes(
         'material_inventory_observation',
         lambda *_args: inventory,
     )
-    monkeypatch.setattr(intensify, 'is_intensify_home_screen', lambda _screen: next(target_selectable))
+    monkeypatch.setattr(
+        intensify, 'is_intensify_home_screen', lambda _screen: next(target_selectable)
+    )
     monkeypatch.setattr(intensify, 'read_intensify_home_panel', lambda *_args: next(panel_results))
     monkeypatch.setattr(intensify, 'is_intensify_confirmation', lambda _screen: False)
     monkeypatch.setattr(intensify, 'goto_page', lambda *_args: None)

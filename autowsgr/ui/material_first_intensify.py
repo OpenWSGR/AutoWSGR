@@ -81,6 +81,7 @@ def is_main_screen(screen: np.ndarray) -> bool:
         return True
     try:
         from autowsgr.ui.main_page import MainPage
+
         match = MainPage.is_current_page(screen)
         return bool(match.matched)
     except Exception:
@@ -98,6 +99,7 @@ def is_sidebar_screen(screen: np.ndarray) -> bool:
         return True
     try:
         from autowsgr.ui.sidebar_page import SidebarPage
+
         return bool(SidebarPage.is_current_page(screen).matched)
     except Exception:
         return False
@@ -117,20 +119,6 @@ def is_intensify_submenu_screen(screen: np.ndarray) -> bool:
     first_white_ratio = float(np.mean(np.min(first_option, axis=2) > 200))
     second_white_ratio = float(np.mean(np.min(second_option, axis=2) > 200))
     return is_sidebar_screen(screen) and (first_white_ratio >= 0.40 and second_white_ratio >= 0.40)
-
-
-def _enter_intensify_home_after_main(self) -> np.ndarray:
-    """Continue the verified navigation after MAIN has already been proven."""
-    self._ctrl.click(*_CLICK_OPEN_SIDEBAR)
-    self._wait_stable(MaterialFirstState.SIDEBAR, is_sidebar_screen)
-
-    self._ctrl.click(*_CLICK_SIDEBAR_INTENSIFY)
-    self._wait_stable(
-        MaterialFirstState.INTENSIFY_SUBMENU,
-        is_intensify_submenu_screen,
-    )
-    self._ctrl.click(*_CLICK_INTENSIFY_SUBMENU)
-    return self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
 
 
 def is_intensify_home_screen(screen: np.ndarray) -> bool:
@@ -268,6 +256,7 @@ class MaterialFirstIntensifyController:
             )
         # 如果当前由于上次异常停留在选择页（目标页/素材页），先点击左上角返回强化首页
         from autowsgr.ui.live_intensify import is_target_selector
+
         if is_target_selector(screen) or is_material_selector_screen(screen):
             self._ctrl.click(0.048, 0.088)
             time.sleep(0.8)
@@ -284,6 +273,7 @@ class MaterialFirstIntensifyController:
         if ctx is not None:
             from autowsgr.ops.navigate import goto_page
             from autowsgr.types import PageName
+
             goto_page(ctx, PageName.INTENSIFY)
             screen = self._ctrl.screenshot()
             if is_intensify_home_screen(screen):

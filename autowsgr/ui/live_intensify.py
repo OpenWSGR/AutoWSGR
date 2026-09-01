@@ -90,6 +90,8 @@ def is_home_target_fully_maxed(
                 continue
         return False
     return True
+
+
 _HOME_CURRENT_RE = re.compile(r'^\d{1,3}$')
 _HOME_GAIN_RE = re.compile(r'^\+\d{1,3}$')
 _HOME_OCR_MIN_CONFIDENCE = 0.50

@@ -32,5 +32,7 @@ def test_empty_intensify_home_is_registered_as_intensify_page() -> None:
 
     assert PageName.INTENSIFY.value in get_registered_pages()
     assert IntensifyPage.is_current_page(screen)
-    assert get_current_page(screen, candidates={PageName.INTENSIFY.value}) == PageName.INTENSIFY.value
+    assert (
+        get_current_page(screen, candidates={PageName.INTENSIFY.value}) == PageName.INTENSIFY.value
+    )
     assert get_current_page(screen) == PageName.INTENSIFY.value

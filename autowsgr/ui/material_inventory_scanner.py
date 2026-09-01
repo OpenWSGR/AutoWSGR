@@ -24,6 +24,7 @@ from autowsgr.ui.material_first_intensify import (
 from autowsgr.ui.utils.ship_list import LEGACY_LIST_WIDTH, to_legacy_format
 from autowsgr.vision import get_api_dll
 
+
 _log = get_logger('ops.intensify')
 
 
@@ -605,7 +606,11 @@ class MaterialInventoryScanner:
                 raise MaterialInventoryScanError('滚动条在未到底时没有移动')
             if not (at_bottom and no_thumb_move):
                 captures.append(self._reader.capture(screen))
-                _log.info('[OPS] 扫描素材库存: 视口第 {} 步, 已捕获 {} 组视口', viewport_count, len(captures))
+                _log.info(
+                    '[OPS] 扫描素材库存: 视口第 {} 步, 已捕获 {} 组视口',
+                    viewport_count,
+                    len(captures),
+                )
             stagnant = stagnant + 1 if at_bottom and no_thumb_move else 0
             if stagnant >= self._stagnant_limit:
                 if not captures:

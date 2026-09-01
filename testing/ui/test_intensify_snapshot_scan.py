@@ -95,11 +95,19 @@ def test_pair_scan_publishes_nothing_and_orders_both_complete_scans(
 ) -> None:
     events: list[str] = []
     navigator = MagicMock()
-    navigator.ensure_home.side_effect = lambda *args, **kwargs: events.append('home')
-    navigator.open_target_selector.side_effect = lambda *args, **kwargs: events.append('open-target')
-    navigator.close_target_selector.side_effect = lambda *args, **kwargs: events.append('close-target')
-    navigator.open_material_selector.side_effect = lambda *args, **kwargs: events.append('open-material')
-    navigator.close_material_selector.side_effect = lambda *args, **kwargs: events.append('close-material')
+    navigator.ensure_home.side_effect = lambda *_args, **_kwargs: events.append('home')
+    navigator.open_target_selector.side_effect = lambda *_args, **_kwargs: events.append(
+        'open-target'
+    )
+    navigator.close_target_selector.side_effect = lambda *_args, **_kwargs: events.append(
+        'close-target'
+    )
+    navigator.open_material_selector.side_effect = lambda *_args, **_kwargs: events.append(
+        'open-material'
+    )
+    navigator.close_material_selector.side_effect = lambda *_args, **_kwargs: events.append(
+        'close-material'
+    )
     targets = MagicMock()
     materials = MagicMock()
     monkeypatch.setattr(

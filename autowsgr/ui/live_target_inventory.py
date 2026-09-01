@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Protocol
 import cv2
 import numpy as np
 
+from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipType
 from autowsgr.ui.intensify_workflow import ShipStats
 from autowsgr.ui.live_intensify import is_target_selector
@@ -22,7 +23,12 @@ from autowsgr.ui.target_inventory_scanner import (
 )
 
 
+_log = get_logger('ui.live_target_inventory')
+
+
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from autowsgr.ui.material_inventory_scanner import AdbLosslessMaterialDevice
     from autowsgr.vision.ocr import OCREngine
     from autowsgr.vision.ship_card_recognizer import ShipCardRecognizer
@@ -328,7 +334,7 @@ class CetusTargetCardReader:
             value = None if binary_glyph is None else self.ocr.recognize_number(binary_glyph)
         return value if value is not None and 0 <= value <= 999 else None
 
-    def read_levels_batch(
+    def read_levels_batch(  # noqa: PLR0912
         self,
         screen: np.ndarray,
         cards: Sequence[CardRect],
@@ -348,7 +354,9 @@ class CetusTargetCardReader:
                 continue
             max_vals = (maximum.firepower, maximum.torpedo, maximum.armor, maximum.anti_air)
             vals: list[int | None] = []
-            for stat_idx, (bounds, field_max) in enumerate(zip(_STRENGTHEN_CROPS, max_vals, strict=True)):
+            for stat_idx, (bounds, field_max) in enumerate(
+                zip(_STRENGTHEN_CROPS, max_vals, strict=True)
+            ):
                 crop = _relative_crop(screen, card, bounds)
                 if field_max == 0 or _is_cross(crop):
                     vals.append(0)
@@ -376,7 +384,9 @@ class CetusTargetCardReader:
         if unresolved_slots and self.ocr is not None:
             batch_images = [slot[2] for slot in unresolved_slots]
             ocr_results = self.ocr.recognize_batch(batch_images, allowlist='0123456789')
-            for (card_idx, stat_idx, _img), ocr_res in zip(unresolved_slots, ocr_results, strict=True):
+            for (card_idx, stat_idx, _img), ocr_res in zip(
+                unresolved_slots, ocr_results, strict=True
+            ):
                 val = None
                 for r in ocr_res:
                     text = r.text.strip()
@@ -438,8 +448,8 @@ class CetusTargetScanDevice:
                 target_top = round(_TRACK_TOP_1080 * screen.shape[0] / 1080)
                 if top <= target_top + round(10 * screen.shape[0] / 1080):
                     return
-            except Exception:
-                pass
+            except Exception as err:
+                _log.debug('target_thumb_bounds 异常: {}', err)
 
             if hasattr(self._device, 'shell'):
                 x = round(500 * self._device.resolution[0] / 1920)
@@ -476,8 +486,8 @@ class CetusTargetScanDevice:
                     y2 = round(580 * self._device.resolution[1] / 1080)
                     self._device.shell(f'input swipe {x} {y1} {x} {y2} 150')
                     swiped = True
-                except Exception:
-                    pass
+                except Exception as err:
+                    _log.debug('advance_target_list swipe 异常: {}', err)
             time.sleep(0.04)
 
             screen = self.screenshot()

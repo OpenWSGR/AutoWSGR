@@ -62,7 +62,7 @@ def _normalize_material_ship_types(value: list[str] | None) -> list[str] | None:
             raise ValueError(f'material_ship_types 不合法: {item!r}, 可选值: {allowed}')
         if canonical not in normalized:
             normalized.append(canonical)
-    return normalized if normalized else None
+    return normalized or None
 
 
 def _normalize_protected_ships(value: list[str]) -> list[str]:

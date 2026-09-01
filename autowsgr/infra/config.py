@@ -404,7 +404,7 @@ class IntensifyConfig(BaseModel):
                 raise ValueError(f'material_ship_types 不合法: {item!r}, 可选值: {allowed}')
             if canonical not in normalized:
                 normalized.append(canonical)
-        return normalized if normalized else None
+        return normalized or None
 
     @field_validator('protected_ships')
     @classmethod

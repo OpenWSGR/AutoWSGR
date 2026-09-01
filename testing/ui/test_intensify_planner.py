@@ -107,10 +107,7 @@ def test_planner_stops_after_finding_a_complete_smaller_batch(
 
     inventory = _inventory(
         _material(0, '允许', ShipStats(armor=4)),
-        *(
-            _material(index, '允许', ShipStats(armor=1))
-            for index in range(1, 41)
-        ),
+        *(_material(index, '允许', ShipStats(armor=1)) for index in range(1, 41)),
     )
     original_combinations = intensify_planner.combinations
     visited_sizes: list[int] = []
@@ -167,12 +164,7 @@ def test_planner_splits_only_when_target_requires_more_than_batch_capacity() -> 
 def test_planner_treats_none_maximum_materials_as_unlimited() -> None:
     result = plan_ordered_intensify_batches(
         (_target(0, ShipStats(armor=8)),),
-        _inventory(
-            *(
-                _material(index, '允许', ShipStats(armor=1))
-                for index in range(8)
-            )
-        ),
+        _inventory(*(_material(index, '允许', ShipStats(armor=1)) for index in range(8))),
         IntensifyPolicy(frozenset({'允许'}), maximum_materials=None),
     )
 

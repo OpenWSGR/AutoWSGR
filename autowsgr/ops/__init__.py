@@ -52,9 +52,6 @@ from autowsgr.ops.decisive import DecisiveController, DecisiveResult
 # ── 解装 ──
 from autowsgr.ops.destroy import destroy_ships
 
-# ── 自动强化 ──
-from autowsgr.ops.intensify import auto_intensify
-
 # ── 活动战斗 ──
 from autowsgr.ops.event_fight import (
     EventFightRunner,
@@ -67,6 +64,9 @@ from autowsgr.ops.exercise import ExerciseRunner, run_exercise
 
 # ── 远征 ──
 from autowsgr.ops.expedition import collect_expedition
+
+# ── 自动强化 ──
+from autowsgr.ops.intensify import auto_intensify
 
 # ── 导航 ──
 from autowsgr.ops.navigate import goto_page, identify_current_page

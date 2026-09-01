@@ -562,8 +562,7 @@ def test_projected_gain_may_exceed_maximum_when_attribute_started_unfilled() -> 
 def test_ship_library_rarity_resolver_reads_canonical_manifest(tmp_path: Path) -> None:
     manifest = tmp_path / 'manifest.json'
     manifest.write_text(
-        '{"ships":[{"id":11,"rarity":3,"ship_type":"dd"},'
-        '{"id":12,"rarity":4,"ship_type":"bb"}]}',
+        '{"ships":[{"id":11,"rarity":3,"ship_type":"dd"},{"id":12,"rarity":4,"ship_type":"bb"}]}',
         encoding='utf-8',
     )
 

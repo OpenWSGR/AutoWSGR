@@ -133,9 +133,7 @@ def _load_metadata(  # noqa: PLR0912
         if ship_type_value is None:
             canonical_identity = canonical.get(ship_id)
             if canonical_identity is None:
-                costume_match = re.search(
-                    r'(?:^|/)(\d+)_(\d+)(?:/|$)', key.replace('\\', '/')
-                )
+                costume_match = re.search(r'(?:^|/)(\d+)_(\d+)(?:/|$)', key.replace('\\', '/'))
                 canonical_ship_id = int(costume_match.group(1)) if costume_match else None
                 canonical_identity = canonical.get(canonical_ship_id)
                 if canonical_identity is None and isinstance(name, str):
@@ -148,7 +146,9 @@ def _load_metadata(  # noqa: PLR0912
                         canonical_ship_id, canonical_identity = exact_name_matches[0]
                 if canonical_identity is None:
                     continue
-                encoded_costume_id = int(''.join(costume_match.groups())) if costume_match else ship_id
+                encoded_costume_id = (
+                    int(''.join(costume_match.groups())) if costume_match else ship_id
+                )
                 if costume_match and ship_id != encoded_costume_id:
                     raise ShipCardRecognitionError(
                         f'WSG-NCC 换装 ID 与资源 key 不一致: {key}/{ship_id}'
@@ -291,11 +291,7 @@ class WsgNccShipCardRecognizer:
         if len(raw_results) != len(arrays):
             raise ShipCardRecognitionError('WSG-NCC 返回数量与船卡数量不一致')
         identities = [self._identity_from_matches(matches, masked=False) for matches in raw_results]
-        retry_indices = [
-            index
-            for index, identity in enumerate(identities)
-            if identity is None
-        ]
+        retry_indices = [index for index, identity in enumerate(identities) if identity is None]
         if retry_indices:
             masked_results = self._engine.recognize(
                 [arrays[index] for index in retry_indices],

@@ -474,7 +474,9 @@ class NormalFightRunner:
             try:
                 intensify_res = auto_intensify(self._ctx)
                 if intensify_res.total_materials_used > 0:
-                    _log.info('[OPS] 自动强化完成，消耗 {} 艘素材', intensify_res.total_materials_used)
+                    _log.info(
+                        '[OPS] 自动强化完成，消耗 {} 艘素材', intensify_res.total_materials_used
+                    )
                     result.dock_full_destroyed = True
             except Exception as e:
                 _log.warning('[OPS] 自动强化失败或无可消耗素材: {}', e)

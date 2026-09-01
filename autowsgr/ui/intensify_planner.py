@@ -165,7 +165,9 @@ def _select_batch(
 ) -> tuple[MaterialOccurrence, ...]:
     if not candidates:
         return ()
-    limit = len(candidates) if maximum_materials is None else min(maximum_materials, len(candidates))
+    limit = (
+        len(candidates) if maximum_materials is None else min(maximum_materials, len(candidates))
+    )
     if limit <= 6:
         complete = _select_complete_batch(candidates, need, limit)
         return complete or _select_partial_batch(candidates, need, limit)

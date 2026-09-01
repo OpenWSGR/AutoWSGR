@@ -62,7 +62,12 @@ def get_intensify_snapshot_scan_service(context: object) -> IntensifySnapshotSca
     serial = getattr(emulator, 'serial', None)
     ctrl = getattr(context, 'ctrl', None)
     if not isinstance(serial, str) or not serial.strip():
-        if ctrl is not None and hasattr(ctrl, 'serial') and isinstance(ctrl.serial, str) and ctrl.serial.strip():
+        if (
+            ctrl is not None
+            and hasattr(ctrl, 'serial')
+            and isinstance(ctrl.serial, str)
+            and ctrl.serial.strip()
+        ):
             serial = ctrl.serial
         else:
             raise IntensifyPreviewConfigurationError('强化库存扫描要求配置明确的 emulator.serial')
