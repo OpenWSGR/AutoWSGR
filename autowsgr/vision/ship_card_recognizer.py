@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ class ShipCardIdentity:
     ship_type: ShipType
     confidence: float
     match_key: str
+    masked: bool = False
 
 
 class ShipCardRecognizer(Protocol):
@@ -243,7 +245,12 @@ class WsgNccShipCardRecognizer:
             return normalized.split(gallery_marker, 1)[1]
         return normalized.lstrip('/')
 
-    def _identity_from_matches(self, matches: object) -> ShipCardIdentity | None:
+    def _identity_from_matches(
+        self,
+        matches: object,
+        *,
+        masked: bool = False,
+    ) -> ShipCardIdentity | None:
         if not isinstance(matches, list) or not matches:
             return None
         for match in matches:
@@ -268,6 +275,7 @@ class WsgNccShipCardRecognizer:
                 ship_type=metadata.ship_type,
                 confidence=confidence,
                 match_key=normalized_key,
+                masked=masked,
             )
         return None
 
@@ -282,7 +290,7 @@ class WsgNccShipCardRecognizer:
         )
         if len(raw_results) != len(arrays):
             raise ShipCardRecognitionError('WSG-NCC 返回数量与船卡数量不一致')
-        identities = [self._identity_from_matches(matches) for matches in raw_results]
+        identities = [self._identity_from_matches(matches, masked=False) for matches in raw_results]
         retry_indices = [
             index
             for index, identity in enumerate(identities)
@@ -299,7 +307,7 @@ class WsgNccShipCardRecognizer:
             if len(masked_results) != len(retry_indices):
                 raise ShipCardRecognitionError('WSG-NCC 蒙版重试返回数量与船卡数量不一致')
             for index, matches in zip(retry_indices, masked_results, strict=True):
-                identities[index] = self._identity_from_matches(matches)
+                identities[index] = self._identity_from_matches(matches, masked=True)
         return identities
 
     @classmethod

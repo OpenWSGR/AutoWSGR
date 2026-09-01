@@ -306,6 +306,7 @@ class CetusTargetCardReader:
                 visual_hash=_stable_card_hash(card_image),
                 identity_confidence=identity.confidence if identity is not None else 0.0,
                 identity_match_key=identity.match_key if identity is not None else 'unknown',
+                masked=getattr(identity, 'masked', False) if identity is not None else False,
             )
             for identity, card_image in zip(identities, card_images, strict=True)
         )

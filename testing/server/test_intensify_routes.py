@@ -17,13 +17,25 @@ from autowsgr.server.intensify_preview_service import (
     IntensifyPreviewSessionUnavailableError,
 )
 from autowsgr.server.routes import ops
-from autowsgr.server.schemas import IntensifyRequest, IntensifySnapshotPreviewRequest
+from autowsgr.server.schemas import (
+    AutoIntensifyRequest,
+    IntensifyRequest,
+    IntensifySnapshotPreviewRequest,
+)
 from autowsgr.ui.intensify_workflow import IntensifyPolicy, SelectionRef
 
 
 def _policy() -> IntensifyRequest:
     return IntensifyRequest(
         target_ship='萤火虫',
+        material_ship_types=['DD'],
+        max_materials=4,
+        protected_ships=['信赖'],
+    )
+
+
+def _automatic_policy() -> AutoIntensifyRequest:
+    return AutoIntensifyRequest(
         material_ship_types=['DD'],
         max_materials=4,
         protected_ships=['信赖'],
@@ -297,6 +309,23 @@ def test_snapshot_preview_request_rejects_selection_beyond_policy_limit() -> Non
         )
 
 
+def test_intensify_requests_accept_null_material_limit_as_unlimited() -> None:
+    execute = AutoIntensifyRequest(
+        material_ship_types=None,
+        max_materials=None,
+    )
+    preview = IntensifySnapshotPreviewRequest(
+        session_id='snapshot-session',
+        selected_target_ref='target:target-revision:0:0:0:0.1000:0.2000',
+        allowed_material_identities=['素材舰'],
+        maximum_materials=None,
+        selected_material_refs=['material:one', 'material:two'],
+    )
+
+    assert execute.max_materials is None
+    assert preview.maximum_materials is None
+
+
 @pytest.mark.parametrize(
     ('field', 'value'),
     [
@@ -335,7 +364,7 @@ def test_snapshot_openapi_exposes_typed_data(path: str, model_name: str) -> None
 
 
 def test_intensify_execute_fails_closed_without_touching_device() -> None:
-    response = asyncio.run(ops.intensify_action(_policy()))
+    response = asyncio.run(ops.intensify_action(_automatic_policy()))
 
     assert response.success is False
     assert response.error is not None
@@ -347,12 +376,101 @@ def test_intensify_execute_obeys_device_lease() -> None:
     token = device_operation_lease.acquire('test-owner')
     try:
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(ops.intensify_action(_policy()))
+            asyncio.run(ops.intensify_action(_automatic_policy()))
     finally:
         device_operation_lease.release(token)
 
     assert exc_info.value.status_code == 409
     assert 'test-owner' in exc_info.value.detail
+
+
+def test_intensify_execute_passes_request_policy_to_automatic_execution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    context = object()
+
+    def fake_auto_intensify(supplied_context: object, **options: object) -> object:
+        captured['context'] = supplied_context
+        captured['options'] = options
+        return SimpleNamespace(
+            success=True,
+            total_batches=0,
+            total_materials_used=0,
+            elapsed_seconds=0.0,
+            batches=[],
+            message='done',
+        )
+
+    monkeypatch.setattr(ops, 'get_context', lambda: context)
+    monkeypatch.setattr('autowsgr.ops.intensify.auto_intensify', fake_auto_intensify)
+
+    request = _automatic_policy().model_copy(update={'max_materials': None})
+    response = asyncio.run(ops.intensify_action(request))
+
+    assert response.success is True
+    assert captured == {
+        'context': context,
+        'options': {
+            'material_ship_types': frozenset({'dd'}),
+            'maximum_materials': None,
+            'protected_material_identities': frozenset({'信赖'}),
+        },
+    }
+
+
+def test_intensify_execute_omitted_request_retains_execution_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_auto_intensify(_context: object, **options: object) -> object:
+        captured['options'] = options
+        return SimpleNamespace(
+            success=True,
+            total_batches=0,
+            total_materials_used=0,
+            elapsed_seconds=0.0,
+            batches=[],
+            message='done',
+        )
+
+    context = SimpleNamespace(
+        config=SimpleNamespace(
+            intensify=SimpleNamespace(
+                material_ship_types=['dd'],
+                max_materials=4,
+                protected_ships=['信赖'],
+            )
+        )
+    )
+    monkeypatch.setattr(ops, 'get_context', lambda: context)
+    monkeypatch.setattr('autowsgr.ops.intensify.auto_intensify', fake_auto_intensify)
+
+    response = asyncio.run(ops.intensify_action())
+
+    assert response.success is True
+    assert captured['options'] == {
+        'material_ship_types': frozenset({'dd'}),
+        'maximum_materials': 4,
+        'protected_material_identities': frozenset({'信赖'}),
+    }
+
+
+def test_auto_intensify_request_rejects_target_authority_fields() -> None:
+    with pytest.raises(ValidationError, match='Extra inputs are not permitted'):
+        AutoIntensifyRequest.model_validate(
+            {
+                'target_ship': '萤火虫',
+                'material_ship_types': ['DD'],
+                'max_materials': 4,
+                'protected_ships': [],
+            }
+        )
+
+
+def test_auto_intensify_request_accepts_finite_limit_above_legacy_cap() -> None:
+    assert AutoIntensifyRequest(max_materials=41).max_materials == 41
 
 
 def test_intensify_policy_rejects_target_in_protected_list() -> None:

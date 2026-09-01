@@ -112,48 +112,63 @@ def plan_ordered_intensify_batches(
     return IntensifyPlanningResult(tuple(batches), remaining)
 
 
+def _select_complete_batch(
+    candidates: tuple[MaterialOccurrence, ...],
+    need: ShipStats,
+    limit: int,
+) -> tuple[MaterialOccurrence, ...]:
+    for size in range(1, limit + 1):
+        best: tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]] | None = None
+        for selected in combinations(candidates, size):
+            contribution = _sum_stats(item.contribution for item in selected)
+            if not _meets(contribution, need):
+                continue
+            excess = _excess(contribution, need)
+            score = (
+                _total(excess),
+                excess.firepower,
+                excess.torpedo,
+                excess.armor,
+                excess.anti_air,
+                tuple(item.index for item in selected),
+            )
+            if best is None or score < best[0]:
+                best = (score, selected)
+        if best is not None:
+            return best[1]
+    return ()
+
+
+def _select_partial_batch(
+    candidates: tuple[MaterialOccurrence, ...],
+    need: ShipStats,
+    limit: int,
+) -> tuple[MaterialOccurrence, ...]:
+    best: tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]] | None = None
+    for size in range(1, limit + 1):
+        for selected in combinations(candidates, size):
+            contribution = _sum_stats(item.contribution for item in selected)
+            useful = _useful(contribution, need)
+            if useful == 0:
+                continue
+            waste = _total(contribution) - useful
+            score = (-useful, waste, size, tuple(item.index for item in selected))
+            if best is None or score < best[0]:
+                best = (score, selected)
+    return best[1] if best is not None else ()
+
+
 def _select_batch(
     candidates: tuple[MaterialOccurrence, ...],
     need: ShipStats,
-    maximum_materials: int,
+    maximum_materials: int | None,
 ) -> tuple[MaterialOccurrence, ...]:
     if not candidates:
         return ()
-    limit = min(maximum_materials, len(candidates))
+    limit = len(candidates) if maximum_materials is None else min(maximum_materials, len(candidates))
     if limit <= 6:
-        complete: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
-        partial: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
-        for size in range(1, limit + 1):
-            for selected in combinations(candidates, size):
-                contribution = _sum_stats(item.contribution for item in selected)
-                indices = tuple(item.index for item in selected)
-                if _meets(contribution, need):
-                    excess = _excess(contribution, need)
-                    complete.append(
-                        (
-                            (
-                                size,
-                                _total(excess),
-                                excess.firepower,
-                                excess.torpedo,
-                                excess.armor,
-                                excess.anti_air,
-                                indices,
-                            ),
-                            selected,
-                        )
-                    )
-                    continue
-                useful = _useful(contribution, need)
-                if useful == 0:
-                    continue
-                waste = _total(contribution) - useful
-                partial.append(((-useful, waste, size, indices), selected))
-        if complete:
-            return min(complete, key=lambda item: item[0])[1]
-        if partial:
-            return min(partial, key=lambda item: item[0])[1]
-        return ()
+        complete = _select_complete_batch(candidates, need, limit)
+        return complete or _select_partial_batch(candidates, need, limit)
 
     selected_list: list[MaterialOccurrence] = []
     current_need = need
@@ -177,7 +192,7 @@ def _select_batch(
         remaining_candidates.remove(best_cand)
         current_need = _remaining_need(current_need, best_cand.contribution)
 
-    return tuple(selected_list)
+    return tuple(sorted(selected_list, key=lambda item: item.index))
 
 
 def _sum_stats(values: object) -> ShipStats:

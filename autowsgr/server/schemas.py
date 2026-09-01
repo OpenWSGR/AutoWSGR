@@ -7,7 +7,11 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from autowsgr.combat.fleet import ALLOWED_SHIP_TYPE_CODES
+from autowsgr.combat.fleet import (
+    ALLOWED_SHIP_TYPE_CODES,
+    LEGACY_SHIP_TYPE_ALIASES,
+    SHIP_TYPE_BY_CODE,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -44,12 +48,36 @@ class LogLevel(StrEnum):
     ERROR = 'ERROR'
 
 
+def _normalize_material_ship_types(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    normalized: list[str] = []
+    for item in value:
+        code = item.strip().lower()
+        if not code:
+            continue
+        canonical = LEGACY_SHIP_TYPE_ALIASES.get(code, code)
+        if canonical not in SHIP_TYPE_BY_CODE:
+            allowed = ', '.join(sorted(ALLOWED_SHIP_TYPE_CODES))
+            raise ValueError(f'material_ship_types 不合法: {item!r}, 可选值: {allowed}')
+        if canonical not in normalized:
+            normalized.append(canonical)
+    return normalized if normalized else None
+
+
+def _normalize_protected_ships(value: list[str]) -> list[str]:
+    normalized = [item.strip() for item in value if item.strip()]
+    if len(set(normalized)) != len(normalized):
+        raise ValueError('protected_ships 不能重复')
+    return normalized
+
+
 class IntensifyRequest(BaseModel):
     """Manual intensify policy. It never carries selector refs or authorization proofs."""
 
     target_ship: str = Field(min_length=1)
     material_ship_types: list[str] | None = None
-    max_materials: int = Field(ge=1, le=12)
+    max_materials: int | None = Field(default=4, ge=1)
     protected_ships: list[str] = Field(default_factory=list)
 
     @field_validator('target_ship')
@@ -62,23 +90,13 @@ class IntensifyRequest(BaseModel):
 
     @field_validator('material_ship_types')
     @classmethod
-    def _normalize_material_ship_types(cls, value: list[str] | None) -> list[str] | None:
-        if value is None:
-            return None
-        normalized = [item.strip().upper() for item in value if item.strip()]
-        if not normalized:
-            raise ValueError('material_ship_types 不能为空列表')
-        if len(set(normalized)) != len(normalized):
-            raise ValueError('material_ship_types 不能重复')
-        return normalized
+    def _validate_material_ship_types(cls, value: list[str] | None) -> list[str] | None:
+        return _normalize_material_ship_types(value)
 
     @field_validator('protected_ships')
     @classmethod
-    def _normalize_protected_ships(cls, value: list[str]) -> list[str]:
-        normalized = [item.strip() for item in value if item.strip()]
-        if len(set(normalized)) != len(normalized):
-            raise ValueError('protected_ships 不能重复')
-        return normalized
+    def _validate_protected_ships(cls, value: list[str]) -> list[str]:
+        return _normalize_protected_ships(value)
 
     @model_validator(mode='after')
     def _protect_target(self) -> IntensifyRequest:
@@ -89,13 +107,33 @@ class IntensifyRequest(BaseModel):
     model_config = {'extra': 'forbid'}
 
 
+class AutoIntensifyRequest(BaseModel):
+    """Autonomous intensify policy without a caller-selected target."""
+
+    material_ship_types: list[str] | None = None
+    max_materials: int | None = Field(default=4, ge=1)
+    protected_ships: list[str] = Field(default_factory=list)
+
+    @field_validator('material_ship_types')
+    @classmethod
+    def _validate_material_ship_types(cls, value: list[str] | None) -> list[str] | None:
+        return _normalize_material_ship_types(value)
+
+    @field_validator('protected_ships')
+    @classmethod
+    def _validate_protected_ships(cls, value: list[str]) -> list[str]:
+        return _normalize_protected_ships(value)
+
+    model_config = {'extra': 'forbid'}
+
+
 class IntensifySnapshotPreviewRequest(BaseModel):
     """Read-only preview intent bound to one server-owned inventory snapshot."""
 
     session_id: str = Field(min_length=1)
     selected_target_ref: str = Field(min_length=1)
     allowed_material_identities: list[str] = Field(min_length=1)
-    maximum_materials: int = Field(default=1, ge=1, le=12)
+    maximum_materials: int | None = Field(default=1, ge=1)
     selected_material_refs: list[str] = Field(default_factory=list)
 
     @field_validator('session_id')
@@ -136,7 +174,10 @@ class IntensifySnapshotPreviewRequest(BaseModel):
 
     @model_validator(mode='after')
     def _limit_selected_materials(self) -> IntensifySnapshotPreviewRequest:
-        if len(self.selected_material_refs) > self.maximum_materials:
+        if (
+            self.maximum_materials is not None
+            and len(self.selected_material_refs) > self.maximum_materials
+        ):
             raise ValueError('selected_material_refs 超过 maximum_materials')
         return self
 

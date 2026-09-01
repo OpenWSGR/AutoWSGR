@@ -24,6 +24,7 @@ from autowsgr.server.intensify_preview_service import (
 from autowsgr.server.intensify_snapshot_scan_service import IntensifySnapshotScanError
 from autowsgr.server.schemas import (
     ApiResponse,
+    AutoIntensifyRequest,
     IntensifyRequest,
     IntensifySnapshotPreviewRequest,
     IntensifySnapshotPreviewResponse,
@@ -133,7 +134,7 @@ async def intensify_snapshot_preview(
 
 @router.post('/api/intensify', response_model=ApiResponse)
 @exclusive_device_operation('api:intensify')
-async def intensify_action(request: IntensifyRequest | None = None) -> ApiResponse:
+async def intensify_action(request: AutoIntensifyRequest | None = None) -> ApiResponse:
     """执行自动强化流程（持有设备独占 Lease）。"""
     try:
         ctx = get_context()
@@ -142,8 +143,21 @@ async def intensify_action(request: IntensifyRequest | None = None) -> ApiRespon
 
     from autowsgr.ops.intensify import auto_intensify
 
+    execution_policy = ctx.config.intensify if request is None else request
+    material_ship_types = execution_policy.material_ship_types
+    maximum_materials = execution_policy.max_materials
+    protected_ships = execution_policy.protected_ships
+
     try:
-        result = await asyncio.to_thread(auto_intensify, ctx)
+        result = await asyncio.to_thread(
+            auto_intensify,
+            ctx,
+            material_ship_types=(
+                None if material_ship_types is None else frozenset(material_ship_types)
+            ),
+            maximum_materials=maximum_materials,
+            protected_material_identities=frozenset(protected_ships),
+        )
         return ApiResponse(
             success=result.success,
             data={

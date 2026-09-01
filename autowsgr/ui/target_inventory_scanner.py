@@ -10,7 +10,10 @@ from typing import TYPE_CHECKING, Protocol
 import cv2
 import numpy as np
 
+from autowsgr.infra.logger import get_logger
 from autowsgr.ui.intensify_workflow import SelectionRef, ShipStats
+
+_log = get_logger('ops.intensify')
 
 
 if TYPE_CHECKING:
@@ -44,6 +47,7 @@ class TargetCardIdentity:
     visual_hash: int
     identity_confidence: float
     identity_match_key: str
+    masked: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +64,7 @@ class TargetShipSnapshot:
     scan_step: int = 0
     global_index: int = -1
     occurrence: int = -1
+    masked: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -597,8 +602,12 @@ class TargetInventoryScanner:
                                 identity_confidence=ident.identity_confidence,
                                 identity_match_key=ident.identity_match_key,
                                 scan_step=step,
+                                masked=ident.masked,
                             )
                         )
+
+            if step % 3 == 0 or stagnant_at_bottom > 0:
+                _log.info('[OPS] 扫描目标库存: 滚动第 {} 步, 已识别 {} 艘目标', step + 1, len(accumulated_targets))
 
             self._device.advance_target_list()
 

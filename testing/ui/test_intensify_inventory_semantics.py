@@ -385,6 +385,50 @@ def test_candidate_preview_derives_execution_path_from_explicit_materials(
     ]
 
 
+def test_candidate_preview_unlimited_policy_accepts_all_selected_material_refs() -> None:
+    target = TargetShipSnapshot(
+        ref=SelectionRef('target:target-rev:0:0:0:0.1000:0.2000'),
+        ship_id=7,
+        name='目标舰',
+        ship_type=ShipType.DD,
+        levels=ShipStats(),
+        card=CardRect(10, 10, 110, 210),
+        visual_hash=1,
+        identity_confidence=0.9,
+        identity_match_key='gallery/7.png',
+        global_index=0,
+        occurrence=0,
+    )
+    targets = TargetInventorySnapshot((target,), 1, True, 'target-rev')
+    materials = MaterialInventoryObservation(
+        tuple(
+            MaterialOccurrence(
+                SelectionRef(f'material:material-rev:0:0:{index}:0.1000:0.2000'),
+                '安全素材',
+                index,
+                ShipStats(armor=1),
+            )
+            for index in range(13)
+        ),
+        True,
+        'material-rev',
+    )
+    resolver = MagicMock()
+    resolver.maximum.return_value = ShipStats(armor=13)
+    resolver.experience_per_level.return_value = 1
+
+    preview = intensify_candidate_preview(
+        targets,
+        materials,
+        resolver,
+        IntensifyPolicy(frozenset({'安全素材'}), maximum_materials=None),
+        projected_material_refs=tuple(item.ref for item in materials.occurrences),
+    )
+
+    assert preview.targets[0].projected_gains == ShipStats(armor=13)
+    assert preview.execution_path == 'direct'
+
+
 def test_candidate_preview_fails_closed_when_target_maximum_is_missing() -> None:
     target = TargetShipSnapshot(
         ref=SelectionRef('target:target-rev:0:0:0:0.1000:0.2000'),
@@ -518,7 +562,8 @@ def test_projected_gain_may_exceed_maximum_when_attribute_started_unfilled() -> 
 def test_ship_library_rarity_resolver_reads_canonical_manifest(tmp_path: Path) -> None:
     manifest = tmp_path / 'manifest.json'
     manifest.write_text(
-        '{"ships":[{"id":11,"rarity":3},{"id":12,"rarity":4}]}',
+        '{"ships":[{"id":11,"rarity":3,"ship_type":"dd"},'
+        '{"id":12,"rarity":4,"ship_type":"bb"}]}',
         encoding='utf-8',
     )
 
@@ -526,4 +571,6 @@ def test_ship_library_rarity_resolver_reads_canonical_manifest(tmp_path: Path) -
 
     assert resolver.rarity(11) == 3
     assert resolver.rarity(12) == 4
+    assert resolver.ship_type(11) == 'dd'
+    assert resolver.ship_type(12) == 'bb'
     assert resolver.rarity(13) is None

@@ -40,9 +40,10 @@ class MaterialRarityResolver(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ShipLibraryRarityResolver:
-    """Resolve authoritative ship rarity from the canonical ship-library manifest."""
+    """Resolve authoritative ship rarity and type from the canonical manifest."""
 
     rarity_by_ship_id: dict[int, int]
+    ship_type_by_ship_id: dict[int, str]
 
     @classmethod
     def from_manifest(cls, path: str | Path) -> ShipLibraryRarityResolver:
@@ -51,11 +52,13 @@ class ShipLibraryRarityResolver:
         if not isinstance(ships, list):
             raise TypeError('舰船资源 manifest 缺少 ships 列表')
         rarities: dict[int, int] = {}
+        ship_types: dict[int, str] = {}
         for item in ships:
             if not isinstance(item, dict):
                 continue
             ship_id = item.get('id')
             rarity = item.get('rarity')
+            ship_type = item.get('ship_type')
             if (
                 isinstance(ship_id, bool)
                 or not isinstance(ship_id, int)
@@ -67,10 +70,15 @@ class ShipLibraryRarityResolver:
             if ship_id in rarities:
                 raise ValueError(f'舰船资源 manifest 规范 ID 重复: {ship_id}')
             rarities[ship_id] = rarity
-        return cls(rarities)
+            if isinstance(ship_type, str) and ship_type.strip():
+                ship_types[ship_id] = ship_type.strip().lower()
+        return cls(rarities, ship_types)
 
     def rarity(self, ship_id: int) -> int | None:
         return self.rarity_by_ship_id.get(ship_id)
+
+    def ship_type(self, ship_id: int) -> str | None:
+        return self.ship_type_by_ship_id.get(ship_id)
 
 
 class TargetMaximumResolver(Protocol):
@@ -277,7 +285,7 @@ def _resolve_projected_materials(
     policy: IntensifyPolicy,
     refs: tuple[SelectionRef, ...],
 ) -> tuple[MaterialOccurrence, ...]:
-    if len(refs) > policy.maximum_materials:
+    if policy.maximum_materials is not None and len(refs) > policy.maximum_materials:
         raise MaterialInventoryScanError('预计强化素材超过策略数量上限')
     if len(set(refs)) != len(refs):
         raise MaterialInventoryScanError('预计强化素材包含重复 occurrence 引用')

@@ -11,6 +11,7 @@ from autowsgr.infra import (
     DecisiveConfig,
     EmulatorConfig,
     FightConfig,
+    IntensifyConfig,
     OCRConfig,
     UserConfig,
 )
@@ -116,6 +117,19 @@ class TestDecisiveConfig:
 # ── UserConfig ──
 
 
+class TestIntensifyConfig:
+    def test_defaults_match_gui_policy(self):
+        config = IntensifyConfig()
+
+        assert config.material_ship_types is None
+        assert config.max_materials == 4
+        assert config.protected_ships == []
+
+    def test_null_limit_and_uncapped_finite_value_are_supported(self):
+        assert IntensifyConfig(max_materials=None).max_materials is None
+        assert IntensifyConfig(max_materials=41).max_materials == 41
+
+
 class TestUserConfig:
     def test_unused_bathroom_feature_count_is_removed(self):
         config = UserConfig(
@@ -139,6 +153,10 @@ account:
 operation_delay_min: 2.0
 operation_delay_max: 3.0
 dock_full_destroy: false
+intensify:
+  material_ship_types: [DD]
+  max_materials: null
+  protected_ships: [信赖]
 """
         path = tmp_yaml('config.yaml', content)
         cfg = UserConfig.from_yaml(path)
@@ -147,6 +165,9 @@ dock_full_destroy: false
         assert cfg.dock_full_destroy is False
         assert cfg.operation_delay_min == 2.0
         assert cfg.operation_delay_max == 3.0
+        assert cfg.intensify.material_ship_types == ['dd']
+        assert cfg.intensify.max_materials is None
+        assert cfg.intensify.protected_ships == ['信赖']
         assert not hasattr(cfg, 'delay')
 
     def test_with_daily_automation(self, tmp_yaml: Callable[[str, str], Path]):

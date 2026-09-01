@@ -16,12 +16,15 @@ import adbutils
 import cv2
 import numpy as np
 
+from autowsgr.infra.logger import get_logger
 from autowsgr.ui.material_first_intensify import (
     MaterialFirstIntensifyController,
     is_material_selector_screen,
 )
 from autowsgr.ui.utils.ship_list import LEGACY_LIST_WIDTH, to_legacy_format
 from autowsgr.vision import get_api_dll
+
+_log = get_logger('ops.intensify')
 
 
 if TYPE_CHECKING:
@@ -628,10 +631,12 @@ class MaterialInventoryScanner:
                 raise MaterialInventoryScanError('滚动条在未到底时没有移动')
             if not (at_bottom and no_thumb_move):
                 captures.append(captured)
+                _log.info('[OPS] 扫描素材库存: 视口第 {} 步, 已捕获 {} 组视口', viewport_count, len(captures))
             stagnant = stagnant + 1 if at_bottom and no_thumb_move else 0
             if stagnant >= self._stagnant_limit:
                 if not captures:
                     raise MaterialInventoryScanError('素材库存没有权威视口证据')
+                _log.info('[OPS] 正在解析素材舰船图像 (共 {} 组视口)...', len(captures))
                 viewports = self._reader.recognize_captures(captures)
                 revision_payload = '|'.join(
                     f'{viewport_index}:{ship_id}:{name}'

@@ -141,11 +141,15 @@ class MaterialInventoryObservation:
 @dataclass(frozen=True, slots=True)
 class IntensifyPolicy:
     allowed_material_identities: frozenset[str]
-    maximum_materials: int = 1
+    maximum_materials: int | None = 1
 
     def __post_init__(self) -> None:
         if not self.allowed_material_identities:
             raise ValueError('必须显式配置可消耗素材 allowlist')
+        if self.maximum_materials is None:
+            return
+        if isinstance(self.maximum_materials, bool) or not isinstance(self.maximum_materials, int):
+            raise TypeError('maximum_materials 必须是正整数或 None')
         if self.maximum_materials < 1:
             raise ValueError('maximum_materials 必须大于零')
 
@@ -412,7 +416,8 @@ def plan_intensify(
         and item.ref != target.ref
     )
     viable: list[tuple[tuple[object, ...], tuple[MaterialOccurrence, ...]]] = []
-    for size in range(1, min(policy.maximum_materials, len(candidates)) + 1):
+    maximum_materials = policy.maximum_materials or len(candidates)
+    for size in range(1, min(maximum_materials, len(candidates)) + 1):
         for selected in combinations(candidates, size):
             gains = _sum_stats(item.contribution for item in selected)
             if not _meets(gains, goal.minimum_gains):
@@ -455,7 +460,7 @@ def create_intensify_plan(
     """Resolve exact occurrences under an explicit destructive-operation policy."""
     if not material_refs:
         raise IntensifyWorkflowError('强化计划至少需要一个素材 occurrence')
-    if len(material_refs) > policy.maximum_materials:
+    if policy.maximum_materials is not None and len(material_refs) > policy.maximum_materials:
         raise IntensifyWorkflowError('强化计划超过允许的素材数量')
     if len(set(material_refs)) != len(material_refs):
         raise IntensifyWorkflowError('强化计划包含重复 occurrence 引用')

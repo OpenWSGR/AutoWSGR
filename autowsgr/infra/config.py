@@ -363,6 +363,47 @@ class DecisiveConfig(BaseModel):
 # ── 顶层用户配置 ──
 
 
+class IntensifyConfig(BaseModel):
+    """Autonomous intensify material policy persisted in usersettings.yaml."""
+
+    model_config = {'frozen': True}
+
+    target_ship: str = ''
+    material_ship_types: list[str] | None = None
+    max_materials: int | None = Field(default=4, ge=1)
+    protected_ships: list[str] = Field(default_factory=list)
+
+    @field_validator('material_ship_types')
+    @classmethod
+    def _normalize_material_types(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        from autowsgr.combat.fleet import (
+            ALLOWED_SHIP_TYPE_CODES,
+            LEGACY_SHIP_TYPE_ALIASES,
+            SHIP_TYPE_BY_CODE,
+        )
+
+        normalized: list[str] = []
+        for item in value:
+            code = item.strip().lower()
+            canonical = LEGACY_SHIP_TYPE_ALIASES.get(code, code)
+            if not code or canonical not in SHIP_TYPE_BY_CODE:
+                allowed = ', '.join(sorted(ALLOWED_SHIP_TYPE_CODES))
+                raise ValueError(f'material_ship_types 不合法: {item!r}, 可选值: {allowed}')
+            if canonical not in normalized:
+                normalized.append(canonical)
+        return normalized if normalized else None
+
+    @field_validator('protected_ships')
+    @classmethod
+    def _normalize_protected_ships(cls, value: list[str]) -> list[str]:
+        normalized = [item.strip() for item in value if item.strip()]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError('protected_ships 不能重复')
+        return normalized
+
+
 class UserConfig(BaseModel):
     """用户配置（顶层聚合）。"""
 
@@ -375,6 +416,7 @@ class UserConfig(BaseModel):
     log: LogConfig = Field(default_factory=LogConfig)
     daily_automation: DailyAutomationConfig | None = None
     decisive_battle: DecisiveConfig | None = None
+    intensify: IntensifyConfig = Field(default_factory=IntensifyConfig)
 
     # 系统（自动检测）
     os_type: OSType = Field(default_factory=OSType.auto)

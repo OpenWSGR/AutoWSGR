@@ -235,10 +235,17 @@ class MaterialFirstIntensifyController:
 
     def _enter_intensify_home_after_main(self) -> np.ndarray:
         """Continue the verified navigation after MAIN has already been proven."""
-
-        self._ctrl.click(*_CLICK_OPEN_SIDEBAR)
-        time.sleep(0.3)
-        self._wait_stable(MaterialFirstState.SIDEBAR, is_sidebar_screen)
+        deadline = time.monotonic() + self._timeout
+        sidebar_ok = False
+        while time.monotonic() < deadline:
+            self._ctrl.click(*_CLICK_OPEN_SIDEBAR)
+            time.sleep(0.5)
+            screen = self._ctrl.screenshot()
+            if is_sidebar_screen(screen):
+                sidebar_ok = True
+                break
+        if not sidebar_ok:
+            raise MaterialFirstNavigationError('未连续稳定识别页面: sidebar')
 
         self._ctrl.click(*_CLICK_SIDEBAR_INTENSIFY)
         time.sleep(0.5)
@@ -250,7 +257,7 @@ class MaterialFirstIntensifyController:
         time.sleep(1.0)
         return self._wait_stable(MaterialFirstState.INTENSIFY_HOME, is_intensify_home_screen)
 
-    def ensure_intensify_home(self) -> np.ndarray:
+    def ensure_intensify_home(self, ctx: object | None = None) -> np.ndarray:
         """Accept an existing intensify home or use the verified MAIN navigation path."""
         screen = self._ctrl.screenshot()
         if is_intensify_home_screen(screen):
@@ -263,7 +270,7 @@ class MaterialFirstIntensifyController:
         from autowsgr.ui.live_intensify import is_target_selector
         if is_target_selector(screen) or is_material_selector_screen(screen):
             self._ctrl.click(0.048, 0.088)
-            time.sleep(0.5)
+            time.sleep(0.8)
             screen = self._ctrl.screenshot()
             if is_intensify_home_screen(screen):
                 return self._wait_stable(
@@ -274,6 +281,17 @@ class MaterialFirstIntensifyController:
         if is_main_screen(screen):
             self._wait_stable(MaterialFirstState.MAIN, is_main_screen, initial_screen=screen)
             return self._enter_intensify_home_after_main()
+        if ctx is not None:
+            from autowsgr.ops.navigate import goto_page
+            from autowsgr.types import PageName
+            goto_page(ctx, PageName.INTENSIFY)
+            screen = self._ctrl.screenshot()
+            if is_intensify_home_screen(screen):
+                return self._wait_stable(
+                    MaterialFirstState.INTENSIFY_HOME,
+                    is_intensify_home_screen,
+                    initial_screen=screen,
+                )
         raise MaterialFirstNavigationError('强化扫描起始页面既不是 main 也不是 intensify_home')
 
     def enter_material_selector_from_main(self) -> MaterialSelectorEvidence:

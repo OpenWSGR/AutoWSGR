@@ -155,6 +155,36 @@ def test_planner_fails_when_no_allowlisted_combination_meets_goal() -> None:
         )
 
 
+def test_unlimited_policy_allows_explicit_plan_beyond_finite_ui_limit() -> None:
+    materials = tuple(
+        MaterialOccurrence(
+            SelectionRef(f'material:{index}'),
+            'safe',
+            index,
+            ShipStats(armor=1),
+        )
+        for index in range(13)
+    )
+    inventory = _inventory(*materials)
+    policy = IntensifyPolicy(frozenset({'safe'}), maximum_materials=None)
+
+    plan = create_intensify_plan(
+        inventory,
+        TARGET,
+        tuple(item.ref for item in inventory.occurrences),
+        GAINS,
+        policy,
+    )
+
+    assert len(plan.materials) == 13
+
+
+@pytest.mark.parametrize('maximum_materials', [0, -1])
+def test_policy_rejects_non_positive_finite_maximum(maximum_materials: int) -> None:
+    with pytest.raises(ValueError, match='必须大于零'):
+        IntensifyPolicy(frozenset({'safe'}), maximum_materials=maximum_materials)
+
+
 class _Rig:
     def __init__(self, inventory: MaterialInventoryObservation) -> None:
         self.inventory_value = inventory

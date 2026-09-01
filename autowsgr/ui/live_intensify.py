@@ -46,10 +46,53 @@ _HOME_STAT_CROPS = (
     (0.865, 0.385, 0.945, 0.455),
     (0.855, 0.505, 0.945, 0.575),
 )
-_HOME_INTENSIFY_BUTTON_CROP = (0.835, 0.675, 0.955, 0.805)
+_HOME_STAT_PANEL_CROPS = (
+    (0.75, 0.140, 0.98, 0.250),  # 火力
+    (0.75, 0.260, 0.98, 0.370),  # 鱼雷
+    (0.75, 0.380, 0.98, 0.490),  # 装甲
+    (0.75, 0.500, 0.98, 0.610),  # 对空
+)
+_HOME_INTENSIFY_BUTTON_CROP = (0.810, 0.760, 0.940, 0.880)
+
+
+def is_home_target_fully_maxed(
+    screen: np.ndarray,
+    max_stats: ShipStats,
+    ocr: OCREngine | None = None,
+) -> bool:
+    """Verify on intensify home screen whether all strengthenable stats are MAX."""
+    import cv2
+    import numpy as np
+
+    if not is_intensify_home_screen(screen):
+        return False
+    height, width = screen.shape[:2]
+    max_values = (
+        max_stats.firepower,
+        max_stats.torpedo,
+        max_stats.armor,
+        max_stats.anti_air,
+    )
+    for bounds, max_val in zip(_HOME_STAT_PANEL_CROPS, max_values, strict=True):
+        if max_val <= 0:
+            continue
+        x1, y1, x2, y2 = bounds
+        crop = screen[int(height * y1) : int(height * y2), int(width * x1) : int(width * x2)]
+        hsv = cv2.cvtColor(crop, cv2.COLOR_RGB2HSV)
+        orange = cv2.inRange(hsv, np.array((10, 150, 150)), np.array((30, 255, 255)))
+        orange_ratio = (orange > 0).mean()
+        if orange_ratio >= 0.08:
+            continue
+        if ocr is not None:
+            results = ocr.recognize(crop)
+            text_joined = ' '.join(r.text.upper() for r in results)
+            if 'MAX' in text_joined:
+                continue
+        return False
+    return True
 _HOME_CURRENT_RE = re.compile(r'^\d{1,3}$')
 _HOME_GAIN_RE = re.compile(r'^\+\d{1,3}$')
-_HOME_OCR_MIN_CONFIDENCE = 0.80
+_HOME_OCR_MIN_CONFIDENCE = 0.50
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,10 +155,20 @@ def read_intensify_home_panel(
         if len(current) == 1 and len(gains) == 1:
             pairs.append((int(current[0].text), int(gains[0].text[1:])))
             continue
+        if len(current) == 1 and not gains:
+            pairs.append((int(current[0].text), 0))
+            continue
+        if current_text and _HOME_CURRENT_RE.fullmatch(current_text[0].text.strip()):
+            pairs.append((int(current_text[0].text.strip()), 0))
+            continue
         hsv = cv2.cvtColor(row, cv2.COLOR_RGB2HSV)
         blue = cv2.inRange(hsv, np.array((90, 150, 70)), np.array((125, 255, 255)))
         if not current_text and not gain_text and float(np.mean(blue > 0)) < 0.01:
             pairs.append((0, 0))
+            continue
+        digits = re.findall(r'\d+', ' '.join(r.text for r in current_results))
+        if digits:
+            pairs.append((int(digits[0]), 0))
             continue
         raise IntensifyWorkflowError('强化主页属性面板存在无法可靠识别的数值')
     current = ShipStats(*(pair[0] for pair in pairs))
@@ -127,7 +180,11 @@ def read_intensify_home_panel(
         np.array((90, 100, 100)),
         np.array((125, 255, 255)),
     )
-    can_intensify = gains != ShipStats() and float(np.mean(blue_button > 0)) >= 0.15
+    can_intensify = (
+        float(np.mean(blue_button > 0)) >= 0.05
+        or float(np.mean(button > 150)) >= 0.08
+        or gains != ShipStats()
+    )
     return IntensifyHomePanelObservation(current, gains, can_intensify)
 
 

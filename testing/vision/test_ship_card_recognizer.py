@@ -428,6 +428,36 @@ def test_wsg_ncc_metadata_ignores_identity_missing_from_manifest(tmp_path: Path)
     assert recognizer.recognize([np.zeros((405, 192, 3), dtype=np.uint8)]) == [None]
 
 
+def test_wsg_ncc_data_directory_loader_adds_bundled_python_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_root = tmp_path / 'wsg-ncc'
+    python_root = data_root / 'python'
+    codebook_path = data_root / 'codebooks' / 'cascade.npz'
+    metadata_path = data_root / 'gallery_meta.json'
+    python_root.mkdir(parents=True)
+    codebook_path.parent.mkdir(parents=True)
+    codebook_path.write_bytes(b'codebook')
+    metadata_path.write_text(
+        json.dumps({'1/84/XM_NORMAL_84.png': {'shipIndex': 84, 'title': '天后'}}),
+        encoding='utf-8',
+    )
+    cascade = MagicMock(return_value=MagicMock())
+    cascade_module = types.ModuleType('cascade_ncc')
+    cascade_module.CascadeRecognizer = cascade
+    monkeypatch.setitem(sys.modules, 'cascade_ncc', cascade_module)
+    monkeypatch.setattr(sys, 'path', [entry for entry in sys.path if entry != str(python_root)])
+
+    WsgNccShipCardRecognizer.from_data_root(
+        data_root,
+        manifest_path=_manifest(tmp_path),
+    )
+
+    assert sys.path[0] == str(python_root)
+    assert cascade.call_args.args[0] == codebook_path
+
+
 def test_wsg_ncc_data_zip_loader_reads_codebook_and_metadata(tmp_path: Path) -> None:
     archive_path = tmp_path / 'data.zip'
     with zipfile.ZipFile(archive_path, 'w') as archive:
