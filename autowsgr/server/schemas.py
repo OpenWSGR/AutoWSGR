@@ -79,6 +79,7 @@ class IntensifyRequest(BaseModel):
     material_ship_types: list[str] | None = None
     max_materials: int | None = Field(default=4, ge=1)
     protected_ships: list[str] = Field(default_factory=list)
+    reuse_target_inventory_baseline: bool = False
 
     @field_validator('target_ship')
     @classmethod
@@ -113,6 +114,7 @@ class AutoIntensifyRequest(BaseModel):
     material_ship_types: list[str] | None = None
     max_materials: int | None = Field(default=4, ge=1)
     protected_ships: list[str] = Field(default_factory=list)
+    reuse_target_inventory_baseline: bool = False
 
     @field_validator('material_ship_types')
     @classmethod

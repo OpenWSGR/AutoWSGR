@@ -328,39 +328,79 @@ class CetusTargetCardReader:
             value = None if binary_glyph is None else self.ocr.recognize_number(binary_glyph)
         return value if value is not None and 0 <= value <= 999 else None
 
+    def read_levels_batch(
+        self,
+        screen: np.ndarray,
+        cards: Sequence[CardRect],
+        identities: Sequence[TargetCardIdentity],
+    ) -> list[ShipStats | None]:
+        results: list[ShipStats | None] = []
+        unresolved_slots: list[tuple[int, int, np.ndarray]] = []
+        card_values: list[list[int | None]] = []
+
+        for card_idx, (card, identity) in enumerate(zip(cards, identities, strict=True)):
+            if identity.ship_id == 0 or identity.masked:
+                card_values.append([0, 0, 0, 0])
+                continue
+            maximum = None if self.max_resolver is None else self.max_resolver(identity.ship_id)
+            if maximum is None:
+                card_values.append([0, 0, 0, 0])
+                continue
+            max_vals = (maximum.firepower, maximum.torpedo, maximum.armor, maximum.anti_air)
+            vals: list[int | None] = []
+            for stat_idx, (bounds, field_max) in enumerate(zip(_STRENGTHEN_CROPS, max_vals, strict=True)):
+                crop = _relative_crop(screen, card, bounds)
+                if field_max == 0 or _is_cross(crop):
+                    vals.append(0)
+                elif _is_max(crop):
+                    vals.append(field_max)
+                else:
+                    topo = _topology_digit(crop)
+                    if topo is not None:
+                        vals.append(topo)
+                    else:
+                        color_glyph = _extract_digit_color(crop)
+                        if color_glyph is not None:
+                            unresolved_slots.append((card_idx, stat_idx, color_glyph))
+                            vals.append(None)
+                        else:
+                            binary_glyph = _extract_digit_glyph(crop)
+                            if binary_glyph is not None:
+                                unresolved_slots.append((card_idx, stat_idx, binary_glyph))
+                                vals.append(None)
+                            else:
+                                vals.append(None)
+            card_values.append(vals)
+
+        # Batch OCR invocation: runs 1 GPU kernel for all crops at once
+        if unresolved_slots and self.ocr is not None:
+            batch_images = [slot[2] for slot in unresolved_slots]
+            ocr_results = self.ocr.recognize_batch(batch_images, allowlist='0123456789')
+            for (card_idx, stat_idx, _img), ocr_res in zip(unresolved_slots, ocr_results, strict=True):
+                val = None
+                for r in ocr_res:
+                    text = r.text.strip()
+                    if text.isdigit():
+                        v = int(text)
+                        if 0 <= v <= 999:
+                            val = v
+                            break
+                card_values[card_idx][stat_idx] = val
+
+        for vals in card_values:
+            if any(v is None for v in vals):
+                results.append(None)
+            else:
+                results.append(ShipStats(*(v for v in vals if v is not None)))
+        return results
+
     def read_levels(
         self,
         screen: np.ndarray,
         card: CardRect,
         identity: TargetCardIdentity,
     ) -> ShipStats | None:
-        if identity.ship_id == 0:
-            return ShipStats(0, 0, 0, 0)
-        maximum = None if self.max_resolver is None else self.max_resolver(identity.ship_id)
-        if maximum is None:
-            return ShipStats(0, 0, 0, 0)
-        maximum_values = (
-            maximum.firepower,
-            maximum.torpedo,
-            maximum.armor,
-            maximum.anti_air,
-        )
-        values = [
-            self._read_stat(_relative_crop(screen, card, bounds), field_maximum)
-            for bounds, field_maximum in zip(
-                _STRENGTHEN_CROPS,
-                maximum_values,
-                strict=True,
-            )
-        ]
-        if any(value is None for value in values):
-            return None
-        firepower, torpedo, armor, anti_air = values
-        assert firepower is not None
-        assert torpedo is not None
-        assert armor is not None
-        assert anti_air is not None
-        return ShipStats(firepower, torpedo, armor, anti_air)
+        return self.read_levels_batch(screen, [card], [identity])[0]
 
 
 class CetusTargetScanDevice:

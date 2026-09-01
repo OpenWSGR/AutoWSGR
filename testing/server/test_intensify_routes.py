@@ -415,6 +415,7 @@ def test_intensify_execute_passes_request_policy_to_automatic_execution(
             'material_ship_types': frozenset({'dd'}),
             'maximum_materials': None,
             'protected_material_identities': frozenset({'信赖'}),
+            'reuse_target_inventory_baseline': False,
         },
     }
 
@@ -454,6 +455,7 @@ def test_intensify_execute_omitted_request_retains_execution_defaults(
         'material_ship_types': frozenset({'dd'}),
         'maximum_materials': 4,
         'protected_material_identities': frozenset({'信赖'}),
+        'reuse_target_inventory_baseline': False,
     }
 
 

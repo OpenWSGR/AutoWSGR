@@ -588,8 +588,12 @@ class TargetInventoryScanner:
                 sig = tuple(c.ship_id for c in idents)
                 if sig not in seen_row_signatures:
                     seen_row_signatures.add(sig)
-                    for card, ident in zip(r, idents, strict=True):
-                        levels = self._reader.read_levels(screen, card, ident)
+                    reader_batch = getattr(self._reader, 'read_levels_batch', None)
+                    if callable(reader_batch):
+                        row_levels = reader_batch(screen, r, idents)
+                    else:
+                        row_levels = [self._reader.read_levels(screen, c, i) for c, i in zip(r, idents, strict=True)]
+                    for card, ident, levels in zip(r, idents, row_levels, strict=True):
                         accumulated_targets.append(
                             TargetShipSnapshot(
                                 ref=SelectionRef('unassigned'),

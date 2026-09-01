@@ -147,6 +147,7 @@ async def intensify_action(request: AutoIntensifyRequest | None = None) -> ApiRe
     material_ship_types = execution_policy.material_ship_types
     maximum_materials = execution_policy.max_materials
     protected_ships = execution_policy.protected_ships
+    reuse_target_baseline = getattr(execution_policy, 'reuse_target_inventory_baseline', False)
 
     try:
         result = await asyncio.to_thread(
@@ -157,6 +158,7 @@ async def intensify_action(request: AutoIntensifyRequest | None = None) -> ApiRe
             ),
             maximum_materials=maximum_materials,
             protected_material_identities=frozenset(protected_ships),
+            reuse_target_inventory_baseline=reuse_target_baseline,
         )
         return ApiResponse(
             success=result.success,

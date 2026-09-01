@@ -75,6 +75,7 @@ class _UnsetPolicyOption:
 
 
 _UNSET_POLICY_OPTION = _UnsetPolicyOption()
+_session_target_inventory_baseline: TargetInventorySnapshot | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,10 +147,12 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
     material_ship_types: frozenset[str] | None | _UnsetPolicyOption = _UNSET_POLICY_OPTION,
     maximum_materials: int | None | _UnsetPolicyOption = _UNSET_POLICY_OPTION,
     protected_material_identities: frozenset[str] | _UnsetPolicyOption = _UNSET_POLICY_OPTION,
+    reuse_target_inventory_baseline: bool = False,
     max_batches: int = 50,
     maximum_rarity: int = 6,
 ) -> AutoIntensifyExecutionResult:
     """执行完整的自动化强化全流程。"""
+    global _session_target_inventory_baseline
     t_start = time.monotonic()
     _log.info('[OPS] 开始自动强化')
 
@@ -182,25 +185,51 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
         maximum_materials = saved_policy.max_materials
     if isinstance(protected_material_identities, _UnsetPolicyOption):
         protected_material_identities = frozenset(saved_policy.protected_ships)
+    if not reuse_target_inventory_baseline and getattr(saved_policy, 'reuse_target_inventory_baseline', False):
+        reuse_target_inventory_baseline = True
 
     # 2. 导航到强化首页
     nav_controller = MaterialFirstIntensifyController(device)
     nav_controller.ensure_intensify_home(ctx=ctx)
 
-    # 3. 全量双库存扫描
-    _log.info('[OPS] 执行双库存全量扫描...')
-    targets_snapshot, materials_snapshot = scan_intensify_inventory_pair(
-        device,
-        identities,
-        scroll_input=ctx.ctrl,
-        ocr=ctx.ocr,
-        max_resolver=max_resolver,
-    )
-    _log.info(
-        '[OPS] 双库存扫描完成: 目标 {} 艘, 素材 {} 艘',
-        targets_snapshot.total,
-        materials_snapshot.total,
-    )
+    # 3. 扫描库存（支持复用目标库基线）
+    if (
+        reuse_target_inventory_baseline
+        and _session_target_inventory_baseline is not None
+        and _session_target_inventory_baseline.targets
+    ):
+        targets_snapshot = _session_target_inventory_baseline
+        _log.info('[OPS] 复用目标库扫描基线 (共 {} 艘目标)，执行素材库单扫描...', targets_snapshot.total)
+        from autowsgr.ui.intensify_snapshot_scan import (
+            IntensifySnapshotNavigator,
+            _scan_and_close_selector,
+        )
+        from autowsgr.ui.material_inventory_scanner import scan_material_inventory_from_selector
+
+        nav = IntensifySnapshotNavigator(device)
+        nav.open_material_selector()
+        materials_snapshot = _scan_and_close_selector(
+            lambda: scan_material_inventory_from_selector(device, identities),
+            nav.close_material_selector,
+            label='素材库存',
+        )
+        _log.info('[OPS] 素材库单扫描完成: 目标 {} 艘(复用), 素材 {} 艘', targets_snapshot.total, materials_snapshot.total)
+    else:
+        _log.info('[OPS] 执行双库存全量扫描...')
+        targets_snapshot, materials_snapshot = scan_intensify_inventory_pair(
+            device,
+            identities,
+            scroll_input=ctx.ctrl,
+            ocr=ctx.ocr,
+            max_resolver=max_resolver,
+        )
+        _log.info(
+            '[OPS] 双库存扫描完成: 目标 {} 艘, 素材 {} 艘',
+            targets_snapshot.total,
+            materials_snapshot.total,
+        )
+        if reuse_target_inventory_baseline:
+            _session_target_inventory_baseline = targets_snapshot
 
     if materials_snapshot.total == 0:
         _log.info('[OPS] 素材库为空，自动强化完成')
@@ -546,6 +575,25 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
                     replace(t, required_contribution=req) if t.index == batch.target_index else t
                     for t in planning_targets
                 ]
+
+    # 动态更新会话目标基线
+    if reuse_target_inventory_baseline and planning_targets:
+        active_target_refs = {t.target.ref for t in planning_targets}
+        remaining_target_snapshots = tuple(
+            t for t in targets_snapshot.targets if t.ref in active_target_refs
+        )
+        if remaining_target_snapshots:
+            from autowsgr.ui.target_inventory_scanner import TargetInventorySnapshot
+
+            _session_target_inventory_baseline = TargetInventorySnapshot(
+                targets=tuple(
+                    replace(t, global_index=new_idx)
+                    for new_idx, t in enumerate(remaining_target_snapshots)
+                ),
+                total=len(remaining_target_snapshots),
+                complete=True,
+                revision=targets_snapshot.revision,
+            )
 
     # 6. 安全返回主页面
     _log.info('[OPS] 自动强化完成，返回主页面')
