@@ -21,6 +21,7 @@ from autowsgr.types import (
     OSType,
     RepairMode,
 )
+from autowsgr.infra.config import resolve_ocr_gpu_enabled
 
 
 @pytest.fixture(autouse=True)
@@ -66,6 +67,21 @@ class TestOCRConfig:
 
     def test_ship_name_aliases_default(self):
         assert OCRConfig().ship_name_aliases == {}
+
+    @pytest.mark.parametrize(
+        ('configured', 'override', 'expected'),
+        [(False, '', False), (False, 'cuda', True), (True, 'cpu', False)],
+    )
+    def test_gpu_override_resolves_one_effective_setting(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        configured: bool,
+        override: str,
+        expected: bool,
+    ) -> None:
+        monkeypatch.setenv('AUTOWSGR_OCR_GPU_MODE', override)
+
+        assert resolve_ocr_gpu_enabled(configured) is expected
 
     def test_ship_name_corrections_skip_malformed_entries(self):
         config = OCRConfig(

@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from autowsgr.infra import resolve_ocr_gpu_enabled
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import PageName
@@ -169,7 +170,9 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
     strengthen_data_path = Path(os.getenv('AUTOWSGR_STRENGTHEN_DATA', r'E:\wsgrgui\resource\strengthen.json'))
     ship_library_path = Path(os.getenv('AUTOWSGR_SHIP_LIBRARY', r'E:\wsgrgui\resource\ship-library'))
 
-    identities = load_default_ship_card_recognizer()
+    identities = load_default_ship_card_recognizer(
+        use_gpu=resolve_ocr_gpu_enabled(ctx.config.ocr.gpu)
+    )
     max_resolver = TargetStrengthenMaxResolver.from_source(strengthen_data_path)
     strengthen_data_resolver = ShipStrengthenDataResolver.from_source(strengthen_data_path)
     rarity_resolver = ShipLibraryRarityResolver.from_manifest(ship_library_path / 'manifest.json')

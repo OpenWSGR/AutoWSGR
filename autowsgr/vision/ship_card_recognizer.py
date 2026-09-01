@@ -348,8 +348,8 @@ class WsgNccShipCardRecognizer:
         )
 
 
-def load_default_ship_card_recognizer() -> WsgNccShipCardRecognizer:
-    """Load the licensed WSG-NCC runtime assets from explicit environment paths."""
+def load_default_ship_card_recognizer(*, use_gpu: bool = False) -> WsgNccShipCardRecognizer:
+    """Load WSG-NCC runtime assets with the caller's authoritative GPU setting."""
     data_root = os.getenv('AUTOWSGR_WSG_NCC_DATA', '').strip()
     library_root = os.getenv('AUTOWSGR_SHIP_LIBRARY', '').strip()
     if not data_root:
@@ -364,7 +364,6 @@ def load_default_ship_card_recognizer() -> WsgNccShipCardRecognizer:
             library_root = str(default_lib)
         else:
             raise ShipCardRecognitionError('未设置 AUTOWSGR_SHIP_LIBRARY')
-    use_gpu = os.getenv('AUTOWSGR_WSG_NCC_GPU', '').strip().lower() in {'1', 'true', 'yes'}
     return WsgNccShipCardRecognizer.from_data_root(
         data_root,
         manifest_path=Path(library_root) / 'manifest.json',

@@ -96,7 +96,13 @@ def _install_auto_intensify_fakes(
     monkeypatch.setattr(intensify, 'AdbLosslessMaterialDevice', lambda _serial: FakeDevice())
     monkeypatch.setattr(intensify, 'MaterialFirstIntensifyController', FakeNavigationController)
     monkeypatch.setattr(intensify_snapshot_scan, 'IntensifySnapshotNavigator', FakeSnapshotNavigator)
-    monkeypatch.setattr(intensify, 'load_default_ship_card_recognizer', object)
+    recognized_gpu_modes: list[bool] = []
+
+    def load_recognizer(*, use_gpu: bool) -> object:
+        recognized_gpu_modes.append(use_gpu)
+        return object()
+
+    monkeypatch.setattr(intensify, 'load_default_ship_card_recognizer', load_recognizer)
     monkeypatch.setattr(
         intensify.TargetStrengthenMaxResolver,
         'from_source',
@@ -131,9 +137,10 @@ def _install_auto_intensify_fakes(
     monkeypatch.setattr(intensify, 'goto_page', lambda *_args: None)
     monkeypatch.setattr(intensify.time, 'sleep', lambda _seconds: None)
 
-    return SimpleNamespace(
+    context = SimpleNamespace(
         config=SimpleNamespace(
             emulator=SimpleNamespace(serial='emulator-5554'),
+            ocr=SimpleNamespace(gpu=True),
             intensify=SimpleNamespace(
                 material_ship_types=['dd'],
                 max_materials=4,
@@ -143,6 +150,8 @@ def _install_auto_intensify_fakes(
         ctrl=SimpleNamespace(),
         ocr=object(),
     )
+    context._recognized_gpu_modes = recognized_gpu_modes
+    return context
 
 
 def test_material_click_steps_use_incremental_scroll_offsets() -> None:
@@ -167,6 +176,7 @@ def test_remove_consumed_materials_rejects_stale_batch_ref() -> None:
 def test_runtime_advancement_removes_only_each_executed_batch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv('AUTOWSGR_OCR_GPU_MODE', 'cpu')
     ctx = _install_auto_intensify_fakes(monkeypatch, target_selectable=iter([True] * 6))
     planned_inventories: list[list[str]] = []
 
@@ -183,6 +193,7 @@ def test_runtime_advancement_removes_only_each_executed_batch(
     assert result.total_batches == 2
     assert [batch.materials for batch in result.batches] == [['A'], ['B']]
     assert planned_inventories == [['A', 'B', 'C'], ['B', 'C']]
+    assert ctx._recognized_gpu_modes == [False]
 
 
 def test_unselectable_target_consumes_nothing_and_next_target_can_run(

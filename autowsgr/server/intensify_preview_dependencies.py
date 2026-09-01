@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from autowsgr.infra import resolve_ocr_gpu_enabled
 from autowsgr.server.intensify_preview_service import IntensifyPreviewService
 from autowsgr.server.intensify_snapshot_scan_service import IntensifySnapshotScanService
 from autowsgr.server.intensify_snapshot_store import IntensifySnapshotStore
@@ -75,7 +76,9 @@ def get_intensify_snapshot_scan_service(context: object) -> IntensifySnapshotSca
         from autowsgr.vision.ship_card_recognizer import load_default_ship_card_recognizer
 
         device = AdbLosslessMaterialDevice(serial.strip())
-        identities = load_default_ship_card_recognizer()
+        identities = load_default_ship_card_recognizer(
+            use_gpu=resolve_ocr_gpu_enabled(config.ocr.gpu)
+        )
         max_resolver = TargetStrengthenMaxResolver.from_source(Path(strengthen_value))
         return scan_intensify_inventory_pair(
             device,

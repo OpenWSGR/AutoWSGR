@@ -30,7 +30,7 @@ from pathlib import Path
 
 from autowsgr.context import GameContext
 from autowsgr.emulator import AndroidController, ScrcpyController
-from autowsgr.infra import ConfigManager, UserConfig
+from autowsgr.infra import ConfigManager, UserConfig, resolve_ocr_gpu_enabled
 from autowsgr.infra.logger import get_logger, setup_logger
 from autowsgr.vision import EasyOCREngine, OCREngine
 
@@ -139,12 +139,7 @@ class Launcher:
         """根据配置创建通用 OCR 引擎 (EasyOCR)。"""
         cfg = self.config
         _log.info('[Launcher] 创建通用 OCR 引擎: EasyOCR')
-        gpu = cfg.ocr.gpu
-        gpu_override = os.getenv('AUTOWSGR_OCR_GPU_MODE', '').lower()
-        if gpu_override == 'cuda':
-            gpu = True
-        elif gpu_override == 'cpu':
-            gpu = False
+        gpu = resolve_ocr_gpu_enabled(cfg.ocr.gpu)
         self._ocr = EasyOCREngine.create(gpu=gpu, mirror=cfg.ocr.mirror)
         # 同步船池感知匹配置信度到 ocr 模块
         from autowsgr.vision.ocr import set_ship_name_match_confidence

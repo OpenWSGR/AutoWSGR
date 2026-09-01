@@ -15,6 +15,7 @@ from autowsgr.types import ShipType
 from autowsgr.vision.ship_card_recognizer import (
     ShipCardRecognitionError,
     WsgNccShipCardRecognizer,
+    load_default_ship_card_recognizer,
 )
 
 
@@ -55,6 +56,28 @@ def _manifest(tmp_path: Path) -> Path:
         encoding='utf-8',
     )
     return path
+
+
+def test_default_wsg_ncc_loader_forwards_explicit_gpu_setting(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / 'wsg-ncc'
+    library_root = tmp_path / 'ship-library'
+    data_root.mkdir()
+    library_root.mkdir()
+    factory = MagicMock(return_value=MagicMock())
+    monkeypatch.setenv('AUTOWSGR_WSG_NCC_DATA', str(data_root))
+    monkeypatch.setenv('AUTOWSGR_SHIP_LIBRARY', str(library_root))
+    monkeypatch.setattr(WsgNccShipCardRecognizer, 'from_data_root', factory)
+
+    load_default_ship_card_recognizer(use_gpu=True)
+
+    factory.assert_called_once_with(
+        str(data_root),
+        manifest_path=library_root / 'manifest.json',
+        use_gpu=True,
+    )
 
 
 def test_wsg_ncc_adapter_maps_confident_unique_match(tmp_path: Path) -> None:

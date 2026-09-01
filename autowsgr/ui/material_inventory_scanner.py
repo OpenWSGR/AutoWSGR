@@ -288,25 +288,6 @@ class MaterialViewportReader:
             screen.shape[0],
         )
 
-    def capture_best(
-        self,
-        screens: Sequence[np.ndarray],
-    ) -> CapturedMaterialViewport:
-        """Keep the sharpest complete-card crop from geometry-identical frames."""
-        captures = tuple(self.capture(screen) for screen in screens)
-        geometry = (captures[0].row_lengths, captures[0].bands)
-        if any((capture.row_lengths, capture.bands) != geometry for capture in captures[1:]):
-            raise MaterialInventoryScanError('稳定帧之间的舰名栏几何不一致')
-
-        def detail_score(crop: np.ndarray) -> float:
-            return float(cv2.Laplacian(crop, cv2.CV_32F).var())
-
-        crops = tuple(
-            max((capture.crops[index] for capture in captures), key=detail_score)
-            for index in range(len(captures[0].crops))
-        )
-        return CapturedMaterialViewport(crops, *geometry, captures[0].screen_height)
-
     def recognize_captures(
         self,
         captures: Sequence[CapturedMaterialViewport],
@@ -582,8 +563,6 @@ class MaterialInventoryScanner:
         is_material_screen: Callable[[np.ndarray], bool] = is_material_selector_screen,
         stagnant_limit: int = 2,
         settle_seconds: float = 0.8,
-        sample_count: int = 8,
-        sample_interval_seconds: float = 0.65,
     ) -> None:
         self._ctrl = ctrl
         self._reader = reader
@@ -591,35 +570,20 @@ class MaterialInventoryScanner:
         self._is_material_screen = is_material_screen
         self._stagnant_limit = stagnant_limit
         self._settle_seconds = settle_seconds
-        if sample_count < 2:
-            raise ValueError('素材视口至少需要采样两帧')
-        self._sample_count = sample_count
-        self._sample_interval_seconds = sample_interval_seconds
 
-    def _stable_screens(self) -> tuple[np.ndarray, ...]:
-        screens: list[np.ndarray] = []
-        thumb_bounds: tuple[int, int] | None = None
-        for index in range(self._sample_count):
-            screen = self._ctrl.screenshot()
-            if not self._is_material_screen(screen) or has_selected_material(screen):
-                raise MaterialInventoryScanError('素材页面状态不安全或已有素材被选中')
-            current_thumb = self._stepper.thumb_bounds(screen)
-            if thumb_bounds is None:
-                thumb_bounds = current_thumb
-            elif current_thumb != thumb_bounds:
-                raise MaterialInventoryScanError('多帧采样期间滚动条位置发生变化')
-            screens.append(screen)
-            if index + 1 < self._sample_count:
-                time.sleep(self._sample_interval_seconds)
-        return tuple(screens)
+    def _settled_screen(self) -> np.ndarray:
+        """Capture one authoritative viewport after the preceding scroll settles."""
+        screen = self._ctrl.screenshot()
+        if not self._is_material_screen(screen) or has_selected_material(screen):
+            raise MaterialInventoryScanError('素材页面状态不安全或已有素材被选中')
+        return screen
 
     def scan(self, *, max_viewports: int = 24) -> MaterialInventorySnapshot:
         captures: list[CapturedMaterialViewport] = []
         previous_thumb: int | None = None
         stagnant = 0
         for viewport_count in range(1, max_viewports + 1):
-            stable_screens = self._stable_screens()
-            screen = stable_screens[-1]
+            screen = self._settled_screen()
             if viewport_count == 1:
                 # 检查素材库是否为空（0 艘素材）
                 if not self._reader.locate_name_bands(screen):
@@ -633,7 +597,6 @@ class MaterialInventoryScanner:
                     )
                 if not self._stepper.is_top(screen):
                     raise MaterialInventoryScanError('素材扫描必须从滚动条顶部开始')
-            captured = self._reader.capture_best(stable_screens)
             thumb_bounds = self._stepper.thumb_bounds(screen)
             thumb_bottom = thumb_bounds[1]
             no_thumb_move = previous_thumb is not None and thumb_bottom == previous_thumb
@@ -641,7 +604,7 @@ class MaterialInventoryScanner:
             if no_thumb_move and not at_bottom:
                 raise MaterialInventoryScanError('滚动条在未到底时没有移动')
             if not (at_bottom and no_thumb_move):
-                captures.append(captured)
+                captures.append(self._reader.capture(screen))
                 _log.info('[OPS] 扫描素材库存: 视口第 {} 步, 已捕获 {} 组视口', viewport_count, len(captures))
             stagnant = stagnant + 1 if at_bottom and no_thumb_move else 0
             if stagnant >= self._stagnant_limit:

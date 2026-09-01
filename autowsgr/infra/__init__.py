@@ -14,6 +14,7 @@ from .config import (
     NodeConfig,
     OCRConfig,
     UserConfig,
+    resolve_ocr_gpu_enabled,
 )
 from .exceptions import (
     ActionFailedError,
@@ -71,6 +72,7 @@ __all__ = [
     'get_logger',
     'load_yaml',
     'merge_dicts',
+    'resolve_ocr_gpu_enabled',
     'resolve_plan_path',
     'save_image',
     'save_yaml',

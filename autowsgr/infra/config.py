@@ -83,6 +83,16 @@ class AccountConfig(BaseModel):
         return self.game_app.package_name
 
 
+def resolve_ocr_gpu_enabled(configured: bool) -> bool:
+    """Apply the process OCR GPU override to one configured GPU preference."""
+    override = os.getenv('AUTOWSGR_OCR_GPU_MODE', '').lower()
+    if override == 'cuda':
+        return True
+    if override == 'cpu':
+        return False
+    return configured
+
+
 class OCRConfig(BaseModel):
     """OCR 引擎配置。"""
 
