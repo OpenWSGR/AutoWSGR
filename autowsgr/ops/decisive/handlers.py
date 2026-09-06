@@ -148,6 +148,7 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._state.stage,
             )
         self._battle_page.click_enter_map()
+        time.sleep(2.0)
         self._use_last_fleet_attempts = 0
         self._wait_deadline = time.monotonic() + 15.0
         self._state.phase = DecisivePhase.WAITING_FOR_MAP
