@@ -86,6 +86,7 @@ class DecisiveBase:
         self._has_chosen_fleet: bool = False
         self._wait_deadline: float = 0.0
         self._use_last_fleet_attempts: int = 0
+        self._skip_advance_choice: bool = False
 
     @property
     def state(self) -> DecisiveState:

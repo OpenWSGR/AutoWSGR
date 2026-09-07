@@ -17,8 +17,6 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-import cv2
-
 from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.infra.logger import get_logger
@@ -150,38 +148,20 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._state.stage,
             )
         self._battle_page.click_enter_map()
-        time.sleep(2.0)
         self._use_last_fleet_attempts = 0
+        self._skip_advance_choice = False
         self._wait_deadline = time.monotonic() + 15.0
         self._state.phase = DecisivePhase.WAITING_FOR_MAP
 
     def _handle_waiting_for_map(self) -> None:
         """等待地图页加载: 单次截图检测 → 转到对应阶段或继续等待。"""
-        screen = self._ctrl.screenshot()
-        phase = self._map.detect_decisive_phase(screen)
-
-        # Ex-1 首次进入第 1 小节时，理论上应先经历一次战备舰队获取。
-        # 若此时尚未进入过 CHOOSE_FLEET，却稳定识别成 PREPARE_COMBAT，
-        # 则将其视为购买界面漏判并自动修正到 CHOOSE_FLEET。
-        # 注意：暂离后重进时 node='U'，此时舰标已在地图上，不应修正到 CHOOSE_FLEET
-        if (
-            phase == DecisivePhase.PREPARE_COMBAT
-            and self._state.stage == 1
-            and not self._has_chosen_fleet
-        ):
-            if self._state.node != 'U':
-                _log.warning('[决战] 首进第 1 小节将 PREPARE_COMBAT 修正为 CHOOSE_FLEET')
-                self._state.phase = DecisivePhase.CHOOSE_FLEET
-                return
-            # node == 'U' 时，通过舰标检测区分暂离重进与 overlay 延迟加载
-            bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-            icon_x = self._map._locate_ship_icon(bgr)
-            if icon_x is None:
-                _log.warning(
-                    '[决战] 首进第 1 小节未检测到舰标，将 PREPARE_COMBAT 修正为 CHOOSE_FLEET'
-                )
-                self._state.phase = DecisivePhase.CHOOSE_FLEET
-                return
+        phase = self._map.wait_for_entry_phase(
+            wait_for_use_last=self._use_last_fleet_attempts == 0,
+            wait_for_advance=not self._skip_advance_choice,
+            timeout=3.0,
+            interval=0.2,
+        )
+        self._skip_advance_choice = False
 
         if phase is not None:
             self._state.phase = phase
@@ -266,7 +246,9 @@ class DecisivePhaseHandlers(DecisiveBase):
         _log.info('[决战] 选择前进点')
         choice_idx = self._logic.get_advance_choice([])
         self._map.select_advance_card(choice_idx)
-        self._state.phase = DecisivePhase.CHOOSE_FLEET
+        self._wait_deadline = time.monotonic() + 10.0
+        self._skip_advance_choice = True
+        self._state.phase = DecisivePhase.WAITING_FOR_MAP
 
     # ── 战斗 ──────────────────────────────────────────────────────────────
 

@@ -56,6 +56,13 @@ class Decisive:
     MAP_PAGE = LazyTemplate('decisive/decisive_map_540p.png', 'decisive_map_page')
     """决战地图页特征 (classic ``decisive_map_entrance``, 247x133)。"""
 
+    RESET_BUTTON = LazyTemplate(
+        'decisive/reset_button.png',
+        'decisive_reset_button',
+        source_resolution=(1280, 720),
+    )
+    """决战总览页底部「重置关卡」入口按钮。"""
+
     # ── 浮层 ──
     FLEET_ACQUISITION = LazyTemplate(
         'decisive/fleet_acq_720p.png',

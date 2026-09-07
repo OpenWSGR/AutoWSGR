@@ -23,6 +23,7 @@ from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisiveEntryStatus, PageName
 from autowsgr.ui.utils import click_and_wait_for_page, confirm_operation
 from autowsgr.vision import (
+    ROI,
     Color,
     ImageChecker,
     MatchStrategy,
@@ -80,6 +81,9 @@ CLICK_ENTER_MAP: tuple[float, float] = (500 / 960, 500 / 540)
 
 CLICK_RESET_CHAPTER: tuple[float, float] = (0.5, 0.925)
 """点击"重置关卡"按钮（总览页底部）。"""
+
+RESET_BUTTON_ROI = ROI(0.64, 0.84, 0.73, 1.0)
+"""1280x720 总览页中「重置关卡」按钮的固定识别区域。"""
 
 CHAPTER_NUM_AREA: tuple[float, float, float, float] = (0.818, 0.810, 0.875, 0.867)
 """章节编号 OCR 裁切区域 (x1, y1, x2, y2)。"""
@@ -437,7 +441,23 @@ class DecisiveBattlePage:
             船坞已满处理由调用方负责。
         """
         _log.info('[决战] 决战页面 → 重置关卡')
-        self._ctrl.click(*CLICK_RESET_CHAPTER)
+        deadline = time.monotonic() + 5.0
+        match = None
+        while time.monotonic() < deadline:
+            match = ImageChecker.find_template(
+                self._ctrl.screenshot(),
+                Templates.Decisive.RESET_BUTTON,
+                roi=RESET_BUTTON_ROI,
+                confidence=0.8,
+            )
+            if match is not None:
+                break
+            time.sleep(0.2)
+
+        if match is None:
+            raise TimeoutError('未识别到「重置关卡」按钮，拒绝点击')
+
+        self._ctrl.click(*match.center)
         time.sleep(1.0)
         screen = self._ctrl.screenshot()
         if ImageChecker.template_exists(

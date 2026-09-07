@@ -33,6 +33,7 @@ from autowsgr.ui.decisive.overlay import (
     CLICK_RETREAT_BUTTON,
     CLICK_RETREAT_CONFIRM,
     CLICK_SORTIE,
+    USE_LAST_FLEET_ROI,
     DecisiveOverlay,
     detect_decisive_overlay,
     get_overlay_template,
@@ -43,6 +44,7 @@ from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 from autowsgr.ui.utils.ship_list import recognize_ships_in_list as _recognize_ships
 from autowsgr.vision import (
     ImageChecker,
+    ImageTemplate,
     MatchStrategy,
     PixelChecker,
     PixelRule,
@@ -154,6 +156,7 @@ class DecisiveMapController:
         if ImageChecker.template_exists(
             screen,
             Templates.Decisive.USE_LAST_FLEET,
+            roi=USE_LAST_FLEET_ROI,
             confidence=0.8,
         ):
             _log.info('[地图控制器] 检测到「使用上次舰队」按钮')
@@ -186,6 +189,74 @@ class DecisiveMapController:
                 return DecisivePhase.PREPARE_COMBAT
 
         return None
+
+    def _wait_for_template(
+        self,
+        template: ImageTemplate,
+        *,
+        timeout: float = 3.0,
+        interval: float = 0.2,
+    ) -> bool:
+        """Poll one decisive UI template without performing any click."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if ImageChecker.template_exists(self._ctrl.screenshot(), template, confidence=0.8):
+                return True
+            time.sleep(interval)
+        return False
+
+    def _wait_for_use_last_fleet(self) -> bool:
+        """等待总览稳定后，在固定按钮区域快速识别三次。"""
+        from autowsgr.image_resources import Templates
+
+        time.sleep(3.0)
+        for _ in range(3):
+            if ImageChecker.template_exists(
+                self._ctrl.screenshot(),
+                Templates.Decisive.USE_LAST_FLEET,
+                roi=USE_LAST_FLEET_ROI,
+                confidence=0.8,
+            ):
+                return True
+            time.sleep(0.2)
+        return False
+
+    def wait_for_entry_phase(
+        self,
+        *,
+        wait_for_use_last: bool,
+        wait_for_advance: bool,
+        timeout: float = 3.0,
+        interval: float = 0.2,
+    ) -> DecisivePhase:
+        """Resolve the next entry UI through staged, positive recognition.
+
+        The caller supplies which already-consumed overlays to skip. The final
+        stage accepts only a fleet-acquisition overlay or a confirmed map page;
+        unknown screens time out instead of receiving a blind click.
+        """
+        from autowsgr.image_resources import Templates
+
+        if wait_for_use_last and self._wait_for_use_last_fleet():
+            return DecisivePhase.USE_LAST_FLEET
+
+        if wait_for_advance and self._wait_for_template(
+            Templates.Decisive.ADVANCE_CHOICE,
+            timeout=timeout,
+            interval=interval,
+        ):
+            return DecisivePhase.ADVANCE_CHOICE
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            if is_fleet_acquisition(screen):
+                return DecisivePhase.CHOOSE_FLEET
+            if is_decisive_map_page(screen):
+                return DecisivePhase.PREPARE_COMBAT
+            time.sleep(interval)
+
+        raise TimeoutError('决战入口页面未识别到预期弹窗或地图页')
 
     # ── 舰船图标颜色检测参数 (HSV, BGR 输入) ──────────────────────
     # 决战地图上的舰船指示器呈橙黄色高亮，是该色段面积最大的连通区域
@@ -408,15 +479,24 @@ class DecisiveMapController:
 
         click_confirm_pos: tuple[float, float] = (873 / 960, 500 / 540)
 
-        screen = self._ctrl.screenshot()
-        match = ImageChecker.find_template(
-            screen,
-            Templates.Decisive.USE_LAST_FLEET,
-            confidence=0.8,
-        )
-        if match is not None:
-            self._ctrl.click(*match.center)
-            time.sleep(0.5)
+        deadline = time.monotonic() + 5.0
+        match = None
+        while time.monotonic() < deadline:
+            match = ImageChecker.find_template(
+                self._ctrl.screenshot(),
+                Templates.Decisive.USE_LAST_FLEET,
+                roi=USE_LAST_FLEET_ROI,
+                confidence=0.8,
+            )
+            if match is not None:
+                break
+            time.sleep(0.2)
+
+        if match is None:
+            raise TimeoutError('未识别到「使用上次舰队」按钮，拒绝点击')
+
+        self._ctrl.click(*match.center)
+        time.sleep(0.5)
 
         self._ctrl.click(*click_confirm_pos)
         time.sleep(1.0)
@@ -506,6 +586,11 @@ class DecisiveMapController:
 
     def select_advance_card(self, index: int) -> None:
         """选择前进点卡片并确认。"""
+        self.wait_for_overlay(
+            DecisiveOverlay.ADVANCE_CHOICE,
+            timeout=5.0,
+            interval=0.2,
+        )
         if index < len(ADVANCE_CARD_POSITIONS):
             self._ctrl.click(*ADVANCE_CARD_POSITIONS[index])
             time.sleep(0.5)
@@ -727,10 +812,11 @@ class DecisiveMapController:
     ) -> np.ndarray:
         """反复截图直到指定 overlay 出现。"""
         tmpl = get_overlay_template(target)
+        confidence = 0.70 if target is DecisiveOverlay.FLEET_ACQUISITION else 0.85
         deadline = time.monotonic() + timeout
         while True:
             screen = self._ctrl.screenshot()
-            if ImageChecker.template_exists(screen, tmpl, confidence=0.85):
+            if ImageChecker.template_exists(screen, tmpl, confidence=confidence):
                 return screen
             if time.monotonic() >= deadline:
                 raise TimeoutError(f'等待 overlay {target.value} 超时 ({timeout}s)')

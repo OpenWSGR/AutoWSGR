@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
+    ROI,
     ImageChecker,
     ImageTemplate,
     MatchStrategy,
@@ -121,12 +122,17 @@ OVERLAY_SIGNATURES: list[tuple[DecisiveOverlay, PixelSignature]] = [
 
 _SIG_BY_TYPE: dict[DecisiveOverlay, PixelSignature] = dict(OVERLAY_SIGNATURES)
 
+# 720p 决战总览页右侧「上次选船」按钮区域，按用户实机红框留出边缘。
+USE_LAST_FLEET_ROI = ROI(0.82, 0.30, 1.0, 0.50)
+
 # overlay → 识别模板映射 (图像模板匹配, 替代上方像素签名)
 _OVERLAY_TEMPLATE_MAP: dict[DecisiveOverlay, ImageTemplate] = {
     DecisiveOverlay.FLEET_ACQUISITION: Templates.Decisive.FLEET_ACQUISITION,
     DecisiveOverlay.CONFIRM_EXIT: Templates.Decisive.CONFIRM_EXIT,
     DecisiveOverlay.ADVANCE_CHOICE: Templates.Decisive.ADVANCE_CHOICE,
 }
+
+_FLEET_ACQUISITION_CONFIDENCE = 0.70
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -222,7 +228,12 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
         首个命中的弹窗类型；无弹窗则返回 ``None``。
     """
     for overlay_type, tmpl in _OVERLAY_TEMPLATE_MAP.items():
-        if ImageChecker.template_exists(screen, tmpl, confidence=0.85):
+        confidence = (
+            _FLEET_ACQUISITION_CONFIDENCE
+            if overlay_type is DecisiveOverlay.FLEET_ACQUISITION
+            else 0.85
+        )
+        if ImageChecker.template_exists(screen, tmpl, confidence=confidence):
             _log.debug('[决战] 检测到 overlay: {}', overlay_type.value)
             return overlay_type
     return None
@@ -236,7 +247,9 @@ def is_decisive_map_page(screen: np.ndarray) -> bool:
 def is_fleet_acquisition(screen: np.ndarray) -> bool:
     """截图是否为战备舰队获取 overlay。"""
     return ImageChecker.template_exists(
-        screen, Templates.Decisive.FLEET_ACQUISITION, confidence=0.85
+        screen,
+        Templates.Decisive.FLEET_ACQUISITION,
+        confidence=_FLEET_ACQUISITION_CONFIDENCE,
     )
 
 
