@@ -6,12 +6,17 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 from autowsgr.ui.battle.base import BaseBattlePreparation, RepairStrategy
 from autowsgr.ui.battle.constants import BLOOD_BAR_PROBE
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 _log = get_logger('ui.preparation')
@@ -52,6 +57,8 @@ class RepairMixin(BaseBattlePreparation):
         ----------
         strategy:
             修理策略，默认 ``RepairStrategy.SEVERE``。
+        manual_repair_action:
+            手动维修模式识别到受损舰船后、抛出异常前执行的导航动作。
 
         Returns
         -------
@@ -80,6 +87,7 @@ class RepairMixin(BaseBattlePreparation):
         strategy: RepairStrategy | None = None,
         *,
         repair_manually: bool = False,
+        manual_repair_action: Callable[[], None] | None = None,
         retry_count: int = 3,
     ) -> list[int]:
         """根据策略执行快速修理。
@@ -108,6 +116,8 @@ class RepairMixin(BaseBattlePreparation):
                 return []
             # 需要手动修理，退出程序
             if self._ctx.config.repair_manually or repair_manually:
+                if manual_repair_action is not None:
+                    manual_repair_action()
                 raise ActionFailedError('需要进行手动修理')
             self.repair_slots(positions)
             repair_pos.extend(positions)

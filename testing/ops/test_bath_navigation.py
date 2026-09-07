@@ -5,8 +5,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from autowsgr.context import GameContext
+from autowsgr.infra import ActionFailedError
 from autowsgr.ops import navigate
 from autowsgr.types import PageName
+from autowsgr.ui.battle.base import RepairStrategy
+from autowsgr.ui.battle.preparation import BattlePreparationPage
 
 
 def test_normal_sortie_returns_to_map_before_bath(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -47,3 +51,22 @@ def test_decisive_sortie_leaves_saved_map_before_bath(monkeypatch: pytest.Monkey
     assert wait_for_page.call_args.args[0] is ctx.ctrl
     assert wait_for_page.call_args.kwargs['target'] is PageName.DECISIVE_BATTLE
     goto_page.assert_called_once_with(ctx, PageName.BATH)
+
+
+def test_manual_repair_action_runs_before_manual_repair_error() -> None:
+    ctx = GameContext(
+        ctrl=MagicMock(),
+        config=SimpleNamespace(repair_manually=True),
+        ocr=None,
+    )
+    page = BattlePreparationPage(ctx)
+    page.check_repair = MagicMock(return_value=[0])
+    manual_repair_action = MagicMock()
+
+    with pytest.raises(ActionFailedError, match='需要进行手动修理'):
+        page.apply_repair(
+            RepairStrategy.MODERATE,
+            manual_repair_action=manual_repair_action,
+        )
+
+    manual_repair_action.assert_called_once_with()
