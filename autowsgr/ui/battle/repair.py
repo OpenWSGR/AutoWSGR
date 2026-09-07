@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from autowsgr.infra import ActionFailedError
+from autowsgr.infra import ActionFailedError, ManualRepairRequiredError
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 from autowsgr.ui.battle.base import BaseBattlePreparation, RepairStrategy
@@ -87,7 +87,7 @@ class RepairMixin(BaseBattlePreparation):
         strategy: RepairStrategy | None = None,
         *,
         repair_manually: bool = False,
-        manual_repair_action: Callable[[], None] | None = None,
+        manual_repair_action: Callable[[list[int]], None] | None = None,
         retry_count: int = 3,
     ) -> list[int]:
         """根据策略执行快速修理。
@@ -117,8 +117,13 @@ class RepairMixin(BaseBattlePreparation):
             # 需要手动修理，退出程序
             if self._ctx.config.repair_manually or repair_manually:
                 if manual_repair_action is not None:
-                    manual_repair_action()
-                raise ActionFailedError('需要进行手动修理')
+                    try:
+                        manual_repair_action(positions)
+                    except ManualRepairRequiredError:
+                        raise
+                    except Exception as exc:
+                        raise ManualRepairRequiredError('手动维修处理失败') from exc
+                raise ManualRepairRequiredError('需要进行手动修理')
             self.repair_slots(positions)
             repair_pos.extend(positions)
             # 修理完成再检查一遍

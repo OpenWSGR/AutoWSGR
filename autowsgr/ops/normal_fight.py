@@ -22,6 +22,7 @@ from autowsgr.combat.fleet import (
 from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_bath_from_normal_sortie, goto_page
+from autowsgr.ops.repair import repair_manual_targets_in_bath
 from autowsgr.types import ConditionFlag, PageName, RepairMode, ShipDamageState
 from autowsgr.ui import BaseEventPage, BattlePreparationPage, MapPage, MapPanel, RepairStrategy
 from autowsgr.ui.utils import NavigationError
@@ -411,9 +412,20 @@ class NormalFightRunner:
             repair_strategy = RepairStrategy.NEVER
 
         if getattr(self._ctx.config, 'repair_manually', False):
+            fleet_names = resolved_ship_names or self._fleet_selection.primary_names
+
+            def manual_repair_action(positions: list[int]) -> None:
+                targets = [
+                    fleet_names[position]
+                    for position in positions
+                    if 0 <= position < len(fleet_names) and fleet_names[position]
+                ]
+                goto_bath_from_normal_sortie(self._ctx)
+                repair_manual_targets_in_bath(self._ctx, targets)
+
             page.apply_repair(
                 repair_strategy,
-                manual_repair_action=lambda: goto_bath_from_normal_sortie(self._ctx),
+                manual_repair_action=manual_repair_action,
             )
         else:
             page.apply_repair(repair_strategy)

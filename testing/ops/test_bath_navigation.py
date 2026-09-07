@@ -5,12 +5,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import autowsgr.ops.repair as repair_module
 from autowsgr.context import GameContext
 from autowsgr.infra import ActionFailedError
 from autowsgr.ops import navigate
 from autowsgr.types import PageName
 from autowsgr.ui.battle.base import RepairStrategy
 from autowsgr.ui.battle.preparation import BattlePreparationPage
+from autowsgr.ui.utils import NavigationError
 
 
 def test_normal_sortie_returns_to_map_before_bath(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -69,4 +71,47 @@ def test_manual_repair_action_runs_before_manual_repair_error() -> None:
             manual_repair_action=manual_repair_action,
         )
 
-    manual_repair_action.assert_called_once_with()
+    manual_repair_action.assert_called_once_with([0])
+
+
+def test_manual_bath_repair_records_success_and_stops_on_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = MagicMock()
+    page.repair_ship.side_effect = [120, -1]
+    ship = MagicMock()
+    ctx = SimpleNamespace(
+        bathroom=MagicMock(),
+        config=SimpleNamespace(bathroom_count=2),
+        get_ship=lambda _name: ship,
+        update_ship_damage=MagicMock(),
+    )
+    goto_page = MagicMock()
+    monkeypatch.setattr(repair_module, 'BathPage', lambda _ctx: page)
+    monkeypatch.setattr(repair_module, 'goto_page', goto_page)
+
+    repair_module.repair_manual_targets_in_bath(ctx, ['舰一', '舰二'])
+
+    assert page.go_to_choose_repair.call_count == 2
+    assert page.repair_ship.call_args_list[0].args == ('舰一',)
+    ship.set_repair.assert_called_once_with(120)
+    ctx.update_ship_damage.assert_called_once_with('舰一', 0)
+    ctx.bathroom.occupy.assert_called_once_with(120)
+    goto_page.assert_called_once_with(ctx, PageName.MAIN)
+
+
+def test_manual_bath_repair_logs_missing_target_and_returns_home(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = MagicMock()
+    page.repair_ship.side_effect = NavigationError('target not listed')
+    ctx = SimpleNamespace()
+    goto_page = MagicMock()
+    monkeypatch.setattr(repair_module, 'BathPage', lambda _ctx: page)
+    monkeypatch.setattr(repair_module, 'goto_page', goto_page)
+
+    repair_module.repair_manual_targets_in_bath(ctx, ['舰一'])
+
+    page.go_to_choose_repair.assert_called_once_with()
+    page.repair_ship.assert_called_once_with('舰一')
+    goto_page.assert_called_once_with(ctx, PageName.MAIN)

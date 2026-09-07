@@ -28,6 +28,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from autowsgr.combat import CombatResult
+from autowsgr.infra import ManualRepairRequiredError
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag
 
@@ -255,6 +256,15 @@ class TaskScheduler:
 
                 try:
                     results = runner.run()
+                except ManualRepairRequiredError as exc:
+                    _log.error(
+                        '[Scheduler] {} 第 {} 次需要手动维修，任务终止: {}',
+                        task.name,
+                        rounds + 1,
+                        exc,
+                    )
+                    task.results.append(CombatResult(flag=ConditionFlag.ACTION_FAILED))
+                    break
                 except Exception as exc:
                     # 子任务异常: 结束本子任务, 不崩溃主循环。ACTION_FAILED 不属
                     # 于任何触发器的成功/耗尽标志, 故 on_done 不会计入战斗次数、

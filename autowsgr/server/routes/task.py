@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import Discriminator
 
+from autowsgr.infra import ManualRepairRequiredError
 from autowsgr.infra.logger import get_logger
 from autowsgr.server.device_lease import DeviceOperationBusyError
 from autowsgr.server.schemas import (
@@ -153,6 +154,11 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
+            except ManualRepairRequiredError as e:
+                _log.error('[Task] 第 {} 轮需要手动维修，任务终止: {}', i + 1, e)
+                # TODO: 未来接入任务持久化挂起恢复，并通过换船 OCR 识别维修中舰船后降级到备选编队。
+                results.append({'round': i + 1, 'success': False, 'error': str(e)})
+                break
             except Exception as e:
                 _log.error('[Task] 第 {} 轮失败: {}', i + 1, e)
                 results.append({'round': i + 1, 'success': False, 'error': str(e)})
@@ -307,6 +313,9 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
                 if result.value in {'leave', 'error'}:
                     _log.warning('[Task] 决战第 {} 轮终止: {}', i + 1, result.value)
                     break
+        except ManualRepairRequiredError as e:
+            task_error = str(e)
+            results.append({'round': len(results) + 1, 'success': False, 'error': str(e)})
         except Exception as e:
             results.append({'round': len(results) + 1, 'success': False, 'error': str(e)})
 
