@@ -179,6 +179,9 @@ Next Step: Await user direction; the chapter-6 E2E was interrupted after the fle
 - Production event-page recognition still needs the bottom-right fight-button ROI fix described in `findings.md`.
 - Do not resume real-device recovery-chain until that false-positive fix is tested offline.
 
+### Commit checkpoint
+- Code/E2E/config checkpoint committed as `5c2eb12` (`fix(decisive): gate entry and reset actions by recognition`).
+
 ### Event-page false-positive diagnosis
 - `BaseEventPage.is_current_page()` checks the generic `fight_button_20260730_540p.png` first at confidence `0.8`.
 - On the decisive formation screenshot, that full-screen match falsely hits the top-left back button at confidence `0.86994`; difficulty-icon and event-title checks were not involved.
