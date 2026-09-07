@@ -269,6 +269,27 @@ class TestParseLegacyCondition:
         assert conditions[0].op == '>='
         assert conditions[0].value == 2
 
+    @pytest.mark.parametrize(
+        ('condition', 'expected'),
+        [
+            ('ap>=1', Condition(field='AP', op='>=', value=1)),
+            ('ap > = 1', Condition(field='AP', op='>=', value=1)),
+            ('bb>=2', Condition(field='BB', op='>=', value=2)),
+            ('cv > = 1', Condition(field='CV', op='>=', value=1)),
+            ('ss + cl > = 3', Condition(field='SS+CL', op='>=', value=3)),
+            ('all == 6', Condition(field='ALL', op='==', value=6)),
+            ('cvl ! = 1', Condition(field='CVL', op='!=', value=1)),
+        ],
+    )
+    def test_accepts_case_and_spaced_operator_compatibility(
+        self,
+        condition: str,
+        expected: Condition,
+    ):
+        assert _parse_legacy_condition(condition) == [
+            expected,
+        ]
+
     def test_compound_and(self):
         conditions = _parse_legacy_condition('(BB >= 2) and (CV > 0)')
         assert len(conditions) == 2

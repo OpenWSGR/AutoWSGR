@@ -301,9 +301,15 @@ def _parse_legacy_condition(condition_str: str) -> list[Condition]:
     不支持 ``or`` — 用多条规则替代。
 
     支持 ``+`` 运算符将多个舰种求和，如 ``CL + DD >= 1``。
+    兼容舰种代码大小写和组合运算符中间的空格，如 ``ap > = 1``。
     """
     conditions: list[Condition] = []
-    parts = _CONDITION_SEPARATOR_RE.split(condition_str.strip())
+    normalized_condition = re.sub(
+        r'([<>!])\s*=\s*',
+        r'\1=',
+        condition_str.strip().upper(),
+    )
+    parts = _CONDITION_SEPARATOR_RE.split(normalized_condition)
     if not parts or any(not part.strip() for part in parts):
         raise ValueError(f"无法解析规则条件: '{condition_str}'")
     for part in parts:

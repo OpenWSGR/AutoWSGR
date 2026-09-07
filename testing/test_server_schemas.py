@@ -428,6 +428,15 @@ def test_node_decision_request_keeps_yaml_supported_fields():
     assert decision.formation_when_spot_enemy_fails == 3
 
 
+@pytest.mark.parametrize('condition', ['ap>=1', 'ap > = 1'])
+def test_node_decision_request_accepts_legacy_rule_spelling(condition: str):
+    decision = NodeDecisionRequest.model_validate(
+        {'enemy_rules': [[condition, 4]]},
+    )
+
+    assert decision.enemy_rules == [(condition, 4)]
+
+
 def test_api_combat_plan_parses_event_entrance_and_node_fields():
     request = CombatPlanRequest(
         mode='event',
