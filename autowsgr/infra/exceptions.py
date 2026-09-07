@@ -112,6 +112,10 @@ class ActionFailedError(UIError):
         super().__init__(msg)
 
 
+class ManualRepairRequiredError(ActionFailedError):
+    """手动维修已处理, 当前整个任务必须终止。"""
+
+
 # ── 游戏逻辑异常 ──
 
 

@@ -23,6 +23,8 @@ from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.decisive.base import DecisiveBase
+from autowsgr.ops.navigate import goto_bath_from_decisive_sortie
+from autowsgr.ops.repair import repair_manual_targets_in_bath
 from autowsgr.types import (
     ConditionFlag,
     DecisiveEntryStatus,
@@ -365,7 +367,25 @@ class DecisivePhaseHandlers(DecisiveBase):
         strategy = (
             RepairStrategy.MODERATE if self._config.repair_level <= 1 else RepairStrategy.SEVERE
         )
-        page.apply_repair(strategy, repair_manually=not self._config.use_quick_repair)
+        if self._config.use_quick_repair:
+            page.apply_repair(strategy)
+        else:
+
+            def manual_repair_action(positions: list[int]) -> None:
+                targets = [
+                    self._state.fleet[position + 1]
+                    for position in positions
+                    if 0 <= position + 1 < len(self._state.fleet)
+                    and self._state.fleet[position + 1]
+                ]
+                goto_bath_from_decisive_sortie(self._ctx)
+                repair_manual_targets_in_bath(self._ctx, targets)
+
+            page.apply_repair(
+                strategy,
+                repair_manually=True,
+                manual_repair_action=manual_repair_action,
+            )
 
         screen = self._ctrl.screenshot()
         damage = page.detect_ship_damage(screen)

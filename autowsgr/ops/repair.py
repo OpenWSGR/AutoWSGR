@@ -17,9 +17,12 @@ from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import PageName, ShipDamageState
 from autowsgr.ui.bath_page import BathPage
+from autowsgr.ui.utils import NavigationError
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from autowsgr.context import GameContext
 
 _log = get_logger('ops')
@@ -27,6 +30,50 @@ _log = get_logger('ops')
 # ═══════════════════════════════════════════════════════════════════════════════
 # 公开函数
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+def repair_manual_targets_in_bath(ctx: GameContext, ship_names: Sequence[str]) -> None:
+    """在澡堂按目标舰船名派修，结束后返回首页。"""
+    page = BathPage(ctx)
+    targets = [name for name in ship_names if name]
+
+    try:
+        if not targets:
+            _log.warning('[OPS] 手动维修: 未能解析需要修理的舰船')
+            return
+
+        for ship_name in targets:
+            try:
+                page.go_to_choose_repair()
+            except NavigationError as exc:
+                _log.error('[OPS] 手动维修: 无法打开选择修理列表: {}', exc)
+                break
+
+            try:
+                repair_seconds = page.repair_ship(ship_name)
+            except NavigationError:
+                _log.warning('[OPS] 手动维修: 舰船 {} 不在修理列表中', ship_name)
+                continue
+
+            if repair_seconds < 0:
+                _log.warning('[OPS] 手动维修: 澡堂槽位已满，无法修理 {}', ship_name)
+                break
+
+            ship = ctx.get_ship(ship_name)
+            ship.set_repair(repair_seconds)
+            ctx.update_ship_damage(ship_name, ShipDamageState.NORMAL)
+            ctx.bathroom.slot_count = ctx.config.bathroom_count
+            ctx.bathroom.occupy(repair_seconds)
+            _log.info(
+                '[OPS] 手动维修: 舰船 {} 正在澡堂修理 ({}s)',
+                ship_name,
+                repair_seconds,
+            )
+    finally:
+        try:
+            goto_page(ctx, PageName.MAIN)
+        except Exception as exc:
+            _log.warning('[OPS] 手动维修后返回首页失败: {}', exc)
 
 
 def repair_in_bath(ctx: GameContext) -> None:
