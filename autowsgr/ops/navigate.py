@@ -179,3 +179,35 @@ def goto_page(ctx: GameContext, target: str) -> None:
         current_page = identify_current_page(ctx)
         _log.info('[OPS] 当前页面: {}, 执行一次重试', current_page)
         _goto_page(ctx, target)
+
+
+def goto_bath_from_normal_sortie(ctx: GameContext) -> None:
+    """从普通出征准备页返回普通地图后进入澡堂。"""
+    from autowsgr.ui.battle.preparation import BattlePreparationPage
+
+    BattlePreparationPage(ctx).go_back()
+    goto_page(ctx, PageName.BATH)
+
+
+def goto_bath_from_decisive_sortie(ctx: GameContext) -> None:
+    """从决战出征准备页暂离保存后进入澡堂。"""
+    from autowsgr.infra import DecisiveConfig
+    from autowsgr.ui.decisive import DecisiveMapController
+    from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
+    from autowsgr.ui.utils import wait_for_page
+
+    config = getattr(ctx.config, 'decisive_battle', None) or DecisiveConfig()
+    map_controller = DecisiveMapController(ctx, config)
+    map_controller.go_to_map_page()
+    map_controller.open_retreat_dialog()
+    map_controller.confirm_leave()
+    wait_for_page(
+        ctx.ctrl,
+        DecisiveBattlePage.is_current_page,
+        source='决战暂离',
+        target=PageName.DECISIVE_BATTLE,
+    )
+    goto_page(ctx, PageName.BATH)
+
+
+# TODO: 活动出征需先从 BATTLE_PREP 返回 EVENT_MAP，再接 EVENT_MAP → MAIN → 后院 → 澡堂。

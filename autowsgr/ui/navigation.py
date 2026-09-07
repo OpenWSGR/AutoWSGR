@@ -208,10 +208,8 @@ NAV_GRAPH: list[NavEdge] = [
     NavEdge(PageName.SIDEBAR, PageName.MAIN, _sidebar_to_main, '侧边栏 → 主页面'),
     # ── 地图 → 子页面 ──
     NavEdge(PageName.MAP, PageName.DECISIVE_BATTLE, _map_to_decisive, '地图 → 决战'),
-    # BATTLE_PREP / CHOOSE_SHIP 不入图: 出征准备与选船是战斗域的中转页
-    # (战斗结束跳过出征准备直接回准备页之前的 UI), 入口有 5 个 (战役/演习/
-    # 常规/决战/活动), 图上建边不可泛化。进入它们走 combat 流程的显式操作,
-    # 取消出征用 BattlePreparationPage.go_back (直接点击, 不经 find_path)。
+    # BATTLE_PREP / CHOOSE_SHIP 不入图: 来源依赖战斗模式, 由 ops.navigate
+    # 的显式路线处理。活动出征需先返回 EVENT_MAP 后再接入澡堂导航 (TODO)。
     # ── 后院 ↔ 子页面 ──
     NavEdge(PageName.BACKYARD, PageName.BATH, _backyard_to_bath, '后院 → 浴室'),
     NavEdge(PageName.BACKYARD, PageName.CANTEEN, _backyard_to_canteen, '后院 → 食堂'),
