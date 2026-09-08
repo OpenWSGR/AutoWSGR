@@ -151,6 +151,7 @@ async def _start_normal_fight(ctx: Any, request: NormalFightRequest) -> ApiRespo
                     plan,
                     times=1,
                     fleet_selection=fleet_selection,
+                    repair_status_callback=task_manager.set_repairing,
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])
@@ -204,6 +205,7 @@ async def _start_event_fight(ctx: Any, request: EventFightRequest) -> ApiRespons
                     plan,
                     times=1,
                     fleet_selection=fleet_selection,
+                    repair_status_callback=task_manager.set_repairing,
                 )[0]
                 results.append(convert_combat_result(result, i + 1))
                 task_manager.add_result(results[-1])

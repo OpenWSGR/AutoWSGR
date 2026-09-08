@@ -189,6 +189,22 @@ def goto_bath_from_normal_sortie(ctx: GameContext) -> None:
     goto_page(ctx, PageName.BATH)
 
 
+def goto_bath_from_event_sortie(ctx: GameContext) -> None:
+    """从活动出征准备页返回活动地图后进入澡堂。"""
+    from autowsgr.ui.battle.constants import CLICK_BACK
+    from autowsgr.ui.event.event_page import BaseEventPage
+    from autowsgr.ui.utils import click_and_wait_for_page
+
+    click_and_wait_for_page(
+        ctx.ctrl,
+        click_coord=CLICK_BACK,
+        checker=BaseEventPage.is_current_page,
+        source=PageName.BATTLE_PREP,
+        target=PageName.EVENT_MAP,
+    )
+    goto_page(ctx, PageName.BATH)
+
+
 def goto_bath_from_decisive_sortie(ctx: GameContext) -> None:
     """从决战出征准备页暂离保存后进入澡堂。"""
     from autowsgr.infra import DecisiveConfig
@@ -208,6 +224,3 @@ def goto_bath_from_decisive_sortie(ctx: GameContext) -> None:
         target=PageName.DECISIVE_BATTLE,
     )
     goto_page(ctx, PageName.BATH)
-
-
-# TODO: 活动出征需先从 BATTLE_PREP 返回 EVENT_MAP，再接 EVENT_MAP → MAIN → 后院 → 澡堂。

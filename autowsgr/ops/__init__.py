@@ -68,6 +68,7 @@ from autowsgr.ops.expedition import collect_expedition
 # ── 导航 ──
 from autowsgr.ops.navigate import (
     goto_bath_from_decisive_sortie,
+    goto_bath_from_event_sortie,
     goto_bath_from_normal_sortie,
     goto_page,
     identify_current_page,
@@ -125,6 +126,7 @@ __all__ = [
     'go_main_page',
     # 导航
     'goto_bath_from_decisive_sortie',
+    'goto_bath_from_event_sortie',
     'goto_bath_from_normal_sortie',
     'goto_page',
     'identify_current_page',

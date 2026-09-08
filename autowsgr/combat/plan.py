@@ -13,7 +13,7 @@ import copy
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from autowsgr.infra import NodeConfig, load_yaml
 from autowsgr.infra.logger import get_logger
@@ -294,6 +294,8 @@ class CombatPlan:
         GUI 整理后的舰队预设列表。
     repair_mode:
         修理策略。
+    repair_method:
+        维修方式。``None`` 表示未指定，兼容读取全局 ``repair_manually``。
     fight_condition:
         战况选择。
     selected_nodes:
@@ -317,6 +319,7 @@ class CombatPlan:
     fleet: list[str] | None = None
     fleet_presets: tuple[FleetPreset, ...] | None = None
     repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
+    repair_method: Literal['quick', 'bath'] | None = None
     fight_condition: FightCondition = FightCondition.aim
     selected_nodes: list[str] = field(default_factory=list)
     nodes: dict[str, NodeDecision] = field(default_factory=dict)
@@ -431,6 +434,14 @@ class CombatPlan:
         else:
             repair_mode = RepairMode(repair_mode_raw)
 
+        # 维修方式缺省时保留旧版全局 repair_manually 兼容语义。
+        repair_method_raw = data.get('repair_method')
+        if repair_method_raw not in (None, 'quick', 'bath'):
+            raise ValueError(
+                f'repair_method 不合法: {repair_method_raw!r}, 可选值: quick/bath',
+            )
+        repair_method: Literal['quick', 'bath'] | None = repair_method_raw
+
         # 默认节点配置
         node_defaults = data.get('node_defaults', {})
         default_node = NodeDecision.from_dict(node_defaults)
@@ -467,6 +478,7 @@ class CombatPlan:
             fleet=fleet,
             fleet_presets=fleet_presets,
             repair_mode=repair_mode,
+            repair_method=repair_method,
             fight_condition=fight_condition,
             selected_nodes=selected_nodes,
             nodes=nodes,

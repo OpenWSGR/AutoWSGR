@@ -86,7 +86,7 @@ class RepairMixin(BaseBattlePreparation):
         self,
         strategy: RepairStrategy | None = None,
         *,
-        repair_manually: bool = False,
+        repair_manually: bool | None = None,
         manual_repair_action: Callable[[list[int]], None] | None = None,
         retry_count: int = 3,
     ) -> list[int]:
@@ -96,6 +96,8 @@ class RepairMixin(BaseBattlePreparation):
         ----------
         strategy:
             修理策略，默认 ``RepairStrategy.SEVERE``。
+        repair_manually:
+            显式传入时覆盖全局配置；``None`` 表示沿用全局 ``repair_manually``。
 
         Returns
         -------
@@ -115,7 +117,12 @@ class RepairMixin(BaseBattlePreparation):
             if not positions:
                 return []
             # 需要手动修理，退出程序
-            if self._ctx.config.repair_manually or repair_manually:
+            manual_repair_enabled = (
+                self._ctx.config.repair_manually
+                if repair_manually is None
+                else repair_manually
+            )
+            if manual_repair_enabled:
                 if manual_repair_action is not None:
                     try:
                         manual_repair_action(positions)

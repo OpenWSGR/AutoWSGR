@@ -30,6 +30,7 @@ class TaskStatusEnum(StrEnum):
 
     IDLE = 'idle'
     RUNNING = 'running'
+    REPAIRING = 'repairing'
     COMPLETED = 'completed'
     FAILED = 'failed'
     STOPPED = 'stopped'
@@ -210,6 +211,10 @@ class CombatPlanRequest(BaseModel):
     repair_mode: list[int] = Field(
         default_factory=lambda: [2, 2, 2, 2, 2, 2],
         description='修理策略 (6个位置)',
+    )
+    repair_method: Literal['quick', 'bath'] | None = Field(
+        default=None,
+        description='维修方式：quick=快速维修，bath=澡堂维修；未传时兼容全局 repair_manually',
     )
     fight_condition: int = Field(default=4, ge=1, le=5, description='战况选择')
     selected_nodes: list[str] = Field(
