@@ -9,10 +9,14 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+import cv2
+
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
 from autowsgr.ui.map.data import (
     CLICK_BACK,
+    CHAPTER_OCR_ALLOWLIST,
+    CHAPTER_SLOT_ROIS,
     CLICK_EXPEDITION_SKIP,
     CLICK_PANEL,
     EXPEDITION_NOTIF_COLOR,
@@ -25,8 +29,10 @@ from autowsgr.ui.map.data import (
     SIDEBAR_SCAN_X,
     SIDEBAR_SCAN_Y_RANGE,
     TITLE_CROP_REGION,
+    ChapterSlot,
     MapIdentity,
     MapPanel,
+    parse_chapter_label,
     parse_map_title,
 )
 from autowsgr.ui.tabbed_page import (
@@ -208,6 +214,57 @@ class BaseMapPage:
             max_bright, int(avg_bright), adaptive_threshold, cover,
         )
         return center
+
+    def read_chapter_slots(self, screen: np.ndarray | None = None) -> tuple[ChapterSlot, ...]:
+        """Read the five fixed sortie chapter slots from one screenshot.
+
+        The title OCR remains the map-state feedback. This method only answers
+        which chapter labels are currently visible in the sidebar and where
+        they can be clicked.
+        """
+        if self._ocr is None:
+            raise RuntimeError('需要 OCR 引擎才能读取章节槽位')
+        if screen is None:
+            screen = self._ctrl.screenshot()
+
+        slots: list[ChapterSlot] = []
+        for index, roi in enumerate(CHAPTER_SLOT_ROIS):
+            crop = PixelChecker.crop(screen, *roi)
+            result = self._ocr.recognize_single(crop, allowlist=CHAPTER_OCR_ALLOWLIST)
+            chapter = parse_chapter_label(result.text)
+
+            if chapter is None and result.text.strip() not in {'', '---'}:
+                gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+                _, binary = cv2.threshold(
+                    gray,
+                    0,
+                    255,
+                    cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+                )
+                binary_rgb = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+                binary_result = self._ocr.recognize_single(
+                    binary_rgb,
+                    allowlist=CHAPTER_OCR_ALLOWLIST,
+                )
+                binary_chapter = parse_chapter_label(binary_result.text)
+                if binary_chapter is not None:
+                    result = binary_result
+                    chapter = binary_chapter
+
+            slots.append(
+                ChapterSlot(
+                    index=index,
+                    chapter=chapter,
+                    text=result.text.strip(),
+                    confidence=result.confidence,
+                ),
+            )
+
+        _log.debug(
+            '[UI] 章节槽位: {}',
+            [(slot.index, slot.chapter, slot.text, round(slot.confidence, 2)) for slot in slots],
+        )
+        return tuple(slots)
 
     # ═══════════════════════════════════════════════════════════════════════
     # 状态查询 — 地图 OCR

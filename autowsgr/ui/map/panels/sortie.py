@@ -17,16 +17,18 @@ from autowsgr.types import PageName
 from autowsgr.ui.map.base import BaseMapPage
 from autowsgr.ui.map.data import (
     CHAPTER_MAP_COUNTS,
-    CHAPTER_NAV_DELAY,
     CHAPTER_NAV_MAX_ATTEMPTS,
-    CHAPTER_SPACING,
+    CHAPTER_SLOT_CENTERS,
+    CHAPTER_SLOT_CENTER_INDEX,
     CLICK_ENTER_SORTIE,
     CLICK_MAP_NEXT,
     CLICK_MAP_PREV,
+    MAP_NAV_SETTLE_DELAY,
     SIDEBAR_CLICK_X,
-    SIDEBAR_SCAN_Y_RANGE,
     TOTAL_CHAPTERS,
+    ChapterSlot,
     MapPanel,
+    choose_chapter_slot,
 )
 # ── 计数器模块 (OCR 纯函数) 重导出 — 保持 sortie.py 对外符号不变 ──
 from autowsgr.ui.map.panels.sortie_counters import (  # noqa: F401  重新导出
@@ -53,120 +55,15 @@ class SortiePanelMixin(BaseMapPage):
     # 章节 / 地图导航
     # ═══════════════════════════════════════════════════════════════════════
 
-    # click_chapter 内部「方向 fallback 探针」轮换使用的候选 y, 保证每次点不同位置避免死点同坐标
-    #  +1 (下一条): 中下半区;  -1 (上一条): 中上半区 (都在安全区 [0.16, 0.84] 内)
-    _PROBE_Y = {
-        1:  (0.700, 0.645, 0.755, 0.590),
-        -1: (0.300, 0.355, 0.245, 0.410),
-    }
-
-    def click_chapter(self, num: int, *, probe_cycle: int = 0) -> bool:
-        """点击侧边栏章节（单步跳转 ±1 最稳，num∈[-3,3]仅相邻可靠）。
-
-        优先使用高亮条 sel_y + CHAPTER_SPACING 并加微小抖动防死点；
-        若 sel_y 连续两次找不到 → 按方向用预定义的 4 个 fallback 探针
-        坐标轮换点击 (probe_cycle 传入 navigate 的点击次数累加即可)。
-
-        Parameters
-        ----------
-        num:
-            跳转数量, 正数向下跳转, 负数向上跳转。单步 ±1 最可靠。
-        probe_cycle:
-            同一方向连续失败时用于轮换 fallback 探针位置, 0~3 自动取模。
-
-        Returns
-        -------
-        bool
-            True = 实际发生了点击; False = 未点击 (两步都没有 sel_y)。
-        """
-        if not -3 <= num <= 3:
-            raise ValueError(f'跳转数量必须为 -3 到 3, 收到: {num}')
-        if num == 0:
-            return False
-
-        y_min, y_max = SIDEBAR_SCAN_Y_RANGE
-        safe_min = y_min + 0.04
-        safe_max = y_max - 0.04
-        direction = 1 if num > 0 else -1
-
-        def _jitter(base: float, amp: float = 0.006) -> float:
-            """给 base y 加微小均匀抖动 ±amp, 避免每次点同一像素无效。"""
-            offset = ((id(self) + probe_cycle * 37) % 100) / 100.0 * 2 - 1  # [-1, 1)
-            return max(safe_min, min(safe_max, base + offset * amp))
-
-        # ── 第 1 轮: 截图定位当前选中章 ──
-        screen = self._ctrl.screenshot()
-        sel_y = self.find_selected_chapter_y(screen)
-        if sel_y is None:
-            _log.debug('[UI] click_chapter 第1轮未找到高亮, 尝试复位侧边栏')
-            if num > 0:
-                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.80, SIDEBAR_CLICK_X, 0.20, duration=0.35)
-            else:
-                self._ctrl.swipe(SIDEBAR_CLICK_X, 0.20, SIDEBAR_CLICK_X, 0.80, duration=0.35)
-            time.sleep(0.30)
-            screen = self._ctrl.screenshot()
-            sel_y = self.find_selected_chapter_y(screen)
-            if sel_y is None:
-                _log.warning(
-                    '[UI] click_chapter 复位后仍无高亮条, 启用方向探针 fallback (cycle=%d)',
-                    probe_cycle,
-                )
-                probes = self._PROBE_Y[direction]
-                probe_y = probes[probe_cycle % len(probes)]
-                target_y = _jitter(probe_y, amp=0.008)
-                self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-                # fallback 探针一定是点击了, 不做点击成功与否判定 (由上层 OCR 回检兜底)
-                return True
-
-        target_y = sel_y + num * CHAPTER_SPACING
-        _log.info(
-            '[UI] 地图页面→跳转章节 {}  sel_y={:.3f}→target_y={:.3f}',
-            num, sel_y, target_y,
-        )
-
-        # ── 第 2 轮: 目标超出安全范围 → 先 swipe 滚动侧边栏 ──
-        if not (safe_min <= target_y <= safe_max):
-            _log.debug(
-                '[UI] 目标 y={:.3f} 超出安全区 [{:.2f},{:.2f}], 先 swipe 滚动列表',
-                target_y, safe_min, safe_max,
-            )
-            delta_y = abs(num) * CHAPTER_SPACING + 0.06
-            if direction == 1:
-                from_y = min(safe_max, sel_y + 0.10)
-                to_y = max(safe_min, from_y - delta_y - 0.04)
-            else:
-                from_y = max(safe_min, sel_y - 0.10)
-                to_y = min(safe_max, from_y + delta_y + 0.04)
-            self._ctrl.swipe(
-                SIDEBAR_CLICK_X, from_y,
-                SIDEBAR_CLICK_X, to_y,
-                duration=0.45,
-            )
-            time.sleep(CHAPTER_NAV_DELAY + 0.10)
-
-            screen = self._ctrl.screenshot()
-            sel_y2 = self.find_selected_chapter_y(screen)
-            if sel_y2 is None:
-                # swipe 后高亮还是看不清 → 改用 fallback 探针
-                probes = self._PROBE_Y[direction]
-                probe_y = probes[probe_cycle % len(probes)]
-                target_y = _jitter(probe_y, amp=0.010)
-                _log.warning('[UI] swipe 后无高亮条, 启用方向探针 y=%.3f', target_y)
-                self._ctrl.click(SIDEBAR_CLICK_X, target_y)
-                return True
-            target_y = sel_y2 + num * CHAPTER_SPACING
-            target_y = max(safe_min, min(safe_max, target_y))
-
-        # 加 ±0.006 抖动, 避免连续 9 次点到完全相同的像素
-        click_y = _jitter(target_y, amp=0.006)
-        self._ctrl.click(SIDEBAR_CLICK_X, click_y)
-        return True
+    def click_chapter_slot(self, index: int) -> None:
+        """Click one of the five fixed chapter slots."""
+        if not 0 <= index < len(CHAPTER_SLOT_CENTERS):
+            raise ValueError(f'章节槽位索引必须为 0-{len(CHAPTER_SLOT_CENTERS) - 1}, 收到: {index}')
+        self._ctrl.click(SIDEBAR_CLICK_X, CHAPTER_SLOT_CENTERS[index])
+        _log.info('[UI] 地图页面→点击章节槽位 {} (y={:.3f})', index, CHAPTER_SLOT_CENTERS[index])
 
     def navigate_to_chapter(self, target: int) -> int | None:
-        """导航到指定章节 (通过 OCR 识别当前位置并批量点击)。
-
-        远距离章节切换时采用批量点击 + 充分等待的策略，
-        避免单步验证导致动画过渡期的 OCR 抖动浪费尝试次数。
+        """Navigate to a chapter through fixed sidebar slots and OCR feedback.
 
         Parameters
         ----------
@@ -178,146 +75,70 @@ class SortiePanelMixin(BaseMapPage):
         if self._ocr is None:
             raise RuntimeError('需要 OCR 引擎才能导航到指定章节')
 
-        def _read_chapter(
-            samples: int = 3, delay: float = 0.15
-        ) -> tuple[int | None, np.ndarray | None, bool]:
-            chapters: list[int] = []
-            last_screen: np.ndarray | None = None
-
-            for i in range(samples):
-                screen = self._ctrl.screenshot()
-                last_screen = screen
-                info = self.recognize_map(screen, self._ocr)
-                if info is not None:
-                    chapters.append(info.chapter)
-                if i < samples - 1:
-                    time.sleep(delay)
-
-            if not chapters:
-                return None, last_screen, False
-
-            # 稳定策略：优先以"最后连续两次一致"为准，防止过渡态旧值占多数
-            if len(chapters) >= 2 and chapters[-1] == chapters[-2]:
-                candidate = chapters[-1]
-                stable = True
-            elif len(chapters) == samples and len(set(chapters)) == 1:
-                candidate = chapters[0]
-                stable = True
-            else:
-                candidate = max(set(chapters), key=chapters.count) if chapters else None
-                stable = False
-                _log.warning('[UI] 章节导航: OCR 抖动 {}，本轮不点击', chapters)
-            return candidate, last_screen, stable
-
-        def _quick_chapter() -> int | None:
-            """单次 OCR 快速回检 (用于点击后立即确认有没有真的切换章)。"""
+        def _read_slots() -> tuple[tuple[ChapterSlot, ...], int | None]:
             screen = self._ctrl.screenshot()
-            info = self.recognize_map(screen, self._ocr)
-            return info.chapter if info is not None else None
+            slots = self.read_chapter_slots(screen)
+            title = self.recognize_map(screen, self._ocr)
+            current = slots[CHAPTER_SLOT_CENTER_INDEX].chapter
+            if current is None and title is not None:
+                current = title.chapter
+            if current is not None and title is not None and title.chapter != current:
+                _log.warning(
+                    '[UI] 章节状态不一致: 侧边栏第{}章, 标题第{}章',
+                    current,
+                    title.chapter,
+                )
+            return slots, current
 
         confirm_hits = 0
-        strategy_switches = 0  # 每 miss 一次就给 probe_cycle +1 (换探针位置)
+        previous_current: int | None = None
+        no_progress = 0
 
         for attempt in range(CHAPTER_NAV_MAX_ATTEMPTS):
-            current, screen, stable = _read_chapter()
+            slots, current = _read_slots()
+            slot_state = [slot.chapter if slot.chapter is not None else slot.text or '---' for slot in slots]
             if current is None:
-                _log.warning('[UI] 章节导航: OCR 识别失败 (第 {} 次尝试)', attempt + 1)
+                _log.warning('[UI] 章节导航: 中间章节槽位识别失败 (第 {} 次尝试)', attempt + 1)
+                time.sleep(MAP_NAV_SETTLE_DELAY)
+                continue
+
+            if previous_current == current:
+                no_progress += 1
+            else:
+                no_progress = 0
+            previous_current = current
+            if no_progress >= 3:
+                _log.warning('[UI] 章节导航: 连续无进展, 槽位={}', slot_state)
                 return None
 
             if current == target:
                 confirm_hits += 1
                 _log.info(
-                    '[UI] 章节导航: 命中目标第 {} 章，二次确认 {}/2',
+                    '[UI] 章节导航: 命中目标第 {} 章，确认 {}/2, 槽位={}',
                     target,
                     confirm_hits,
+                    slot_state,
                 )
                 if confirm_hits >= 2:
                     _log.info('[UI] 章节导航: 已到达第 {} 章', target)
                     return current
-                time.sleep(CHAPTER_NAV_DELAY)
+                time.sleep(MAP_NAV_SETTLE_DELAY)
                 continue
 
             confirm_hits = 0
-            _log.info(
-                '[UI] 章节导航: 当前第 {} 章 -> 目标第 {} 章',
-                current,
-                target,
-            )
-
-            if not stable or screen is None:
-                time.sleep(CHAPTER_NAV_DELAY)
+            index = choose_chapter_slot(current, target, slots)
+            if index is None:
+                _log.warning(
+                    '[UI] 章节导航: 目标第 {} 章没有可用槽位 (当前={}, 槽位={})',
+                    target,
+                    current,
+                    slot_state,
+                )
+                time.sleep(MAP_NAV_SETTLE_DELAY)
                 continue
 
-            delta = target - current
-            direction = 1 if delta > 0 else -1
-            remaining = abs(delta)
-            consec_misses = 0      # click_chapter 没点的次数
-            consec_stuck = 0       # 点击后章没变的次数
-            MAX_MISSES = 6
-            MAX_STUCK = 3
-            steps_done = 0
-
-            while remaining > 0 and consec_misses < MAX_MISSES and consec_stuck < MAX_STUCK:
-                clicked = self.click_chapter(direction, probe_cycle=strategy_switches + steps_done)
-                if not clicked:
-                    consec_misses += 1
-                    _log.warning('[UI] 章节导航: click 无动作 %d/%d', consec_misses, MAX_MISSES)
-                    time.sleep(CHAPTER_NAV_DELAY)
-                    continue
-                steps_done += 1
-                consec_misses = 0
-                remaining -= 1
-                _log.info('[UI] 章节导航: 跳转{:+d}章, 剩余{}章 (已走{}步)'.format(direction, remaining, steps_done))
-                time.sleep(CHAPTER_NAV_DELAY)
-
-                # ── 每步回检 (单次OCR ~0.18s): 立即确认章号是否真的前进了 ──
-                qc = _quick_chapter()
-                if qc is None:
-                    continue  # OCR 偶发失败跳过 (下一轮 _read_chapter 会兜底)
-                if direction == 1 and qc <= current:
-                    # 本该往下跳 (+1) 但章号没涨 → 卡住 (允许 current 不变一次)
-                    if qc == current and consec_stuck == 0:
-                        consec_stuck = 1  # 第1次相等温和记录
-                    else:
-                        consec_stuck += 1
-                    _log.warning(
-                        '[UI] 章节导航: 跳+1后第{}章, 未前进 (cur={} stuck={}/{})',
-                        qc, current, consec_stuck, MAX_STUCK,
-                    )
-                elif direction == -1 and qc >= current:
-                    if qc == current and consec_stuck == 0:
-                        consec_stuck = 1
-                    else:
-                        consec_stuck += 1
-                    _log.warning(
-                        '[UI] 章节导航: 跳-1后第{}章, 未前进 (cur={} stuck={}/{})',
-                        qc, current, consec_stuck, MAX_STUCK,
-                    )
-                else:
-                    consec_stuck = 0
-                    current = qc  # 同步 OCR 锚点, 后续回检以此为基准
-                    remaining = abs(target - current)
-
-                # 卡住 ≥2 次 → 紧急策略调整: 强制 swipe 侧边栏 + 换探针
-                if consec_stuck >= 2:
-                    strategy_switches += 1
-                    _log.warning(
-                        '[UI] 章节导航: 连续 %d 次卡住 → 执行侧边栏重置 swipe',
-                        consec_stuck,
-                    )
-                    if direction == 1:
-                        # +1 卡住: 先从上往下扫一下 (把列表再拉到底一点)
-                        self._ctrl.swipe(SIDEBAR_CLICK_X, 0.25, SIDEBAR_CLICK_X, 0.80, duration=0.45)
-                    else:
-                        # -1 卡住: 从下往上扫 (把列表拉到顶一点)
-                        self._ctrl.swipe(SIDEBAR_CLICK_X, 0.80, SIDEBAR_CLICK_X, 0.25, duration=0.45)
-                    time.sleep(0.5)
-            if consec_misses >= MAX_MISSES:
-                _log.warning('[UI] 章节导航: 连续 %d 次无点击, 重启本层 attempt', consec_misses)
-                continue
-            if consec_stuck >= MAX_STUCK:
-                _log.warning('[UI] 章节导航: 连续 %d 次没前进, 重启本层 attempt (strategy_switches=%d)', consec_stuck, strategy_switches)
-                continue
+            self.click_chapter_slot(index)
+            time.sleep(MAP_NAV_SETTLE_DELAY)
 
         _log.warning(
             '[UI] 章节导航: 超过最大尝试次数 ({}), 目标第 {} 章',
@@ -350,7 +171,7 @@ class SortiePanelMixin(BaseMapPage):
                 f'地图编号 map_num={map_num} 超出范围 [1, {cur_max}] '
                 '(若当前章识别失败请先调用 navigate_to_chapter 正确选章)',
             )
-        MAP_NAV_DELAY = CHAPTER_NAV_DELAY
+        MAP_NAV_DELAY = MAP_NAV_SETTLE_DELAY
 
         def _read_map(
             samples: int = 3, delay: float = 0.15
@@ -400,8 +221,7 @@ class SortiePanelMixin(BaseMapPage):
                 continue
 
             delta = map_num - current
-            direction = 1 if delta > 0 else -1
-            remaining = abs(delta)
+            remaining = abs(map_num - current)
             stuck = 0
             misses = 0
             steps = 0
@@ -414,6 +234,7 @@ class SortiePanelMixin(BaseMapPage):
             )
 
             while remaining > 0 and stuck < MAX_STUCK and misses < MAX_MISSES:
+                direction = 1 if map_num > current else -1
                 if direction == 1:
                     self._ctrl.click(*CLICK_MAP_NEXT)
                     _log.info('[UI] 地图节点导航: → 下一节 (remaining %d, steps %d)', remaining, steps + 1)
@@ -510,7 +331,7 @@ class SortiePanelMixin(BaseMapPage):
 
         # 1. 确保在出征面板
         self.ensure_panel(MapPanel.SORTIE)
-        time.sleep(0.5)
+        time.sleep(MAP_NAV_SETTLE_DELAY)
 
         # 2. 导航到指定章节
         if isinstance(chapter, int):
