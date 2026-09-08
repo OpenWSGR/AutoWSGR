@@ -135,6 +135,22 @@ Cargo.lock
 # Agent temporary files
 .tmp/
 
+# Agent debug toolkit keeps empty output directories but ignores generated files.
+!tools/debug_toolkit/
+!tools/debug_toolkit/result/
+!tools/debug_toolkit/result/logs/
+!tools/debug_toolkit/result/logs/.gitkeep
+!tools/debug_toolkit/result/screenshot/
+!tools/debug_toolkit/result/screenshot/.gitkeep
+!tools/debug_toolkit/result/ocr/
+!tools/debug_toolkit/result/ocr/.gitkeep
+tools/debug_toolkit/result/logs/*
+!tools/debug_toolkit/result/logs/.gitkeep
+tools/debug_toolkit/result/screenshot/*
+!tools/debug_toolkit/result/screenshot/.gitkeep
+tools/debug_toolkit/result/ocr/*
+!tools/debug_toolkit/result/ocr/.gitkeep
+
 # MCP / Jupyter 测试产物
 test_*.ipynb
 *_test.ipynb

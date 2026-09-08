@@ -552,6 +552,7 @@ def _add_capture_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument('--serial', help='设备地址；默认使用最后连接的设备')
     parser.add_argument('--output', type=Path, help='输出根目录；默认是工具旁的 output')
+    parser.add_argument('--raw-only', action='store_true', help='只保存原始截图，不生成 ROI 裁切图')
     parser.add_argument('--adb-path', help=argparse.SUPPRESS)
 
 
@@ -583,6 +584,10 @@ def _run_capture(args: Namespace) -> int:
     output_root = (args.output or _default_output_root()).expanduser().resolve()
     target = prepare_capture_target(output_root, args.mode, args.command)
     source_path = _save_source_screen(screen, target, args.command)
+    if args.raw_only:
+        print(f'原始截图：{source_path}')
+        print(f'输出目录：{target.root}')
+        return 0
 
     if args.command == 'team':
         valid_items, saved_images = crop_team(screen, target.root, target.suffix)
