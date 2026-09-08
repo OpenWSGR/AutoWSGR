@@ -1,8 +1,8 @@
 # Progress Log
 
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
-Task Status: in_progress
-Next Step: Commit the verified decisive recognition fix, excluding local `config.json`.
+Task Status: done
+Next Step: Activity-page false-positive ROI remains a separate follow-up.
 
 ### 2026-09-08: decisive preparation return checker
 - Confirmed the prior real-device timeout was after a successful back click; the screenshot was already the decisive map.
@@ -25,6 +25,13 @@ Next Step: Commit the verified decisive recognition fix, excluding local `config
 - Automatic reset, Case 1 retreat, Case 2 mocked one-ship retreat, Case 3 formation/return/temporary leave, and Case 4 resume all passed.
 - Result: `44 steps, 0 failures`; Case 4 stopped on the preparation page without calling `start_battle`.
 - E2E log directory: `logs/e2e_tools/decisive/20260908_222708`.
+
+### 2026-09-08 22:35: committed-version real-device recovery-chain
+- Re-ran the same four-case chain from the committed code checkpoint `78b77de`.
+- Result: `44 steps, 0 failures`; Case 3 map return/temporary leave and Case 4 resume passed again.
+- Case 4 ended on the preparation page without starting battle; cleanup returned the device to the main page.
+- E2E log directory: `logs/e2e_tools/decisive/20260908_223501`.
+- Code checkpoint: `78b77de` (`fix(decisive): recognize map after preparation return`).
 
 ## Session: 2026-09-08
 

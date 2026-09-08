@@ -1,6 +1,6 @@
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
-Task Status: in_progress
-Next Step: Commit the verified decisive recognition fix, excluding local `config.json`.
+Task Status: done
+Next Step: Activity-page false-positive ROI remains a separate follow-up.
 
 # Task Plan: Decisive battle debug
 
@@ -13,7 +13,7 @@ Use the isolated AutoWSGR worktree to investigate and fix the decisive-battle mo
 - Development worktree: `C:\ShiinaKuroko\01.Project\AutoWSGR\.worktrees\20260907-autowsgr-decisive-debug-6e3a`
 
 ## Next Step
-Commit the verified decisive recognition fix, excluding local `config.json`.
+Activity-page false-positive ROI remains a separate follow-up.
 
 ## Current Phase
 Phase 4 - Testing & Verification
@@ -42,12 +42,12 @@ Phase 4 - Testing & Verification
 - [x] Document test results
 - [x] Run the four-case real-device recovery-chain after chapter 6 is reset
 - [x] Verify decisive preparation return uses decisive-map recognition
-- **Status:** in_progress
+- **Status:** completed
 
 ### Phase 5: Delivery
-- [ ] Review outputs
-- [ ] Deliver to user
-- **Status:** pending
+- [x] Review outputs
+- [x] Deliver to user
+- **Status:** completed
 
 ## Decisions Made
 | Decision | Rationale |
