@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call, patch
 
+import numpy as np
 import pytest
 
 from autowsgr.context import GameContext
 from autowsgr.emulator import AndroidController
 from autowsgr.ui.map.data import (
+    ChapterSlot,
     CHAPTER_MAP_COUNTS,
     MAP_DATABASE,
+    choose_chapter_slot,
+    parse_chapter_label,
     parse_map_title,
 )
 from autowsgr.ui.map.page import MapPage
+from autowsgr.vision import OCRResult
 
 
 # ─────────────────────────────────────────────
@@ -157,6 +162,41 @@ class TestMapDatabase:
         assert len(MAP_DATABASE) >= 40
 
 
+class TestChapterSlots:
+    @staticmethod
+    def slots(values: list[int | None]) -> tuple[ChapterSlot, ...]:
+        return tuple(
+            ChapterSlot(index=i, chapter=chapter, text='', confidence=1.0)
+            for i, chapter in enumerate(values)
+        )
+
+    def test_parse_labels_and_placeholder(self):
+        assert parse_chapter_label('第六章') == 6
+        assert parse_chapter_label('第10章') == 10
+        assert parse_chapter_label('---') is None
+        assert parse_chapter_label('3十章') is None
+
+    def test_prefers_visible_target(self):
+        slots = self.slots([8, 9, 10, None, None])
+        assert choose_chapter_slot(10, 9, slots) == 1
+
+    def test_uses_two_slot_jump_when_available(self):
+        slots = self.slots([8, 9, 10, None, None])
+        assert choose_chapter_slot(10, 5, slots) == 0
+
+    def test_uses_one_slot_jump_after_overshoot(self):
+        slots = self.slots([4, 5, 6, 7, 8])
+        assert choose_chapter_slot(6, 5, slots) == 1
+
+    def test_uses_two_slot_jump_at_lower_boundary(self):
+        slots = self.slots([None, None, 1, 2, 3])
+        assert choose_chapter_slot(1, 5, slots) == 4
+
+    def test_refuses_placeholder_slot(self):
+        slots = self.slots([None, 9, 10, None, None])
+        assert choose_chapter_slot(10, 8, slots) is None
+
+
 # ─────────────────────────────────────────────
 # 动作 — 章节导航
 # ─────────────────────────────────────────────
@@ -179,3 +219,38 @@ class TestNavigateToChapter:
         pg = MapPage(ctx)
         with pytest.raises(RuntimeError, match='OCR'):
             pg.navigate_to_chapter(5)
+
+    def test_fixed_slots_navigate_by_two_then_one(self):
+        ctrl = MagicMock(spec=AndroidController)
+        ocr = MagicMock()
+        ctx = GameContext(ctrl=ctrl, config=MagicMock(), ocr=ocr)
+        pg = MapPage(ctx)
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+        ctrl.screenshot.return_value = screen
+
+        slot_reads = [
+            ['第八章', '第九章', '第十章', '---', '---'],
+            ['第六章', '第七章', '第八章', '第九章', '第十章'],
+            ['第四章', '第五章', '第六章', '第七章', '第八章'],
+            ['第三章', '第四章', '第五章', '第六章', '第七章'],
+            ['第三章', '第四章', '第五章', '第六章', '第七章'],
+        ]
+        ocr.recognize_single.side_effect = [
+            OCRResult(text=text, confidence=0.95)
+            for row in slot_reads
+            for text in row
+        ]
+        ocr.recognize_maxlen.side_effect = [
+            OCRResult(text=text, confidence=0.95)
+            for text in ['10-1', '8-1', '6-1', '5-3', '5-3']
+        ]
+
+        with patch('autowsgr.ui.map.panels.sortie.time.sleep'):
+            result = pg.navigate_to_chapter(5)
+
+        assert result == 5
+        assert ctrl.click.call_args_list == [
+            call(0.1, 0.31),
+            call(0.1, 0.31),
+            call(0.1, 0.43),
+        ]

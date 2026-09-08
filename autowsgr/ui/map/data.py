@@ -42,6 +42,16 @@ class MapIdentity:
     raw_text: str
 
 
+@dataclass(frozen=True, slots=True)
+class ChapterSlot:
+    """One fixed chapter slot in the sortie sidebar."""
+
+    index: int
+    chapter: int | None
+    text: str
+    confidence: float
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 地图数据库
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -177,11 +187,26 @@ SIDEBAR_SCAN_STEP: float = 0.01
 SIDEBAR_BRIGHTNESS_THRESHOLD: int = 150
 """选中章节的亮度阈值 (R+G+B)。"""
 
-CHAPTER_SPACING: float = 0.12
-"""章节条目之间的 y 间距 (估算值)。"""
-
 SIDEBAR_CLICK_X: float = 0.10
 """侧边栏点击的 x 坐标。"""
+
+CHAPTER_SLOT_CENTERS: tuple[float, ...] = (0.31, 0.43, 0.55, 0.67, 0.79)
+"""出征章节侧边栏五个固定槽位的 y 中心。"""
+
+CHAPTER_SLOT_ROIS: tuple[tuple[float, float, float, float], ...] = (
+    (0.055, 0.265, 0.17, 0.355),
+    (0.055, 0.385, 0.17, 0.475),
+    (0.055, 0.505, 0.17, 0.595),
+    (0.055, 0.625, 0.17, 0.715),
+    (0.055, 0.745, 0.17, 0.835),
+)
+"""五个章节标签 OCR 裁剪区域 (x1, y1, x2, y2)。"""
+
+CHAPTER_SLOT_CENTER_INDEX: int = 2
+"""固定槽位中代表当前选中章节的索引。"""
+
+CHAPTER_OCR_ALLOWLIST = '0123456789第章一二三四五六七八九十'
+"""章节标签 OCR 允许字符。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -191,8 +216,8 @@ SIDEBAR_CLICK_X: float = 0.10
 CLICK_BACK: tuple[float, float] = (0.022, 0.058)
 """回退按钮 (◁)。"""
 
-CHAPTER_NAV_DELAY: float = 0.5
-"""章节切换后等待动画的延迟 (秒)。"""
+MAP_NAV_SETTLE_DELAY: float = 1.5
+"""地图章节/节点点击后等待界面稳定的延迟 (秒)。"""
 
 CHAPTER_NAV_MAX_ATTEMPTS: int = 20
 """章节导航最大尝试次数。"""
@@ -201,6 +226,61 @@ CHAPTER_NAV_MAX_ATTEMPTS: int = 20
 # ═══════════════════════════════════════════════════════════════════════════════
 # 辅助函数
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+_CHAPTER_NUMERALS: dict[str, int] = {
+    '一': 1,
+    '二': 2,
+    '三': 3,
+    '四': 4,
+    '五': 5,
+    '六': 6,
+    '七': 7,
+    '八': 8,
+    '九': 9,
+    '十': 10,
+}
+
+
+def parse_chapter_label(text: str) -> int | None:
+    """Parse a sidebar label such as ``第六章`` or ``---``."""
+    compact = re.sub(r'\s+', '', text)
+    if not compact or re.fullmatch(r'[-—_~]+', compact):
+        return None
+
+    match = re.fullmatch(r'第?([0-9]{1,2}|[一二三四五六七八九十百]+)章', compact)
+    if match is None:
+        return None
+
+    token = match.group(1)
+    chapter = int(token) if token.isdigit() else _CHAPTER_NUMERALS.get(token)
+    if chapter is None or not 1 <= chapter <= TOTAL_CHAPTERS:
+        return None
+    return chapter
+
+
+def choose_chapter_slot(
+    current: int,
+    target: int,
+    slots: tuple[ChapterSlot, ...],
+) -> int | None:
+    """Choose a visible fixed slot for the next click, if one is valid."""
+    for slot in slots:
+        if slot.chapter == target:
+            return slot.index
+
+    delta = target - current
+    if delta == 0:
+        return None
+
+    step = 2 if abs(delta) >= 2 else 1
+    direction = 1 if delta > 0 else -1
+    index = CHAPTER_SLOT_CENTER_INDEX + direction * step
+    if not 0 <= index < len(slots):
+        return None
+
+    expected = current + direction * step
+    return index if slots[index].chapter == expected else None
 
 
 def parse_map_title(text: str) -> MapIdentity | None:
