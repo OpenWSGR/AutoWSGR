@@ -22,6 +22,7 @@ from autowsgr.vision import (
     ImageChecker,
     ImageTemplate,
     MatchStrategy,
+    PixelChecker,
     PixelRule,
     PixelSignature,
 )
@@ -124,6 +125,9 @@ _SIG_BY_TYPE: dict[DecisiveOverlay, PixelSignature] = dict(OVERLAY_SIGNATURES)
 
 # 720p 决战总览页右侧「上次选船」按钮区域，按用户实机红框留出边缘。
 USE_LAST_FLEET_ROI = ROI(0.82, 0.30, 1.0, 0.50)
+
+# 1280x720 决战出征准备页「主力决战舰队」标题区域。
+FLEET_NAME_ROI = ROI(0.08, 0.11, 0.26, 0.22)
 
 # overlay → 识别模板映射 (图像模板匹配, 替代上方像素签名)
 _OVERLAY_TEMPLATE_MAP: dict[DecisiveOverlay, ImageTemplate] = {
@@ -241,7 +245,7 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
 
 def is_decisive_map_page(screen: np.ndarray) -> bool:
     """截图是否为决战地图页 (无 overlay 遮挡)。"""
-    return ImageChecker.template_exists(screen, Templates.Decisive.MAP_PAGE, confidence=0.85)
+    return PixelChecker.check_signature(screen, SIG_MAP_PAGE).matched
 
 
 def is_fleet_acquisition(screen: np.ndarray) -> bool:

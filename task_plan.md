@@ -1,6 +1,6 @@
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
 Task Status: in_progress
-Next Step: Fix the event-page false-positive ROI, then rerun the recovery-chain from Case 1.
+Next Step: Commit the verified decisive recognition fix, excluding local `config.json`.
 
 # Task Plan: Decisive battle debug
 
@@ -13,7 +13,7 @@ Use the isolated AutoWSGR worktree to investigate and fix the decisive-battle mo
 - Development worktree: `C:\ShiinaKuroko\01.Project\AutoWSGR\.worktrees\20260907-autowsgr-decisive-debug-6e3a`
 
 ## Next Step
-Fix the event-page false-positive ROI, then rerun the recovery-chain from Case 1 and stop at the fourth preparation page.
+Commit the verified decisive recognition fix, excluding local `config.json`.
 
 ## Current Phase
 Phase 4 - Testing & Verification
@@ -34,12 +34,14 @@ Phase 4 - Testing & Verification
 ### Phase 3: Implementation
 - [x] Execute the staged entry-recognition change
 - [x] Add focused regression coverage
+- [x] Fix decisive preparation return recognition and its stale map template path
 - **Status:** completed
 
 ### Phase 4: Testing & Verification
 - [x] Verify offline requirements and adjacent operation tests
 - [x] Document test results
-- [ ] Run the four-case real-device recovery-chain after chapter 6 is reset
+- [x] Run the four-case real-device recovery-chain after chapter 6 is reset
+- [x] Verify decisive preparation return uses decisive-map recognition
 - **Status:** in_progress
 
 ### Phase 5: Delivery

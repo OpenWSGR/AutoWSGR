@@ -11,10 +11,11 @@ import pytest
 from autowsgr.image_resources import Templates
 from autowsgr.ops.decisive import handlers
 from autowsgr.types import DecisiveEntryStatus, DecisivePhase
-from autowsgr.ui.decisive import battle_page, map_controller
+from autowsgr.ui.decisive import battle_page, map_controller, overlay, preparation
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     CLICK_ADVANCE_CONFIRM,
+    FLEET_NAME_ROI,
     USE_LAST_FLEET_ROI,
     DecisiveOverlay,
 )
@@ -192,6 +193,94 @@ def test_reset_chapter_requires_recognized_reset_button(
     page._ctrl.click.assert_called_once_with(*match.center)
     assert find_template.call_args.kwargs['roi'] == battle_page.RESET_BUTTON_ROI
     confirm.assert_called_once_with(page._ctrl, must_confirm=True, timeout=5.0)
+
+
+def test_enter_formation_retries_after_fleet_name_miss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing decisive fleet title causes one map-back and formation retry."""
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctrl = MagicMock()
+    controller._wait_for_fleet_name = MagicMock(side_effect=[False, True])
+    controller.go_to_map_page = MagicMock()
+    clicks: list[object] = []
+    monkeypatch.setattr(
+        map_controller,
+        'click_and_wait_for_page',
+        lambda *_args, **_kwargs: clicks.append(True),
+    )
+    monkeypatch.setattr(
+        map_controller.ImageChecker,
+        'template_exists',
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(map_controller.time, 'sleep', lambda _delay: None)
+
+    controller.enter_formation()
+
+    assert len(clicks) == 2
+    controller.go_to_map_page.assert_called_once_with()
+
+
+def test_decisive_preparation_go_back_uses_decisive_map_checker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Decisive preparation return waits for the decisive map recognizer."""
+    page = object.__new__(preparation.DecisiveBattlePreparationPage)
+    page._ctrl = MagicMock()
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        preparation,
+        'click_and_wait_for_page',
+        lambda ctrl, **kwargs: calls.append({'ctrl': ctrl, **kwargs}),
+    )
+
+    page.go_back()
+
+    assert calls == [
+        {
+            'ctrl': page._ctrl,
+            'click_coord': preparation.CLICK_BACK,
+            'checker': preparation.is_decisive_map_page,
+            'source': preparation.PageName.BATTLE_PREP,
+            'target': preparation.PageName.MAP,
+        }
+    ]
+
+
+def test_decisive_map_recognizer_uses_pixel_signature() -> None:
+    """The decisive map recognizer accepts its existing pixel signature."""
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    for rule in overlay.SIG_MAP_PAGE.rules:
+        screen[int(rule.y * screen.shape[0]), int(rule.x * screen.shape[1])] = (
+            rule.color.as_rgb_tuple()
+        )
+
+    assert overlay.is_decisive_map_page(screen)
+
+    first_rule = overlay.SIG_MAP_PAGE.rules[0]
+    screen[int(first_rule.y * screen.shape[0]), int(first_rule.x * screen.shape[1])] = 0
+    assert not overlay.is_decisive_map_page(screen)
+
+
+def test_fleet_name_checks_fixed_roi_three_times(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The decisive formation title uses three fixed-ROI template checks."""
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctrl = MagicMock()
+    calls: list[tuple[object, float]] = []
+    monkeypatch.setattr(
+        map_controller.ImageChecker,
+        'template_exists',
+        lambda _screen, _template, *, roi, confidence: calls.append((roi, confidence)) or False,
+    )
+    sleeps: list[float] = []
+    monkeypatch.setattr(map_controller.time, 'sleep', sleeps.append)
+
+    assert controller._wait_for_fleet_name() is False
+    assert calls == [(FLEET_NAME_ROI, 0.8)] * 3
+    assert sleeps == [0.2, 0.2, 0.2]
 
 
 def test_select_advance_card_requires_recognized_overlay(

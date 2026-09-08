@@ -78,3 +78,18 @@
 - On the decisive formation screenshot `logs/e2e_tools/decisive/20260908_034922/images/NavError_034216_477.png`, that matcher returned confidence `0.869940996170044` at normalized center `(0.130078125, 0.050694444444444445)`, which is the top-left back button, not an event attack button.
 - Difficulty-icon and event-title checks were both `None`; the false hit won because `EVENT_MAP` is registered before other page candidates.
 - Narrow fix for tomorrow: constrain the event fight-button matcher to the real bottom-right activity-button ROI and add an offline regression using this screenshot. Do not change decisive reset or combat logic for this issue.
+
+## Formation Back-Return Root Cause
+- The latest `BATTLE_PREP -> MAP` timeout occurs after the back click succeeds; failure screenshots are already on the decisive map.
+- `BattlePreparationPage.go_back()` waits for generic `PageName.MAP`, whose tabbed-map checker does not recognize the decisive map layout.
+- `DecisiveMapController.is_decisive_map_page()` does recognize that screen, but it is not the checker used by the preparation-page return path.
+- The event false positive is a secondary first-frame misclassification; after it disappears, the generic MAP target still returns `None` and causes the timeout.
+
+## Decisive Preparation Return Fix
+- `DecisiveBattlePreparationPage` is the concrete page used by decisive fleet scanning and fleet changes.
+- Its inherited `BattlePreparationPage.go_back()` waited for generic `MapPage.is_current_page()`, which does not recognize the decisive map layout.
+- Added a decisive-only `go_back()` override using `is_decisive_map_page`; generic campaign/exercise preparation navigation remains unchanged.
+- The first rerun still timed out because `is_decisive_map_page()` itself used the stale `decisive_map_540p.png` template; the actual return screenshot scored `0.2687` against the `0.85` threshold.
+- The existing `SIG_MAP_PAGE` pixel signature matched that same screenshot 5/5, so `is_decisive_map_page()` now uses `PixelChecker.check_signature` without adding a new asset.
+- Offline verification after the final fix: `uv run pytest -q testing/ops` -> `115 passed`; compileall and selected pre-commit hooks passed.
+- Final recovery-chain verification passed all 44 steps, including Case 3 map return/temporary leave and Case 4 resume stopping before battle.

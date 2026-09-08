@@ -2,7 +2,29 @@
 
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
 Task Status: in_progress
-Next Step: Await user direction; the chapter-6 E2E was interrupted after the fleet-acquisition stage passed.
+Next Step: Commit the verified decisive recognition fix, excluding local `config.json`.
+
+### 2026-09-08: decisive preparation return checker
+- Confirmed the prior real-device timeout was after a successful back click; the screenshot was already the decisive map.
+- Added `DecisiveBattlePreparationPage.go_back()` using `is_decisive_map_page` instead of the generic tabbed-map checker.
+- Added a focused regression asserting the decisive checker is passed to `click_and_wait_for_page`.
+- Verification: focused decisive tests `12 passed`; full `testing/ops` `114 passed`; compileall passed; selected pre-commit passed.
+- Next: rerun the existing four-case real-device recovery chain and inspect whether Case 3 reaches temporary leave and Case 4.
+
+### 2026-09-08 22:17: first rerun after decisive go_back override
+- Case 1, Case 2, and Case 3 formation completed.
+- Case 3 `编队完成回到地图` still timed out; the back click had already returned to the decisive map.
+- Offline matching of the failure screenshot showed `decisive_map_540p.png` confidence `0.2687`, below the `0.85` threshold.
+
+### 2026-09-08: final decisive map recognition fix
+- Replaced the stale template check inside `is_decisive_map_page()` with the existing `SIG_MAP_PAGE` pixel signature.
+- Added positive/negative unit coverage for the map signature.
+- Verification: focused decisive tests `13 passed`; full `testing/ops` `115 passed`; compileall and selected pre-commit passed.
+
+### 2026-09-08 22:27: final real-device recovery-chain
+- Automatic reset, Case 1 retreat, Case 2 mocked one-ship retreat, Case 3 formation/return/temporary leave, and Case 4 resume all passed.
+- Result: `44 steps, 0 failures`; Case 4 stopped on the preparation page without calling `start_battle`.
+- E2E log directory: `logs/e2e_tools/decisive/20260908_222708`.
 
 ## Session: 2026-09-08
 
@@ -169,15 +191,41 @@ Next Step: Await user direction; the chapter-6 E2E was interrupted after the fle
 - Case 3 reached normal fleet selection and the formation page, but the E2E case hard-coded unavailable `U-47`; OCR had purchased `鹦鹉螺` and `M-296`.
 - Changed Case 3 to use the actual ships recorded in the current run for formation; production code was not changed by this correction.
 
+### Real-device attempt 2026-09-08 21:51
+- Automatic reset, Case 1, and Case 2 passed again.
+- Case 3 passed advance recognition, normal purchase, formation-title guard, and actual formation completion.
+- Case 3 still failed only at returning from preparation to the map; Case 4 was not reached. This remains the pending event/page-recognition issue.
+
+### Real-device attempt 2026-09-08 21:51 repeat
+- Automatic reset, Case 1, Case 2, Case 3 formation entry, formation-title guard, and actual formation completion passed again.
+- After the preparation-page back click, `BATTLE_PREP -> MAP` recognition timed out; no temporary-leave action or Case 4 action was reached.
+- This reproduces the same page-recognition boundary independently of formation entry and fleet OCR.
+
 ### Real-device attempt 2026-09-08 03:41
 - The run stopped before decisive navigation: an event-map stage-card overlay repeatedly blocked `定位决战总览页` and the framework timed out returning to the main page.
 - No reset click or decisive case action occurred in this run; no further device recovery clicks were issued.
 - User confirmed the actual device is currently on the fleet-formation page despite the framework cleanup summary; preserve this page and do not auto-navigate.
 - Latest screenshots and logs show this run did not click formation: the page was already `出征准备`, while the framework misrecognized it as `活动页面 (score=0.870)` and repeatedly clicked the event close coordinate. The formation entry came from the previous Case 3 run, whose failed cleanup falsely reported returning home.
 
+### Real-device attempt 2026-09-08 21:45
+- Automatic reset ROI and confirmation passed.
+- Case 1 and Case 2 passed completely; Case 2 physically clicked the first fleet card before the insufficient-fleet retreat check.
+- Case 3 passed advance recognition, normal fleet acquisition, formation entry, and formation completion using the actual purchased `M-296` and `鹦鹉螺`.
+- Case 3 failed only while returning from formation to the map, reproducing the known `EVENT_MAP` false-positive page-recognition issue; Case 4 was not reached.
+
 ### Tomorrow handoff
 - Production event-page recognition still needs the bottom-right fight-button ROI fix described in `findings.md`.
 - Do not resume real-device recovery-chain until that false-positive fix is tested offline.
+
+### Decisive formation title guard
+- Added `fleet_name.png` as a 1280x720 OpenCV template with ROI `x=0.08..0.26`, `y=0.11..0.22`.
+- `enter_formation()` now requires three title checks; on failure it returns to the map and retries formation once before raising.
+- Verification: focused decisive tests `11 passed`; full `testing/ops` `113 passed`; selected pre-commit and compile checks passed.
+
+### Formation back-return diagnosis
+- The back click succeeds and the screenshot is already the decisive map.
+- The wait path targets generic `PageName.MAP`, while decisive-map recognition lives only in `DecisiveMapController.is_decisive_map_page()`; this is the primary return timeout cause.
+- Event-page false matching affects the first recognition frame but is secondary to the wrong target checker.
 
 ### Commit checkpoint
 - Code/E2E/config checkpoint committed as `5c2eb12` (`fix(decisive): gate entry and reset actions by recognition`).

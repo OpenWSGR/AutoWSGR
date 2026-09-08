@@ -33,6 +33,7 @@ from autowsgr.ui.decisive.overlay import (
     CLICK_RETREAT_BUTTON,
     CLICK_RETREAT_CONFIRM,
     CLICK_SORTIE,
+    FLEET_NAME_ROI,
     USE_LAST_FLEET_ROI,
     DecisiveOverlay,
     detect_decisive_overlay,
@@ -623,14 +624,38 @@ class DecisiveMapController:
         )
 
         config = NavConfig(timeout=10.0, interval=0.5, max_retries=3)
-        click_and_wait_for_page(
-            self._ctrl,
-            CLICK_FORMATION,
-            BattlePreparationPage.is_current_page,
-            config=config,
-            source='决战地图',
-            target='出征准备',
-        )
+        for attempt in range(2):
+            click_and_wait_for_page(
+                self._ctrl,
+                CLICK_FORMATION,
+                BattlePreparationPage.is_current_page,
+                config=config,
+                source='决战地图',
+                target='出征准备',
+            )
+            if self._wait_for_fleet_name():
+                return
+            if attempt == 0:
+                _log.warning('[地图控制器] 出征准备页未识别到决战舰队标题，返回地图后重试')
+                self.go_to_map_page()
+                time.sleep(0.5)
+
+        raise TimeoutError('进入决战出征准备页后未识别到「主力决战舰队」标题')
+
+    def _wait_for_fleet_name(self) -> bool:
+        """在固定 ROI 内连续识别三次决战编队标题。"""
+        from autowsgr.image_resources import Templates
+
+        for _ in range(3):
+            if ImageChecker.template_exists(
+                self._ctrl.screenshot(),
+                Templates.Decisive.FLEET_NAME,
+                roi=FLEET_NAME_ROI,
+                confidence=0.8,
+            ):
+                return True
+            time.sleep(0.2)
+        return False
 
     def click_sortie(self) -> None:
         """点击右下角「出征」按钮。"""

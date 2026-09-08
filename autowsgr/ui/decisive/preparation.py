@@ -20,8 +20,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.combat.fleet import exact_fleet_rules
+from autowsgr.types import PageName
+from autowsgr.ui.battle.constants import CLICK_BACK
 from autowsgr.ui.battle.preparation import BattlePreparationPage
 from autowsgr.ui.decisive.legacy_fleet_change import change_fleet_legacy
+from autowsgr.ui.decisive.overlay import is_decisive_map_page
+from autowsgr.ui.utils import click_and_wait_for_page
 
 
 if TYPE_CHECKING:
@@ -50,6 +54,16 @@ class DecisiveBattlePreparationPage(BattlePreparationPage):
     """
 
     _use_search: bool = False
+
+    def go_back(self) -> None:
+        """Return to the decisive map using its dedicated page recognizer."""
+        click_and_wait_for_page(
+            self._ctrl,
+            click_coord=CLICK_BACK,
+            checker=is_decisive_map_page,
+            source=PageName.BATTLE_PREP,
+            target=PageName.MAP,
+        )
 
     def __init__(
         self,

@@ -56,6 +56,13 @@ class Decisive:
     MAP_PAGE = LazyTemplate('decisive/decisive_map_540p.png', 'decisive_map_page')
     """决战地图页特征 (classic ``decisive_map_entrance``, 247x133)。"""
 
+    FLEET_NAME = LazyTemplate(
+        'decisive/fleet_name.png',
+        'decisive_fleet_name',
+        source_resolution=(1280, 720),
+    )
+    """决战出征准备页「主力决战舰队」标题。"""
+
     RESET_BUTTON = LazyTemplate(
         'decisive/reset_button.png',
         'decisive_reset_button',
