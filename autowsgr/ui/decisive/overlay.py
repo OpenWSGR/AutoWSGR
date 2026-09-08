@@ -129,6 +129,12 @@ USE_LAST_FLEET_ROI = ROI(0.82, 0.30, 1.0, 0.50)
 # 1280x720 决战出征准备页「主力决战舰队」标题区域。
 FLEET_NAME_ROI = ROI(0.08, 0.11, 0.26, 0.22)
 
+# 1280x720 决战「选择前进点」左侧卡片区域。
+ADVANCE_CHOICE_ROI = ROI(324 / 1280, 237 / 720, 607 / 1280, 429 / 720)
+
+# 1280x720 三分支「选择前进点」左侧卡片区域（adb-teamchose3.png）。
+ADVANCE_CHOICE_THREE_ROI = ROI(142 / 1280, 235 / 720, 429 / 1280, 431 / 720)
+
 # overlay → 识别模板映射 (图像模板匹配, 替代上方像素签名)
 _OVERLAY_TEMPLATE_MAP: dict[DecisiveOverlay, ImageTemplate] = {
     DecisiveOverlay.FLEET_ACQUISITION: Templates.Decisive.FLEET_ACQUISITION,
@@ -218,7 +224,11 @@ ADVANCE_CARD_POSITIONS: list[tuple[float, float]] = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
+def detect_decisive_overlay(
+    screen: np.ndarray,
+    *,
+    advance_choice_roi: ROI | None = None,
+) -> DecisiveOverlay | None:
     """按优先级检测决战地图页上的弹窗。
 
     Parameters
@@ -237,7 +247,24 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
             if overlay_type is DecisiveOverlay.FLEET_ACQUISITION
             else 0.85
         )
-        if ImageChecker.template_exists(screen, tmpl, confidence=confidence):
+        if overlay_type is DecisiveOverlay.ADVANCE_CHOICE:
+            rois = (
+                (advance_choice_roi,)
+                if advance_choice_roi is not None
+                else (ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
+            )
+            matched = any(
+                ImageChecker.template_exists(screen, tmpl, roi=roi, confidence=confidence)
+                for roi in rois
+            )
+        else:
+            matched = ImageChecker.template_exists(
+                screen,
+                tmpl,
+                roi=None,
+                confidence=confidence,
+            )
+        if matched:
             _log.debug('[决战] 检测到 overlay: {}', overlay_type.value)
             return overlay_type
     return None

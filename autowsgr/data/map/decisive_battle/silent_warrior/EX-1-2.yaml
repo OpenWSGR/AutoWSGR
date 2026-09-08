@@ -1,0 +1,36 @@
+# Decisive battle node graph for Silent Warrior.
+# Node IDs keep branch suffixes (A1/A2); position is intentionally absent until measured.
+schema_version: 1
+event: silent_warrior
+mapping_type: node_graph
+map_id: EX-1-2
+chapter: 1
+stage: 2
+key_points: [B, F, H]
+nodes:
+  '0': {label: '0', column: 0, index: 0, next: [A1]}
+  A1: {label: A, column: 1, index: 0, next: [B1, B2, B3]}
+  B1: {label: B, column: 2, index: 0, next: [C1]}
+  B2: {label: B, column: 2, index: 1, next: [C1]}
+  B3: {label: B, column: 2, index: 2, next: [C1]}
+  C1: {label: C, column: 3, index: 0, next: [D1, D2]}
+  D1: {label: D, column: 4, index: 0, next: [E1, E2]}
+  D2: {label: D, column: 4, index: 1, next: [E2, E3]}
+  E1: {label: E, column: 5, index: 0, next: [F1]}
+  E2: {label: E, column: 5, index: 1, next: [F2]}
+  E3: {label: E, column: 5, index: 2, next: [F3]}
+  F1: {label: F, column: 6, index: 0, next: [G1]}
+  F2: {label: F, column: 6, index: 1, next: [G1, G2]}
+  F3: {label: F, column: 6, index: 2, next: [G2]}
+  G1: {label: G, column: 7, index: 0, next: [H1]}
+  G2: {label: G, column: 7, index: 1, next: [H1]}
+  H1: {label: H, column: 8, index: 0, next: []}
+enemy:
+  A: [CL, DD, CL, CL, DD]
+  B: [CA, CA, CL, DD, DD, DD]
+  C: [BC, CL, DD, DD, DD, DD]
+  D: [CA, CVL, CL, CL, CL, DD]
+  E: [CVL, CA, CA, CL, DD, DD]
+  F: [CA, CL, CL, CL, DD, SS]
+  G: [BC, CVL, CL, CL, DD, DD]
+  H: [CVL, BB, BB, BBV, CLT, BC]

@@ -157,8 +157,8 @@ class DecisiveLogic:
     def is_stage_end(self, node: str | None = None) -> bool:
         """判断当前节点是否为该小关的终止节点。
 
-        根据 ``MapData`` 中的 ``map_end`` 数据判断，
-        替代原先硬编码 ``> "J"`` 的逻辑。
+        根据 per-EX 地图数据中的终点节点判断，
+        替代原先的静态终点常量。
 
         Parameters
         ----------
@@ -249,22 +249,6 @@ class DecisiveLogic:
         return best
 
     # ── 路径选择 ───────────────────────────────────────────────────────
-
-    def get_advance_choice(self, options: list[str]) -> int:  # noqa: ARG002
-        """选择前进点索引。
-
-        Parameters
-        ----------
-        options:
-            可选前进点列表 (如 ``["A1", "A2"]``)。
-
-        Returns
-        -------
-        int
-            选中选项的索引 (0-based)。
-        """
-        # TODO: 根据地图数据和关键节点信息做出更智能的选择
-        return 0
 
     def get_formation(self) -> Formation:
         """根据当前节点敌方编成动态选择阵型。

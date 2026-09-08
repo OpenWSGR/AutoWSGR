@@ -1,140 +1,100 @@
-"""决战控制器配置与地图数据。"""
+"""Decisive battle configuration and per-map data."""
 
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from autowsgr.infra.file_utils import load_yaml
-from autowsgr.infra.logger import get_logger
 
 
-_log = get_logger('decisive')
+_MAP_DATA_ROOT = (
+    Path(__file__).resolve().parents[2] / 'data' / 'map' / 'decisive_battle' / 'silent_warrior'
+)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# 地图静态数据
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# 数据来源: autowsgr_legacy/data/map/decisive_battle/enemy_spec.yaml
-# map_end[chapter][stage] → 该小关最后一个节点字母
-# chapter 索引 0 为占位; 有效章节 1-6; stage 索引 0 为占位, 有效小关 1-3。
-_MAP_END: list[str] = [
-    '',  # 0: 占位
-    ' FHH',  # chapter 1: stage1=F, stage2=H, stage3=H
-    ' FHH',  # chapter 2
-    ' HHJ',  # chapter 3
-    ' HHJ',  # chapter 4
-    ' HJJ',  # chapter 5
-    ' JJJ',  # chapter 6
-]
-
-# key_points[chapter][stage] → 需要夜战的关键节点字母集合
-_KEY_POINTS: dict[int, list[str]] = {
-    1: ['', 'BDF', 'BFH', 'DHJ'],
-    2: ['', 'CFH', 'BFH', 'DHJ'],
-    3: ['', 'CFH', 'BFH', 'DHJ'],
-    4: ['', 'CFH', 'BFH', 'DHJ'],
-    5: ['', 'DFH', 'DGJ', 'CGJ'],
-    6: ['', 'BGJ', 'CHJ', 'DGJ'],
-}
+@lru_cache(maxsize=18)
+def _load_map_data(chapter: int, stage: int) -> dict[str, Any]:
+    path = _MAP_DATA_ROOT / f'EX-{chapter}-{stage}.yaml'
+    data = load_yaml(path)
+    if not isinstance(data, dict) or not isinstance(data.get('nodes'), dict):
+        raise TypeError(f'invalid decisive map data: {path}')
+    return data
 
 
-@lru_cache(maxsize=1)
-def _load_enemy_spec_data() -> dict:
-    """加载决战 enemy_spec.yaml 数据。"""
-    data_path = (
-        Path(__file__).resolve().parents[2] / 'data' / 'map' / 'decisive_battle' / 'enemy_spec.yaml'
-    )
-    return load_yaml(data_path)
+def _node_label(node_id: str, node: dict[str, Any]) -> str:
+    return str(node.get('label', node_id)).upper()
+
+
+def _leftmost_node_ids(data: dict[str, Any]) -> dict[str, str]:
+    """Return the node IDs on the route that always takes the first edge."""
+    nodes = data['nodes']
+    result: dict[str, str] = {}
+    current = '0'
+    visited: set[str] = set()
+    while current not in visited:
+        visited.add(current)
+        node = nodes.get(current)
+        if not isinstance(node, dict):
+            break
+        label = _node_label(current, node)
+        result.setdefault(label, current)
+        next_nodes = node.get('next', [])
+        if not next_nodes:
+            break
+        current = str(next_nodes[0])
+    return result
 
 
 class MapData:
-    """决战地图静态数据查询。
-
-    封装 ``map_end`` 与 ``key_points``，提供按 *chapter / stage* 查询的方法。
-    """
+    """Query the normalized per-EX decisive map files."""
 
     @staticmethod
     def get_stage_end_node(chapter: int, stage: int) -> str:
-        """获取指定章节、小关的终止节点字母。
-
-        Parameters
-        ----------
-        chapter:
-            章节编号 (1-6)。
-        stage:
-            小关编号 (1-3)。
-
-        Returns
-        -------
-        str
-            终止节点字母 (如 ``'H'``, ``'J'``)。
-            若 chapter/stage 超出范围，返回 ``'J'`` 作为安全回退。
-        """
-        if 1 <= chapter < len(_MAP_END) and 1 <= stage <= 3:
-            return _MAP_END[chapter][stage]
-        raise ValueError(f'无效章节/小关: chapter={chapter}, stage={stage}')
+        data = _load_map_data(chapter, stage)
+        terminal_labels = {
+            _node_label(node_id, node)
+            for node_id, node in data['nodes'].items()
+            if isinstance(node, dict) and node_id != '0' and not node.get('next', [])
+        }
+        if len(terminal_labels) != 1:
+            raise ValueError(f'invalid decisive terminal nodes: chapter={chapter}, stage={stage}')
+        return terminal_labels.pop()
 
     @staticmethod
     def is_stage_end(chapter: int, stage: int, node: str) -> bool:
-        """判断当前节点是否为该小关的终止节点。
-
-        Parameters
-        ----------
-        chapter:
-            章节编号 (1-6)。
-        stage:
-            小关编号 (1-3)。
-        node:
-            当前节点字母 (如 ``'A'``, ``'H'``)。
-        """
-        return node == MapData.get_stage_end_node(chapter, stage)
+        return node.upper() == MapData.get_stage_end_node(chapter, stage)
 
     @staticmethod
     def get_key_points(chapter: int, stage: int) -> set[str]:
-        """获取指定章节、小关的关键节点集合 (需夜战)。
-
-        Parameters
-        ----------
-        chapter:
-            章节编号 (4-6)。
-        stage:
-            小关编号 (1-3)。
-
-        Returns
-        -------
-        set[str]
-            关键节点字母集合；未找到时返回空集。
-        """
-        kps = _KEY_POINTS.get(chapter, [])
-        if 1 <= stage < len(kps):
-            return set(kps[stage])
-        return set()
+        data = _load_map_data(chapter, stage)
+        return {str(node).upper() for node in data.get('key_points', [])}
 
     @staticmethod
     def is_key_point(chapter: int, stage: int, node: str) -> bool:
-        """判断当前节点是否为关键点 (需夜战)。"""
-        return node in MapData.get_key_points(chapter, stage)
+        return node.upper() in MapData.get_key_points(chapter, stage)
 
     @staticmethod
     def get_enemy(chapter: int, stage: int, node: str) -> list[str]:
-        """获取指定章节/小关/节点的敌方编成。"""
-        try:
-            data = _load_enemy_spec_data()
-            enemy_data = data.get('enemy', [])
-            chapter_data = enemy_data[chapter]
-            stage_data = chapter_data[stage]
-            node_data = stage_data.get(node.upper())
-            if isinstance(node_data, list):
-                return [str(x) for x in node_data if x]
-        except Exception:
-            _log.debug(
-                '[决战] 敌方规格数据查询失败: chapter={}, stage={}, node={}',
-                chapter,
-                stage,
-                node,
-                exc_info=True,
-            )
+        data = _load_map_data(chapter, stage)
+        enemy = data.get('enemy', {}).get(node.upper(), [])
+        return [str(value) for value in enemy if value]
+
+    @staticmethod
+    def get_leftmost_choices(chapter: int, stage: int, source_node: str) -> list[str]:
+        """Return successors from the route node for an always-left path."""
+        data = _load_map_data(chapter, stage)
+        nodes = data['nodes']
+        source = source_node.upper()
+        source_id = '0' if source in {'', 'U', '0'} else _leftmost_node_ids(data).get(source)
+        if source_id is None:
+            candidates = [
+                (node.get('column', 0), node.get('index', 0), node_id)
+                for node_id, node in nodes.items()
+                if isinstance(node, dict) and _node_label(node_id, node) == source
+            ]
+            source_id = min(candidates)[2] if candidates else None
+        if source_id is None:
             return []
-        return []
+        return [str(node_id) for node_id in nodes[source_id].get('next', [])]

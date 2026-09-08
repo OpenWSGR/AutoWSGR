@@ -1,6 +1,6 @@
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
 Task Status: done
-Next Step: Activity-page false-positive ROI remains a separate follow-up.
+Next Step: Run real-device validation of the map-driven decisive flow.
 
 # Task Plan: Decisive battle debug
 
@@ -13,7 +13,7 @@ Use the isolated AutoWSGR worktree to investigate and fix the decisive-battle mo
 - Development worktree: `C:\ShiinaKuroko\01.Project\AutoWSGR\.worktrees\20260907-autowsgr-decisive-debug-6e3a`
 
 ## Next Step
-Activity-page false-positive ROI remains a separate follow-up.
+Run real-device validation of the map-driven route and three-card ROI; the activity-page false-positive ROI remains a separate follow-up.
 
 ## Current Phase
 Phase 4 - Testing & Verification
@@ -55,6 +55,14 @@ Phase 4 - Testing & Verification
 | Create a new local task branch from `ShiinaKuroko` | Existing debug worktrees belong to unrelated or completed tasks, and the current branch has advanced to `c5a464c`. |
 | Place the worktree under `AutoWSGR/.worktrees` | The user explicitly requested the repository-owned path. |
 | Preserve the shared checkout | It contains pre-existing user changes and must not be switched, cleaned, or overwritten. |
+
+## Map Data Follow-up (2026-09-09)
+
+- [x] Read the normal-map node contract and the supplied decisive route/enemy sources.
+- [x] Add one normalized `silent_warrior/EX-*.yaml` file per Silent Warrior map with branch-qualified node IDs, directed `next` edges, reachable key points, and runtime enemy codes.
+- [x] Add a data contract test and run the full `testing/ops` suite.
+- [x] Integrate runtime loading, leftmost route selection, and branch-count ROI recognition without persisting a route column.
+- [x] Remove the obsolete `enemy_spec.yaml` data source.
 
 ## Errors Encountered
 | Error | Resolution |

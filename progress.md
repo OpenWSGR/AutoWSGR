@@ -246,3 +246,32 @@ Next Step: Activity-page false-positive ROI remains a separate follow-up.
 - `BaseEventPage.is_current_page()` checks the generic `fight_button_20260730_540p.png` first at confidence `0.8`.
 - On the decisive formation screenshot, that full-screen match falsely hits the top-left back button at confidence `0.86994`; difficulty-icon and event-title checks were not involved.
 - Because `EVENT_MAP` is registered before `DECISIVE_BATTLE`/other page candidates, the false event hit wins page recognition. The minimal fix boundary is an event-fight-button bottom-right ROI (the real event button location), not a reset or decisive-flow change.
+
+### 2026-09-09: map data cross-check
+
+- Read the normal-map YAML contract and the supplied decisive forward/enemy YAMLs.
+- Built a read-only normalized preview: 18 maps, 319 nodes, 401 edges; all terminal labels match legacy `map_end`.
+- First structural probe used the legacy enemy shape as a mapping and failed because `enemy_spec.yaml` stores `enemy` as a padded list; reran with shape-aware parsing.
+- One inspection probe referenced a non-existent `autowsgr/types/decisive.py`; the enum is defined in `autowsgr/types.py`. No repository files were changed by either failed read.
+
+### 2026-09-09: normalized decisive map archive
+
+- Generated 18 `autowsgr/data/map/decisive_battle/silent_warrior/EX-*.yaml` files from the supplied forward graph and enemy formations, using branch-qualified node IDs and normal-map `next` semantics.
+- Removed the temporary combined archive and normalized enemy formations through `ShipType` member names, with `AF` retained for the special `机场` unit. New map data stores only actual enemy codes; it does not copy the legacy index-0 sentinel.
+- Corrected the two legacy decisive aliases after validation: `CBG -> BG` for `大巡` and `BG -> BBG` for `导战`.
+- The first conversion assertion assumed every source formation had six units; the source contains 1-6 actual units. The new archive preserves those lengths instead of padding them.
+- The data test first rejected legacy empty padding, then caught the incompatible `CBG` code; both issues were corrected without weakening unknown-code validation.
+
+### 2026-09-09: route data runtime integration
+
+- Replaced `MapData`'s static `map_end`/`key_points` and legacy `enemy_spec.yaml` loader with per-EX `silent_warrior` map loading.
+- Added leftmost-route successor queries; no column or route cursor is persisted.
+- Added the three-card ROI from `adb-teamchose3.png`; unknown recovery state checks both two-card and three-card ROIs, while known route state selects the matching ROI.
+- Removed `get_advance_choice()`'s unconditional index-0 decision; the handler now always clicks the leftmost card after route-derived recognition.
+- Deleted `autowsgr/data/map/decisive_battle/enemy_spec.yaml` after removing all Python references.
+- Three-card ROI is `x=142..429, y=235..431` at 1280x720, taken from `adb-teamchose3.png`; the existing two-card ROI remains unchanged.
+- The first integration pre-commit caught a `TypeError` lint and a missing ROI return annotation; both were fixed and the second run passed.
+- The first data test exposed unreachable legacy key points; filtered each map's key points to its actual node labels and recorded the mismatch without changing `enemy_spec.yaml`.
+- Data contract test: `uv run pytest -q testing/ops/test_decisive_map_data.py` -> `1 passed`.
+- File-scoped pre-commit (including Ruff, YAML/file checks, and codespell) passed.
+- The first generation attempt used the wrong legacy-data path and failed before writing; the corrected generation completed with 18 maps, 319 nodes, and 401 edges.

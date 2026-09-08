@@ -87,6 +87,7 @@ class DecisiveBase:
         self._wait_deadline: float = 0.0
         self._use_last_fleet_attempts: int = 0
         self._skip_advance_choice: bool = False
+        self._advance_source_node: str | None = None
 
     @property
     def state(self) -> DecisiveState:

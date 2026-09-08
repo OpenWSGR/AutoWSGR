@@ -68,7 +68,7 @@
 - The unsafe behavior was at the state/action boundary: entry used a fixed 2-second delay, and `select_advance_card()` clicked coordinates without rechecking that the choice overlay was visible.
 - The fix removes the fixed delay, stages positive `USE_LAST_FLEET` and `ADVANCE_CHOICE` checks before the map-page fallback, routes a confirmed map page directly to `PREPARE_COMBAT`, and gates advance-card clicks on a positive `ADVANCE_CHOICE` template match.
 - The no-popup paths do not call `select_advance_card()`: only a positive `ADVANCE_CHOICE` overlay result enters `DecisivePhase.ADVANCE_CHOICE`; resume/terminal paths route to `PREPARE_COMBAT` or `STAGE_CLEAR`.
-- The current backend decisive data has `map_end`, `key_points`, and `enemy`, but no per-node `next` route graph. GUI map data covers normal/event maps, not decisive routes, so route-specific expectations cannot be inferred from the current repository.
+- Before the map archive was added, the backend decisive data exposed only `map_end`, `key_points`, and `enemy`; the new per-EX files now provide the route graph and are the runtime source.
 - The first mock E2E case design was invalid: it reused the normal entry path and reached `使用上次舰队` before the insufficient-fleet injection, so it did not isolate the requested same-task retreat/re-entry chain. The mock flag was removed without changing production code.
 - The captured chapter-6 log proves the advance card was not clicked blindly: `00:34:12.559` detected `advance_choice`, `00:34:12.609` entered `ADVANCE_CHOICE`, then `00:34:12.612` clicked the card and `00:34:13.126` clicked confirm.
 - The earlier chapter-1 failure was a different bug: at `00:21:30.224`, missing ship-marker recognition caused the old fallback to force `PREPARE_COMBAT → CHOOSE_FLEET`, which later timed out waiting for `fleet_acquisition`; it did not click an unrecognized advance popup.
@@ -78,6 +78,18 @@
 - On the decisive formation screenshot `logs/e2e_tools/decisive/20260908_034922/images/NavError_034216_477.png`, that matcher returned confidence `0.869940996170044` at normalized center `(0.130078125, 0.050694444444444445)`, which is the top-left back button, not an event attack button.
 - Difficulty-icon and event-title checks were both `None`; the false hit won because `EVENT_MAP` is registered before other page candidates.
 - Narrow fix for tomorrow: constrain the event fight-button matcher to the real bottom-right activity-button ROI and add an offline regression using this screenshot. Do not change decisive reset or combat logic for this issue.
+
+## Decisive Map Data Semantic Unification (2026-09-09)
+
+- The normal-map contract is one YAML file per map with node keys and `position` plus directed `next` edges. Decisive data should reuse the `next` meaning, but its source does not provide reliable pixel positions, so positions must remain absent until measured from real screenshots.
+- `silent_warrior_forward_map.yaml` covers 18 maps (`EX-1-1` through `EX-6-3`), 319 branch-qualified nodes, and 401 directed edges. Node IDs are `0` or `{label}{branch_number}` such as `A1`, `A2`, and `J3`.
+- `enemy_formations.yaml` covers the same 18 maps, but keys are base labels (`A` through `J`). Joining is therefore `node_id -> label` by removing the numeric suffix; duplicate branch instances intentionally share the same source formation.
+- All 18 route graphs have one terminal base label. Runtime terminal and key-point queries now derive directly from each EX file.
+- The current decisive state and DLL recognizer retain only the base node letter, while `get_advance_choice()` always returns index `0`. Route data can be archived now, but branch-qualified tracking and route-aware card selection require a separate state/API decision.
+- The supplied enemy data uses human-readable classes (`轻巡`, `驱逐`, `战列`, etc.); the canonical archive maps them through the existing type contract and legacy decisive aliases (`CL`, `DD`, `BB`, `BG`, `BBG`, etc.). In the decisive format, `大巡 -> BG` and `导战 -> BBG`; `机场` is not a normal `ShipType`, so it retains `AF`.
+- The old key-point table contained unreachable labels for some shorter maps (for example `J` in `EX-1-3` and `H` in `EX-2-1`); the normalized files retain only reachable key points.
+- Added 18 `autowsgr/data/map/decisive_battle/silent_warrior/EX-*.yaml` files as an offline archive only; production loading and state-machine behavior are intentionally unchanged in this phase.
+- The leading empty element in legacy enemy arrays is a 1-based compatibility sentinel, not an enemy slot. `MapData.get_enemy()` filters it with `if x`; the new `silent_warrior` files store actual enemy codes only and leave the legacy file untouched.
 
 ## Formation Back-Return Root Cause
 - The latest `BATTLE_PREP -> MAP` timeout occurs after the back click succeeds; failure screenshots are already on the decisive map.

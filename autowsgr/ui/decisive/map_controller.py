@@ -25,6 +25,8 @@ from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
+    ADVANCE_CHOICE_ROI,
+    ADVANCE_CHOICE_THREE_ROI,
     CLICK_ADVANCE_CONFIRM,
     CLICK_FLEET_CLOSE,
     CLICK_FLEET_REFRESH,
@@ -44,8 +46,8 @@ from autowsgr.ui.decisive.overlay import (
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
 from autowsgr.ui.utils.ship_list import recognize_ships_in_list as _recognize_ships
 from autowsgr.vision import (
+    ROI,
     ImageChecker,
-    ImageTemplate,
     MatchStrategy,
     PixelChecker,
     PixelRule,
@@ -126,6 +128,8 @@ class DecisiveMapController:
     def detect_decisive_phase(  # noqa: PLR0911
         self,
         screen: np.ndarray | None = None,
+        *,
+        advance_choice_roi: ROI | None = None,
     ) -> DecisivePhase | None:
         """单次截图检测当前决战页面状态。
 
@@ -163,7 +167,7 @@ class DecisiveMapController:
             _log.info('[地图控制器] 检测到「使用上次舰队」按钮')
             return DecisivePhase.USE_LAST_FLEET
 
-        overlay = detect_decisive_overlay(screen)
+        overlay = detect_decisive_overlay(screen, advance_choice_roi=advance_choice_roi)
         if overlay is not None:
             if overlay == DecisiveOverlay.ADVANCE_CHOICE:
                 return DecisivePhase.ADVANCE_CHOICE
@@ -177,7 +181,10 @@ class DecisiveMapController:
             time.sleep(0.2)
             confirm_screen = self._ctrl.screenshot()
 
-            overlay = detect_decisive_overlay(confirm_screen)
+            overlay = detect_decisive_overlay(
+                confirm_screen,
+                advance_choice_roi=advance_choice_roi,
+            )
             if overlay is not None:
                 if overlay == DecisiveOverlay.ADVANCE_CHOICE:
                     _log.debug('[地图控制器] 地图页复检修正为 overlay: advance_choice')
@@ -190,21 +197,6 @@ class DecisiveMapController:
                 return DecisivePhase.PREPARE_COMBAT
 
         return None
-
-    def _wait_for_template(
-        self,
-        template: ImageTemplate,
-        *,
-        timeout: float = 3.0,
-        interval: float = 0.2,
-    ) -> bool:
-        """Poll one decisive UI template without performing any click."""
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if ImageChecker.template_exists(self._ctrl.screenshot(), template, confidence=0.8):
-                return True
-            time.sleep(interval)
-        return False
 
     def _wait_for_use_last_fleet(self) -> bool:
         """等待总览稳定后，在固定按钮区域快速识别三次。"""
@@ -227,6 +219,7 @@ class DecisiveMapController:
         *,
         wait_for_use_last: bool,
         wait_for_advance: bool,
+        advance_choice_roi: ROI | None = None,
         timeout: float = 3.0,
         interval: float = 0.2,
     ) -> DecisivePhase:
@@ -236,13 +229,12 @@ class DecisiveMapController:
         stage accepts only a fleet-acquisition overlay or a confirmed map page;
         unknown screens time out instead of receiving a blind click.
         """
-        from autowsgr.image_resources import Templates
 
         if wait_for_use_last and self._wait_for_use_last_fleet():
             return DecisivePhase.USE_LAST_FLEET
 
-        if wait_for_advance and self._wait_for_template(
-            Templates.Decisive.ADVANCE_CHOICE,
+        if wait_for_advance and self._wait_for_advance_choice(
+            advance_choice_roi,
             timeout=timeout,
             interval=interval,
         ):
@@ -585,13 +577,17 @@ class DecisiveMapController:
     # 选择前进点 overlay
     # ══════════════════════════════════════════════════════════════════════
 
-    def select_advance_card(self, index: int) -> None:
+    def select_advance_card(
+        self,
+        index: int,
+        *,
+        advance_choice_roi: ROI | None = None,
+    ) -> None:
         """选择前进点卡片并确认。"""
-        self.wait_for_overlay(
-            DecisiveOverlay.ADVANCE_CHOICE,
-            timeout=5.0,
-            interval=0.2,
-        )
+        wait_kwargs = {'timeout': 5.0, 'interval': 0.2}
+        if advance_choice_roi is not None:
+            wait_kwargs['advance_choice_roi'] = advance_choice_roi
+        self.wait_for_overlay(DecisiveOverlay.ADVANCE_CHOICE, **wait_kwargs)
         if index < len(ADVANCE_CARD_POSITIONS):
             self._ctrl.click(*ADVANCE_CARD_POSITIONS[index])
             time.sleep(0.5)
@@ -834,6 +830,8 @@ class DecisiveMapController:
         target: DecisiveOverlay,
         timeout: float = 5.0,
         interval: float = 0.3,
+        *,
+        advance_choice_roi: ROI | None = None,
     ) -> np.ndarray:
         """反复截图直到指定 overlay 出现。"""
         tmpl = get_overlay_template(target)
@@ -841,8 +839,52 @@ class DecisiveMapController:
         deadline = time.monotonic() + timeout
         while True:
             screen = self._ctrl.screenshot()
-            if ImageChecker.template_exists(screen, tmpl, confidence=confidence):
+            if target is DecisiveOverlay.ADVANCE_CHOICE:
+                rois = self._advance_choice_rois(advance_choice_roi)
+                matched = any(
+                    ImageChecker.template_exists(screen, tmpl, roi=roi, confidence=confidence)
+                    for roi in rois
+                )
+            else:
+                matched = ImageChecker.template_exists(
+                    screen,
+                    tmpl,
+                    confidence=confidence,
+                )
+            if matched:
                 return screen
             if time.monotonic() >= deadline:
                 raise TimeoutError(f'等待 overlay {target.value} 超时 ({timeout}s)')
             time.sleep(interval)
+
+    @staticmethod
+    def _advance_choice_rois(advance_choice_roi: ROI | None) -> tuple[ROI, ...]:
+        if advance_choice_roi is not None:
+            return (advance_choice_roi,)
+        return (ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
+
+    def _wait_for_advance_choice(
+        self,
+        advance_choice_roi: ROI | None,
+        *,
+        timeout: float,
+        interval: float,
+    ) -> bool:
+        from autowsgr.image_resources import Templates
+
+        deadline = time.monotonic() + timeout
+        rois = self._advance_choice_rois(advance_choice_roi)
+        while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
+            if any(
+                ImageChecker.template_exists(
+                    screen,
+                    Templates.Decisive.ADVANCE_CHOICE,
+                    roi=roi,
+                    confidence=0.85,
+                )
+                for roi in rois
+            ):
+                return True
+            time.sleep(interval)
+        return False

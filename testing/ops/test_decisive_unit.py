@@ -8,12 +8,13 @@ from unittest.mock import MagicMock, call
 import numpy as np
 import pytest
 
-from autowsgr.image_resources import Templates
 from autowsgr.ops.decisive import handlers
 from autowsgr.types import DecisiveEntryStatus, DecisivePhase
 from autowsgr.ui.decisive import battle_page, map_controller, overlay, preparation
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
+    ADVANCE_CHOICE_ROI,
+    ADVANCE_CHOICE_THREE_ROI,
     CLICK_ADVANCE_CONFIRM,
     FLEET_NAME_ROI,
     USE_LAST_FLEET_ROI,
@@ -103,6 +104,7 @@ def test_map_fallback_routes_to_prepare_without_state_guess(
         _has_chosen_fleet=False,
         _use_last_fleet_attempts=0,
         _skip_advance_choice=False,
+        _advance_choice_roi=lambda: None,
         _wait_deadline=101.0,
     )
     monkeypatch.setattr(handlers.time, 'monotonic', lambda: 100.0)
@@ -128,7 +130,7 @@ def test_entry_phase_checks_overlays_before_map_fallback(
     controller = object.__new__(map_controller.DecisiveMapController)
     controller._ctrl = MagicMock()
     controller._wait_for_use_last_fleet = MagicMock(return_value=False)
-    controller._wait_for_template = MagicMock(side_effect=[False, False])
+    controller._wait_for_advance_choice = MagicMock(return_value=False)
     monkeypatch.setattr(map_controller, 'is_fleet_acquisition', lambda _screen: False)
     monkeypatch.setattr(map_controller, 'is_decisive_map_page', lambda _screen: True)
 
@@ -140,11 +142,106 @@ def test_entry_phase_checks_overlays_before_map_fallback(
     )
 
     assert phase is DecisivePhase.PREPARE_COMBAT
-    controller._wait_for_template.assert_has_calls(
-        [
-            call(Templates.Decisive.ADVANCE_CHOICE, timeout=3.0, interval=0.2),
-        ]
+    controller._wait_for_advance_choice.assert_called_once_with(
+        None,
+        timeout=3.0,
+        interval=0.2,
     )
+
+
+def test_advance_choice_overlay_uses_fixed_roi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Advance-choice matching is restricted to the annotated card region."""
+    calls: list[object] = []
+
+    def template_exists(
+        _screen: object, _template: object, *, roi: object, confidence: float
+    ) -> bool:
+        calls.append((roi, confidence))
+        return len(calls) == 3
+
+    monkeypatch.setattr(overlay.ImageChecker, 'template_exists', template_exists)
+
+    assert overlay.detect_decisive_overlay(np.zeros((720, 1280, 3), dtype=np.uint8)) is (
+        DecisiveOverlay.ADVANCE_CHOICE
+    )
+    assert calls == [(None, 0.70), (None, 0.85), (ADVANCE_CHOICE_ROI, 0.85)]
+
+
+def test_advance_choice_overlay_tries_three_branch_roi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fallback detector also checks the annotated three-card ROI."""
+    calls: list[object] = []
+
+    def template_exists(
+        _screen: object, _template: object, *, roi: object, confidence: float
+    ) -> bool:
+        calls.append((roi, confidence))
+        return roi is ADVANCE_CHOICE_THREE_ROI
+
+    monkeypatch.setattr(overlay.ImageChecker, 'template_exists', template_exists)
+
+    assert overlay.detect_decisive_overlay(np.zeros((720, 1280, 3), dtype=np.uint8)) is (
+        DecisiveOverlay.ADVANCE_CHOICE
+    )
+    assert calls[-1] == (ADVANCE_CHOICE_THREE_ROI, 0.85)
+
+
+def test_node_result_timeout_keeps_waiting_for_late_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A late post-combat advance popup must not fall through to formation."""
+    context = SimpleNamespace(
+        _logic=SimpleNamespace(is_stage_end=lambda: False),
+        _map=SimpleNamespace(
+            detect_decisive_phase=MagicMock(return_value=DecisivePhase.PREPARE_COMBAT)
+        ),
+        _state=SimpleNamespace(
+            node='A',
+            stage=1,
+            phase=DecisivePhase.NODE_RESULT,
+        ),
+        _POST_COMBAT_TIMEOUT=0.0,
+        _wait_deadline=0.0,
+    )
+    monkeypatch.setattr(handlers.time, 'monotonic', lambda: 100.0)
+
+    handlers.DecisivePhaseHandlers._handle_node_result(context)
+
+    assert context._state.node == 'B'
+    assert context._state.phase is DecisivePhase.WAITING_FOR_MAP
+    assert context._wait_deadline == 110.0
+
+
+def test_combat_success_clicks_result_page_before_node_poll(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A successful decisive combat dismisses the result page before polling."""
+    result = SimpleNamespace(
+        flag=handlers.ConditionFlag.OPERATION_SUCCESS,
+        ship_stats=[],
+    )
+    context = SimpleNamespace(
+        _ctx=SimpleNamespace(ctrl=MagicMock()),
+        _ctrl=MagicMock(),
+        _logic=SimpleNamespace(get_formation=lambda: 'single_column', is_key_point=lambda: False),
+        _state=SimpleNamespace(node='A', stage=1, ship_stats=[]),
+        _sync_ship_states=MagicMock(),
+    )
+    run_combat = MagicMock(return_value=result)
+    click_result = MagicMock()
+    sleeps: list[float] = []
+    monkeypatch.setattr(handlers, 'run_combat', run_combat)
+    monkeypatch.setattr(handlers, 'click_result', click_result)
+    monkeypatch.setattr(handlers.time, 'sleep', sleeps.append)
+
+    handlers.DecisivePhaseHandlers._handle_combat(context)
+
+    click_result.assert_called_once_with(context._ctrl)
+    assert context._state.phase is DecisivePhase.NODE_RESULT
+    assert 0.3 in sleeps
 
 
 def test_use_last_fleet_checks_fixed_roi_three_times(
@@ -325,9 +422,11 @@ def test_advance_choice_waits_for_next_recognized_phase(
 ) -> None:
     """After choosing a card, the next phase comes from fresh screen recognition."""
     context = SimpleNamespace(
-        _logic=SimpleNamespace(get_advance_choice=lambda _options: 0),
+        _logic=SimpleNamespace(),
         _map=SimpleNamespace(select_advance_card=MagicMock()),
         _state=SimpleNamespace(phase=DecisivePhase.ADVANCE_CHOICE),
+        _resolve_advance_source_node=lambda: None,
+        _advance_choice_roi=lambda: None,
         _wait_deadline=0.0,
     )
     monkeypatch.setattr(handlers.time, 'monotonic', lambda: 100.0)

@@ -1,0 +1,27 @@
+# Decisive battle node graph for Silent Warrior.
+# Node IDs keep branch suffixes (A1/A2); position is intentionally absent until measured.
+schema_version: 1
+event: silent_warrior
+mapping_type: node_graph
+map_id: EX-1-1
+chapter: 1
+stage: 1
+key_points: [B, D, F]
+nodes:
+  '0': {label: '0', column: 0, index: 0, next: [A1]}
+  A1: {label: A, column: 1, index: 0, next: [B1, B2]}
+  B1: {label: B, column: 2, index: 0, next: [C1]}
+  B2: {label: B, column: 2, index: 1, next: [C1]}
+  C1: {label: C, column: 3, index: 0, next: [D1, D2]}
+  D1: {label: D, column: 4, index: 0, next: [E1]}
+  D2: {label: D, column: 4, index: 1, next: [E2]}
+  E1: {label: E, column: 5, index: 0, next: [F1]}
+  E2: {label: E, column: 5, index: 1, next: [F1]}
+  F1: {label: F, column: 6, index: 0, next: []}
+enemy:
+  A: [CL]
+  B: [DD, DD]
+  C: [CL, DD, DD]
+  D: [DD, CL, SS]
+  E: [CA, CVL, DD, DD]
+  F: [CV, BC, SS, CLT, BBV, DD]
