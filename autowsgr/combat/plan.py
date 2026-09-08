@@ -13,7 +13,7 @@ import copy
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from autowsgr.infra import NodeConfig, load_yaml
 from autowsgr.infra.logger import get_logger
@@ -294,6 +294,8 @@ class CombatPlan:
         GUI 整理后的舰队预设列表。
     repair_mode:
         修理策略。
+    repair_method:
+        维修方式。``None`` 表示未指定，兼容读取全局 ``repair_manually``。
     fight_condition:
         战况选择。
     selected_nodes:
@@ -317,6 +319,7 @@ class CombatPlan:
     fleet: list[str] | None = None
     fleet_presets: tuple[FleetPreset, ...] | None = None
     repair_mode: RepairMode | list[RepairMode] = RepairMode.severe_damage
+    repair_method: Literal['quick', 'bath'] | None = None
     fight_condition: FightCondition = FightCondition.aim
     selected_nodes: list[str] = field(default_factory=list)
     nodes: dict[str, NodeDecision] = field(default_factory=dict)
@@ -326,9 +329,8 @@ class CombatPlan:
     event_name: str | None = None
     """活动名称（如 ``"20260212"``），用于定位活动地图节点数据。
     在 YAML 中写为 ``event: "20260212"``。"""
-    _force_collect_result: bool = field(default=False, repr=False, compare=False)
-    """运行时强制慢速采集开关 (仅 :attr:`collect_result_info` 的兼容
-    setter 使用, 不入 yaml)。"""
+    _force_collect_result: bool = field(default=True, repr=False, compare=False)
+    """运行时强制慢速采集开关 (默认开启, 仅供兼容 setter 使用)。"""
 
     def __post_init__(self) -> None:
         """\u5c06单个 repair_mode 展开为 6 个位置的列表，保证属性始终为 ``list[RepairMode]``。"""
@@ -345,10 +347,10 @@ class CombatPlan:
               F:
                 grade: S   # F 点要求 S 胜 (>= S)
 
-        配置后: ① 自动启用慢速结算采集 (:attr:`collect_result_info` 派生为
-        ``True``); ② 触发器 (:class:`~autowsgr.scheduler.triggers.NormalFightTrigger`)
-        按条件判定本次战斗是否计入次数 (所有配置 grade 的节点全部达标)。
-        空元组 (默认) 无条件, 每场成功即计数, 走快速穿行。
+        配置后: ① 保持完整战果采集 (:attr:`collect_result_info` 默认已开启); ② 触发器
+        (:class:`~autowsgr.scheduler.triggers.NormalFightTrigger`) 按条件判定本次战斗
+        是否计入次数 (所有配置 grade 的节点全部达标)。
+        空元组 (默认) 仍完整采集战果, 每场成功即计数。
         """
         return tuple(
             GradeCondition(node=node, grade=decision.grade)
@@ -358,15 +360,10 @@ class CombatPlan:
 
     @property
     def collect_result_info(self) -> bool:
-        """是否在战果/经验结算页停留采集信息 (评级/MVP) — 慢速通过。
+        """是否在战果/经验结算页停留采集信息 (评级/MVP) — 默认开启慢速通过。
 
-        由 :attr:`conditions` 派生: 任一节点配置了战果要求 → ``True``
-        (慢速, 经验页入状态机逐页推进, 完整采集评级与 MVP); 无要求 →
-        ``False`` (默认, 快速穿行, 经验页是过渡页, 不为页面停留)。
-
-        兼容 setter: 运行时赋值 (如 ``run_for_times_condition`` 的
-        ``plan.collect_result_info = True``) 写入内部强制开关, 不改
-        *conditions* 本身。
+        后端默认完整采集战果，避免普通计划因没有 grade 条件而跳过经验结算页。
+        兼容 setter: 运行时仍可显式赋值 ``False`` 请求快速穿行；GUI 不再暴露该开关。
         """
         return bool(self.conditions) or self._force_collect_result
 
@@ -437,6 +434,14 @@ class CombatPlan:
         else:
             repair_mode = RepairMode(repair_mode_raw)
 
+        # 维修方式缺省时保留旧版全局 repair_manually 兼容语义。
+        repair_method_raw = data.get('repair_method')
+        if repair_method_raw not in (None, 'quick', 'bath'):
+            raise ValueError(
+                f'repair_method 不合法: {repair_method_raw!r}, 可选值: quick/bath',
+            )
+        repair_method: Literal['quick', 'bath'] | None = repair_method_raw
+
         # 默认节点配置
         node_defaults = data.get('node_defaults', {})
         default_node = NodeDecision.from_dict(node_defaults)
@@ -473,6 +478,7 @@ class CombatPlan:
             fleet=fleet,
             fleet_presets=fleet_presets,
             repair_mode=repair_mode,
+            repair_method=repair_method,
             fight_condition=fight_condition,
             selected_nodes=selected_nodes,
             nodes=nodes,

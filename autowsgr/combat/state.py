@@ -107,7 +107,7 @@ def build_transitions(
     category: ModeCategory,
     end_page: CombatPhase | None,
     *,
-    collect_result_info: bool = False,
+    collect_result_info: bool = True,
 ) -> dict[CombatPhase, PhaseBranch]:
     """根据模式大类和结束页面自动构建状态转移图。
 
@@ -118,10 +118,9 @@ def build_transitions(
     end_page:
         战斗结束游戏回到的页面状态。``None`` 表示以 ``RESULT`` 作为终止态。
     collect_result_info:
-        是否在战果页停留采集评级/MVP (慢速通过)。``False`` (默认) 时经验
-        结算页是**过渡页** — RESULT 点击直接穿行直达后继, 不入状态机;
-        ``True`` 时经验页入状态机 (:attr:`CombatPhase.EXP_SETTLEMENT`),
-        处理器在 RESULT 页完成信息采集后再逐页推进。
+        是否在战果页停留采集评级/MVP (慢速通过)。``True`` (默认) 时经验结算页
+        进入状态机 (:attr:`CombatPhase.EXP_SETTLEMENT`)，处理器在 RESULT 页完成信息
+        采集后再逐页推进；显式传入 ``False`` 才启用快速穿行兼容路径。
 
     Returns
     -------
@@ -134,7 +133,7 @@ def build_transitions(
 
 def _build_map_transitions(
     end_page: CombatPhase | None,
-    collect_result_info: bool = False,
+    collect_result_info: bool = True,
 ) -> dict[CombatPhase, PhaseBranch]:
     """MAP 类：多节点地图战斗的完整转移图。"""
     ep = end_page  # 简写
@@ -206,9 +205,8 @@ def _build_map_transitions(
     }
 
     # 战果页点击后必进经验结算子页 (游戏固定流转), 掉落/继续前进等
-    # 只能从经验页到达。快速模式 (默认) 经验页是过渡页, RESULT 的点击
-    # 循环直接穿行 (EXP_SETTLEMENT 不入状态机); 慢速模式为采集 grade/MVP
-    # 逐页推进
+    # 只能从经验页到达。默认慢速模式进入状态机逐页采集 grade/MVP;
+    # 仅显式传入 collect_result_info=False 时才将经验页作为过渡页穿行。
     if collect_result_info:
         t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
     else:
@@ -226,7 +224,7 @@ def _build_map_transitions(
 
 def _build_single_transitions(
     end_page: CombatPhase | None,
-    collect_result_info: bool = False,
+    collect_result_info: bool = True,
 ) -> dict[CombatPhase, PhaseBranch]:
     """SINGLE 类：单点战斗的精简转移图。"""
     ep = end_page
@@ -254,7 +252,7 @@ def _build_single_transitions(
     }
 
     if ep is not None:
-        # 演习等: 慢速逐页 (战果→经验→结束), 快速穿行 (战果直达结束)
+        # 演习等: 默认慢速逐页 (战果→经验→结束), 显式 False 时快速穿行
         if collect_result_info:
             t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
             t[CombatPhase.EXP_SETTLEMENT] = [ep]

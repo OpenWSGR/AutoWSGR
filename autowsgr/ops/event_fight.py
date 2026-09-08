@@ -30,13 +30,15 @@ from autowsgr.combat.fleet import (
     validate_fleet_selection_arguments,
 )
 from autowsgr.infra.logger import get_logger
+from autowsgr.ops.navigate import goto_bath_from_event_sortie
 from autowsgr.ops.normal_fight import NormalFightRunner
 
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from autowsgr.context import GameContext
+
 
 _log = get_logger('ops')
 
@@ -79,6 +81,7 @@ class EventFightRunner(NormalFightRunner):
         map_code: str | None = None,  # noqa: ARG002 - 已废弃, 仅为兼容旧签名保留
         entrance: Literal['alpha', 'beta'] | None = None,
         event_name: str | None = None,
+        repair_status_callback: Callable[[bool], None] | None = None,
     ) -> None:
         # entrance override: 覆盖 plan.entrance (UI 层 a/b ↔ α/β)
         if entrance is not None:
@@ -93,7 +96,12 @@ class EventFightRunner(NormalFightRunner):
             fleet_id=fleet_id,
             fleet=fleet,
             fleet_rules=fleet_rules,
+            repair_status_callback=repair_status_callback,
         )
+
+    def _goto_bath_for_repair(self) -> None:
+        """从活动出征准备页返回活动地图，再进入澡堂。"""
+        goto_bath_from_event_sortie(self._ctx)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -113,6 +121,7 @@ def run_event_fight(
     fleet: Sequence[str] | None = None,
     fleet_rules: Sequence[FleetSlotRule] | None = None,
     fleet_selection: ResolvedFleetSelection | None = None,
+    repair_status_callback: Callable[[bool], None] | None = None,
 ) -> list[CombatResult]:
     """执行活动战的便捷函数 (兼容入口, 委托 :class:`NormalFightRunner`)。
 
@@ -156,6 +165,7 @@ def run_event_fight(
         resolved_selection,
         map_code=map_code,
         entrance=entrance,
+        repair_status_callback=repair_status_callback,
     )
     return runner.run_for_times(times, gap=gap)
 

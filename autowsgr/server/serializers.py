@@ -180,6 +180,7 @@ def build_combat_plan(request: Any) -> Any:
         fleet_id=request.fleet_id,
         fleet=request.fleet,
         repair_mode=[RepairMode(r) for r in request.repair_mode],
+        repair_method=request.repair_method,
         fight_condition=request.fight_condition,
         selected_nodes=request.selected_nodes,
         default_node=NodeDecision.from_dict(node_defaults),
@@ -235,6 +236,13 @@ def apply_combat_plan_overrides(
         return plan
 
     fields = request.model_fields_set
+    if 'repair_mode' in fields:
+        from autowsgr.types import RepairMode
+
+        plan.repair_mode = [RepairMode(value) for value in request.repair_mode]
+    if 'repair_method' in fields:
+        plan.repair_method = request.repair_method
+
     if 'selected_nodes' in fields:
         plan.selected_nodes = list(request.selected_nodes)
 

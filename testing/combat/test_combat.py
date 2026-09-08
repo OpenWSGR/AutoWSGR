@@ -88,11 +88,11 @@ class TestResolveSuccessors:
         assert CombatPhase.SPOT_ENEMY_SUCCESS in result
         assert CombatPhase.FORMATION in result
 
-    def test_exercise_transitions(self):
+    def test_exercise_transitions_default_to_slow(self):
+        """演习默认完整采集：RESULT 先进入经验结算页，再到结束页。"""
         exercise = MODE_TRANSITIONS[CombatMode.EXERCISE]
-        # 演习 (快速穿行): RESULT 直达结束页, 经验页同为终点
         result = resolve_successors(exercise, CombatPhase.RESULT, '')
-        assert result == [CombatPhase.EXERCISE_PAGE]
+        assert result == [CombatPhase.EXP_SETTLEMENT]
         result = resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '')
         assert result == [CombatPhase.EXERCISE_PAGE]
 
@@ -106,15 +106,15 @@ class TestResolveSuccessors:
             CombatPhase.EXERCISE_PAGE
         ]
 
-    def test_normal_result_passes_through_exp(self):
-        """MAP 类 (快速穿行): 经验页是过渡页, RESULT 的后继直达
-        掉落/继续前进/终态页, 不经过 EXP_SETTLEMENT。"""
+    def test_normal_result_enters_exp_by_default(self):
+        """MAP 类默认完整采集：RESULT 先进入经验结算页。"""
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
         result = resolve_successors(normal, CombatPhase.RESULT, '')
-        assert CombatPhase.EXP_SETTLEMENT not in result
-        assert CombatPhase.PROCEED in result
-        assert CombatPhase.MAP_PAGE in result
-        assert CombatPhase.GET_SHIP in result
+        assert result == [CombatPhase.EXP_SETTLEMENT]
+        after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
+        assert CombatPhase.PROCEED in after_exp
+        assert CombatPhase.MAP_PAGE in after_exp
+        assert CombatPhase.GET_SHIP in after_exp
 
     def test_normal_result_only_reaches_exp_when_slow(self):
         """MAP 类 (慢速): RESULT 只到经验结算页, 掉落/前进/终态从经验页到达。"""
@@ -1074,30 +1074,29 @@ class TestCombatPlanConditions:
         )
         assert plan.conditions == (GradeCondition('A', 'S'), GradeCondition('F', 'S'))
 
-    def test_no_grade_fast_path(self):
+    def test_no_grade_defaults_to_slow_path(self):
         plan = CombatPlan.from_dict({'node_args': {'F': {'night': True}}})
         assert plan.conditions == ()
-        assert plan.collect_result_info is False
+        assert plan.collect_result_info is True
 
     def test_invalid_grade_rejected_at_node_decision(self):
         with pytest.raises(ValueError, match='node grade'):
             CombatPlan.from_dict({'node_args': {'F': {'grade': 'X'}}})
 
-    def test_setter_forces_slow_without_conditions(self):
-        """兼容 setter: 运行时赋值 (run_for_times_condition) 只置内部开关。"""
+    def test_setter_can_disable_default_slow_without_conditions(self):
+        """兼容 setter: 运行时仍可显式请求快速穿行。"""
         plan = CombatPlan.from_dict({})
-        plan.collect_result_info = True
         assert plan.conditions == ()
         assert plan.collect_result_info is True
         plan.collect_result_info = False
         assert plan.collect_result_info is False
 
-    def test_conditions_plan_transitions_are_slow(self):
-        """配置 grade → transitions 走慢速 (RESULT 后继含经验页)。"""
-        plan = CombatPlan.from_dict({'node_args': {'F': {'grade': 'S'}}})
-        successors = resolve_successors(plan.transitions, CombatPhase.RESULT, '')
-        assert CombatPhase.EXP_SETTLEMENT in successors
-        # 快速路径 (无 grade) 则穿行直达, 不经过经验页
+    def test_default_plan_transitions_are_slow(self):
+        """无 grade 条件的计划默认进入经验结算页。"""
         plain = CombatPlan.from_dict({})
         plain_successors = resolve_successors(plain.transitions, CombatPhase.RESULT, '')
-        assert CombatPhase.EXP_SETTLEMENT not in plain_successors
+        assert plain_successors == [CombatPhase.EXP_SETTLEMENT]
+
+        fast = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=False)
+        fast_successors = resolve_successors(fast, CombatPhase.RESULT, '')
+        assert CombatPhase.EXP_SETTLEMENT not in fast_successors

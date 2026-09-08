@@ -209,7 +209,7 @@ NAV_GRAPH: list[NavEdge] = [
     # ── 地图 → 子页面 ──
     NavEdge(PageName.MAP, PageName.DECISIVE_BATTLE, _map_to_decisive, '地图 → 决战'),
     # BATTLE_PREP / CHOOSE_SHIP 不入图: 来源依赖战斗模式, 由 ops.navigate
-    # 的显式路线处理。活动出征需先返回 EVENT_MAP 后再接入澡堂导航 (TODO)。
+    # 的显式路线处理。活动战返回活动地图后再由 ops.navigate 进入澡堂。
     # ── 后院 ↔ 子页面 ──
     NavEdge(PageName.BACKYARD, PageName.BATH, _backyard_to_bath, '后院 → 浴室'),
     NavEdge(PageName.BACKYARD, PageName.CANTEEN, _backyard_to_canteen, '后院 → 食堂'),
