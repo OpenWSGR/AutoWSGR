@@ -326,9 +326,8 @@ class CombatPlan:
     event_name: str | None = None
     """活动名称（如 ``"20260212"``），用于定位活动地图节点数据。
     在 YAML 中写为 ``event: "20260212"``。"""
-    _force_collect_result: bool = field(default=False, repr=False, compare=False)
-    """运行时强制慢速采集开关 (仅 :attr:`collect_result_info` 的兼容
-    setter 使用, 不入 yaml)。"""
+    _force_collect_result: bool = field(default=True, repr=False, compare=False)
+    """运行时强制慢速采集开关 (默认开启, 仅供兼容 setter 使用)。"""
 
     def __post_init__(self) -> None:
         """\u5c06单个 repair_mode 展开为 6 个位置的列表，保证属性始终为 ``list[RepairMode]``。"""
@@ -345,10 +344,10 @@ class CombatPlan:
               F:
                 grade: S   # F 点要求 S 胜 (>= S)
 
-        配置后: ① 自动启用慢速结算采集 (:attr:`collect_result_info` 派生为
-        ``True``); ② 触发器 (:class:`~autowsgr.scheduler.triggers.NormalFightTrigger`)
-        按条件判定本次战斗是否计入次数 (所有配置 grade 的节点全部达标)。
-        空元组 (默认) 无条件, 每场成功即计数, 走快速穿行。
+        配置后: ① 保持完整战果采集 (:attr:`collect_result_info` 默认已开启); ② 触发器
+        (:class:`~autowsgr.scheduler.triggers.NormalFightTrigger`) 按条件判定本次战斗
+        是否计入次数 (所有配置 grade 的节点全部达标)。
+        空元组 (默认) 仍完整采集战果, 每场成功即计数。
         """
         return tuple(
             GradeCondition(node=node, grade=decision.grade)
@@ -358,15 +357,10 @@ class CombatPlan:
 
     @property
     def collect_result_info(self) -> bool:
-        """是否在战果/经验结算页停留采集信息 (评级/MVP) — 慢速通过。
+        """是否在战果/经验结算页停留采集信息 (评级/MVP) — 默认开启慢速通过。
 
-        由 :attr:`conditions` 派生: 任一节点配置了战果要求 → ``True``
-        (慢速, 经验页入状态机逐页推进, 完整采集评级与 MVP); 无要求 →
-        ``False`` (默认, 快速穿行, 经验页是过渡页, 不为页面停留)。
-
-        兼容 setter: 运行时赋值 (如 ``run_for_times_condition`` 的
-        ``plan.collect_result_info = True``) 写入内部强制开关, 不改
-        *conditions* 本身。
+        后端默认完整采集战果，避免普通计划因没有 grade 条件而跳过经验结算页。
+        兼容 setter: 运行时仍可显式赋值 ``False`` 请求快速穿行；GUI 不再暴露该开关。
         """
         return bool(self.conditions) or self._force_collect_result
 
