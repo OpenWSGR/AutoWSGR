@@ -1,8 +1,23 @@
 # Progress Log
 
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
-Task Status: done
-Next Step: Activity-page false-positive ROI remains a separate follow-up.
+Task Status: in_progress
+Next Step: Run the remaining 9 tickets with 15-minute health checks and stop after the ticket count completes.
+
+### 2026-09-09 04:30: refresh-state reset recovery
+- Diagnosed the stability-run loop: `reset_chapter()` only searched the `reset_button.png` ROI, while the real `refresh` overview presents the existing `entry_refresh_540p.png` as a large bottom-center `重置关卡` button.
+- Added `RESET_ENTRY_ROI` and a staged `ENTRY_REFRESH` fallback in `autowsgr/ui/decisive/battle_page.py`; the original right-side `RESET_BUTTON_ROI` path remains first.
+- Added `test_reset_chapter_falls_back_to_refresh_entry` to `testing/ops/test_decisive_unit.py`.
+- Offline reset tests: `3 passed`.
+- Real-device smoke: `BEFORE refresh` → `识别到重置入口: entry_refresh` → `confirm_1` → `AFTER refreshed`; no ticket was started.
+- First stability run: ticket 1 completed all three stages with 3 leaves and 1 retreat; ticket 2 hit a stale fleet-overlay/state-machine timeout at `05:09:28`, then the old harness restarted home without resetting the chapter and contaminated later tickets. The run was stopped at `05:14`.
+- Added harness recovery: restart home → re-enter Ex-6 → reset `challenging/refresh` → verify `refreshed`; stop if recovery verification fails.
+- Added production stale-frame guard: `fleet_acquisition` must match again on a fresh screenshot before entering OCR; added an offline regression.
+- Added start-of-run chapter reset: the harness now verifies `refreshed` before ticket 1, covering an interrupted prior process.
+- Final run: ticket 1 completed; ticket 2 hit a `WAITING_FOR_MAP` timeout and reset recovery recognized `reset_button` but did not open `confirm_1`, so the run was stopped safely. Added immediate report/exit when recovery is halted instead of waiting for the deadline-only expedition loop.
+- Reports written: `logs/e2e_tools/decisive_stability/20260909_053232/stability_report.md` and `debug_report.md`.
+- User reports the ship depot has been cleared and authorizes resuming the remaining 9-ticket stability run.
+- Added `--stop-after-tickets` so the run exits immediately after the requested count instead of waiting for the next day's 08:00.
 
 ### 2026-09-08: decisive preparation return checker
 - Confirmed the prior real-device timeout was after a successful back click; the screenshot was already the decisive map.
@@ -275,3 +290,68 @@ Next Step: Activity-page false-positive ROI remains a separate follow-up.
 - Data contract test: `uv run pytest -q testing/ops/test_decisive_map_data.py` -> `1 passed`.
 - File-scoped pre-commit (including Ruff, YAML/file checks, and codespell) passed.
 - The first generation attempt used the wrong legacy-data path and failed before writing; the corrected generation completed with 18 maps, 319 nodes, and 401 edges.
+
+### Stability run attempt 2026-09-09 08:24
+
+- Started the requested 9-ticket run with `--stop-after-tickets` and seed `314859790`.
+- The stale `ADVANCE_CHOICE` screen was recovered by the normal startup path: page recognition failed, then the game was force-restarted to the home page.
+- Ex-6 navigation and `challenging` entry recognition passed.
+- `reset_button.png` was recognized twice at `(0.684, 0.932)`, but neither click opened a confirmation dialog; the run halted before ticket 1.
+- Failure screenshot shows the unchanged `挑战中` overview, with no ship-depot dialog visible. Do not repeat the same reset click without a new state explanation.
+- The first inline behavior-check command was invalid Python because class declarations cannot follow semicolons; reran the check with `type()` fakes successfully.
+- Updated `tools/e2e/cases/decisive_stability.py`: only `refresh` invokes `reset_chapter()`; `challenging` is explicitly resumed without chapter reset.
+
+### Stability run health check 2026-09-09 09:07
+
+- The `uv` runner and child Python processes remained alive (runner PID `14692`); the requested serial `127.0.0.1:16384` remained online.
+- The active debug log continued through `09:08:20`, during formation/fight recognition in ticket 1 stage 3. The file metadata timestamp lagged behind the flushed log content, so health was judged from fresh tail lines and process/device state.
+- No restart or recovery was needed at this checkpoint.
+
+### Stability run health check 2026-09-09 09:22
+
+- Runner PID `14692` and child Python processes remained alive; `127.0.0.1:16384` remained online.
+- Ticket 2 continued through combat/fleet transitions; fresh log tail reached `09:23:17` in `FIGHT_PERIOD`.
+- No restart or recovery was needed. The open log's filesystem `LastWriteTime` remains stale, so the tail timestamp is the reliable activity signal.
+
+### Stability run health check 2026-09-09 09:37
+
+- Runner PID `14692` and child Python processes remained alive; `127.0.0.1:16384` remained online.
+- Fresh log tail reached `09:37:54` while ticket 2 resumed stage 3 after a system retreat. No process restart or manual intervention was needed.
+
+### Stability run guard verification 2026-09-09 09:52
+
+- Restarted the stability case after adding the consecutive system-retreat guard. The new run is active under a new log directory and reached ticket 1 combat after the preserved `challenging` state.
+- Runner and child processes are alive; target ADB serial remains online. No guard trigger or restart has occurred in this verification run yet.
+
+### Stability run stop 2026-09-09 09:47
+
+- Ticket 1 completed all 3 stages and 10 drops with the requested 3 leaves and 1 retreat.
+- Ticket 2 completed the requested injections, but then entered an unbounded no-ship loop: `PREPARE_COMBAT -> system retreat -> re-enter -> ADVANCE_CHOICE` repeated hundreds of times without another battle.
+- The run was stopped with Ctrl+C after preserving the log; cleanup returned the game to the home page. The last runner summary was 604 steps, 0 failed action steps, but overall FAIL because ticket 2 never cleared.
+- Added a five-consecutive-system-retreat guard to the stability case; it marks the report halted and exits after the existing restart/recovery attempt instead of looping until the deadline.
+
+### Stability run health check 2026-09-09 10:07
+
+- Runner PID `15860` and child Python processes remained alive; target ADB serial remained online.
+- Ticket 3 produced a `WAITING_FOR_MAP` timeout and recovered by restarting the game; ticket 4 continued afterward with all three leaves completed.
+- Fresh log content reached `10:08:33`; no continuous-system-retreat guard trigger yet.
+
+### Stability run final 2026-09-09 10:24
+
+- Final run directory: `logs/e2e_tools/decisive_stability/20260909_095023`.
+- Final report: 9 tickets attempted, 1 clear, 8 errors, 2 expedition collections, and 8 automatic restart recoveries.
+- Added `debug_report.md` with the ticket-2 leave-confirm failure, tickets-3-9 post-combat `WAITING_FOR_MAP` failures, and the prior no-ship loop evidence.
+- No E2E runner remains; the game cleanup path returned to the home page. Compile and `git diff --check` passed after the guard change.
+
+### Stability run health check 2026-09-09 10:22
+
+- Runner PID `15860` and child Python processes remained alive; target ADB serial remained online.
+- Ticket 9 is active in combat; the latest log tail reached `10:22:36` in `FIGHT_PERIOD`.
+- No guard halt or process restart occurred at this checkpoint.
+- The previous progress append failed because its anchor text had changed; no file content was altered by that failed patch.
+
+### Confirm exit ROI restriction 2026-09-09
+
+- Added the fixed `CONFIRM_EXIT_ROI` from the user-marked screenshot: `ROI(363/1280, 161/720, 917/1280, 465/720)`.
+- `confirm_exit_720p.png` remains the 526x273 crop template; matching is now restricted to that dialog region instead of the full screen.
+- Verification: `uv run pytest -q testing/ops/test_decisive_unit.py` -> `20 passed`; `git diff --check` passed.

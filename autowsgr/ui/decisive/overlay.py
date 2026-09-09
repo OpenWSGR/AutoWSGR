@@ -129,6 +129,9 @@ USE_LAST_FLEET_ROI = ROI(0.82, 0.30, 1.0, 0.50)
 # 1280x720 决战出征准备页「主力决战舰队」标题区域。
 FLEET_NAME_ROI = ROI(0.08, 0.11, 0.26, 0.22)
 
+# 1280x720 确认退出弹窗的固定红框区域（confirm_exit_720p.png）。
+CONFIRM_EXIT_ROI = ROI(363 / 1280, 161 / 720, 917 / 1280, 465 / 720)
+
 # 1280x720 决战「选择前进点」左侧卡片区域。
 ADVANCE_CHOICE_ROI = ROI(324 / 1280, 237 / 720, 607 / 1280, 429 / 720)
 
@@ -143,6 +146,7 @@ _OVERLAY_TEMPLATE_MAP: dict[DecisiveOverlay, ImageTemplate] = {
 }
 
 _FLEET_ACQUISITION_CONFIDENCE = 0.70
+_ADVANCE_CHOICE_CONFIDENCE = 0.80
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -245,6 +249,8 @@ def detect_decisive_overlay(
         confidence = (
             _FLEET_ACQUISITION_CONFIDENCE
             if overlay_type is DecisiveOverlay.FLEET_ACQUISITION
+            else _ADVANCE_CHOICE_CONFIDENCE
+            if overlay_type is DecisiveOverlay.ADVANCE_CHOICE
             else 0.85
         )
         if overlay_type is DecisiveOverlay.ADVANCE_CHOICE:
@@ -261,7 +267,11 @@ def detect_decisive_overlay(
             matched = ImageChecker.template_exists(
                 screen,
                 tmpl,
-                roi=None,
+                roi=(
+                    CONFIRM_EXIT_ROI
+                    if overlay_type is DecisiveOverlay.CONFIRM_EXIT
+                    else None
+                ),
                 confidence=confidence,
             )
         if matched:

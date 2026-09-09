@@ -15,6 +15,7 @@ from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     ADVANCE_CHOICE_ROI,
     ADVANCE_CHOICE_THREE_ROI,
+    CONFIRM_EXIT_ROI,
     CLICK_ADVANCE_CONFIRM,
     FLEET_NAME_ROI,
     USE_LAST_FLEET_ROI,
@@ -149,6 +150,31 @@ def test_entry_phase_checks_overlays_before_map_fallback(
     )
 
 
+def test_fleet_overlay_requires_fresh_confirmation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stale fleet overlay match must not re-enter the OCR phase."""
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctrl = MagicMock()
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    controller._ctrl.screenshot.return_value = screen
+    monkeypatch.setattr(
+        map_controller.ImageChecker,
+        'template_exists',
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        map_controller,
+        'detect_decisive_overlay',
+        MagicMock(side_effect=[DecisiveOverlay.FLEET_ACQUISITION, None]),
+    )
+    monkeypatch.setattr(map_controller, 'is_fleet_acquisition', lambda _screen: False)
+    monkeypatch.setattr(map_controller, 'is_decisive_map_page', lambda _screen: True)
+    monkeypatch.setattr(map_controller.time, 'sleep', lambda _delay: None)
+
+    assert controller.detect_decisive_phase() is DecisivePhase.PREPARE_COMBAT
+
+
 def test_advance_choice_overlay_uses_fixed_roi(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -166,7 +192,11 @@ def test_advance_choice_overlay_uses_fixed_roi(
     assert overlay.detect_decisive_overlay(np.zeros((720, 1280, 3), dtype=np.uint8)) is (
         DecisiveOverlay.ADVANCE_CHOICE
     )
-    assert calls == [(None, 0.70), (None, 0.85), (ADVANCE_CHOICE_ROI, 0.85)]
+    assert calls == [
+        (None, 0.70),
+        (CONFIRM_EXIT_ROI, 0.85),
+        (ADVANCE_CHOICE_ROI, 0.80),
+    ]
 
 
 def test_advance_choice_overlay_tries_three_branch_roi(
@@ -186,7 +216,7 @@ def test_advance_choice_overlay_tries_three_branch_roi(
     assert overlay.detect_decisive_overlay(np.zeros((720, 1280, 3), dtype=np.uint8)) is (
         DecisiveOverlay.ADVANCE_CHOICE
     )
-    assert calls[-1] == (ADVANCE_CHOICE_THREE_ROI, 0.85)
+    assert calls[-1] == (ADVANCE_CHOICE_THREE_ROI, 0.80)
 
 
 def test_node_result_timeout_keeps_waiting_for_late_overlay(
@@ -290,6 +320,56 @@ def test_reset_chapter_requires_recognized_reset_button(
     page._ctrl.click.assert_called_once_with(*match.center)
     assert find_template.call_args.kwargs['roi'] == battle_page.RESET_BUTTON_ROI
     confirm.assert_called_once_with(page._ctrl, must_confirm=True, timeout=5.0)
+
+
+def test_reset_chapter_falls_back_to_refresh_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The completed-state reset button is the bottom-center entry template."""
+    page = object.__new__(battle_page.DecisiveBattlePage)
+    page._ctrl = MagicMock()
+    match = SimpleNamespace(center=(0.53, 0.93))
+    find_template = MagicMock(side_effect=[None, match])
+    monkeypatch.setattr(battle_page.ImageChecker, 'find_template', find_template)
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'template_exists',
+        lambda *_args, **_kwargs: False,
+    )
+    confirm = MagicMock()
+    monkeypatch.setattr(battle_page, 'confirm_operation', confirm)
+    monkeypatch.setattr(battle_page.time, 'sleep', lambda _delay: None)
+
+    assert page.reset_chapter() is True
+    page._ctrl.click.assert_called_once_with(*match.center)
+    assert find_template.call_args_list[1].kwargs['roi'] == battle_page.RESET_ENTRY_ROI
+    confirm.assert_called_once_with(page._ctrl, must_confirm=True, timeout=5.0)
+
+
+def test_reset_chapter_retries_entry_when_confirmation_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missed confirmation retries only after re-matching the reset entry."""
+    page = object.__new__(battle_page.DecisiveBattlePage)
+    page._ctrl = MagicMock()
+    match = SimpleNamespace(center=(0.684, 0.932))
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'find_template',
+        MagicMock(side_effect=[match, match]),
+    )
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'template_exists',
+        lambda *_args, **_kwargs: False,
+    )
+    confirm = MagicMock(side_effect=[battle_page.NavigationError('missing confirmation'), None])
+    monkeypatch.setattr(battle_page, 'confirm_operation', confirm)
+    monkeypatch.setattr(battle_page.time, 'sleep', lambda _delay: None)
+
+    assert page.reset_chapter() is True
+    assert page._ctrl.click.call_count == 2
+    assert confirm.call_count == 2
 
 
 def test_enter_formation_retries_after_fleet_name_miss(
@@ -425,7 +505,6 @@ def test_advance_choice_waits_for_next_recognized_phase(
         _logic=SimpleNamespace(),
         _map=SimpleNamespace(select_advance_card=MagicMock()),
         _state=SimpleNamespace(phase=DecisivePhase.ADVANCE_CHOICE),
-        _resolve_advance_source_node=lambda: None,
         _advance_choice_roi=lambda: None,
         _wait_deadline=0.0,
     )

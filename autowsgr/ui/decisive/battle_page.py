@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisiveEntryStatus, PageName
-from autowsgr.ui.utils import click_and_wait_for_page, confirm_operation
+from autowsgr.ui.utils import NavigationError, click_and_wait_for_page, confirm_operation
 from autowsgr.vision import (
     ROI,
     Color,
@@ -84,6 +84,9 @@ CLICK_RESET_CHAPTER: tuple[float, float] = (0.5, 0.925)
 
 RESET_BUTTON_ROI = ROI(0.64, 0.84, 0.73, 1.0)
 """1280x720 总览页中「重置关卡」按钮的固定识别区域。"""
+
+RESET_ENTRY_ROI = ROI(0.35, 0.80, 0.70, 1.0)
+"""``refresh`` 状态下底部中央「重置关卡」入口的识别区域。"""
 
 CHAPTER_NUM_AREA: tuple[float, float, float, float] = (0.818, 0.810, 0.875, 0.867)
 """章节编号 OCR 裁切区域 (x1, y1, x2, y2)。"""
@@ -443,13 +446,24 @@ class DecisiveBattlePage:
         _log.info('[决战] 决战页面 → 重置关卡')
         deadline = time.monotonic() + 5.0
         match = None
+        match_source = None
         while time.monotonic() < deadline:
+            screen = self._ctrl.screenshot()
             match = ImageChecker.find_template(
-                self._ctrl.screenshot(),
+                screen,
                 Templates.Decisive.RESET_BUTTON,
                 roi=RESET_BUTTON_ROI,
                 confidence=0.8,
             )
+            match_source = 'reset_button' if match is not None else None
+            if match is None:
+                match = ImageChecker.find_template(
+                    screen,
+                    Templates.Decisive.ENTRY_REFRESH,
+                    roi=RESET_ENTRY_ROI,
+                    confidence=0.8,
+                )
+                match_source = 'entry_refresh' if match is not None else None
             if match is not None:
                 break
             time.sleep(0.2)
@@ -457,17 +471,47 @@ class DecisiveBattlePage:
         if match is None:
             raise TimeoutError('未识别到「重置关卡」按钮，拒绝点击')
 
-        self._ctrl.click(*match.center)
-        time.sleep(1.0)
-        screen = self._ctrl.screenshot()
-        if ImageChecker.template_exists(
-            screen,
-            Templates.Build.SHIP_FULL_DEPOT,
-            confidence=0.8,
-        ):
-            _log.warning('[决战] 重置关卡时检测到船坞已满')
-            return False
-        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0)
-        time.sleep(1.0)  # 防止后续 stage 识别出问题
-        _log.info('[决战] 决战关卡重置完成')
-        return True
+        for attempt in range(2):
+            if attempt:
+                screen = self._ctrl.screenshot()
+                match = ImageChecker.find_template(
+                    screen,
+                    Templates.Decisive.RESET_BUTTON,
+                    roi=RESET_BUTTON_ROI,
+                    confidence=0.8,
+                )
+                match_source = 'reset_button' if match is not None else None
+                if match is None:
+                    match = ImageChecker.find_template(
+                        screen,
+                        Templates.Decisive.ENTRY_REFRESH,
+                        roi=RESET_ENTRY_ROI,
+                        confidence=0.8,
+                    )
+                    match_source = 'entry_refresh' if match is not None else None
+                if match is None:
+                    raise TimeoutError('重试时未识别到「重置关卡」按钮，拒绝点击')
+                _log.warning('[决战] 确认弹窗未出现，重新识别并点击重置入口')
+
+            _log.info('[决战] 识别到重置入口: {}', match_source)
+            self._ctrl.click(*match.center)
+            time.sleep(1.0)
+            screen = self._ctrl.screenshot()
+            if ImageChecker.template_exists(
+                screen,
+                Templates.Build.SHIP_FULL_DEPOT,
+                confidence=0.8,
+            ):
+                _log.warning('[决战] 重置关卡时检测到船坞已满')
+                return False
+            try:
+                confirm_operation(self._ctrl, must_confirm=True, timeout=5.0)
+            except NavigationError:
+                if attempt == 1:
+                    raise
+                continue
+            time.sleep(1.0)  # 防止后续 stage 识别出问题
+            _log.info('[决战] 决战关卡重置完成')
+            return True
+
+        raise TimeoutError('重置关卡确认失败')

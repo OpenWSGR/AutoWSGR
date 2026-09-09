@@ -105,22 +105,6 @@ class DecisivePhaseHandlers(DecisiveBase):
         )
         return choices
 
-    def _resolve_advance_source_node(self) -> None:
-        if getattr(self, '_advance_source_node', None) is not None:
-            return
-        source_node = self._state.node
-        if source_node == 'U':
-            try:
-                recognized = self._map.recognize_node()
-            except RuntimeError:
-                recognized = None
-            if recognized not in {None, '', 'U', 'CHOOSE_FLEET'}:
-                self._state.node = recognized
-                source_node = recognized
-            else:
-                source_node = '0'
-        self._advance_source_node = source_node
-
     def _advance_choice_roi(self) -> ROI | None:
         if getattr(self, '_advance_source_node', None) is None and self._state.node == 'U':
             return None
@@ -297,7 +281,6 @@ class DecisivePhaseHandlers(DecisiveBase):
     def _handle_advance_choice(self) -> None:
         """选择前进点。"""
         _log.info('[决战] 选择前进点')
-        self._resolve_advance_source_node()
         if (advance_choice_roi := self._advance_choice_roi()) is None:
             self._map.select_advance_card(0)
         else:

@@ -1,6 +1,6 @@
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
-Task Status: done
-Next Step: Run real-device validation of the map-driven decisive flow.
+Task Status: in_progress
+Next Step: Review the stability/debug reports, fix post-combat WAITING_FOR_MAP and leave-confirm recognition, then rerun the remaining stability coverage.
 
 # Task Plan: Decisive battle debug
 
@@ -13,10 +13,10 @@ Use the isolated AutoWSGR worktree to investigate and fix the decisive-battle mo
 - Development worktree: `C:\ShiinaKuroko\01.Project\AutoWSGR\.worktrees\20260907-autowsgr-decisive-debug-6e3a`
 
 ## Next Step
-Run real-device validation of the map-driven route and three-card ROI; the activity-page false-positive ROI remains a separate follow-up.
+The user cleared the ship depot. Run 9 remaining tickets with periodic process/log checks; preserve prior logs and write a new report. The activity-page false-positive ROI remains a separate follow-up.
 
 ## Current Phase
-Phase 4 - Testing & Verification
+Phase 4 - Testing & Verification (stability run)
 
 ## Phases
 
@@ -48,6 +48,20 @@ Phase 4 - Testing & Verification
 - [x] Review outputs
 - [x] Deliver to user
 - **Status:** completed
+
+### Phase 6: Overnight Stability Run
+- [x] Recover the refresh-state reset path; `refresh -> reset -> refreshed` passed during ticket 2.
+- [x] Run the requested 9-ticket attempt with three leaves and one retreat per ticket; ticket 1 cleared and tickets 2-9 produced recorded errors/recoveries.
+- [x] Collect expeditions during leave/recovery windows; 2 collections recorded.
+- [x] Perform periodic process, ADB, and log health checks; no runner/device loss was observed.
+- [x] Write stability and debug reports.
+- **Status:** completed with failures documented
+
+### Phase 7: Production Follow-up
+- [ ] Fix post-combat `WAITING_FOR_MAP` recognition after result-page click.
+- [ ] Fix or diagnose `confirm_exit` recognition during injected leave.
+- [ ] Rerun stability coverage after the production fixes.
+- **Status:** in progress
 
 ## Decisions Made
 | Decision | Rationale |

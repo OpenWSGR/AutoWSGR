@@ -97,6 +97,20 @@
 - `DecisiveMapController.is_decisive_map_page()` does recognize that screen, but it is not the checker used by the preparation-page return path.
 - The event false positive is a secondary first-frame misclassification; after it disappears, the generic MAP target still returns `None` and causes the timeout.
 
+## Stability Run Reset Failure (2026-09-09)
+
+- The long-run process completed ticket 1, then repeatedly saw entry status `refresh` and failed inside `reset_chapter()` before any confirmation dialog was opened.
+- The captured `refresh` overview shows a large bottom-center `重置关卡` button matching `Templates.Decisive.ENTRY_REFRESH` at about `(0.43, 0.88)-(0.63, 0.98)` on 1280x720.
+- `reset_button.png` is a small circular-arrow control at about `(0.65, 0.86)-(0.71, 0.96)` on the `challenging` overview; it does not match the bottom-center `refresh` button (offline score in the old ROI: `0.118`).
+- The existing `RESET_BUTTON_ROI = ROI(0.64, 0.84, 0.73, 1.0)` is correct for the small control but cannot handle the `refresh` state. `ENTRY_REFRESH` matches the captured refresh page at `0.9856` in a bottom-center ROI.
+- The production reset path must recognize either existing reset control before clicking, then use the existing confirmation matcher. No blind fallback click is needed.
+- In the first long-run attempt, ticket 2 hit a second failure at `05:09:20`: after the close click, the next preparation check still saw `fleet_acquisition`; the subsequent `CHOOSE_FLEET` retry waited for an overlay that was no longer consistently present and timed out at `05:09:28`.
+- The stability harness originally restarted the app to home after this error but did not reset the decisive chapter, so later tickets reused the stale `challenging` state and repeatedly failed the insufficient-fleet path. The harness now re-enters Ex-6, resets `challenging/refresh` to `refreshed`, and halts if that recovery cannot be verified.
+- The production fix is to require a fresh second screenshot after a first-frame `fleet_acquisition` hit. If the second frame does not match, the controller discards the stale overlay result and continues normal map recognition.
+- A run interrupted between tickets can leave the game in `challenging`; the corrected harness now performs the same reset-and-verify step before ticket 1 as well as after ticket errors.
+- The final run reached a full-dock state. `reset_button` was recognized at `(0.684, 0.932)`, but two clicks produced no confirmation; clicking the central challenge button exposed the `舰船船坞已满` dialog. No ship destruction was authorized or performed.
+- In the final run, ticket 2 recovery reached `reset_button` recognition but did not produce the confirmation dialog, so recovery correctly failed closed. The harness previously still entered its deadline-only expedition loop after `halted`; this is now fixed to write the report and exit immediately.
+
 ## Decisive Preparation Return Fix
 - `DecisiveBattlePreparationPage` is the concrete page used by decisive fleet scanning and fleet changes.
 - Its inherited `BattlePreparationPage.go_back()` waited for generic `MapPage.is_current_page()`, which does not recognize the decisive map layout.
@@ -105,3 +119,17 @@
 - The existing `SIG_MAP_PAGE` pixel signature matched that same screenshot 5/5, so `is_decisive_map_page()` now uses `PixelChecker.check_signature` without adding a new asset.
 - Offline verification after the final fix: `uv run pytest -q testing/ops` -> `115 passed`; compileall and selected pre-commit hooks passed.
 - Final recovery-chain verification passed all 44 steps, including Case 3 map return/temporary leave and Case 4 resume stopping before battle.
+
+## Stability Run Attempt 2026-09-09 08:24
+
+- The run's normal startup recovery successfully returned from the stale map overlay to the home page and navigated back to Ex-6.
+- The live overview was `challenging`; the reset icon matched at the expected ROI and click coordinate `(0.684, 0.932)`.
+- Two recognition-gated reset clicks left the overview unchanged and never exposed `confirm_1`. The failure screenshot does not show the full-dock dialog seen when the central `挑战中` button was previously clicked.
+- This is a distinct unresolved reset-entry behavior: the click target is recognized, but the game ignores it in the current `challenging` state. The next diagnostic should inspect the challenge entry state/interaction rather than retrying the same reset click.
+
+## Confirm Exit Template ROI (2026-09-09)
+
+- `confirm_exit_720p.png` is a 526x273 cropped dialog template, not a full-screen image.
+- The user-marked 1280x720 red box is `x=363..916, y=161..464`; the matching ROI uses the exclusive edge `(917, 465)`.
+- `detect_decisive_overlay()` now searches `CONFIRM_EXIT` only inside `CONFIRM_EXIT_ROI`; fleet and advance overlay behavior is unchanged.
+- The marked screenshot matched at confidence `0.9989` both before and after the ROI restriction.

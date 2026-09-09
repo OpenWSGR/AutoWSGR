@@ -172,7 +172,14 @@ class DecisiveMapController:
             if overlay == DecisiveOverlay.ADVANCE_CHOICE:
                 return DecisivePhase.ADVANCE_CHOICE
             if overlay == DecisiveOverlay.FLEET_ACQUISITION:
-                return DecisivePhase.CHOOSE_FLEET
+                # Closing the fleet dialog can leave one stale scrcpy frame that
+                # still matches the overlay. Require a fresh confirmation before
+                # routing back into OCR, otherwise the state machine can wait
+                # for a dialog that has already disappeared.
+                time.sleep(0.2)
+                if is_fleet_acquisition(self._ctrl.screenshot()):
+                    return DecisivePhase.CHOOSE_FLEET
+                _log.debug('[地图控制器] 丢弃过期的战备舰队弹窗匹配')
 
         if is_decisive_map_page(screen):
             # 进图后的首个稳定帧有时会短暂满足“地图页”特征，但战备舰队
@@ -835,7 +842,13 @@ class DecisiveMapController:
     ) -> np.ndarray:
         """反复截图直到指定 overlay 出现。"""
         tmpl = get_overlay_template(target)
-        confidence = 0.70 if target is DecisiveOverlay.FLEET_ACQUISITION else 0.85
+        confidence = (
+            0.70
+            if target is DecisiveOverlay.FLEET_ACQUISITION
+            else 0.80
+            if target is DecisiveOverlay.ADVANCE_CHOICE
+            else 0.85
+        )
         deadline = time.monotonic() + timeout
         while True:
             screen = self._ctrl.screenshot()
@@ -881,7 +894,7 @@ class DecisiveMapController:
                     screen,
                     Templates.Decisive.ADVANCE_CHOICE,
                     roi=roi,
-                    confidence=0.85,
+                    confidence=0.80,
                 )
                 for roi in rois
             ):
