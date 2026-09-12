@@ -589,3 +589,9 @@ Next Step: Extract explicit node re-anchoring, separate post-combat overlay reco
 - Entry detection returned `第 3 小节正在进行`; preparation logged live node recognition `A` after the `U` anchor.
 - Completed stage 3 nodes A through J, collected 10 drops, and reached `chapter_clear`.
 - E2E result: `3 steps, 0 failures`; log directory `logs/e2e_tools/decisive/20260913_012346`.
+
+## 2026-09-13 commit checkpoint
+
+- Child worktree commit: `d3c1dd0` (`fix(decisive): stabilize fleet and stage recovery`).
+- Merged into shared `ShiinaKuroko`: `68bc60d` (`Merge decisive battle stabilization`).
+- Shared checkout untracked `.dbg/` was preserved.
