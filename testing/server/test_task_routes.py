@@ -227,7 +227,7 @@ def test_decisive_error_result_marks_task_failed(
         def __init__(self, _ctx: object, _config: object) -> None:
             pass
 
-        def run(self) -> DecisiveResult:
+        def run(self, *, full_recovery_check: bool = False) -> DecisiveResult:
             return DecisiveResult.ERROR
 
     manager = _ExecutingTaskManager()
@@ -249,6 +249,91 @@ def test_decisive_error_result_marks_task_failed(
     ]
 
 
+def test_decisive_error_retries_after_sl_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transient decisive ERROR is recovered before the task fails."""
+    from autowsgr.ops import DecisiveResult
+
+    calls = 0
+    recoveries: list[int] = []
+    modes: list[bool] = []
+
+    class RetryController:
+        def __init__(self, _ctx: object, _config: object) -> None:
+            pass
+
+        def run(self, *, full_recovery_check: bool = False) -> DecisiveResult:
+            nonlocal calls
+            calls += 1
+            modes.append(full_recovery_check)
+            return DecisiveResult.ERROR if calls < 3 else DecisiveResult.CHAPTER_CLEAR
+
+    manager = _ExecutingTaskManager()
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'DecisiveController', RetryController)
+    monkeypatch.setattr(
+        task,
+        '_recover_decisive_after_error',
+        lambda _ctx, attempt: recoveries.append(attempt),
+    )
+
+    asyncio.run(task._start_decisive(object(), DecisiveRequest()))
+
+    assert calls == 3
+    assert recoveries == [1, 2]
+    assert modes == [False, True, True]
+    assert manager.outcome is not None
+    assert manager.outcome.success is True
+    assert manager.outcome.results == [{'round': 1, 'success': True, 'result': 'chapter_clear'}]
+
+
+def test_decisive_error_fails_after_retry_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Persistent decisive ERROR only fails after the bounded recovery budget."""
+    from autowsgr.ops import DecisiveResult
+
+    calls = 0
+    recoveries: list[int] = []
+    modes: list[bool] = []
+
+    class ErrorController:
+        def __init__(self, _ctx: object, _config: object) -> None:
+            pass
+
+        def run(self, *, full_recovery_check: bool = False) -> DecisiveResult:
+            nonlocal calls
+            calls += 1
+            modes.append(full_recovery_check)
+            return DecisiveResult.ERROR
+
+    manager = _ExecutingTaskManager()
+    monkeypatch.setattr(task, 'task_manager', manager)
+    monkeypatch.setattr(ops, 'DecisiveController', ErrorController)
+    monkeypatch.setattr(
+        task,
+        '_recover_decisive_after_error',
+        lambda _ctx, attempt: recoveries.append(attempt),
+    )
+
+    asyncio.run(task._start_decisive(object(), DecisiveRequest()))
+
+    assert calls == task._DECISIVE_MAX_ATTEMPTS
+    assert recoveries == [1, 2, 3]
+    assert modes == [False, True, True]
+    assert manager.outcome is not None
+    assert manager.outcome.success is False
+    assert manager.outcome.results == [
+        {
+            'round': 1,
+            'success': False,
+            'result': 'error',
+            'error': '决战异常退出',
+        }
+    ]
+
+
 def test_decisive_leave_result_remains_successful(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -260,7 +345,7 @@ def test_decisive_leave_result_remains_successful(
         def __init__(self, _ctx: object, _config: object) -> None:
             pass
 
-        def run(self) -> DecisiveResult:
+        def run(self, *, full_recovery_check: bool = False) -> DecisiveResult:
             return DecisiveResult.LEAVE
 
     manager = _ExecutingTaskManager()

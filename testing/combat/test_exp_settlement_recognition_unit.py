@@ -3,64 +3,26 @@
 背景 (实机 2026-08-15): 战果页点击后游戏进入经验结算子页, 旧识别器在该页
 返回 None → 引擎等待后继状态超时。
 
-判据演进 (两轮实机迭代):
-  1. "升级剩余经验" 标签 (exp_settlement_540p): 舰船背景使置信度在
-     0.61~0.91 大幅波动, 计数判据也漏检 — 弃用。
-  2. MVP 徽章 + 无评级字母: MVP 徽章 (result_page_540p) 在战果/经验
-     两页必出现于 6 个舰船行位之一 (左缘 x≈0.057, 实测 0.94+, 不被
-     立绘遮挡), 评级字母仅战果页出现 → "MVP 有 + 评级无" 即经验页。
+当前判据: 固定顶部 ROI OCR 必须识别出 ``数字 + Exp``。
 """
 
 from __future__ import annotations
 
-import numpy as np
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+import numpy as np
+import pytest
+
+from autowsgr.combat import handlers as handlers_module
+from autowsgr.combat.handlers import PhaseHandlersMixin
 from autowsgr.combat.recognizer import CombatRecognizer
 from autowsgr.combat.state import CombatPhase
 from autowsgr.image_resources import TemplateKey
+from autowsgr.vision import OCRResult
 
 
-def _paste(canvas: np.ndarray, tile: np.ndarray, x: int, y: int) -> None:
-    h, w = tile.shape[:2]
-    canvas[y : y + h, x : x + w] = tile
-
-
-def _synth_frame(tiles: list[np.ndarray], shape: tuple[int, int] = (540, 960)) -> np.ndarray:
-    """把各 *tiles* 粘贴到左缘 (MVP 行位) 的合成帧。*shape* 为 (H, W)。"""
-    frame = np.zeros((*shape, 3), dtype=np.uint8)
-    y = 100
-    for tile in tiles:
-        _paste(frame, tile, 40, y)
-        y += tile.shape[0] + 60
-    return frame
-
-
-class TestExpSettlementByMvp:
-    def test_mvp_only_matches(self):
-        """MVP 徽章出现、无评级字母 → 识别为 EXP_SETTLEMENT。"""
-        frame = _synth_frame([TemplateKey.RESULT_PAGE.templates[0].image])
-        result = CombatRecognizer.identify_current(frame, [CombatPhase.EXP_SETTLEMENT])
-        assert result is CombatPhase.EXP_SETTLEMENT
-
-    def test_mvp_with_grade_rejected(self):
-        """MVP 徽章与评级字母同时出现 (战果页形态) → 否决键排除, 不命中。"""
-        tiles = [
-            TemplateKey.RESULT_PAGE.templates[0].image,
-            TemplateKey.RESULT_GRADES.templates[0].image,
-        ]
-        frame = _synth_frame(tiles)
-        result = CombatRecognizer.identify_current(frame, [CombatPhase.EXP_SETTLEMENT])
-        assert result is None
-
-    def test_empty_frame_no_match(self):
-        """既无 MVP 也无评级 → 不命中。"""
-        assert (
-            CombatRecognizer.identify_current(
-                np.zeros((540, 960, 3), dtype=np.uint8), [CombatPhase.EXP_SETTLEMENT]
-            )
-            is None
-        )
-
+class TestExpSettlementByOcr:
     def test_default_signature_unchanged(self):
         """exclude_template_key 默认 None — 其他状态不受否决逻辑影响。"""
         from autowsgr.combat.recognizer import PhaseSignature
@@ -68,12 +30,17 @@ class TestExpSettlementByMvp:
         sig = PhaseSignature(template_key=TemplateKey.PROCEED)
         assert sig.exclude_template_key is None
 
-    def test_exp_settlement_signature_config(self):
-        """EXP_SETTLEMENT 签名: 主键 MVP 徽章, 否决键评级字母, 置信度 0.85。"""
+    def test_exp_settlement_signature_uses_runtime_ocr(self):
+        """EXP_SETTLEMENT 没有全屏模板，运行时走 ROI OCR。"""
         sig = CombatRecognizer.get_signature(CombatPhase.EXP_SETTLEMENT)
-        assert sig.template_key == TemplateKey.RESULT_PAGE
-        assert sig.exclude_template_key == TemplateKey.RESULT_GRADES
+        assert sig.template_key is None
+        assert sig.exclude_template_key is None
         assert sig.confidence == 0.85
+        assert sig.after_match_delay == 1.0
+
+    def test_static_identify_does_not_use_exp_template(self):
+        frame = np.zeros((540, 960, 3), dtype=np.uint8)
+        assert CombatRecognizer.identify_current(frame, [CombatPhase.EXP_SETTLEMENT]) is None
 
     def test_result_signature_uses_grades(self):
         """RESULT 签名用评级字母 (仅战果页出现), 不再用 "点击继续" 文字
@@ -81,3 +48,86 @@ class TestExpSettlementByMvp:
         sig = CombatRecognizer.get_signature(CombatPhase.RESULT)
         assert sig.template_key == TemplateKey.RESULT_GRADES
         assert len(TemplateKey.RESULT_GRADES.templates) == 6
+
+    def test_runtime_exp_ocr_accepts_digits_and_exp(self):
+        class FakeOCR:
+            def recognize(self, _image, allowlist=''):
+                assert '0123456789' in allowlist
+                return [OCRResult(text='200', confidence=0.99, bbox=(0, 0, 20, 20)), OCRResult(
+                    text='Exp', confidence=0.99, bbox=(25, 0, 50, 20)
+                )]
+
+        recognizer = CombatRecognizer(SimpleNamespace(ctrl=None, ocr=FakeOCR()))
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        assert recognizer.identify_current_runtime(frame, [CombatPhase.EXP_SETTLEMENT]) == (
+            CombatPhase.EXP_SETTLEMENT
+        )
+
+    def test_incremental_exp_tokens_accumulate_until_stable(self, monkeypatch):
+        class FakeOCR:
+            def __init__(self):
+                self.calls = 0
+
+            def recognize(self, _image, allowlist=''):
+                self.calls += 1
+                text = ('200E', 'X', 'P', '200E', 'X', 'P', '200E', 'X', 'P')[
+                    self.calls - 1
+                ]
+                return [OCRResult(text=text, confidence=0.99, bbox=(0, 0, 20, 20))]
+
+        fake_ocr = FakeOCR()
+        recognizer = CombatRecognizer(SimpleNamespace(ctrl=None, ocr=fake_ocr))
+        host = SimpleNamespace(_device=MagicMock(), _recognizer=recognizer)
+        host._device.screenshot.return_value = np.zeros((720, 1280, 3), dtype=np.uint8)
+        now = [0.0]
+        monkeypatch.setattr(handlers_module.time, 'monotonic', lambda: now[0])
+        monkeypatch.setattr(
+            handlers_module.time,
+            'sleep',
+            lambda delay: now.__setitem__(0, now[0] + delay),
+        )
+
+        PhaseHandlersMixin._wait_for_exp_settlement(host)
+
+        assert fake_ocr.calls == 9
+        assert now[0] == 7.0
+
+    def test_runtime_exp_ocr_rejects_missing_exp_suffix(self):
+        class FakeOCR:
+            def recognize(self, _image, allowlist=''):
+                return [OCRResult(text='200', confidence=0.99, bbox=(0, 0, 20, 20))]
+
+        recognizer = CombatRecognizer(SimpleNamespace(ctrl=None, ocr=FakeOCR()))
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        assert recognizer.identify_current_runtime(frame, [CombatPhase.EXP_SETTLEMENT]) is None
+
+    def test_runtime_exp_ocr_rejects_other_characters(self):
+        class FakeOCR:
+            def recognize(self, _image, allowlist=''):
+                return [OCRResult(text='200经验', confidence=0.99, bbox=(0, 0, 40, 20))]
+
+        recognizer = CombatRecognizer(SimpleNamespace(ctrl=None, ocr=FakeOCR()))
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+        assert recognizer.recognize_exp_settlement_text(frame) is None
+
+    def test_incremental_exp_timeout_raises_error(self, monkeypatch):
+        class FakeOCR:
+            def recognize(self, _image, allowlist=''):
+                return [OCRResult(text='200E', confidence=0.99, bbox=(0, 0, 40, 20))]
+
+        recognizer = CombatRecognizer(SimpleNamespace(ctrl=None, ocr=FakeOCR()))
+        host = SimpleNamespace(_device=MagicMock(), _recognizer=recognizer)
+        host._device.screenshot.return_value = np.zeros((720, 1280, 3), dtype=np.uint8)
+        now = [0.0]
+        monkeypatch.setattr(handlers_module.time, 'monotonic', lambda: now[0])
+        monkeypatch.setattr(
+            handlers_module.time,
+            'sleep',
+            lambda delay: now.__setitem__(0, now[0] + delay),
+        )
+
+        with pytest.raises(TimeoutError, match='未能识别到经验结算页'):
+            PhaseHandlersMixin._wait_for_exp_settlement(host)

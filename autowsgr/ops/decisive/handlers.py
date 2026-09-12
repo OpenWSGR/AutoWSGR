@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from autowsgr.combat.actions import click_result
 from autowsgr.combat.engine import run_combat
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
+from autowsgr.constants import DECISIVE_SKILL_NAMES
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.decisive.base import DecisiveBase
 from autowsgr.ops.decisive.config import MapData
@@ -168,10 +169,17 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         _log.info('[决战] 入口状态: {}', entry_status.value)
 
-        self._state.stage = self._battle_page.detect_stage(
+        stage = self._battle_page.detect_stage(
             self._ctrl.screenshot(),
             self._config.chapter,
         )
+        if stage == 0:
+            raise RuntimeError(f'决战 Ex-{self._config.chapter}: 无法识别有效小节')
+        if stage is None:
+            _log.info('[决战] Ex-{} 三个小节均已完成，结束本轮', self._config.chapter)
+            self._state.phase = DecisivePhase.CHAPTER_CLEAR
+            return
+        self._state.stage = stage
         if self._config.chapter == 1:
             self._resume_mode = False
             _log.info(
@@ -187,9 +195,17 @@ class DecisivePhaseHandlers(DecisiveBase):
 
     def _handle_waiting_for_map(self) -> None:
         """等待地图页加载: 单次截图检测 → 转到对应阶段或继续等待。"""
+        wait_for_advance = not self._skip_advance_choice
+        full_recovery_check = getattr(self, '_full_recovery_check', False)
         entry_kwargs = {
             'wait_for_use_last': self._use_last_fleet_attempts == 0,
-            'wait_for_advance': not self._skip_advance_choice,
+            'wait_for_advance': wait_for_advance,
+            'wait_for_fleet': self._fleet_overlay_enabled
+            and (
+                full_recovery_check
+                or self._advance_source_node is not None
+                or self._skip_advance_choice
+            ),
             'timeout': 3.0,
             'interval': 0.2,
         }
@@ -199,6 +215,15 @@ class DecisivePhaseHandlers(DecisiveBase):
             **entry_kwargs,
         )
         self._skip_advance_choice = False
+
+        if (
+            phase is DecisivePhase.PREPARE_COMBAT
+            and wait_for_advance
+            and self._advance_source_node is None
+            and not full_recovery_check
+        ):
+            _log.info('[决战] 未检测到前进点弹窗，按暂离恢复处理，关闭战备浮窗识别')
+            self._fleet_overlay_enabled = False
 
         if phase is not None:
             self._state.phase = phase
@@ -233,13 +258,15 @@ class DecisivePhaseHandlers(DecisiveBase):
 
     def _handle_choose_fleet(self) -> None:
         """战备舰队获取：OCR 识别选项 → 购买决策 → 关闭弹窗。"""
-        self._has_chosen_fleet = True
+        self._has_chosen_fleet = False
+        self._force_fleet_scan = False
 
         _log.info('[决战] 战备舰队获取')
         screen, score, selections = self._recognize_fleet_options_with_retry(
             fallback_score=self._state.score,
         )
         self._state.score = score or self._state.score
+        to_buy: list[str] = []
 
         if selections:
             first_node = self._state.is_begin()
@@ -262,21 +289,46 @@ class DecisivePhaseHandlers(DecisiveBase):
                     first_node=first_node,
                 )
 
-            _log.info('[决战] 选择购买: {}', to_buy)
-            for name in to_buy:
-                sel = selections[name]
-                self._map.buy_fleet_option(sel.click_position)
-                if name not in {'长跑训练', '肌肉记忆', '黑科技'}:
-                    self._state.ships.add(name)
+        _log.info('[决战] 选择购买: {}', to_buy)
+        for name in to_buy:
+            sel = selections[name]
+            self._map.buy_fleet_option(sel.click_position)
+            if name not in {'长跑训练', '肌肉记忆', '黑科技'}:
+                self._state.ships.add(name)
 
-        self._state.phase = DecisivePhase.PREPARE_COMBAT
         if not self._map.close_fleet_overlay():
-            _log.info('[决战] 关闭决战选船界面失败, 选择第一艘后撤退')
-            self._state.phase = DecisivePhase.RETREAT
-            _, first_value = next(iter(selections.items()))
-            self._map.buy_fleet_option(first_value.click_position)
+            if to_buy:
+                _log.warning('[决战] 已购买配置舰船但关闭选船界面失败, 准备撤退')
+                self._state.phase = DecisivePhase.RETREAT
+                return
+
+            fallback_options = [
+                (name, selection)
+                for name, selection in selections.items()
+                if name not in DECISIVE_SKILL_NAMES
+            ]
+            if not fallback_options:
+                raise TimeoutError('未购买配置舰船且没有可用的舰船兜底卡')
+
+            fallback_name, fallback = min(fallback_options, key=lambda item: item[1].cost)
+            _log.info(
+                '[决战] 首次关闭失败且未购买配置舰船, 选择最低费兜底舰船: {} (费用={})',
+                fallback_name,
+                fallback.cost,
+            )
+            self._map.buy_fleet_option(fallback.click_position)
+            self._state.ships.add(fallback_name)
             if not self._map.close_fleet_overlay():
-                raise RuntimeError('关闭决战选船界面失败')
+                raise TimeoutError('选择兜底舰船后仍无法关闭战备舰队弹窗')
+            self._state.phase = DecisivePhase.RETREAT
+            return
+
+        if not to_buy:
+            _log.info('[Decisive] defer current-fleet sufficiency check to preparation')
+            self._force_fleet_scan = True
+
+        self._has_chosen_fleet = True
+        self._state.phase = DecisivePhase.PREPARE_COMBAT
 
     def _handle_advance_choice(self) -> None:
         """选择前进点。"""
@@ -302,6 +354,7 @@ class DecisivePhaseHandlers(DecisiveBase):
         overlay_phase = self._map.detect_decisive_phase(
             screen,
             advance_choice_roi=self._advance_choice_roi(),
+            allow_fleet_overlay=self._fleet_overlay_enabled,
         )
         if overlay_phase in (DecisivePhase.CHOOSE_FLEET, DecisivePhase.ADVANCE_CHOICE):
             _log.info('[决战] 出征准备前检测到 overlay，切回阶段: {}', overlay_phase.name)
@@ -316,6 +369,12 @@ class DecisivePhaseHandlers(DecisiveBase):
                 self._state.phase = DecisivePhase.CHOOSE_FLEET
                 return
             self._state.node = recognized_node
+            _log.info(
+                '[决战] 当前进入为章节 {} 小节 {} 的 {} 列',
+                self._config.chapter,
+                self._state.stage,
+                recognized_node,
+            )
         _log.info(
             '[决战] 出征准备 (小关 {} 节点 {})',
             self._state.stage,
@@ -324,7 +383,8 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # ── 恢复模式检测 ─────────────────────────────────────────────
         # 恢复模式逻辑修改，默认进入恢复模式，如果是首节点，则不进入恢复模式
-        if self._state.is_begin():
+        full_recovery_check = getattr(self, '_full_recovery_check', False)
+        if self._state.is_begin() and not self._force_fleet_scan and not full_recovery_check:
             self._resume_mode = False
             _log.info(
                 '[决战] 检测到恢复模式 (节点={}, has_chosen_fleet={})',
@@ -360,15 +420,20 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # ── 恢复模式: 扫描当前舰队与可用舰船 ─────────────────────────
         # 对齐 legacy: if fleet.empty() and not is_begin(): _check_fleet()
-        if self._resume_mode:
+        formation_ready = False
+        if self._resume_mode or self._force_fleet_scan or full_recovery_check:
             _log.info('[决战] 恢复模式: 扫描当前舰队')
-            fleet, damage, all_ships = self._map.check_fleet()
+            fleet, damage, all_ships = self._map.check_fleet(
+                scan_ship_pool=full_recovery_check,
+            )
+            formation_ready = True
             self._state.ship_stats = [damage.get(i, ShipDamageState.NORMAL) for i in range(6)]
-            self._state.ships = all_ships
+            self._state.ships.update(all_ships)
             # 将编队成员写入 state.fleet[1:]
             for i, name in enumerate(fleet):
                 if i < 6:
                     self._state.fleet[i + 1] = name or ''
+            self._force_fleet_scan = False
             self._sync_ship_states()
             self._resume_mode = False  # 扫描完成后退出恢复模式
 
@@ -378,8 +443,9 @@ class DecisivePhaseHandlers(DecisiveBase):
             self._state.phase = DecisivePhase.RETREAT
             return
 
-        self._map.enter_formation()
-        time.sleep(0.5)  # 等待编队页加载完成（对齐 check_fleet 的做法）
+        if not formation_ready:
+            self._map.enter_formation()
+            time.sleep(0.5)  # 等待编队页加载完成（对齐 check_fleet 的做法）
         page = DecisiveBattlePreparationPage(self._ctx, self._config, self._ocr)
 
         current_fleet = self._state.fleet[:]
@@ -419,6 +485,7 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         page.start_battle()
         time.sleep(1.0)
+        self._full_recovery_check = False
         self._state.phase = DecisivePhase.IN_COMBAT
 
     def _handle_combat(self) -> None:
@@ -483,6 +550,7 @@ class DecisivePhaseHandlers(DecisiveBase):
 
         # 先通过逻辑判断小关是否结束
         if self._logic.is_stage_end():
+            self._fleet_overlay_enabled = False
             _log.info(
                 '[决战] 小关 {} 终止节点 {} 已到达',
                 self._state.stage,
@@ -497,6 +565,7 @@ class DecisivePhaseHandlers(DecisiveBase):
         # 此时不应调用 recognize_node()，因为舰标尚未出现。
         # 恢复模式（暂离后再进）时，节点识别在 _handle_prepare_combat 中进行。
         current_node = self._state.node
+        self._fleet_overlay_enabled = True
         self._advance_source_node = current_node
         expected_node = chr(ord(current_node) + 1)
         self._state.node = expected_node
@@ -511,6 +580,7 @@ class DecisivePhaseHandlers(DecisiveBase):
             time.sleep(self._POST_COMBAT_INTERVAL)
             phase = self._map.detect_decisive_phase(
                 advance_choice_roi=self._advance_choice_roi(),
+                allow_fleet_overlay=self._fleet_overlay_enabled,
             )
             if phase == DecisivePhase.PREPARE_COMBAT:
                 continue
@@ -531,9 +601,13 @@ class DecisivePhaseHandlers(DecisiveBase):
         """小关通关：确认弹窗 → 收集掉落 → 下一小关或大关。"""
         _log.info('[决战] 小关 {} 通关!', self._state.stage)
         collected = self._map.confirm_stage_clear()
-        self._state.node = 'A'
+        # The next subsection must re-anchor from the live map. Do not carry
+        # A across the stage boundary or route selection will use A as source
+        # instead of the synthetic entry node 0.
+        self._state.node = 'U'
         self._advance_source_node = None
         self._resume_mode = True
+        self._fleet_overlay_enabled = True
         if collected:
             _log.info('[决战] 获得 {} 个掉落: {}', len(collected), collected)
 
@@ -549,9 +623,11 @@ class DecisivePhaseHandlers(DecisiveBase):
         _log.info('[决战] 执行撤退')
         self._map.open_retreat_dialog()
         self._map.confirm_retreat()
+        self._fleet_overlay_enabled = True
 
     def _execute_leave(self) -> None:
         """执行暂离操作。"""
         _log.info('[决战] 执行暂离')
         self._map.open_retreat_dialog()
         self._map.confirm_leave()
+        self._fleet_overlay_enabled = False

@@ -35,7 +35,11 @@ from autowsgr.combat.recognition import (
     SHIP_DROP_PAGE_SIGNATURE,
     detect_mvp,
 )
-from autowsgr.combat.recognizer import CombatRecognizer
+from autowsgr.combat.recognizer import (
+    CombatRecognizer,
+    EXP_SETTLEMENT_TIMEOUT_SECONDS,
+    EXP_SETTLEMENT_STABLE_SECONDS,
+)
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, Formation, ShipDamageState
@@ -438,6 +442,78 @@ class PhaseHandlersMixin:
             )
         return ConditionFlag.FIGHT_CONTINUE
 
+    def _wait_for_exp_settlement(self) -> None:
+        """Accumulate incremental OCR tokens until ``digits + EXP`` is stable."""
+        signature = self._recognizer.get_signature(CombatPhase.EXP_SETTLEMENT)
+        interval = 0.75
+        started_at = time.monotonic()
+        deadline = started_at + EXP_SETTLEMENT_TIMEOUT_SECONDS
+        completed_results: list[str] = []
+        current_digits = ''
+        current_exp_tokens: list[str] = []
+
+        while time.monotonic() < deadline:
+            text = self._recognizer.recognize_exp_settlement_text(
+                self._device.screenshot()
+            )
+            if text:
+                digits = ''.join(char for char in text if char.isdigit())
+                if digits:
+                    if not current_digits or current_digits in digits:
+                        current_digits = digits
+                    elif digits not in current_digits:
+                        current_digits = digits
+
+                for char in text:
+                    if char == 'E' and not current_exp_tokens:
+                        current_exp_tokens.append(char)
+                    elif char == 'X' and current_exp_tokens == ['E']:
+                        current_exp_tokens.append(char)
+                    elif char == 'P' and current_exp_tokens == ['E', 'X']:
+                        current_exp_tokens.append(char)
+
+                if current_digits and current_exp_tokens == ['E', 'X', 'P']:
+                    completed_results.append(current_digits)
+                    _log.debug(
+                        '[Combat] 经验结算结果累加: {} ({}/3)',
+                        current_digits,
+                        len(completed_results),
+                    )
+                    current_digits = ''
+                    current_exp_tokens = []
+
+                elapsed = time.monotonic() - started_at
+                _log.debug(
+                    '[Combat] 经验结算增量 OCR: text={!r} results={} elapsed={:.2f}s',
+                    text,
+                    completed_results,
+                    elapsed,
+                )
+                if (
+                    len(completed_results) >= 3
+                    and completed_results[-1] == completed_results[-2] == completed_results[-3]
+                    and elapsed >= EXP_SETTLEMENT_STABLE_SECONDS
+                ):
+                    if signature.after_match_delay > 0:
+                        time.sleep(signature.after_match_delay)
+                    _log.info(
+                        '[Combat] 经验结算页识别成功: results={}',
+                        completed_results[-3:],
+                    )
+                    return
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(interval, remaining))
+
+        _log.error(
+            '[Combat] 未能识别到经验结算页: results={} elapsed>={}s',
+            completed_results,
+            EXP_SETTLEMENT_TIMEOUT_SECONDS,
+        )
+        raise TimeoutError('未能识别到经验结算页')
+
     def _click_result_until_closed(
         self,
         phase: CombatPhase,
@@ -480,12 +556,32 @@ class PhaseHandlersMixin:
         """
         successors = self._result_successors(phase)
         candidates = [phase, *pass_through, *successors]
+
+        if (
+            phase is CombatPhase.RESULT
+            and isinstance(self._recognizer, CombatRecognizer)
+            and CombatPhase.EXP_SETTLEMENT in candidates
+        ):
+            click_result(self._device)
+            self._wait_for_exp_settlement()
+            if CombatPhase.EXP_SETTLEMENT in pass_through:
+                self._click_result_until_closed(
+                    CombatPhase.EXP_SETTLEMENT,
+                    attempts=attempts,
+                    interval=interval,
+                    polls=polls,
+                )
+            return
+
         for attempt in range(1, attempts + 1):
             click_result(self._device)
             for _ in range(polls):
                 time.sleep(interval)
                 screen = self._device.screenshot()
-                current = self._recognizer.identify_current(screen, candidates)
+                if isinstance(self._recognizer, CombatRecognizer):
+                    current = self._recognizer.identify_current_runtime(screen, candidates)
+                else:
+                    current = self._recognizer.identify_current(screen, candidates)
                 if current is None:
                     # 过渡帧: 只等待, 不点击 (防穿透/误触)。GET_SHIP 模板
                     # 可能因页面动画/字体渲染未命中, 用掉落页像素签名兜底探测,

@@ -84,6 +84,7 @@ def recognize_fleet_options(
     _log.debug('[舰队OCR] 开始识别战备舰队可选项')
 
     # 1. 识别可用分数
+    # TODO(decisive-architecture): govern score/cost/name OCR at the UI architecture layer.
     res_roi = ROI(
         x1=RESOURCE_AREA[0][0],
         y1=RESOURCE_AREA[1][1],

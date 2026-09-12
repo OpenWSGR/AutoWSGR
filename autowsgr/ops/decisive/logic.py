@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
@@ -101,37 +102,54 @@ class DecisiveLogic:
         list[str]
             选中购买的名称列表（按决策顺序）。
         """
-        fleet_count = sum(1 for s in self.state.fleet[1:] if s)
+        owned = {name for name in getattr(self.state, 'ships', set()) if _is_ship(name)}
         score = self.state.score
+        primary = [name for name in self.config.level1 if _is_ship(name)]
+        backup = [
+            name for name in self.config.level2 if _is_ship(name) and name not in self._level1_set
+        ]
+        ordered = [*primary, *backup]
 
-        if fleet_count <= 1:
-            candidates = self.config.level1
-        elif fleet_count < 6:
-            candidates = [e for e in self._level2_full if _is_ship(e)]
-        elif not {s for s in self.state.fleet[1:] if s}.issubset(self._level1_set):
-            candidates = self.config.level1
-        else:
-            candidates = self.config.level1 + [e for e in self._level2_full if not _is_ship(e)]
+        target_count = 2 if first_node and len(owned) < 2 else 6
+        missing_count = max(0, target_count - len(owned))
+        candidates = [name for name in ordered if name in selections and name not in owned]
 
-        lim = 6 if fleet_count < 6 else score
-        lim = score if fleet_count == 0 else lim
-        result: list[str] = []
-        for target in candidates:
-            if target in selections:
-                sel = selections[target]
-                if score >= sel.cost and sel.cost <= lim:
-                    score -= sel.cost
-                    result.append(target)
+        # Maximize new ships first, then primary ships, then preserve resources.
+        selected: list[str] = []
+        if missing_count and candidates:
+            best_names: tuple[str, ...] = ()
+            best_rank = (-1, -1, 0)
+            for size in range(1, min(missing_count, len(candidates)) + 1):
+                for names in combinations(candidates, size):
+                    cost = sum(selections[name].cost for name in names)
+                    if cost > score:
+                        continue
+                    primary_count = sum(name in self._level1_set for name in names)
+                    rank = (size, primary_count, -cost)
+                    if rank > best_rank:
+                        best_names = names
+                        best_rank = rank
+            selected.extend(best_names)
+            score -= sum(selections[name].cost for name in best_names)
+            owned.update(best_names)
 
-        # 第一节点没选上Lv1，也购买Lv2舰船
-        if first_node:
-            for target in set(self._level2_full) - self._level1_set:
-                if target in selections:
-                    sel = selections[target]
-                    if score >= sel.cost and sel.cost <= lim:
-                        score -= sel.cost
-                        result.append(target)
-        return result
+        # Once six ships exist, add missing primary ships before buying upgrades.
+        if not first_node and len(owned) >= 6:
+            for name in primary:
+                if name not in owned and name in selections and score >= selections[name].cost:
+                    selected.append(name)
+                    score -= selections[name].cost
+                    owned.add(name)
+
+            # Upgrade only primary ships already in the acquired pool.
+            for name in primary:
+                if name in owned and name in selections and name not in selected:
+                    if score < selections[name].cost:
+                        continue
+                    selected.append(name)
+                    score -= selections[name].cost
+
+        return selected
 
     # ── 状态判断 ───────────────────────────────────────────────────────
 
@@ -226,14 +244,20 @@ class DecisiveLogic:
             长度 7 的列表：索引 0 留空，1-6 为各位置舰船名。
         """
         ships = self.state.ships
+        current_fleet = {name for name in self.state.fleet[1:] if name}
         best: list[str] = ['']
         _log.debug('[决战] 当前舰船: {}', ships)
         for ship in self.config.level1:
-            if ship in ships and self._is_available(ship) and len(best) < 7:
+            if ship in ships and (ship in current_fleet or self._is_available(ship)) and len(best) < 7:
                 best.append(ship)
 
         for ship in self.config.level2:
-            if ship in ships and ship not in best and self._is_available(ship) and len(best) < 7:
+            if (
+                ship in ships
+                and ship not in best
+                and (ship in current_fleet or self._is_available(ship))
+                and len(best) < 7
+            ):
                 best.append(ship)
 
         for flag_ship in self.config.flagship_priority:

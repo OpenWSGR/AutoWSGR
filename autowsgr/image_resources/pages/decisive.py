@@ -76,7 +76,7 @@ class Decisive:
         'decisive_fleet_acq',
         source_resolution=(1280, 720),
     )
-    """战备舰队获取浮层 (「刷新/关闭」按钮, 505x62)。"""
+    """战备舰队获取浮层标题 ROI 模板 (305x69)。"""
 
     CONFIRM_EXIT = LazyTemplate(
         'decisive/confirm_exit_720p.png',

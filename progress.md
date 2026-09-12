@@ -2,7 +2,7 @@
 
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
 Task Status: in_progress
-Next Step: Run the remaining 9 tickets with 15-minute health checks and stop after the ticket count completes.
+Next Step: Extract explicit node re-anchoring, separate post-combat overlay recognition, add focused tests, then run device verification.
 
 ### 2026-09-09 04:30: refresh-state reset recovery
 - Diagnosed the stability-run loop: `reset_chapter()` only searched the `reset_button.png` ROI, while the real `refresh` overview presents the existing `entry_refresh_540p.png` as a large bottom-center `重置关卡` button.
@@ -355,3 +355,237 @@ Next Step: Run the remaining 9 tickets with 15-minute health checks and stop aft
 - Added the fixed `CONFIRM_EXIT_ROI` from the user-marked screenshot: `ROI(363/1280, 161/720, 917/1280, 465/720)`.
 - `confirm_exit_720p.png` remains the 526x273 crop template; matching is now restricted to that dialog region instead of the full screen.
 - Verification: `uv run pytest -q testing/ops/test_decisive_unit.py` -> `20 passed`; `git diff --check` passed.
+
+### Entry status ROI restriction 2026-09-09
+
+- Added `ENTRY_STATUS_ROI = ROI(547/1280, 635/720, 814/1280, 705/720)` from the user-marked overview screenshot.
+- Applied the shared ROI to overview recognition, entry-status polling, and stage-clear return recognition.
+- Verification: marked screenshot `entry_challenging_540p` confidence `0.9951`; focused decisive tests -> `22 passed`; `git diff --check` passed.
+
+### Stage index alignment 2026-09-09
+
+- Fixed `recognize_stage()` to return one-based subsection numbers for the per-EX map loader.
+- Added unit coverage for stage 1, stage 2, and stage 3/all-complete states.
+- Verification: `uv run pytest -q testing/ops/test_decisive_unit.py` -> `23 passed`; `git diff --check` passed.
+
+### Chapter clear signal 2026-09-09
+
+- Separated active stage 3 from completed chapter: all-complete progress markers return `None` and enter `CHAPTER_CLEAR` before map entry.
+- Added handler coverage to ensure completed chapters do not click into the map.
+- Verification: `uv run pytest -q testing/ops/test_decisive_unit.py` -> `24 passed`; `git diff --check` passed.
+
+### Node context logging 2026-09-09
+
+- Added chapter/stage/node context logging after DLL node recognition.
+- Log format: `当前进入为章节 {chapter} 小节 {stage} 的 {node} 列`.
+- Verification: focused decisive tests -> `24 passed`; `git diff --check` passed.
+
+### Temporary leave recovery audit 2026-09-09
+
+- Traced production recovery from `_execute_leave()` through the next `run()` invocation and the server task wrapper.
+- Confirmed `LEAVE` is a terminal result for the current task invocation; automatic re-entry exists only in the E2E stability harness, which manually reuses the controller.
+- Confirmed the no-popup re-entry path is `WAITING_FOR_MAP -> PREPARE_COMBAT`, followed by one ship-marker/DLL node anchor when the node is unknown.
+- Recorded the stage-1/node-A exception where `_resume_mode` is cleared before `check_fleet()`, plus the prior stability evidence for stage-3 recovery scanning.
+
+### Post-combat recognition audit 2026-09-09
+
+- Confirmed node localization and DLL recognition already exist as `get_ship_icon_pos*()` plus `recognize_node()`, but the orchestration calls them only for `U` in preparation.
+- Confirmed post-combat currently predicts the next letter with `chr(...)` and polls the generic phase detector; it has no dedicated post-combat branch/fleet state resolver.
+- Confirmed before the ROI change that `FLEET_ACQUISITION` was a full-screen `fleet_acq_720p.png` template at `0.70`; `ADVANCE_CHOICE` was ROI-limited and route-aware.
+- Recorded the fresh-frame inconsistency: the direct fleet-overlay path rechecks a fresh screenshot, while the map-page fallback can return `CHOOSE_FLEET` from a single follow-up overlay match.
+
+### Fleet overlay context gate 2026-09-10
+
+- Added `_fleet_overlay_enabled` without changing `_resume_mode` semantics.
+- Kept fleet-overlay recognition enabled for new entry, retreat re-entry, and stage transitions; `_execute_leave()` disables it for same-controller temporary-leave recovery, and non-terminal node results enable it again.
+- The first wait still checks ADVANCE_CHOICE before fleet acquisition; fleet matching is only enabled after an advance selection or a post-combat source node. A no-advance/no-source map fallback disables the recovery context.
+- Passed the gate through entry and map-phase detection, including the overlay matcher itself; left fleet ROI unchanged until user annotation.
+- Verification: `uv run pytest -q testing/ops/test_decisive_unit.py` -> `29 passed`; `uv run pytest -q testing/ops` -> `133 passed`; compileall and `git diff --check` passed.
+- Validation note: `uv run ruff check ...` could not start because `ruff` is not installed in the current environment.
+- One initial test run failed because two SimpleNamespace fixtures lacked `_advance_source_node`; fixtures were corrected and the rerun passed.
+
+### Fleet overlay ROI and template 2026-09-10
+
+- Detected the marked title ROI as `(494,38)-(799,107)` on the 1280x720 source.
+- Cropped the no-red source to `autowsgr/data/images/decisive/fleet_acq_720p.png` (`305x69`), replacing the old bottom-button crop.
+- Expanded the runtime match ROI by 1px per side to `(493,37)-(800,108)` while keeping the template crop unchanged.
+- Applied the ROI to `detect_decisive_overlay()`, `is_fleet_acquisition()`, and `wait_for_overlay()`.
+- OpenCV source match: score `1.0`, location `(494,38)`.
+- Project `ImageChecker` validation on the no-red source returned `True` with the new ROI.
+- Verification: decisive unit tests `30 passed`; full `testing/ops` `134 passed`; compileall and `git diff --check` passed.
+
+### Decisive ROI padding audit 2026-09-10
+
+- Added `ROI.expand_pixels()` and applied one-pixel padding to all fixed decisive template ROIs.
+- Rechecked scaled template dimensions at 1280x720. All fit their padded ROI except the legacy `entry_cant_fight_540p.png` versus the shared entry-status ROI; recorded as a separate asset/ROI mismatch.
+- Verification: ROI + decisive tests `44 passed`; full `testing/ops` `134 passed`; compileall and `git diff --check` passed.
+
+### Fleet acquisition page flow audit 2026-09-10
+
+- Traced `CHOOSE_FLEET -> stable screenshot -> OCR score/cost/name -> purchase decision -> card clicks -> close click -> title-disappearance polling -> PREPARE_COMBAT`.
+- Changed `_has_chosen_fleet` to commit only after a purchase decision and successful close; empty purchase decisions close, force a current-fleet scan, then defer to `should_retreat()`.
+- Added a 1.5-second broad settle wait after title disappearance; removed the empty-selection first-card fallback.
+- Verification: decisive tests `33 passed`; full `testing/ops` `137 passed`; ROI + decisive tests `47 passed`.
+
+### Formation and retreat navigation audit 2026-09-10
+
+- Traced map -> formation through `DecisiveMapController.enter_formation()` and its fleet-title verification/retry.
+- Traced explicit formation -> map through `DecisiveBattlePreparationPage.go_back()`.
+- Traced retreat through `_execute_retreat()` -> `open_retreat_dialog()` -> `go_to_map_page()` -> retreat button -> `CONFIRM_EXIT` -> `confirm_retreat()`.
+
+### Formation failure handling audit 2026-09-10
+
+- Confirmed title recognition has one map-return retry.
+- Confirmed click/navigation, fleet change, repair, and sortie failures currently bubble to `DecisiveResult.ERROR`; no generic map-return/retreat cleanup exists.
+- Confirmed sortie click itself has no page-arrival verification; combat state is entered after a fixed one-second sleep.
+
+### Formation error recovery boundary 2026-09-10
+
+- Confirmed production `DecisiveController.run()` returns `ERROR` after logging; it does not automatically SL/restart/reset.
+- Confirmed server task handling stops after an error result.
+- Confirmed restart-to-home plus decisive reset is currently implemented by the stability E2E exception recovery only.
+
+### Decisive task ERROR retry 2026-09-10
+
+- Added 3-attempt task-boundary retry for decisive `ERROR`; each failure invokes SL/restart plus `ensure_game_ready`, including the final exhausted attempt.
+- `LEAVE` and success remain terminal without retry.
+- Targeted server tests: `4 passed`; full `testing/server/test_task_routes.py` has unrelated temp-directory permission and missing-`set_repairing` fixture failures.
+
+### SL full recovery check 2026-09-10
+
+- Passed `full_recovery_check=True` on retry attempts after ERROR.
+- SL recovery keeps ADVANCE/FLEET detection enabled, re-anchors the node, forces current-fleet scanning, and only then permits sortie.
+- Verification: decisive unit tests `34 passed`; full `testing/ops` `138 passed`; targeted server retry tests `4 passed`; compileall and `git diff --check` passed.
+
+### 通用战斗链路审查 2026-09-10
+
+- 已从决战出征点击追踪到通用 `CombatEngine` 终止：出征页点击、首轮索敌/阵型/战斗状态识别、战斗过程、夜战、战果采集、结算关闭和决战节点结果轮询。
+- 已确认当前生产边界：出征点击后仅固定等待 1 秒，没有确认真正进入战斗页；战斗状态识别 30 秒超时后只检查终态并可能转成 `SL`；战果关闭在引擎和决战外层各点击一次，分别负责 RESULT→EXP_SETTLEMENT 与关闭经验页，但外层第二次点击后没有到达验证。
+- 新确认：决战外层第二次结算点击没有经过通用识别器；当前只确认了第一次点击到 `EXP_SETTLEMENT`，没有确认第二次点击到 `GET_SHIP` 或决战地图。
+
+### 决战战斗与掉落收口边界 2026-09-10
+
+- 已用生产调用链确认：决战战斗调用通用 `run_combat()`，没有独立战斗引擎。
+- 已解释历史上“能成功关闭并收集掉落”的原因：决战外层第二次结算点击后，终止节点进入 `confirm_stage_clear()`，该方法自己执行两次确认、掉落 OCR/关闭和入口页确认。
+- 成功实机日志已对齐：`战果成功 -> 小关通关 -> confirm_4 -> confirm_1 -> 10 个掉落 -> 回到决战入口页`。
+
+### 普通战结算边界对比 2026-09-10
+
+- 已确认普通战/活动战不会在外层重复点击结算；通用引擎按 `MAP_PAGE`/`EVENT_MAP_PAGE` 终态继续处理经验页、掉落页和最终页面。
+- 决战使用 `RESULT` 作为通用引擎终态，外层再补第二次点击并接管终点掉落，因此决战的结算边界与普通战不一致，是当前重构需要优先统一/明确的地方。
+- 用户确认决战上层接管经验结算页点击是正确边界；已移除上一轮临时添加的错误 TODO，未修改运行逻辑。
+
+### 战后点击前正向识别保护 2026-09-10
+
+- 在共享 `autowsgr/ui/decisive/map_controller.py::enter_formation()` 点击编队前增加决战地图正向识别；未知页面直接拒绝点击。
+- 新增 `test_enter_formation_refuses_unrecognized_page`，并更新既有编队测试夹具。
+- 验证：`uv run pytest -q testing/ops/test_decisive_unit.py` -> `35 passed`；`uv run pytest -q testing/ops` -> `139 passed`；`git diff --check` 通过。
+
+### 经验结算识别与成功返回边界 2026-09-10
+
+- 已确认并替换经验页判据：固定顶部 ROI OCR 校验 `数字 + Exp`；点击后每 `0.3s` 复检，单次最多 4 帧。
+- 已确认风险：后继页面 4 帧都未识别时 helper 静默返回；由于决战 phase 仍是 `RESULT`，引擎仍可能返回 `OPERATION_SUCCESS`。决战上层第二次点击也未复核经验页是否关闭。
+- 当前仅记录问题，未修改结算行为；后续需要决定失败时返回错误、继续等待还是交由决战上层恢复。
+- 当前仅完成审查和记录，尚未修改通用战斗代码。下一步应先决定“出征到达确认”与“战斗识别超时保真/错误边界”是否作为独立批次，再补对应测试。
+
+### 经验结算 ROI OCR 2026-09-10
+
+- 按用户干净截图增加固定顶部 ROI OCR：`数字 + Exp` 格式校验，不再使用经验页全屏模板。
+- OCR 每 `0.75s` 循环一次，按 `E/X/P` 增量累积；累积数字和完整 `EXP` 且经过至少 `1.5s` 后才确认经验页，并在确认后等待 1 秒再继续点击。
+- 运行时 `wait_for_phase()` 与 `_click_result_until_closed()` 使用 OCR-aware recognizer；保留静态识别 API 兼容，但静态路径不再匹配 EXP 全屏模板。
+- 增加 OCR 正/负格式与增量 token 测试。验证：经验与结算专项 `27 passed`；`testing/ops` `139 passed`；compileall、`git diff --check` 通过。
+- 实图 OCR 工具验证未完成：Windows 命令行传递中文文件名时路径变乱码，工具在 `imread` 阶段找不到 `经验结算页roi裁切.png`；不是 OCR 判定失败。Fake OCR 格式测试已覆盖正/负结果。
+- 已复制截图到 ASCII 临时路径后完成真实 EasyOCR 验证：1x/2x/4x/8x 均识别出数字与 `Exp`；生产 matcher 实测三帧结果为 `[False, False, True]`。中文原路径乱码只影响工具直接读取，未影响识别结果。
+
+### 经验结算一致结果与超时边界 2026-09-10
+
+- 成功条件改为三个追加到 list 的完整 `数字+EXP` 结果一致，且总耗时超过 `1.5s`；不是简单三帧计数。
+- `10s` 超时记录“未能识别到经验结算页”并抛出 `TimeoutError`，不返回 `OPERATION_SUCCESS`。
+- 真实生产循环验证结果：`['200EXP', '200EXP', '200EXP']`，约 `1.63s` 确认后等待 1 秒；专项测试 `28 passed`，`testing/ops` `139 passed`。
+- 单个结果 list 固定为 `[数字0, 数字1, 数字2, EXP]`；真实生产循环输出三组 `['2', '0', '0', 'EXP']`，约 `1.96s` 一致后成功。
+
+### 经验结算结果 list 语义修正 2026-09-10
+
+- 按用户澄清，历史 list 改为只存完整数字：`['200', '200', '200']`；`EXP` 只作为固定格式校验，不占 list 槽位。
+- 真实 EasyOCR 生产循环验证输出 `['200', '200', '200']`，约 `1.75s` 达成一致后等待 1 秒；经验专项 `28 passed`，`testing/ops` `139 passed`。
+## 2026-09-10 State-preserving stability bootstrap
+
+- Read the active task plan, findings, progress, repository rules, and binding; verified the bound worktree before editing.
+- Performed a read-only device diagnostic on `127.0.0.1:16384`; the actual current page was the main page, with no decisive map or overlay match.
+- Found two startup assumptions to remove: E2E `prepare()` returns home by default, and the stability case assumes a decisive overview plus `_resume_mode=True`/`ENTER_MAP`.
+- Next: add an explicit state-preserving runner mode and a detected-page stability bootstrap; unknown active-map stage must fail closed.
+- First patch attempt did not apply because a hunk included comments whose encoding did not match the file; no source changes were made by that attempt. Reapplied using ASCII-only anchors.
+- Added `--preserve-state` to the E2E runner and changed decisive stability bootstrap to recognize the current page before navigation. `compileall`, `git diff --check`, argument parsing, and E2E case listing passed.
+- Ran the requested six-ticket test until the repeated failure was proven; stopped after ticket 5's same `WAITING_FOR_MAP` failure instead of burning the remaining path. Repeated logs showed retreat re-entry reached `ADVANCE_CHOICE`, then the visible fleet overlay was ignored.
+- Re-saved the failure screen with an ASCII tag and measured `FLEET_ACQUISITION` at `0.9999333`; this ruled out template/ROI mismatch and identified `_fleet_overlay_enabled=False` after retreat as the root cause.
+- Fixed `_execute_retreat()` to re-enable fleet-overlay recognition and added `test_retreat_reenables_fleet_overlay_for_reentry`. Verification: decisive unit `36 passed`, full `testing/ops` `140 passed`, compileall and diff check passed.
+- Enabled `_full_recovery_check=True` in the stability controller bootstrap so an unknown challenging/overlay state checks ADVANCE, fleet, and node evidence before acting.
+- A real no-purchase probe showed selecting one lowest-cost card is required before the game accepts the close action. Added lowest-cost fallback selection in `_handle_choose_fleet()` and `test_choose_fleet_uses_low_cost_fallback_card_before_close`. Verification: decisive unit `37 passed`, full `testing/ops` `141 passed`, compileall and diff check passed.
+- One fallback patch attempt caused an indentation error in the shared purchase loop; fixed immediately and reran all affected checks successfully.
+- Final clean-start stability attempt reset the chapter successfully but still found only one usable last-fleet ship. It was stopped after repeated node-A system retreats; no combat or ticket completion was counted. Partial reports were written under `logs/e2e_tools/decisive_stability/20260910_051504/`.
+- Changed `DecisiveLogic.choose_ships()` so every incomplete formation uses ordered `level1` primary candidates followed by `level2` ship backups; added two focused tests. Verification: decisive unit `39 passed`, full `testing/ops` `143 passed`, compileall and diff check passed.
+
+## 2026-09-12 configured fleet fallback removal
+
+- Real-device run reached chapter 6 stage 2 node G and exposed the production lowest-cost arbitrary-card fallback: OCR offered `塞瓦斯托波尔` and `格罗兹尼`, neither configured.
+- Removed the fallback from `autowsgr/ops/decisive/handlers.py`.
+- Replaced the fallback regression with `test_choose_fleet_does_not_buy_unconfigured_card`.
+- Verification: `python -m pytest -q testing/ops/test_decisive_unit.py` -> `40 passed`; `git diff --check` passed.
+- Updated production flow: when `to_buy == []` and the first close attempt fails, choose the lowest-cost real ship (excluding configured decisive skill cards), close again, and enter `RETREAT`; a successful first close still proceeds to current-fleet sufficiency checks.
+- Added `test_choose_fleet_falls_back_to_low_cost_ship_when_empty_close_fails`.
+- Verification: decisive unit `41 passed`; full `testing/ops` `145 passed`; `git diff --check` passed.
+- Next: rerun one complete real-device decisive round with the current state-preserving launcher.
+
+## 2026-09-12 decisive fleet priority and repair ordering
+
+- Reworked `DecisiveLogic.choose_ships()` as a decisive-only algorithm: choose an affordable bundle that maximizes new-ship count, prefers primary ships among equal-size bundles, then adds missing primary ships and upgrades only already-acquired primary ships once the pool has six ships.
+- First-node purchase logic now explicitly handles the two-ship affordability cases such as `4+4`, `5+5`, and `6+4`.
+- Updated `get_best_fleet()` to retain ships already in the current formation even when the context marks them unavailable, so the decisive preparation flow can repair them before the next sortie.
+- Added focused coverage for first-node bundles, six-ship priority, primary-only upgrades, and damaged current ships. Decisive unit tests: `46 passed`; full `testing/ops`: `150 passed`.
+- No public smart fleet-change module was modified.
+- Next: real-device validation of purchase/formation/repair ordering.
+
+## 2026-09-12 purchase and formation audit
+
+- Inspected the current decisive purchase and preparation call chain without changing production code.
+- Confirmed the latest node-E log: score `5`, OCR offers did not match configured ships, then `选择购买: []`.
+- Confirmed `check_fleet()` opens the formation page and clicks slot 0 before it knows whether the existing formation is sufficient.
+- Recorded the next production change boundary: recognize and evaluate the current formation first; open the ship pool only when the target formation is incomplete or a missing configured ship must be found.
+
+## 2026-09-13 current formation gate
+
+- Changed `DecisiveMapController.check_fleet()` to inspect the current formation first and skip ship-pool entry when at least one ship is already assigned.
+- Kept the original ship-pool scan, sufficiency check, retreat decision, and formation replacement path for an empty formation.
+- Changed preparation recovery to merge `all_ships` into the accumulated per-round state rather than overwrite it.
+- Added `test_check_fleet_skips_ship_pool_when_current_formation_has_ships`.
+- Verification: focused tests `2 passed`; decisive unit tests `47 passed`; full `testing/ops` `151 passed`; `compileall` and `git diff --check` passed.
+
+## 2026-09-13 full recovery gate and real-device validation
+
+- Added `scan_ship_pool=True` for `full_recovery_check`, including the first-node path; abnormal restart recovery now scans both current formation and ship pool.
+- Kept ordinary non-empty formation scans pool-free and changed fleet scanning to remain on the preparation page so replacement starts immediately.
+- The first post-change E2E attempt was blocked by the previous interrupted run leaving the device on the ordinary ship-selection page; the old `initialize` case could not run because it imports the removed `autowsgr.application` package.
+- Used the current production `restart_game()` and `ensure_game_ready()` path to restore the device, then ran `decisive --preserve-state --with-ocr --times 1`.
+- Final real-device result: `logs/e2e_tools/decisive/20260913_001508`, chapter 6 stages 1-3 completed, result `chapter_clear`, E2E `3 steps, 0 failures`.
+- Verification after the final changes: decisive unit tests `48 passed`; full `testing/ops` `152 passed`; compileall and diff check passed.
+
+## 2026-09-13 subsection node re-anchor
+
+- Confirmed from the final E2E log that stage 3 did execute A-J, but its entry route incorrectly used `source=A` because stage-clear code carried `node='A'` across the subsection boundary.
+- Changed `_handle_stage_clear()` to reset `state.node='U'`; the next subsection now uses map entry source `0` and re-runs live node recognition.
+- Added `test_stage_clear_reanchors_next_subsection_from_unknown_node`.
+- Verification: targeted node tests `3 passed`; decisive unit tests `49 passed`; full `testing/ops` `153 passed`; compileall and diff check passed.
+
+## 2026-09-13 stage progress status gate
+
+- Reworked `recognize_stage()` so the three existing pixel points represent node existence, not completion.
+- Added entry-status ROI checks for the ambiguous all-nodes-present case: `ENTRY_REFRESH` means all three subsections are complete; `ENTRY_CHALLENGING` plus `RESET_BUTTON` means subsection 3 is still active; unknown combinations return `0`.
+- Captured the actual device overview to `debug/current_decisive_overview.png`; direct production recognition returns `3`, matching the visible third subsection at `0/50`.
+- Verification: stage tests `2 passed`; decisive unit tests `50 passed`; full `testing/ops` `154 passed`; compileall and diff check passed.
+
+## 2026-09-13 remaining stage 3 real-device run
+
+- Started from the actual challenging overview without resetting the chapter.
+- Entry detection returned `第 3 小节正在进行`; preparation logged live node recognition `A` after the `U` anchor.
+- Completed stage 3 nodes A through J, collected 10 drops, and reached `chapter_clear`.
+- E2E result: `3 steps, 0 failures`; log directory `logs/e2e_tools/decisive/20260913_012346`.

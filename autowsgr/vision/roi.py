@@ -116,6 +116,19 @@ class ROI:
             int(self.y2 * height),
         )
 
+    def expand_pixels(self, width: int, height: int, padding: int = 1) -> ROI:
+        """Return this ROI expanded by a pixel margin at the given resolution."""
+        if width <= 0 or height <= 0 or padding < 0:
+            raise ValueError('ROI resolution and padding must be non-negative')
+        dx = padding / width
+        dy = padding / height
+        return ROI(
+            max(0.0, self.x1 - dx),
+            max(0.0, self.y1 - dy),
+            min(1.0, self.x2 + dx),
+            min(1.0, self.y2 + dy),
+        )
+
     def crop(self, screen: np.ndarray) -> np.ndarray:
         """从截图中裁切出 ROI 区域。
 

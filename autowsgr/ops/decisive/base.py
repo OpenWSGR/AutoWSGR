@@ -36,6 +36,9 @@ class DecisiveBase:
         _map               决战地图页 UI
         _resume_mode       是否恢复进度模式
         _has_chosen_fleet  是否已经历过战备舰队获取
+        _fleet_overlay_enabled  是否允许检测战备舰队弹窗
+        _force_fleet_scan  无购买项时强制扫描当前编队
+        _full_recovery_check  SL 后是否执行完整恢复检查
         _wait_deadline     等待超时截止时间
         _use_last_fleet_attempts  使用上次舰队尝试次数
 
@@ -84,6 +87,9 @@ class DecisiveBase:
         )
         self._resume_mode: bool = False
         self._has_chosen_fleet: bool = False
+        self._fleet_overlay_enabled: bool = True
+        self._force_fleet_scan: bool = False
+        self._full_recovery_check: bool = False
         self._wait_deadline: float = 0.0
         self._use_last_fleet_attempts: int = 0
         self._skip_advance_choice: bool = False

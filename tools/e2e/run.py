@@ -86,7 +86,7 @@ def print_case_list(cases: dict[str, Any]) -> None:
         print(f'  {name:24s} {desc}')
     print()
     print('  运行: python tools/e2e/run.py <case> [全局参数在前, case 参数在后]')
-    print('  全局: --serial SERIAL / --debug / --no-launch / --with-ocr')
+    print('  全局: --serial SERIAL / --debug / --no-launch / --preserve-state / --with-ocr')
     print('═' * 68)
 
 
@@ -101,7 +101,14 @@ def split_argv(argv: list[str]) -> tuple[list[str], str | None, list[str]]:
     全局参数可出现在 case 名之前或之后; ``--serial`` 带一个值;
     第一个非 ``-`` 开头的 token 视为 case 名, 其余非全局 token 归 case 参数。
     """
-    global_flags = {'--debug', '--fast-ocr', '--list', '--no-launch', '--with-ocr'}
+    global_flags = {
+        '--debug',
+        '--fast-ocr',
+        '--list',
+        '--no-launch',
+        '--preserve-state',
+        '--with-ocr',
+    }
     global_args: list[str] = []
     case_name: str | None = None
     case_args: list[str] = []
@@ -152,6 +159,11 @@ def main() -> int:
     gp.add_argument('--serial', default=None, help='ADB 设备序列号 (默认用配置)')
     gp.add_argument('--debug', action='store_true', help='DEBUG 日志')
     gp.add_argument('--no-launch', action='store_true', help='跳过游戏就绪 (只读验证)')
+    gp.add_argument(
+        '--preserve-state',
+        action='store_true',
+        help='连接后保留设备当前页面，不自动回到首页',
+    )
     gp.add_argument('--with-ocr', action='store_true', help='初始化 OCR 引擎')
     gp.add_argument('--fast-ocr', action='store_true', help='本次运行使用 CPU FastOCR')
     g = gp.parse_args(global_argv)
@@ -172,6 +184,7 @@ def main() -> int:
     print(f'  设备: {g.serial or "自动检测 (usersettings.yaml)"}')
     print(
         f'  模式: {"只读 (跳过游戏就绪)" if g.no_launch else "完整 (游戏就绪)"}'
+        f'{" + 保留当前状态" if g.preserve_state else ""}'
         f'{" + OCR" if g.with_ocr else ""}{" + FastOCR" if g.fast_ocr else ""}'
     )
 
@@ -184,6 +197,7 @@ def main() -> int:
         serial=g.serial,
         debug=g.debug,
         no_launch=g.no_launch,
+        preserve_state=g.preserve_state,
         with_ocr=g.with_ocr,
         fast_ocr=g.fast_ocr,
     )

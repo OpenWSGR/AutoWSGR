@@ -83,6 +83,7 @@ class E2ERunner:
         serial: str | None = None,
         debug: bool = False,
         no_launch: bool = False,
+        preserve_state: bool = False,
         with_ocr: bool = False,
         fast_ocr: bool = False,
     ) -> None:
@@ -93,6 +94,7 @@ class E2ERunner:
         self.no_launch = no_launch  # True 时跳过游戏就绪 (纯只读验证)
         self.with_ocr = with_ocr  # True 时初始化 OCR 引擎 (编队识别等需要)
         self.fast_ocr = fast_ocr  # True 时仅在本次 E2E 内切换 CPU FastOCR
+        self.preserve_state = preserve_state
         self.state = RunnerState()
         self.ctx: Any = None  # GameContext (prepare() 成功后可用)
         self._launcher: Any = None
@@ -158,6 +160,10 @@ class E2ERunner:
                 self.ctx = launcher.build_context()  # 含 OCR 引擎
             else:
                 self.ctx = GameContext(ctrl=launcher.ctrl, config=launcher.config, ocr=None)
+
+            if self.preserve_state:
+                self.note('保留设备当前游戏状态，由测试用例自行识别入口')
+                return True
 
             if self.no_launch:
                 # 显式只读模式: 不启动/导航游戏, 供截图和页面识别诊断使用。
@@ -262,7 +268,7 @@ class E2ERunner:
             return
         self._cleanup_done = True
 
-        if self.ctx is not None and not self.no_launch:
+        if self.ctx is not None and not self.no_launch and not self.preserve_state:
             t0 = time.monotonic()
             try:
                 self._initialize_game()
@@ -363,7 +369,11 @@ class E2ERunner:
             from autowsgr.infra import save_image
 
             screen = self.ctx.ctrl.screenshot()
-            tag = f'e2e_fail_{label.replace(" ", "_")[:40]}'
+            safe_label = ''.join(
+                char if char.isascii() and (char.isalnum() or char in '._-') else '_'
+                for char in label
+            )
+            tag = f'e2e_fail_{safe_label[:40]}'
             path = save_image(screen, tag=tag)
             if path:
                 print(f'        失败截图: {path}')

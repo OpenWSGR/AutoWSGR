@@ -72,13 +72,16 @@ class DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps):
 
     # ── 主入口 ────────────────────────────────────────────────────────────
 
-    def run(self) -> DecisiveResult:
+    def run(self, *, full_recovery_check: bool = False) -> DecisiveResult:
         """执行一轮完整决战（3 个小关）。"""
         _log.info('[决战] 开始第 {} 章决战', self._config.chapter)
         self._state.reset()
         # 默认进入恢复模式，扫描舰船进度
         self._resume_mode = True
         self._has_chosen_fleet = False
+        self._fleet_overlay_enabled = True
+        self._force_fleet_scan = full_recovery_check
+        self._full_recovery_check = full_recovery_check
         self._prepare_entry_state()
         self._state.phase = DecisivePhase.ENTER_MAP
         try:
@@ -138,6 +141,7 @@ class DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps):
                 self._execute_retreat()
                 self._state.reset()
                 self._state.phase = DecisivePhase.ENTER_MAP
+                self._force_fleet_scan = False
                 continue
 
             if phase == DecisivePhase.LEAVE:

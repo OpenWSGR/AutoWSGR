@@ -124,19 +124,30 @@ OVERLAY_SIGNATURES: list[tuple[DecisiveOverlay, PixelSignature]] = [
 _SIG_BY_TYPE: dict[DecisiveOverlay, PixelSignature] = dict(OVERLAY_SIGNATURES)
 
 # 720p 决战总览页右侧「上次选船」按钮区域，按用户实机红框留出边缘。
-USE_LAST_FLEET_ROI = ROI(0.82, 0.30, 1.0, 0.50)
+USE_LAST_FLEET_ROI = ROI(0.82, 0.30, 1.0, 0.50).expand_pixels(1280, 720)
 
 # 1280x720 决战出征准备页「主力决战舰队」标题区域。
-FLEET_NAME_ROI = ROI(0.08, 0.11, 0.26, 0.22)
+FLEET_NAME_ROI = ROI(0.08, 0.11, 0.26, 0.22).expand_pixels(1280, 720)
+
+# Keep a 1px margin around the 305x69 title template.
+FLEET_ACQUISITION_ROI = ROI(494 / 1280, 38 / 720, 799 / 1280, 107 / 720).expand_pixels(
+    1280, 720
+)
 
 # 1280x720 确认退出弹窗的固定红框区域（confirm_exit_720p.png）。
-CONFIRM_EXIT_ROI = ROI(363 / 1280, 161 / 720, 917 / 1280, 465 / 720)
+CONFIRM_EXIT_ROI = ROI(363 / 1280, 161 / 720, 917 / 1280, 465 / 720).expand_pixels(
+    1280, 720
+)
 
 # 1280x720 决战「选择前进点」左侧卡片区域。
-ADVANCE_CHOICE_ROI = ROI(324 / 1280, 237 / 720, 607 / 1280, 429 / 720)
+ADVANCE_CHOICE_ROI = ROI(324 / 1280, 237 / 720, 607 / 1280, 429 / 720).expand_pixels(
+    1280, 720
+)
 
 # 1280x720 三分支「选择前进点」左侧卡片区域（adb-teamchose3.png）。
-ADVANCE_CHOICE_THREE_ROI = ROI(142 / 1280, 235 / 720, 429 / 1280, 431 / 720)
+ADVANCE_CHOICE_THREE_ROI = ROI(
+    142 / 1280, 235 / 720, 429 / 1280, 431 / 720
+).expand_pixels(1280, 720)
 
 # overlay → 识别模板映射 (图像模板匹配, 替代上方像素签名)
 _OVERLAY_TEMPLATE_MAP: dict[DecisiveOverlay, ImageTemplate] = {
@@ -232,6 +243,7 @@ def detect_decisive_overlay(
     screen: np.ndarray,
     *,
     advance_choice_roi: ROI | None = None,
+    include_fleet_acquisition: bool = True,
 ) -> DecisiveOverlay | None:
     """按优先级检测决战地图页上的弹窗。
 
@@ -246,6 +258,8 @@ def detect_decisive_overlay(
         首个命中的弹窗类型；无弹窗则返回 ``None``。
     """
     for overlay_type, tmpl in _OVERLAY_TEMPLATE_MAP.items():
+        if overlay_type is DecisiveOverlay.FLEET_ACQUISITION and not include_fleet_acquisition:
+            continue
         confidence = (
             _FLEET_ACQUISITION_CONFIDENCE
             if overlay_type is DecisiveOverlay.FLEET_ACQUISITION
@@ -255,7 +269,9 @@ def detect_decisive_overlay(
         )
         if overlay_type is DecisiveOverlay.ADVANCE_CHOICE:
             rois = (
-                (advance_choice_roi,)
+                # Map data describes available branches, but the live UI can
+                # render fewer cards after route filtering.
+                (advance_choice_roi, ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
                 if advance_choice_roi is not None
                 else (ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
             )
@@ -268,7 +284,9 @@ def detect_decisive_overlay(
                 screen,
                 tmpl,
                 roi=(
-                    CONFIRM_EXIT_ROI
+                    FLEET_ACQUISITION_ROI
+                    if overlay_type is DecisiveOverlay.FLEET_ACQUISITION
+                    else CONFIRM_EXIT_ROI
                     if overlay_type is DecisiveOverlay.CONFIRM_EXIT
                     else None
                 ),
@@ -290,6 +308,7 @@ def is_fleet_acquisition(screen: np.ndarray) -> bool:
     return ImageChecker.template_exists(
         screen,
         Templates.Decisive.FLEET_ACQUISITION,
+        roi=FLEET_ACQUISITION_ROI,
         confidence=_FLEET_ACQUISITION_CONFIDENCE,
     )
 

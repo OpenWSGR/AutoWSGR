@@ -9,13 +9,15 @@ import numpy as np
 import pytest
 
 from autowsgr.ops.decisive import handlers
-from autowsgr.types import DecisiveEntryStatus, DecisivePhase
+from autowsgr.ops.decisive.logic import DecisiveLogic
+from autowsgr.types import DecisiveEntryStatus, DecisivePhase, FleetSelection
 from autowsgr.ui.decisive import battle_page, map_controller, overlay, preparation
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     ADVANCE_CHOICE_ROI,
     ADVANCE_CHOICE_THREE_ROI,
     CONFIRM_EXIT_ROI,
+    FLEET_ACQUISITION_ROI,
     CLICK_ADVANCE_CONFIRM,
     FLEET_NAME_ROI,
     USE_LAST_FLEET_ROI,
@@ -52,6 +54,132 @@ def test_enter_map_uses_overlay_detection_instead_of_fixed_delay(
 
     assert events == ['enter']
     assert battle_page_context._state.phase is DecisivePhase.WAITING_FOR_MAP
+
+
+def test_choose_ships_uses_level2_when_no_level1_is_available() -> None:
+    """Backup ships are considered at every incomplete node, not only first_node."""
+    config = SimpleNamespace(level1=['Primary'], level2=['Backup'])
+    state = SimpleNamespace(fleet=[''] * 7, score=10)
+    logic = DecisiveLogic(config, state)
+
+    result = logic.choose_ships(
+        {'Backup': FleetSelection('Backup', 4, (0.25, 0.5))},
+        first_node=False,
+    )
+
+    assert result == ['Backup']
+
+
+def test_choose_ships_prioritizes_level1_before_level2() -> None:
+    """Primary ships consume the budget before backup ships are considered."""
+    config = SimpleNamespace(level1=['Primary'], level2=['Backup'])
+    state = SimpleNamespace(fleet=[''] * 7, score=10)
+    logic = DecisiveLogic(config, state)
+
+    result = logic.choose_ships(
+        {
+            'Primary': FleetSelection('Primary', 4, (0.25, 0.5)),
+            'Backup': FleetSelection('Backup', 4, (0.375, 0.5)),
+        },
+        first_node=False,
+    )
+
+    assert result == ['Primary', 'Backup']
+
+
+def test_choose_ships_first_node_preserves_two_ship_goal() -> None:
+    """First-node purchasing prefers an affordable two-ship bundle over one primary."""
+    config = SimpleNamespace(level1=['Primary'], level2=['BackupA', 'BackupB'])
+    state = SimpleNamespace(fleet=[''] * 7, ships=set(), score=10)
+    logic = DecisiveLogic(config, state)
+
+    result = logic.choose_ships(
+        {
+            'Primary': FleetSelection('Primary', 6, (0.25, 0.5)),
+            'BackupA': FleetSelection('BackupA', 5, (0.375, 0.5)),
+            'BackupB': FleetSelection('BackupB', 5, (0.5, 0.5)),
+        },
+        first_node=True,
+    )
+
+    assert result == ['BackupA', 'BackupB']
+
+
+def test_choose_ships_first_node_prefers_primary_when_two_ship_bundle_fits() -> None:
+    """A 6+4 primary/backup bundle wins when it still reaches two ships."""
+    config = SimpleNamespace(level1=['Primary'], level2=['Backup'])
+    state = SimpleNamespace(fleet=[''] * 7, ships=set(), score=10)
+    logic = DecisiveLogic(config, state)
+
+    result = logic.choose_ships(
+        {
+            'Primary': FleetSelection('Primary', 6, (0.25, 0.5)),
+            'Backup': FleetSelection('Backup', 4, (0.375, 0.5)),
+        },
+        first_node=True,
+    )
+
+    assert result == ['Primary', 'Backup']
+
+
+def test_choose_ships_fills_pool_before_primary_upgrade() -> None:
+    """Later nodes spend on missing ships before upgrading existing primaries."""
+    config = SimpleNamespace(level1=['Primary'], level2=['BackupA', 'BackupB'])
+    state = SimpleNamespace(
+        fleet=[''] * 7,
+        ships={'BackupA', 'OwnedA', 'OwnedB', 'OwnedC'},
+        score=10,
+    )
+    logic = DecisiveLogic(config, state)
+
+    result = logic.choose_ships(
+        {
+            'Primary': FleetSelection('Primary', 6, (0.25, 0.5)),
+            'BackupB': FleetSelection('BackupB', 4, (0.375, 0.5)),
+            'BackupA': FleetSelection('BackupA', 4, (0.5, 0.5)),
+        },
+        first_node=False,
+    )
+
+    assert result == ['Primary', 'BackupB']
+
+
+def test_choose_ships_upgrades_existing_primary_only() -> None:
+    """Once six ships exist, only an already-acquired primary may be upgraded."""
+    config = SimpleNamespace(level1=['Primary'], level2=['Backup'])
+    state = SimpleNamespace(
+        fleet=[''] * 7,
+        ships={'Primary', 'Backup', 'Ship3', 'Ship4', 'Ship5', 'Ship6'},
+        score=10,
+    )
+    logic = DecisiveLogic(config, state)
+
+    result = logic.choose_ships(
+        {
+            'Primary': FleetSelection('Primary', 4, (0.25, 0.5)),
+            'Backup': FleetSelection('Backup', 1, (0.375, 0.5)),
+        },
+        first_node=False,
+    )
+
+    assert result == ['Primary']
+
+
+def test_best_fleet_keeps_current_damaged_ship_until_repair() -> None:
+    """A damaged ship already in formation stays in the decisive target fleet."""
+    config = SimpleNamespace(
+        level1=['Primary'],
+        level2=['Backup'],
+        flagship_priority=[],
+    )
+    state = SimpleNamespace(
+        fleet=['', 'Primary', 'Backup', '', '', '', ''],
+        ships={'Primary', 'Backup'},
+    )
+    ctx = SimpleNamespace(is_ship_available=lambda name: name != 'Primary')
+    logic = DecisiveLogic(config, state, ctx=ctx)
+
+    assert logic.get_best_fleet() == ['', 'Primary', 'Backup', '', '', '', '']
 
 
 def test_refresh_entry_resets_before_entering_map(
@@ -103,6 +231,8 @@ def test_map_fallback_routes_to_prepare_without_state_guess(
             phase=DecisivePhase.WAITING_FOR_MAP,
         ),
         _has_chosen_fleet=False,
+        _fleet_overlay_enabled=True,
+        _advance_source_node=None,
         _use_last_fleet_attempts=0,
         _skip_advance_choice=False,
         _advance_choice_roi=lambda: None,
@@ -117,11 +247,87 @@ def test_map_fallback_routes_to_prepare_without_state_guess(
     map_controller_mock.wait_for_entry_phase.assert_called_once_with(
         wait_for_use_last=True,
         wait_for_advance=True,
+        wait_for_fleet=False,
         timeout=3.0,
         interval=0.2,
     )
     assert context._state.phase is DecisivePhase.PREPARE_COMBAT
+    assert context._fleet_overlay_enabled is False
     assert events == [0.05]
+
+
+def test_new_entry_enables_fleet_after_advance_choice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A normal new entry enables fleet detection after choosing advance."""
+    map_controller_mock = MagicMock()
+    map_controller_mock.wait_for_entry_phase.return_value = DecisivePhase.PREPARE_COMBAT
+    context = SimpleNamespace(
+        _ctrl=SimpleNamespace(screenshot=lambda: np.zeros((720, 1280, 3), dtype=np.uint8)),
+        _map=map_controller_mock,
+        _state=SimpleNamespace(
+            stage=1,
+            node='U',
+            phase=DecisivePhase.WAITING_FOR_MAP,
+        ),
+        _fleet_overlay_enabled=True,
+        _has_chosen_fleet=False,
+        _advance_source_node=None,
+        _use_last_fleet_attempts=0,
+        _skip_advance_choice=True,
+        _advance_choice_roi=lambda: None,
+        _wait_deadline=101.0,
+    )
+    monkeypatch.setattr(handlers.time, 'monotonic', lambda: 100.0)
+    monkeypatch.setattr(handlers.time, 'sleep', lambda _delay: None)
+
+    handlers.DecisivePhaseHandlers._handle_waiting_for_map(context)
+
+    map_controller_mock.wait_for_entry_phase.assert_called_once_with(
+        wait_for_use_last=True,
+        wait_for_advance=False,
+        wait_for_fleet=True,
+        timeout=3.0,
+        interval=0.2,
+    )
+
+
+def test_full_recovery_keeps_fleet_check_enabled_without_advance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SL recovery keeps fleet detection enabled even when no advance popup appears."""
+    map_controller_mock = MagicMock()
+    map_controller_mock.wait_for_entry_phase.return_value = DecisivePhase.PREPARE_COMBAT
+    context = SimpleNamespace(
+        _ctrl=SimpleNamespace(screenshot=lambda: np.zeros((720, 1280, 3), dtype=np.uint8)),
+        _map=map_controller_mock,
+        _state=SimpleNamespace(
+            stage=1,
+            node='U',
+            phase=DecisivePhase.WAITING_FOR_MAP,
+        ),
+        _fleet_overlay_enabled=True,
+        _full_recovery_check=True,
+        _has_chosen_fleet=False,
+        _use_last_fleet_attempts=0,
+        _skip_advance_choice=False,
+        _advance_source_node=None,
+        _advance_choice_roi=lambda: None,
+        _wait_deadline=101.0,
+    )
+    monkeypatch.setattr(handlers.time, 'monotonic', lambda: 100.0)
+    monkeypatch.setattr(handlers.time, 'sleep', lambda _delay: None)
+
+    handlers.DecisivePhaseHandlers._handle_waiting_for_map(context)
+
+    map_controller_mock.wait_for_entry_phase.assert_called_once_with(
+        wait_for_use_last=True,
+        wait_for_advance=True,
+        wait_for_fleet=True,
+        timeout=3.0,
+        interval=0.2,
+    )
+    assert context._fleet_overlay_enabled is True
 
 
 def test_entry_phase_checks_overlays_before_map_fallback(
@@ -148,6 +354,147 @@ def test_entry_phase_checks_overlays_before_map_fallback(
         timeout=3.0,
         interval=0.2,
     )
+
+
+def test_entry_phase_can_skip_fleet_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Initial entry can finish on the map without checking fleet acquisition."""
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctrl = MagicMock()
+    controller._wait_for_use_last_fleet = MagicMock(return_value=False)
+    controller._wait_for_advance_choice = MagicMock(return_value=False)
+    fleet_match = MagicMock(return_value=True)
+    monkeypatch.setattr(map_controller, 'is_fleet_acquisition', fleet_match)
+    monkeypatch.setattr(map_controller, 'is_decisive_map_page', lambda _screen: True)
+
+    phase = controller.wait_for_entry_phase(
+        wait_for_use_last=False,
+        wait_for_advance=False,
+        wait_for_fleet=False,
+    )
+
+    assert phase is DecisivePhase.PREPARE_COMBAT
+    fleet_match.assert_not_called()
+
+
+def test_decisive_overview_uses_entry_status_roi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Overview recognition searches the fixed entry-status button region."""
+    calls: list[object] = []
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'find_any',
+        lambda _screen, _templates, **kwargs: calls.append(kwargs)
+        or SimpleNamespace(confidence=0.91),
+    )
+
+    result = battle_page.DecisiveBattlePage.is_current_page(
+        np.zeros((720, 1280, 3), dtype=np.uint8),
+    )
+
+    assert result.matched
+    assert calls[0]['roi'] is battle_page.ENTRY_STATUS_ROI
+
+
+def test_recognize_stage_uses_one_based_map_stage_numbers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stage detection aligns its return values with EX-<chapter>-<stage>.yaml."""
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    points = battle_page._STAGE_CHECK_POINTS[6]
+    white = battle_page._STAGE_CHECK_COLOR.as_rgb_tuple()
+
+    assert battle_page.DecisiveBattlePage.recognize_stage(screen, 6) == 0
+
+    for rx, ry in points[:1]:
+        screen[int(ry * 720), int(rx * 1280)] = white
+    assert battle_page.DecisiveBattlePage.recognize_stage(screen, 6) == 1
+
+    for rx, ry in points[1:2]:
+        screen[int(ry * 720), int(rx * 1280)] = white
+    assert battle_page.DecisiveBattlePage.recognize_stage(screen, 6) == 2
+
+    for rx, ry in points[2:]:
+        screen[int(ry * 720), int(rx * 1280)] = white
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'template_exists',
+        lambda _screen, template, **_kwargs: template.name
+        in {'decisive_entry_challenging', 'decisive_reset_button'},
+    )
+    assert battle_page.DecisiveBattlePage.recognize_stage(screen, 6) == 3
+
+
+def test_recognize_stage_uses_entry_status_for_three_existing_nodes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Three visible nodes need entry status to distinguish stage 3 from clear."""
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    points = battle_page._STAGE_CHECK_POINTS[6]
+    color = battle_page._STAGE_CHECK_COLOR.as_rgb_tuple()
+    for rx, ry in points:
+        screen[int(ry * 720), int(rx * 1280)] = color
+
+    def match_template(_screen: object, template: object, **_kwargs: object) -> bool:
+        return template is battle_page.Templates.Decisive.ENTRY_CHALLENGING or template is (
+            battle_page.Templates.Decisive.RESET_BUTTON
+        )
+
+    monkeypatch.setattr(battle_page.ImageChecker, 'template_exists', match_template)
+    assert battle_page.DecisiveBattlePage.recognize_stage(screen, 6) == 3
+
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'template_exists',
+        lambda _screen, template, **_kwargs: template is battle_page.Templates.Decisive.ENTRY_REFRESH,
+    )
+    assert battle_page.DecisiveBattlePage.recognize_stage(screen, 6) is None
+
+
+def test_completed_chapter_does_not_enter_map(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A completed overview enters the existing chapter-clear phase."""
+    battle_page = MagicMock()
+    battle_page.detect_entry_status.return_value = DecisiveEntryStatus.CHALLENGING
+    battle_page.detect_stage.return_value = None
+    context = SimpleNamespace(
+        _battle_page=battle_page,
+        _config=SimpleNamespace(chapter=6),
+        _ctrl=MagicMock(),
+        _state=SimpleNamespace(stage=0, phase=DecisivePhase.ENTER_MAP),
+        _resume_mode=True,
+    )
+
+    handlers.DecisivePhaseHandlers._handle_enter_map(context)
+
+    assert context._state.phase is DecisivePhase.CHAPTER_CLEAR
+    battle_page.click_enter_map.assert_not_called()
+
+
+def test_entry_status_uses_entry_status_roi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Chapter-entry status recognition uses the same fixed ROI."""
+    page = object.__new__(battle_page.DecisiveBattlePage)
+    page._ctrl = MagicMock()
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    page._ctrl.screenshot.return_value = screen
+    calls: list[object] = []
+    template_name = battle_page.Templates.Decisive.entry_status_templates()[1].name
+    monkeypatch.setattr(
+        battle_page.ImageChecker,
+        'find_any',
+        lambda _screen, _templates, **kwargs: calls.append(kwargs)
+        or SimpleNamespace(template_name=template_name),
+    )
+
+    status = page.detect_entry_status(timeout=1.0)
+
+    assert status is DecisiveEntryStatus.CHALLENGING
+    assert calls[0]['roi'] is battle_page.ENTRY_STATUS_ROI
 
 
 def test_fleet_overlay_requires_fresh_confirmation(
@@ -193,10 +540,30 @@ def test_advance_choice_overlay_uses_fixed_roi(
         DecisiveOverlay.ADVANCE_CHOICE
     )
     assert calls == [
-        (None, 0.70),
+        (FLEET_ACQUISITION_ROI, 0.70),
         (CONFIRM_EXIT_ROI, 0.85),
         (ADVANCE_CHOICE_ROI, 0.80),
     ]
+
+
+def test_fleet_overlay_uses_fixed_roi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fleet acquisition matching is restricted to the annotated title ROI."""
+    calls: list[tuple[object, float]] = []
+
+    def template_exists(
+        _screen: object, _template: object, *, roi: object, confidence: float
+    ) -> bool:
+        calls.append((roi, confidence))
+        return True
+
+    monkeypatch.setattr(overlay.ImageChecker, 'template_exists', template_exists)
+
+    assert overlay.detect_decisive_overlay(np.zeros((720, 1280, 3), dtype=np.uint8)) is (
+        DecisiveOverlay.FLEET_ACQUISITION
+    )
+    assert calls == [(FLEET_ACQUISITION_ROI, 0.70)]
 
 
 def test_advance_choice_overlay_tries_three_branch_roi(
@@ -219,6 +586,30 @@ def test_advance_choice_overlay_tries_three_branch_roi(
     assert calls[-1] == (ADVANCE_CHOICE_THREE_ROI, 0.80)
 
 
+def test_advance_choice_explicit_roi_falls_back_to_two_card_roi(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A graph-selected three-card ROI still accepts a live two-card popup."""
+    calls: list[object] = []
+
+    def template_exists(
+        _screen: object, _template: object, *, roi: object, confidence: float
+    ) -> bool:
+        calls.append((roi, confidence))
+        return roi is ADVANCE_CHOICE_ROI
+
+    monkeypatch.setattr(overlay.ImageChecker, 'template_exists', template_exists)
+
+    assert overlay.detect_decisive_overlay(
+        np.zeros((720, 1280, 3), dtype=np.uint8),
+        advance_choice_roi=ADVANCE_CHOICE_THREE_ROI,
+    ) is DecisiveOverlay.ADVANCE_CHOICE
+    assert calls[-2:] == [
+        (ADVANCE_CHOICE_THREE_ROI, 0.80),
+        (ADVANCE_CHOICE_ROI, 0.80),
+    ]
+
+
 def test_node_result_timeout_keeps_waiting_for_late_overlay(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -233,6 +624,7 @@ def test_node_result_timeout_keeps_waiting_for_late_overlay(
             stage=1,
             phase=DecisivePhase.NODE_RESULT,
         ),
+        _fleet_overlay_enabled=False,
         _POST_COMBAT_TIMEOUT=0.0,
         _wait_deadline=0.0,
     )
@@ -243,6 +635,268 @@ def test_node_result_timeout_keeps_waiting_for_late_overlay(
     assert context._state.node == 'B'
     assert context._state.phase is DecisivePhase.WAITING_FOR_MAP
     assert context._wait_deadline == 110.0
+
+
+def test_non_terminal_node_result_enables_fleet_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-terminal result enables fleet detection for the next node."""
+    detect_phase = MagicMock(return_value=DecisivePhase.CHOOSE_FLEET)
+    context = SimpleNamespace(
+        _logic=SimpleNamespace(is_stage_end=lambda: False),
+        _map=SimpleNamespace(detect_decisive_phase=detect_phase),
+        _state=SimpleNamespace(
+            node='A',
+            stage=1,
+            phase=DecisivePhase.NODE_RESULT,
+        ),
+        _fleet_overlay_enabled=False,
+        _advance_choice_roi=lambda: None,
+        _POST_COMBAT_TIMEOUT=1.0,
+        _POST_COMBAT_INTERVAL=0.0,
+    )
+    monkeypatch.setattr(handlers.time, 'monotonic', lambda: 100.0)
+    monkeypatch.setattr(handlers.time, 'sleep', lambda _delay: None)
+
+    handlers.DecisivePhaseHandlers._handle_node_result(context)
+
+    assert context._fleet_overlay_enabled is True
+    detect_phase.assert_called_once_with(
+        advance_choice_roi=None,
+        allow_fleet_overlay=True,
+    )
+    assert context._state.phase is DecisivePhase.CHOOSE_FLEET
+
+
+def test_terminal_node_result_disables_fleet_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A terminal result enters stage clear without enabling fleet detection."""
+    context = SimpleNamespace(
+        _logic=SimpleNamespace(is_stage_end=lambda: True),
+        _state=SimpleNamespace(
+            node='J',
+            stage=1,
+            phase=DecisivePhase.NODE_RESULT,
+        ),
+        _fleet_overlay_enabled=True,
+    )
+
+    handlers.DecisivePhaseHandlers._handle_node_result(context)
+
+    assert context._fleet_overlay_enabled is False
+    assert context._state.phase is DecisivePhase.STAGE_CLEAR
+
+
+def test_stage_clear_reanchors_next_subsection_from_unknown_node() -> None:
+    """A new subsection starts at U so its first live node is recognized."""
+    context = SimpleNamespace(
+        _map=SimpleNamespace(confirm_stage_clear=MagicMock(return_value=[])),
+        _state=SimpleNamespace(
+            stage=1,
+            node='J',
+            phase=DecisivePhase.STAGE_CLEAR,
+        ),
+        _advance_source_node='J',
+        _resume_mode=False,
+        _fleet_overlay_enabled=False,
+    )
+
+    handlers.DecisivePhaseHandlers._handle_stage_clear(context)
+
+    assert context._state.node == 'U'
+    assert context._advance_source_node is None
+    assert context._resume_mode is True
+    assert context._fleet_overlay_enabled is True
+    assert context._state.phase is DecisivePhase.ENTER_MAP
+
+
+def test_temporary_leave_disables_fleet_overlay_for_reentry() -> None:
+    """A leave/re-entry context suppresses fleet detection until another result."""
+    map_controller = SimpleNamespace(
+        open_retreat_dialog=MagicMock(),
+        confirm_leave=MagicMock(),
+    )
+    context = SimpleNamespace(
+        _map=map_controller,
+        _fleet_overlay_enabled=True,
+    )
+
+    handlers.DecisivePhaseHandlers._execute_leave(context)
+
+    assert context._fleet_overlay_enabled is False
+    map_controller.open_retreat_dialog.assert_called_once_with()
+    map_controller.confirm_leave.assert_called_once_with()
+
+
+def test_retreat_reenables_fleet_overlay_for_reentry() -> None:
+    """A retreat starts a fresh entry path where fleet detection is allowed."""
+    map_controller = SimpleNamespace(
+        open_retreat_dialog=MagicMock(),
+        confirm_retreat=MagicMock(),
+    )
+    context = SimpleNamespace(
+        _map=map_controller,
+        _fleet_overlay_enabled=False,
+    )
+
+    handlers.DecisivePhaseHandlers._execute_retreat(context)
+
+    assert context._fleet_overlay_enabled is True
+    map_controller.open_retreat_dialog.assert_called_once_with()
+    map_controller.confirm_retreat.assert_called_once_with()
+
+
+def test_choose_fleet_commits_state_only_after_purchase_and_close() -> None:
+    """Fleet state is committed only after a purchase and successful close."""
+    selection = SimpleNamespace(click_position=(0.25, 0.5))
+    close = MagicMock(return_value=True)
+    buy = MagicMock()
+    context = SimpleNamespace(
+        _has_chosen_fleet=False,
+        _recognize_fleet_options_with_retry=MagicMock(
+            return_value=(np.zeros((720, 1280, 3), dtype=np.uint8), 10, {'Ship': selection})
+        ),
+        _state=SimpleNamespace(
+            score=10,
+            ships=set(),
+            phase=DecisivePhase.CHOOSE_FLEET,
+            is_begin=lambda: False,
+        ),
+        _logic=SimpleNamespace(choose_ships=lambda _selections, first_node: ['Ship']),
+        _map=SimpleNamespace(
+            close_fleet_overlay=close,
+            buy_fleet_option=buy,
+            refresh_fleet=MagicMock(),
+        ),
+    )
+
+    handlers.DecisivePhaseHandlers._handle_choose_fleet(context)
+
+    assert context._has_chosen_fleet is True
+    assert context._force_fleet_scan is False
+    assert context._state.phase is DecisivePhase.PREPARE_COMBAT
+    buy.assert_called_once_with(selection.click_position)
+    close.assert_called_once_with()
+
+
+def test_choose_fleet_without_purchase_defers_to_sufficiency_check() -> None:
+    """An empty purchase decision closes and lets preparation judge sufficiency."""
+    close = MagicMock(return_value=True)
+    buy = MagicMock()
+    context = SimpleNamespace(
+        _has_chosen_fleet=False,
+        _recognize_fleet_options_with_retry=MagicMock(
+            return_value=(np.zeros((720, 1280, 3), dtype=np.uint8), 10, {})
+        ),
+        _state=SimpleNamespace(
+            score=10,
+            ships=set(),
+            phase=DecisivePhase.CHOOSE_FLEET,
+            is_begin=lambda: False,
+        ),
+        _logic=SimpleNamespace(choose_ships=MagicMock()),
+        _map=SimpleNamespace(
+            close_fleet_overlay=close,
+            buy_fleet_option=buy,
+            refresh_fleet=MagicMock(),
+        ),
+    )
+
+    handlers.DecisivePhaseHandlers._handle_choose_fleet(context)
+
+    assert context._has_chosen_fleet is True
+    assert context._force_fleet_scan is True
+    assert context._state.phase is DecisivePhase.PREPARE_COMBAT
+    close.assert_called_once_with()
+    buy.assert_not_called()
+
+
+def test_choose_fleet_does_not_buy_unconfigured_card() -> None:
+    """Unconfigured OCR cards are not valid substitutes for primary/backup ships."""
+    selection = SimpleNamespace(name='Unconfigured', cost=1, click_position=(0.25, 0.5))
+    close = MagicMock(return_value=True)
+    buy = MagicMock()
+    context = SimpleNamespace(
+        _has_chosen_fleet=False,
+        _recognize_fleet_options_with_retry=MagicMock(
+            return_value=(np.zeros((720, 1280, 3), dtype=np.uint8), 10, {'Cheap': selection})
+        ),
+        _state=SimpleNamespace(
+            score=10,
+            ships=set(),
+            phase=DecisivePhase.CHOOSE_FLEET,
+            is_begin=lambda: False,
+        ),
+        _logic=SimpleNamespace(choose_ships=lambda _selections, first_node: []),
+        _map=SimpleNamespace(
+            close_fleet_overlay=close,
+            buy_fleet_option=buy,
+            refresh_fleet=MagicMock(),
+        ),
+    )
+
+    handlers.DecisivePhaseHandlers._handle_choose_fleet(context)
+
+    buy.assert_not_called()
+    assert context._state.ships == set()
+    assert context._force_fleet_scan is True
+    assert context._state.phase is DecisivePhase.PREPARE_COMBAT
+    close.assert_called_once_with()
+
+
+def test_choose_fleet_falls_back_to_low_cost_ship_when_empty_close_fails() -> None:
+    """An empty configured purchase selects one real ship, closes, then retreats."""
+    ship = SimpleNamespace(name='Unconfigured', cost=4, click_position=(0.25, 0.5))
+    skill = SimpleNamespace(name='长跑训练', cost=1, click_position=(0.375, 0.5))
+    close = MagicMock(side_effect=[False, True])
+    buy = MagicMock()
+    context = SimpleNamespace(
+        _has_chosen_fleet=False,
+        _recognize_fleet_options_with_retry=MagicMock(
+            return_value=(
+                np.zeros((720, 1280, 3), dtype=np.uint8),
+                10,
+                {'Unconfigured': ship, '长跑训练': skill},
+            )
+        ),
+        _state=SimpleNamespace(
+            score=10,
+            ships=set(),
+            phase=DecisivePhase.CHOOSE_FLEET,
+            is_begin=lambda: True,
+        ),
+        _logic=SimpleNamespace(choose_ships=lambda _selections, first_node: []),
+        _map=SimpleNamespace(
+            close_fleet_overlay=close,
+            buy_fleet_option=buy,
+            refresh_fleet=MagicMock(),
+            detect_last_offer_name=MagicMock(return_value=None),
+        ),
+    )
+
+    handlers.DecisivePhaseHandlers._handle_choose_fleet(context)
+
+    buy.assert_called_once_with(ship.click_position)
+    assert context._state.ships == {'Unconfigured'}
+    assert context._state.phase is DecisivePhase.RETREAT
+    assert close.call_count == 2
+
+
+def test_close_fleet_overlay_waits_for_stable_map_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A confirmed title disappearance adds the broad post-close settle wait."""
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctrl = MagicMock()
+    controller._ctrl.screenshot.return_value = np.zeros((720, 1280, 3), dtype=np.uint8)
+    monkeypatch.setattr(map_controller, 'is_fleet_acquisition', lambda _screen: False)
+    monkeypatch.setattr(map_controller.time, 'monotonic', lambda: 0.0)
+    sleeps: list[float] = []
+    monkeypatch.setattr(map_controller.time, 'sleep', sleeps.append)
+
+    assert controller.close_fleet_overlay() is True
+    assert 1.5 in sleeps
 
 
 def test_combat_success_clicks_result_page_before_node_poll(
@@ -391,12 +1045,34 @@ def test_enter_formation_retries_after_fleet_name_miss(
         'template_exists',
         lambda *_args, **_kwargs: False,
     )
+    monkeypatch.setattr(map_controller, 'is_decisive_map_page', lambda _screen: True)
     monkeypatch.setattr(map_controller.time, 'sleep', lambda _delay: None)
 
     controller.enter_formation()
 
     assert len(clicks) == 2
     controller.go_to_map_page.assert_called_once_with()
+
+
+def test_enter_formation_refuses_unrecognized_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Formation must not click when the current page is not the decisive map."""
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctrl = MagicMock()
+    clicks: list[object] = []
+    monkeypatch.setattr(
+        map_controller,
+        'click_and_wait_for_page',
+        lambda *_args, **_kwargs: clicks.append(True),
+    )
+    monkeypatch.setattr(map_controller, 'is_decisive_map_page', lambda _screen: False)
+    monkeypatch.setattr(map_controller.time, 'sleep', lambda _delay: None)
+
+    with pytest.raises(TimeoutError, match='未识别到决战地图页'):
+        controller.enter_formation()
+
+    assert clicks == []
 
 
 def test_decisive_preparation_go_back_uses_decisive_map_checker(
@@ -495,6 +1171,79 @@ def test_use_last_fleet_refuses_unrecognized_click(
         controller.click_use_last_fleet()
 
     controller._ctrl.click.assert_not_called()
+
+
+def test_check_fleet_skips_ship_pool_when_current_formation_has_ships(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-empty formation is checked without opening the ship pool."""
+    fleet = ['U-47', None, None, None, None, None]
+    page = MagicMock()
+    page.detect_fleet.return_value = fleet
+    page.detect_ship_damage.return_value = {}
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctx = object()
+    controller._config = object()
+    controller._ocr = object()
+    controller._ctrl = MagicMock()
+    controller._ctrl.screenshot.return_value = np.zeros((720, 1280, 3), dtype=np.uint8)
+    controller.enter_formation = MagicMock()
+
+    monkeypatch.setattr(
+        map_controller,
+        'DecisiveBattlePreparationPage',
+        lambda *_args: page,
+    )
+    monkeypatch.setattr(map_controller.time, 'sleep', lambda _delay: None)
+    recognize = MagicMock()
+    monkeypatch.setattr(map_controller, '_recognize_ships', recognize)
+
+    result = controller.check_fleet()
+
+    assert result == (fleet, {}, {'U-47'})
+    controller.enter_formation.assert_called_once_with()
+    page.click_ship_slot.assert_not_called()
+    page.go_back.assert_not_called()
+    recognize.assert_not_called()
+
+
+def test_check_fleet_forces_ship_pool_scan_for_full_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Full recovery rebuilds the ship context even with a non-empty formation."""
+    fleet = ['U-47', None, None, None, None, None]
+    page = MagicMock()
+    page.detect_fleet.return_value = fleet
+    page.detect_ship_damage.return_value = {}
+    controller = object.__new__(map_controller.DecisiveMapController)
+    controller._ctx = object()
+    controller._config = object()
+    controller._ocr = object()
+    controller._ctrl = MagicMock()
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    controller._ctrl.screenshot.side_effect = [screen, screen, screen]
+    controller.enter_formation = MagicMock()
+
+    monkeypatch.setattr(
+        map_controller,
+        'DecisiveBattlePreparationPage',
+        lambda *_args: page,
+    )
+    monkeypatch.setattr(
+        map_controller.BattlePreparationPage,
+        'is_current_page',
+        lambda _screen: False,
+    )
+    monkeypatch.setattr(map_controller.time, 'sleep', lambda _delay: None)
+    recognize = MagicMock(return_value={'U-1206'})
+    monkeypatch.setattr(map_controller, '_recognize_ships', recognize)
+
+    result = controller.check_fleet(scan_ship_pool=True)
+
+    assert result == (fleet, {}, {'U-47', 'U-1206'})
+    page.click_ship_slot.assert_called_once_with(0)
+    recognize.assert_called_once()
+    page.go_back.assert_not_called()
 
 
 def test_advance_choice_waits_for_next_recognized_phase(
