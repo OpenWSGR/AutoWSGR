@@ -23,6 +23,7 @@ import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
+from autowsgr.ui.decisive.battle_page import ENTRY_STATUS_ROI
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     ADVANCE_CHOICE_ROI,
@@ -35,6 +36,7 @@ from autowsgr.ui.decisive.overlay import (
     CLICK_RETREAT_BUTTON,
     CLICK_RETREAT_CONFIRM,
     CLICK_SORTIE,
+    FLEET_ACQUISITION_ROI,
     FLEET_NAME_ROI,
     USE_LAST_FLEET_ROI,
     DecisiveOverlay,
@@ -130,6 +132,7 @@ class DecisiveMapController:
         screen: np.ndarray | None = None,
         *,
         advance_choice_roi: ROI | None = None,
+        allow_fleet_overlay: bool = True,
     ) -> DecisivePhase | None:
         """单次截图检测当前决战页面状态。
 
@@ -167,7 +170,11 @@ class DecisiveMapController:
             _log.info('[地图控制器] 检测到「使用上次舰队」按钮')
             return DecisivePhase.USE_LAST_FLEET
 
-        overlay = detect_decisive_overlay(screen, advance_choice_roi=advance_choice_roi)
+        overlay = detect_decisive_overlay(
+            screen,
+            advance_choice_roi=advance_choice_roi,
+            include_fleet_acquisition=allow_fleet_overlay,
+        )
         if overlay is not None:
             if overlay == DecisiveOverlay.ADVANCE_CHOICE:
                 return DecisivePhase.ADVANCE_CHOICE
@@ -191,6 +198,7 @@ class DecisiveMapController:
             overlay = detect_decisive_overlay(
                 confirm_screen,
                 advance_choice_roi=advance_choice_roi,
+                include_fleet_acquisition=allow_fleet_overlay,
             )
             if overlay is not None:
                 if overlay == DecisiveOverlay.ADVANCE_CHOICE:
@@ -226,6 +234,7 @@ class DecisiveMapController:
         *,
         wait_for_use_last: bool,
         wait_for_advance: bool,
+        wait_for_fleet: bool = True,
         advance_choice_roi: ROI | None = None,
         timeout: float = 3.0,
         interval: float = 0.2,
@@ -250,7 +259,7 @@ class DecisiveMapController:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
-            if is_fleet_acquisition(screen):
+            if wait_for_fleet and is_fleet_acquisition(screen):
                 return DecisivePhase.CHOOSE_FLEET
             if is_decisive_map_page(screen):
                 return DecisivePhase.PREPARE_COMBAT
@@ -449,6 +458,7 @@ class DecisiveMapController:
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()
             if not is_fleet_acquisition(screen):
+                time.sleep(1.5)
                 return True
             time.sleep(0.2)
         _log.warning('[地图控制器] 关闭战备舰队弹窗后仍停留在原界面')
@@ -507,6 +517,8 @@ class DecisiveMapController:
 
     def check_fleet(
         self,
+        *,
+        scan_ship_pool: bool = False,
     ) -> tuple[list[str | None], dict[int, ShipDamageState], set[str]]:
         """恢复进度时在编队页面扫描当前编队及所有可用舰船。
 
@@ -537,6 +549,11 @@ class DecisiveMapController:
         screen = self._ctrl.screenshot()
         fleet = page.detect_fleet(screen)
         damage = page.detect_ship_damage(screen)
+
+        current_ships = {name for name in fleet if name}
+        if current_ships and not scan_ship_pool:
+            _log.info('[Decisive] current formation is not empty; skip ship-pool scan')
+            return fleet, damage, current_ships
 
         # 进入选船列表：先确认已离开出征准备页，再进行一次识别
         page.click_ship_slot(0)
@@ -569,12 +586,8 @@ class DecisiveMapController:
         self._ctrl.click(0.05, 0.05)
         time.sleep(1.0)
 
-        # 返回地图页
-        page.go_back()
-        time.sleep(1.0)
-
         _log.info(
-            '[地图控制器] 编队={}, 可用舰船={}',
+            '[地图控制器] 编队={}, 可用舰船={} (停留在编队页)',
             fleet,
             sorted(all_ships),
         )
@@ -614,6 +627,10 @@ class DecisiveMapController:
         from autowsgr.ui.utils.navigation import NavConfig
 
         screen = self._ctrl.screenshot()
+        if not is_decisive_map_page(screen):
+            _log.warning('[地图控制器] 点击编队前未识别到决战地图页，拒绝点击')
+            raise TimeoutError('点击编队前未识别到决战地图页')
+
         map_check = ImageChecker.template_exists(
             screen, Templates.Decisive.MAP_PAGE, confidence=0.85
         )
@@ -746,7 +763,15 @@ class DecisiveMapController:
         reward_ack_pos = (0.953, 0.954)
         while time.monotonic() < settle_deadline:
             screen = self._ctrl.screenshot()
-            if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
+            if (
+                ImageChecker.find_any(
+                    screen,
+                    entry_templates,
+                    roi=ENTRY_STATUS_ROI,
+                    confidence=0.8,
+                )
+                is not None
+            ):
                 _log.info('[地图控制器] 小关通关结算完成，已回到决战入口页')
                 break
 
@@ -769,7 +794,15 @@ class DecisiveMapController:
         # settle 循环结束后，如果仍未回到入口页，尝试从地图页返回
         for _ in range(5):
             screen = self._ctrl.screenshot()
-            if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
+            if (
+                ImageChecker.find_any(
+                    screen,
+                    entry_templates,
+                    roi=ENTRY_STATUS_ROI,
+                    confidence=0.8,
+                )
+                is not None
+            ):
                 _log.info('[地图控制器] 通过返回按钮回到决战入口页')
                 break
             _log.debug('[地图控制器] 尝试点击返回按钮回到决战入口页')
@@ -862,6 +895,11 @@ class DecisiveMapController:
                 matched = ImageChecker.template_exists(
                     screen,
                     tmpl,
+                    roi=(
+                        FLEET_ACQUISITION_ROI
+                        if target is DecisiveOverlay.FLEET_ACQUISITION
+                        else None
+                    ),
                     confidence=confidence,
                 )
             if matched:
@@ -873,7 +911,9 @@ class DecisiveMapController:
     @staticmethod
     def _advance_choice_rois(advance_choice_roi: ROI | None) -> tuple[ROI, ...]:
         if advance_choice_roi is not None:
-            return (advance_choice_roi,)
+            # The map graph may report three successors while the live UI
+            # filters the popup down to two cards.
+            return (advance_choice_roi, ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
         return (ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
 
     def _wait_for_advance_choice(

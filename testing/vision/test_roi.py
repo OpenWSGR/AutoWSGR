@@ -48,6 +48,10 @@ class TestROI:
         assert (px1, py1) == (0, 0)
         assert (px2, py2) == (480, 270)
 
+    def test_expand_pixels(self):
+        roi = ROI(100 / 1280, 100 / 720, 200 / 1280, 200 / 720)
+        assert roi.expand_pixels(1280, 720).to_absolute(1280, 720) == (99, 99, 201, 201)
+
     def test_crop(self):
         screen = solid_screen(100, 100, 100)
         roi = ROI(0.0, 0.0, 0.5, 0.5)

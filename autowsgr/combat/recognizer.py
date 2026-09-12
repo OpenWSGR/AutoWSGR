@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -14,6 +15,7 @@ from autowsgr.vision import (
     PixelChecker,
     PixelRule,
     PixelSignature,
+    ROI,
 )
 
 from .state import CombatPhase
@@ -29,6 +31,16 @@ if TYPE_CHECKING:
 
 
 _log = get_logger('combat.recognition')
+
+# 1280x720 经验结算页顶部「数字 + Exp」区域，运行时向外扩 1px。
+EXP_SETTLEMENT_ROI = ROI(272 / 1280, 4 / 720, 388 / 1280, 43 / 720).expand_pixels(
+    1280,
+    720,
+)
+_EXP_SETTLEMENT_ALLOWLIST = '0123456789EXPexp'
+_EXP_SETTLEMENT_PATTERN = re.compile(r'\d+EXP')
+EXP_SETTLEMENT_STABLE_SECONDS = 1.5
+EXP_SETTLEMENT_TIMEOUT_SECONDS = 10.0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -145,15 +157,12 @@ PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
         default_timeout=90.0,
         confidence=0.85,
     ),
-    # 经验页判据: MVP 徽章 + 无评级字母。MVP 徽章在战果/经验两页必出现
-    # 于 6 个舰船行位之一 (左缘 x≈0.057, 实测 0.94+, 不受立绘遮挡),
-    # 评级字母仅在战果页出现 → 否决键排除战果页。旧判据 "升级剩余经验"
-    # 标签会被舰船背景干扰 (置信度波动 0.61~0.91), 弃用。
+    # 经验页只由运行时固定 ROI OCR 判定；不再配置全屏模板。
     CombatPhase.EXP_SETTLEMENT: PhaseSignature(
-        template_key=TemplateKey.RESULT_PAGE,
-        exclude_template_key=TemplateKey.RESULT_GRADES,
-        default_timeout=7.5,
+        template_key=None,
+        default_timeout=EXP_SETTLEMENT_TIMEOUT_SECONDS,
         confidence=0.85,
+        after_match_delay=1.0,
     ),
     CombatPhase.GET_SHIP: PhaseSignature(
         template_key=TemplateKey.GET_SHIP_OR_ITEM,
@@ -269,6 +278,51 @@ class CombatRecognizer:
             return CombatRecognizer._match_pixel(screen, sig.pixel_signature)
         return False
 
+    def _match_phase_runtime(
+        self,
+        screen: np.ndarray,
+        phase: CombatPhase,
+        sig: PhaseSignature,
+    ) -> bool:
+        """Match a phase using runtime-only recognizers when needed."""
+        if phase is CombatPhase.EXP_SETTLEMENT:
+            return self._match_exp_settlement(screen)
+        return self._match_phase(screen, sig)
+
+    def recognize_exp_settlement_text(self, screen: np.ndarray) -> str | None:
+        """Read allowed incremental characters from the fixed experience ROI."""
+        ocr = getattr(self._ctx, 'ocr', None)
+        if ocr is None:
+            return None
+
+        try:
+            results = ocr.recognize(
+                EXP_SETTLEMENT_ROI.crop(screen),
+                allowlist=_EXP_SETTLEMENT_ALLOWLIST,
+            )
+        except RuntimeError as exc:
+            _log.debug('[Combat] 经验结算 OCR 暂时失败: {}', exc)
+            return None
+
+        text = ''.join(
+            result.text
+            for result in sorted(
+                results,
+                key=lambda result: result.bbox[0] if result.bbox else 0,
+            )
+        )
+        normalized = re.sub(r'\s+', '', text).upper()
+        if not normalized or re.fullmatch(r'[0-9EXP]+', normalized) is None:
+            _log.debug('[Combat] 经验结算 ROI OCR 丢弃非法结果: {!r}', text)
+            return None
+        _log.debug('[Combat] 经验结算 ROI OCR: {!r} -> {!r}', text, normalized)
+        return normalized
+
+    def _match_exp_settlement(self, screen: np.ndarray) -> bool:
+        """Recognize a complete ``digits + EXP`` result in the top ROI."""
+        text = self.recognize_exp_settlement_text(screen)
+        return text is not None and _EXP_SETTLEMENT_PATTERN.fullmatch(text) is not None
+
     @staticmethod
     def get_signature(phase: CombatPhase) -> PhaseSignature:
         """获取状态的视觉签名。"""
@@ -330,13 +384,13 @@ class CombatRecognizer:
                 poll_action(screen)
 
             for phase, sig in phase_sigs:
-                if (
+                if phase is not CombatPhase.EXP_SETTLEMENT and (
                     sig.template_key is None
                     and sig.pixel_signature is None
                     and sig.image_templates is None
                 ):
                     continue
-                if self._match_phase(screen, sig):
+                if self._match_phase_runtime(screen, phase, sig):
                     if sig.after_match_delay > 0:
                         time.sleep(sig.after_match_delay)
                     _log.debug('[Combat] 匹配到状态: {}', phase.name)
@@ -366,13 +420,31 @@ class CombatRecognizer:
         """
         for phase in candidates:
             sig = CombatRecognizer.get_signature(phase)
-            if (
+            if phase is CombatPhase.EXP_SETTLEMENT or (
                 sig.template_key is None
                 and sig.pixel_signature is None
                 and sig.image_templates is None
             ):
                 continue
             if CombatRecognizer._match_phase(screen, sig):
+                return phase
+        return None
+
+    def identify_current_runtime(
+        self,
+        screen: np.ndarray,
+        candidates: list[CombatPhase],
+    ) -> CombatPhase | None:
+        """Identify a phase with runtime OCR-aware checks."""
+        for phase in candidates:
+            sig = self.get_signature(phase)
+            if phase is not CombatPhase.EXP_SETTLEMENT and (
+                sig.template_key is None
+                and sig.pixel_signature is None
+                and sig.image_templates is None
+            ):
+                continue
+            if self._match_phase_runtime(screen, phase, sig):
                 return phase
         return None
 

@@ -1,6 +1,6 @@
 Task ID: 20260907-autowsgr-decisive-debug-6e3a
 Task Status: in_progress
-Next Step: Review the stability/debug reports, fix post-combat WAITING_FOR_MAP and leave-confirm recognition, then rerun the remaining stability coverage.
+Next Step: Validate subsection re-anchoring and forced full recovery on real device before resuming the six-ticket stability run.
 
 # Task Plan: Decisive battle debug
 
@@ -13,7 +13,7 @@ Use the isolated AutoWSGR worktree to investigate and fix the decisive-battle mo
 - Development worktree: `C:\ShiinaKuroko\01.Project\AutoWSGR\.worktrees\20260907-autowsgr-decisive-debug-6e3a`
 
 ## Next Step
-The user cleared the ship depot. Run 9 remaining tickets with periodic process/log checks; preserve prior logs and write a new report. The activity-page false-positive ROI remains a separate follow-up.
+Fleet-overlay gating and the annotated ROI are implemented and tested; proceed to device verification.
 
 ## Current Phase
 Phase 4 - Testing & Verification (stability run)
@@ -63,6 +63,19 @@ Phase 4 - Testing & Verification (stability run)
 - [ ] Rerun stability coverage after the production fixes.
 - **Status:** in progress
 
+### Phase 8: Generic Combat Boundary Audit
+- [x] Trace sortie click, combat phase recognition, result collection, and decisive post-combat routing
+- [x] Record timeout, recovery, and duplicate-click boundaries
+- [ ] Define the smallest production change and regression test before implementation
+- **Status:** in progress
+
+### Phase 9: State-Preserving Stability Bootstrap
+- [x] Prevent the E2E runner from forcing the device back to the home page for stability runs.
+- [x] Detect the actual initial page and only navigate when the device is outside the decisive flow.
+- [x] Refuse unknown in-map stage state instead of guessing a chapter subsection.
+- [x] Run a real-device smoke check from the detected current state before starting ticket coverage.
+- **Status:** completed with device precondition blocker
+
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
@@ -82,3 +95,28 @@ Phase 4 - Testing & Verification (stability run)
 | Error | Resolution |
 |-------|------------|
 | Initial planning patch did not match the generated UTF-8 BOM template | Read the generated files and recreated only the new task-scoped planning files with the required task header. |
+
+### Phase 10: Configured Fleet Selection Verification
+- [x] Remove production fallback that buys arbitrary OCR cards
+- [x] Add regression coverage for unconfigured fleet cards
+- [x] Run decisive unit tests
+- [x] Run full adjacent ops tests
+- [x] Run one complete real-device decisive round
+- **Status:** in progress
+
+### Phase 11: Decisive Fleet Priority and Repair Ordering
+- [x] Rework battle-preparation purchase priority: fill six ships, then primary ships, then primary upgrades
+- [x] Preserve primary/backup ordering and first-node two-ship affordability
+- [x] Keep current damaged ships in decisive target formation until repair can run
+- [x] Keep public smart fleet-change code unchanged
+- [x] Add focused regression coverage
+- [x] Run full ops tests and one complete normal real-device validation; forced-recovery physical validation remains pending
+- **Status:** in progress
+
+### Phase 12: Subsection Node Re-anchor
+- [x] Confirm stage 3 real-device combat coverage and identify the carried-A entry bug
+- [x] Reset stage boundary node context to `U`
+- [x] Add regression coverage and run adjacent ops tests
+- [x] Validate stage-progress recognition against the current real overview screenshot
+- [x] Validate the corrected stage boundary on a new real-device round
+- **Status:** in progress

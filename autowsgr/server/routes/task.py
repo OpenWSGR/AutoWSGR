@@ -35,6 +35,23 @@ _log = get_logger('server')
 
 router = APIRouter(prefix='/api/task', tags=['task'])
 
+_DECISIVE_MAX_ATTEMPTS = 3
+
+
+def _recover_decisive_after_error(ctx: Any, attempt: int) -> None:
+    """SL back to a clean game entry before the next decisive attempt."""
+    from autowsgr.ops import ensure_game_ready, restart_game
+
+    app = ctx.config.account.game_app
+    package = app.package_name if hasattr(app, 'package_name') else app
+    _log.warning(
+        '[Task] decisive recovery {}/{}: restart game and restore entry state',
+        attempt,
+        _DECISIVE_MAX_ATTEMPTS,
+    )
+    restart_game(ctx.ctrl, package)
+    ensure_game_ready(ctx, app)
+
 
 TaskRequestUnion = Annotated[
     NormalFightRequest | EventFightRequest | CampaignRequest | ExerciseRequest | DecisiveRequest,
@@ -299,7 +316,39 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
 
                 task_manager.update_progress(current_round=i + 1, current_node='决战')
                 _log.info('[Task] 决战第 {}/{} 轮', i + 1, request.decisive_rounds)
-                result = controller.run()
+                result = None
+                for attempt in range(1, _DECISIVE_MAX_ATTEMPTS + 1):
+                    if task_manager.should_stop():
+                        break
+                    _log.info(
+                        '[Task] decisive round {} attempt {}/{}',
+                        i + 1,
+                        attempt,
+                        _DECISIVE_MAX_ATTEMPTS,
+                    )
+                    try:
+                        result = controller.run(full_recovery_check=attempt > 1)
+                    except Exception:
+                        _log.exception('[Task] decisive attempt raised an exception')
+                        from autowsgr.ops import DecisiveResult
+
+                        result = DecisiveResult.ERROR
+                    if result.value != 'error':
+                        break
+                    _log.warning(
+                        '[Task] decisive round {} failed, recovering before attempt {}/{}',
+                        i + 1,
+                        attempt,
+                        _DECISIVE_MAX_ATTEMPTS,
+                    )
+                    try:
+                        _recover_decisive_after_error(ctx, attempt)
+                    except Exception:
+                        _log.exception('[Task] decisive error recovery failed')
+                    if attempt == _DECISIVE_MAX_ATTEMPTS:
+                        break
+                if result is None:
+                    break
                 is_error = result.value == 'error'
                 converted = {
                     'round': i + 1,

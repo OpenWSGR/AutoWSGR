@@ -82,11 +82,16 @@ CLICK_ENTER_MAP: tuple[float, float] = (500 / 960, 500 / 540)
 CLICK_RESET_CHAPTER: tuple[float, float] = (0.5, 0.925)
 """点击"重置关卡"按钮（总览页底部）。"""
 
-RESET_BUTTON_ROI = ROI(0.64, 0.84, 0.73, 1.0)
+RESET_BUTTON_ROI = ROI(0.64, 0.84, 0.73, 1.0).expand_pixels(1280, 720)
 """1280x720 总览页中「重置关卡」按钮的固定识别区域。"""
 
-RESET_ENTRY_ROI = ROI(0.35, 0.80, 0.70, 1.0)
+RESET_ENTRY_ROI = ROI(0.35, 0.80, 0.70, 1.0).expand_pixels(1280, 720)
 """``refresh`` 状态下底部中央「重置关卡」入口的识别区域。"""
+
+ENTRY_STATUS_ROI = ROI(547 / 1280, 635 / 720, 814 / 1280, 705 / 720).expand_pixels(
+    1280, 720
+)
+"""1280x720 总览页底部中央入口状态按钮的固定识别区域。"""
 
 CHAPTER_NUM_AREA: tuple[float, float, float, float] = (0.818, 0.810, 0.875, 0.867)
 """章节编号 OCR 裁切区域 (x1, y1, x2, y2)。"""
@@ -128,13 +133,13 @@ _STAGE_CHECK_POINTS: dict[int, list[tuple[float, float]]] = {
     5: [(0.418, 0.378), (0.760, 0.477), (0.550, 0.750)],
     6: [(0.606, 0.375), (0.532, 0.703), (0.862, 0.644)],
 }
-"""每章 3 个小关的像素检测点 (相对坐标)。
+"""每章 3 个小关的节点存在检测点 (相对坐标)。
 
-若检测点颜色接近白色 (250, 244, 253) 表示该小关已通过。
+若检测点颜色接近白色 (250, 244, 253) 表示该小节节点已出现在总览页。
 """
 
 _STAGE_CHECK_COLOR: Color = Color.of(250, 244, 253)
-"""小关已通过标记颜色 (近白色)。"""
+"""小节节点存在标记颜色 (近白色)。"""
 
 _STAGE_CHECK_TOLERANCE: float = 30.0
 """颜色匹配容差。"""
@@ -182,7 +187,10 @@ class DecisiveBattlePage:
         深色活动主题页误命中) 保留备查, 不再参与判定。
         """
         result = ImageChecker.find_any(
-            screen, Templates.Decisive.entry_status_templates(), confidence=0.8
+            screen,
+            Templates.Decisive.entry_status_templates(),
+            roi=ENTRY_STATUS_ROI,
+            confidence=0.8,
         )
         name = PageName.DECISIVE_BATTLE.value
         if result is None:
@@ -192,32 +200,68 @@ class DecisiveBattlePage:
     # ── 小关进度识别 ──────────────────────────────────────────────────────
 
     @staticmethod
-    def recognize_stage(screen: np.ndarray, chapter: int) -> int:
-        """识别当前决战章节的小关进度 (0-3)。
+    def recognize_stage(screen: np.ndarray, chapter: int) -> int | None:
+        """识别当前决战章节的小关进度 (1-3) 或章节已完成。
 
-        检查每个小关位置像素颜色，白色 (250,244,253) 为已通过。
-        返回当前正在进行的小关编号; 3 表示全部通过。
+        三个像素点只负责确认小节节点是否存在。三个节点都存在时，
+        再用入口状态和重置按钮区分第三节进行中与三节全部完成。
         """
         check_points = _STAGE_CHECK_POINTS.get(chapter)
         if check_points is None:
             _log.warning('[决战] 决战 recognize_stage: 未知章节 {}', chapter)
             return 0
 
-        for i, (rx, ry) in enumerate(check_points):
-            if not PixelChecker.check_pixel(
+        node_exists = [
+            PixelChecker.check_pixel(
                 screen,
                 rx,
                 ry,
                 _STAGE_CHECK_COLOR,
                 _STAGE_CHECK_TOLERANCE,
-            ):
-                _log.info('[决战] 识别决战地图参数, 第 {} 小节正在进行', i)
-                return i
+            )
+            for rx, ry in check_points
+        ]
 
-        _log.info('[决战] 识别决战地图参数, 第 3 小节正在进行')
-        return 3
+        if not node_exists[0]:
+            _log.warning('[决战] 小节节点进度异常: 第 1 个节点不存在')
+            return 0
+        if not node_exists[1]:
+            _log.info('[决战] 识别决战地图参数, 第 1 小节正在进行')
+            return 1
+        if not node_exists[2]:
+            _log.info('[决战] 识别决战地图参数, 第 2 小节正在进行')
+            return 2
 
-    def detect_stage(self, screen: np.ndarray, chapter: int) -> int:
+        entry_refresh = ImageChecker.template_exists(
+            screen,
+            Templates.Decisive.ENTRY_REFRESH,
+            roi=ENTRY_STATUS_ROI,
+            confidence=0.8,
+        )
+        if entry_refresh:
+            _log.info('[决战] 入口为可重置状态，三个小节均已完成')
+            return None
+
+        entry_challenging = ImageChecker.template_exists(
+            screen,
+            Templates.Decisive.ENTRY_CHALLENGING,
+            roi=ENTRY_STATUS_ROI,
+            confidence=0.8,
+        )
+        reset_button = ImageChecker.template_exists(
+            screen,
+            Templates.Decisive.RESET_BUTTON,
+            roi=RESET_BUTTON_ROI,
+            confidence=0.8,
+        )
+        if entry_challenging and reset_button:
+            _log.info('[决战] 入口仍在挑战中且存在重置按钮，第 3 小节正在进行')
+            return 3
+
+        _log.warning('[决战] 三个小节节点均存在，但入口状态无法确认第三节或完成状态')
+        return 0
+
+    def detect_stage(self, screen: np.ndarray, chapter: int) -> int | None:
         """识别小节号（统一调用 recognize_stage）。"""
         return self.recognize_stage(screen, chapter)
 
@@ -418,6 +462,7 @@ class DecisiveBattlePage:
             detail = ImageChecker.find_any(
                 screen,
                 templates,
+                roi=ENTRY_STATUS_ROI,
                 confidence=confidence,
             )
             if detail is not None:
