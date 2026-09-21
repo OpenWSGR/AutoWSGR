@@ -210,7 +210,14 @@ def _build_map_transitions(
     # 循环直接穿行 (EXP_SETTLEMENT 不入状态机); 慢速模式为采集 grade/MVP
     # 逐页推进
     if collect_result_info:
-        t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
+        # 经验页是期望落点, 但**不是唯一可能的落点**: RESULT 关闭时的点击会被
+        # 入场动画吞掉而重试, 重试的一击可能直接跨过经验页落到掉落页/前进页
+        # (处理器日志 "RESULT 已推进到 GET_SHIP")。候选若只放 EXP_SETTLEMENT,
+        # 这种穿透必然干等到 7.5s 超时 → 错误恢复失败 → SL 重开整局
+        # (实机统计: 40 次超时 / 累计约 300s, 每次都把这一局判为 failed)。
+        # 故把 after_result 一并列为候选 —— 穿透后引擎按当前页继续, 掉落仍能
+        # 由 _handle_get_ship 捕获, 不再整局作废。
+        t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT, *after_result]
     else:
         t[CombatPhase.RESULT] = list(after_result)
     t[CombatPhase.EXP_SETTLEMENT] = list(after_result)
@@ -256,7 +263,9 @@ def _build_single_transitions(
     if ep is not None:
         # 演习等: 慢速逐页 (战果→经验→结束), 快速穿行 (战果直达结束)
         if collect_result_info:
-            t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
+            # 同上: 经验页是期望落点, 但点击可能跨过它直达结束页; 只认
+            # EXP_SETTLEMENT 会把这种穿透拖成 7.5s 超时 + SL 重开。
+            t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT, ep]
             t[CombatPhase.EXP_SETTLEMENT] = [ep]
         else:
             t[CombatPhase.RESULT] = [ep]

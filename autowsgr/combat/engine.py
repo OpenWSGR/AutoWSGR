@@ -303,9 +303,23 @@ class CombatEngine(PhaseHandlersMixin):
 
         screen = self._device.screenshot()
         end_phase = self._plan.end_phase
-        result = self._recognizer.identify_current(screen, [end_phase])
+
+        # 恢复判据不只看终态页: 若页面其实停在当前状态的某个合法后继上
+        # (典型: 战果页点击穿透到掉落页/经验页), 认出来就能接着跑, 不必
+        # 判 SL 重开整局 —— 那会丢掉刚打完的这一局战果。
+        candidates: list[CombatPhase] = []
+        if end_phase is not None:
+            candidates.append(end_phase)
+        for phase in resolve_successors(
+            self._plan.transitions, self._phase, self._last_action
+        ):
+            if phase not in candidates:
+                candidates.append(phase)
+
+        result = self._recognizer.identify_current(screen, candidates)
         if result is not None:
-            self._phase = end_phase
+            _log.warning('[Combat] 错误恢复: 识别到 {}, 继续战斗', result.name)
+            self._phase = result
             return True
         return False
 
