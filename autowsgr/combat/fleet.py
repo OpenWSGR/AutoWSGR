@@ -87,6 +87,8 @@ SHIP_TYPE_BY_CODE: Mapping[str, tuple[ShipType, ...]] = MappingProxyType(
             for code, vessel_type in NATIVE_VESSEL_TYPE_BY_CODE.items()
         },
         'ss_or_ssg': (ShipType.SS, ShipType.SSG),
+        # autowsgr_native 0.3.0 尚未提供「防战」；由本项目本地补充（Wiki 的 BBGAA）。
+        'aabg': (ShipType.AABG,),
     },
 )
 """API 舰种代码到后端领域枚举的唯一映射。"""

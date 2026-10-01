@@ -338,6 +338,7 @@ class ShipType(StrEnum):
     CG = '防巡'
     CBG = '大巡'
     BG = '导战'
+    AABG = '防战'  # Python OCR 类型; native 0.3.0 尚未提供对应舰种。
     Other = '其他'
 
     @property
@@ -368,6 +369,8 @@ class ShipType(StrEnum):
             ShipType.BG: (0.646, 0.561),
             ShipType.Other: (0.738, 0.561),
         }
+        if self not in _map:
+            raise ValueError(f'{self.value}的解装筛选坐标尚未校准')
         return _map[self]
 
 
