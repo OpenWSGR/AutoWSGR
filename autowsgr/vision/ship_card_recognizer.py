@@ -42,6 +42,7 @@ class ShipCardRecognizer(Protocol):
 
 
 _SHIP_TYPE_CODES = {
+    'aabg': '防战',
     'aadg': '防驱',
     'ap': '补给',
     'asdg': '导驱',

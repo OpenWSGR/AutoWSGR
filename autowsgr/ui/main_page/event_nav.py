@@ -13,7 +13,7 @@ from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import ImageChecker
 
-from .constants import NavCoord, Target
+from .constants import Target
 from .overlays import detect_overlay, dismiss_overlay
 
 
@@ -42,6 +42,11 @@ def _get_event_icon_templates() -> list[ImageTemplate]:
     from autowsgr.image_resources._lazy import load_template
 
     return [
+        load_template(
+            'event/event_icon_20260930_540p.png',
+            name='event_icon_20260930',
+            source_resolution=(960, 540),
+        ),
         load_template(
             'event/event_icon_20260212_720p.png',
             name='event_icon_20260212',
@@ -98,7 +103,7 @@ def _try_navigate_to_event(
     detail = None
     while time.time() < deadline:
         screen = ctrl.screenshot()
-        detail = ImageChecker.find_any(screen, templates, confidence=0.8)
+        detail = ImageChecker.find_best(screen, templates, confidence=0.8)
         if detail is not None:
             break
         time.sleep(0.3)
@@ -108,7 +113,7 @@ def _try_navigate_to_event(
         return False
 
     # ③ 点击活动图标并等待活动页面
-    coord = NavCoord.EVENT.xy
+    coord = detail.center
     _log.debug('[UI] 主页面 → 活动')
     ctrl.click(*coord)
     time.sleep(1.0)

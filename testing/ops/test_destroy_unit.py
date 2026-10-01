@@ -87,7 +87,9 @@ def test_exclude_computes_complement(recorded: list[dict]):
     assert destroy_ships_auto(ctx) is True
 
     call = recorded[0]
-    expected = {t for t in ShipType if t is not ShipType.Other and t not in set(protected)}
+    expected = {
+        t for t in ShipType if t not in (ShipType.Other, ShipType.AABG) and t not in set(protected)
+    }
     assert set(call['ship_types']) == expected
     assert ShipType.CV not in call['ship_types']
     assert ShipType.Other not in call['ship_types']
