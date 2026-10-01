@@ -487,6 +487,8 @@ class BuildPage:
         remove_equipment:
             是否在解装前卸下装备。默认 ``True``。
         """
+        # 在任何 UI 操作前验证坐标，避免新增 OCR 舰种导致筛选中途失败。
+        type_positions = [t.relative_position_in_destroy for t in ship_types or []]
         _step_delay = 1.5
 
         self.destroy_click_add()
@@ -496,9 +498,9 @@ class BuildPage:
             # 按舰种过滤：打开过滤器 → 勾选各舰种 → 确认
             self.destroy_open_type_filter()
             time.sleep(_step_delay)
-            for ship_type in ship_types:
+            for ship_type, position in zip(ship_types, type_positions, strict=True):
                 _log.debug('[UI] 解体 → 点击舰种: {}', ship_type.value)
-                self._ctrl.click(*ship_type.relative_position_in_destroy)
+                self._ctrl.click(*position)
                 time.sleep(0.8)
             self.destroy_confirm_filter()
             time.sleep(_step_delay)

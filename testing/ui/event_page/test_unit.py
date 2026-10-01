@@ -53,6 +53,8 @@ def _make_page() -> tuple[BaseEventPage, MagicMock]:
 def _no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     """屏蔽真实 sleep, 加速 _enter_node/go_back 的等待循环。"""
     monkeypatch.setattr('autowsgr.ui.event.event_page.time.sleep', lambda *_: None)
+    # 本文件隔离关卡浮层；答题浮层在 test_20260930.py 使用真实模板覆盖。
+    monkeypatch.setattr(BaseEventPage, '_dismiss_quiz', lambda _self: None)
 
 
 def _mock_fight_button(

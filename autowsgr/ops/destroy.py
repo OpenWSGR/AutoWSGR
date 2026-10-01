@@ -99,7 +99,12 @@ def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
         ship_types = cfg.destroy_ship_types or None
     else:  # exclude (白名单): 解装除指定舰种外的所有
         protected = set(cfg.destroy_ship_types)
-        ship_types = [t for t in ShipType if t is not ShipType.Other and t not in protected]
+        # 防战筛选坐标尚未校准，自动解装保留该舰种，避免误点其他分类。
+        ship_types = [
+            t for t in ShipType if t not in (ShipType.Other, ShipType.AABG) and t not in protected
+        ]
+        if ShipType.AABG not in protected:
+            _log.warning('[OPS] 防战筛选坐标未校准，本轮自动解装保留防战')
         if not ship_types:
             _log.warning('[OPS] 白名单包含全部舰种, 无可解装对象, 跳过')
             return False

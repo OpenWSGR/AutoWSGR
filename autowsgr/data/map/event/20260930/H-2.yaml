@@ -1,0 +1,87 @@
+"0":
+  position:
+  - 0.093
+  - 0.721
+  next:
+  - A
+  - B
+A:
+  position:
+  - 0.211
+  - 0.349
+  next:
+  - C
+  - D
+  - E
+B:
+  position:
+  - 0.312
+  - 0.86
+  next:
+  - G
+  - H
+C:
+  position:
+  - 0.18
+  - 0.083
+  next: []
+D:
+  position:
+  - 0.39
+  - 0.289
+  next:
+  - F
+E:
+  position:
+  - 0.335
+  - 0.54
+  next:
+  - G
+F:
+  position:
+  - 0.57
+  - 0.377
+  next:
+  - J
+  - K
+G:
+  position:
+  - 0.555
+  - 0.623
+  next:
+  - H
+  - K
+H:
+  position:
+  - 0.555
+  - 0.929
+  next:
+  - I
+I:
+  position:
+  - 0.789
+  - 0.917
+  next:
+  - K
+J:
+  position:
+  - 0.68
+  - 0.155
+  next: []
+K:
+  position:
+  - 0.774
+  - 0.555
+  next:
+  - L
+  - M
+L:
+  position:
+  - 0.953
+  - 0.695
+  next: []
+M:
+  position:
+  - 0.829
+  - 0.223
+  next: []
