@@ -92,11 +92,14 @@ class TestResolveSuccessors:
         assert result == [CombatPhase.EXERCISE_PAGE]
 
     def test_exercise_transitions_slow(self):
-        """慢速 (collect_result_info=True): 经验页入状态机逐页推进。"""
+        """慢速 (collect_result_info=True): 经验页入状态机逐页推进，允许穿透直接回演习页。"""
         exercise = build_transitions(
             ModeCategory.SINGLE, CombatPhase.EXERCISE_PAGE, collect_result_info=True
         )
-        assert resolve_successors(exercise, CombatPhase.RESULT, '') == [CombatPhase.EXP_SETTLEMENT]
+        assert resolve_successors(exercise, CombatPhase.RESULT, '') == [
+            CombatPhase.EXP_SETTLEMENT,
+            CombatPhase.EXERCISE_PAGE,
+        ]
         assert resolve_successors(exercise, CombatPhase.EXP_SETTLEMENT, '') == [
             CombatPhase.EXERCISE_PAGE
         ]
@@ -112,10 +115,13 @@ class TestResolveSuccessors:
         assert CombatPhase.GET_SHIP in result
 
     def test_normal_result_only_reaches_exp_when_slow(self):
-        """MAP 类 (慢速): RESULT 只到经验结算页, 掉落/前进/终态从经验页到达。"""
+        """MAP 类 (慢速): RESULT 包含经验结算页及穿透后继。"""
         normal = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=True)
         result = resolve_successors(normal, CombatPhase.RESULT, '')
-        assert result == [CombatPhase.EXP_SETTLEMENT]
+        assert result[0] == CombatPhase.EXP_SETTLEMENT
+        assert CombatPhase.PROCEED in result
+        assert CombatPhase.MAP_PAGE in result
+        assert CombatPhase.GET_SHIP in result
         after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
         assert CombatPhase.PROCEED in after_exp
         assert CombatPhase.MAP_PAGE in after_exp
