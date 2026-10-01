@@ -62,6 +62,7 @@ def _get_fight_button_templates() -> list[ImageTemplate]:
 
     return [
         load_template('event/fight_button_20260730_540p.png', name='fight_button'),
+        load_template('event/fight_button_20260930_540p.png', name='fight_button_20260930'),
     ]
 
 
@@ -77,6 +78,11 @@ def _get_event_title_templates() -> list[ImageTemplate]:
     from autowsgr.image_resources._lazy import load_template
 
     return [
+        load_template(
+            'event/event_title_20260930_540p.png',
+            name='event_title_20260930',
+            source_resolution=(960, 540),
+        ),
         load_template(
             'event/event_title_20260730_540p.png',
             name='event_title_20260730',
@@ -138,6 +144,14 @@ NODE_POSITIONS = {
 # 各活动专属地图入口坐标 (照搬 classic 各活动子类的 NODE_POSITION)
 # 激斗漩涡 (20260730): 3 行 2 列布局
 NODE_POSITIONS_BY_EVENT: dict[str, dict[int, tuple[float, float]]] = {
+    '20260930': {
+        1: (0.0879801735, 0.2251655629),
+        2: (0.5947955390, 0.2240618102),
+        3: (0.7856257745, 0.2075055188),
+        4: (0.1964064436, 0.5242825607),
+        5: (0.4702602230, 0.6401766004),
+        6: (0.7806691450, 0.7483443709),
+    },
     '20260730': {
         1: (0.1771, 0.3148),
         2: (0.1740, 0.7259),
@@ -234,6 +248,9 @@ class BaseEventPage:
         返回带置信度的 PageMatch, 供候选集排序。
         """
         name = str(PageName.EVENT_MAP)
+        quiz = BaseEventPage._quiz_prompt_detail(screen)
+        if quiz is not None:
+            return PageMatch(name=name, matched=True, score=quiz.confidence)
         button = BaseEventPage._fight_button_detail(screen)
         if button is not None:
             return PageMatch(name=name, matched=True, score=button.confidence)
@@ -248,7 +265,18 @@ class BaseEventPage:
     @staticmethod
     def _fight_button_detail(screen: np.ndarray) -> ImageMatchDetail | None:
         """查找出击按钮 (浮层态锚点), 返回匹配详情 (``None`` = 浮层未开)。"""
-        return ImageChecker.find_any(screen, _get_fight_button_templates(), confidence=0.8)
+        return ImageChecker.find_best(screen, _get_fight_button_templates(), confidence=0.8)
+
+    @staticmethod
+    def _quiz_prompt_detail(screen: np.ndarray) -> ImageMatchDetail | None:
+        from autowsgr.ui.event.popups import quiz_prompt_detail
+
+        return quiz_prompt_detail(screen)
+
+    def _dismiss_quiz(self) -> None:
+        from autowsgr.ui.event.popups import dismiss_quiz
+
+        dismiss_quiz(self._ctrl)
 
     # ── 节点选择 ──────────────────────────────────────────────────────────
     def _enter_node(self, node_id: int) -> None:
@@ -269,6 +297,7 @@ class BaseEventPage:
         _log.debug('[UI] 活动地图: 选择节点 {}', node_id)
         self._ctrl.click(x, y)
         for _ in range(10):
+            self._dismiss_quiz()
             after = self._ctrl.screenshot()
             if self._fight_button_detail(after) is not None:
                 break  # 出击按钮出现 = 节点详情浮层弹出 = 选择成功
@@ -282,7 +311,11 @@ class BaseEventPage:
         self, map: str, entrance: Literal['alpha', 'beta'] | None = None, skip_check: bool = False
     ) -> None:
         """点击出击按钮，等待进入出征准备页面。"""
+        # 本期地图无 α/β 标记，禁止误用上期入口配置。
+        if self._event_name == '20260930' and entrance is not None:
+            raise ValueError('20260930 活动 map 请使用纯数字，不支持 α/β 入口')
         # map 为 H1, E1 等
+        self._dismiss_quiz()
         if not skip_check:
             if (
                 len(map) != 2
@@ -377,6 +410,7 @@ class BaseEventPage:
         判定与清理: **出击按钮可见 = 浮层在** (模态浮层在按钮必在) → 点红色
         X 关闭, 以按钮消失确认; 按钮不可见 → 已是干净态, 直接返回。
         """
+        self._dismiss_quiz()
         screen = self._ctrl.screenshot()
         if self._fight_button_detail(screen) is None:
             return
@@ -462,6 +496,7 @@ class BaseEventPage:
 
         deadline = time.monotonic() + 15.0
         while time.monotonic() < deadline:
+            self._dismiss_quiz()
             screen = self._ctrl.screenshot()
             if MainPage.is_current_page(screen):
                 _log.info('[UI] 活动地图 -> 已到达主页面')

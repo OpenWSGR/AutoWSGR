@@ -162,6 +162,10 @@ def get_current_page(
             hits.append(pm)
 
     if hits:
+        _log.debug(
+            '[UI] 页面识别命中明细: {}',
+            [(hit.name, round(hit.score, 3)) for hit in hits],
+        )
         # 覆盖型优先 (z-order): 侧边栏开着时主页面也命中且分更高, 但当前页是侧边栏
         overlay_hits = [m for m in hits if m.name in _OVERLAY_PAGES]
         pool = overlay_hits or hits
