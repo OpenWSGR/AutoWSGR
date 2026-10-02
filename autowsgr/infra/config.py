@@ -11,7 +11,13 @@ import random
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import (
@@ -477,8 +483,11 @@ class UserConfig(BaseModel):
         return v
 
     # 解装设置
-    destroy_ship_work_mode: DestroyShipWorkMode = DestroyShipWorkMode.disable
-    """解装工作模式"""
+    destroy_ship_work_mode: DestroyShipWorkMode = Field(default=DestroyShipWorkMode.all)
+    """解装范围: all=拆解全部 / destroy_only=拆解舰种 / keep_only=保留舰种。
+
+    值别名兼容, 见 :meth:`_coerce_destroy_mode`。
+    """
     destroy_ship_types: list[ShipType] = Field(default_factory=list)
     """指定舰种列表"""
     remove_equipment_mode: bool = True
@@ -487,14 +496,20 @@ class UserConfig(BaseModel):
     @field_validator('destroy_ship_work_mode', mode='before')
     @classmethod
     def _coerce_destroy_mode(cls, v: object) -> object:
-        """允许用中文别名或英文成员名指定解装模式。"""
+        """允许用中文别名、英文成员名或旧别名指定解装范围。"""
         _alias: dict[str, int] = {
-            '不启用': 0,
-            'disable': 0,
-            '黑名单': 1,
-            'include': 1,
-            '白名单': 2,
-            'exclude': 2,
+            '拆解全部': 0,
+            '不启用': 0,  # 旧值
+            'all': 0,
+            'disable': 0,  # 旧值
+            '拆解舰种': 1,
+            '黑名单': 1,  # 旧值
+            'destroy_only': 1,
+            'include': 1,  # 旧值
+            '保留舰种': 2,
+            '白名单': 2,  # 旧值
+            'keep_only': 2,
+            'exclude': 2,  # 旧值
         }
         if isinstance(v, str):
             key = v.strip()

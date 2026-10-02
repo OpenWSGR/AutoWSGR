@@ -231,8 +231,45 @@ destroy_ship_types:
 """
         path = tmp_yaml('destroy.yaml', content)
         cfg = UserConfig.from_yaml(path)
-        assert cfg.destroy_ship_work_mode == DestroyShipWorkMode.include
+        assert cfg.destroy_ship_work_mode == DestroyShipWorkMode.destroy_only
         assert len(cfg.destroy_ship_types) == 2
+
+    @pytest.mark.parametrize(
+        ('value', 'expected'),
+        [
+            ('拆解全部', DestroyShipWorkMode.all),
+            ('拆解舰种', DestroyShipWorkMode.destroy_only),
+            ('保留舰种', DestroyShipWorkMode.keep_only),
+        ],
+    )
+    def test_destroy_ship_chinese_alias(
+        self,
+        tmp_yaml: Callable[[str, str], Path],
+        value: str,
+        expected: DestroyShipWorkMode,
+    ):
+        """中文别名 拆解全部 / 拆解舰种 / 保留舰种 均映射到对应枚举。"""
+        content = f"""\
+emulator:
+  type: "雷电"
+  serial: "emulator-5554"
+  path: "C:/fake/dnplayer.exe"
+destroy_ship_work_mode: {value}
+"""
+        cfg = UserConfig.from_yaml(tmp_yaml('destroy_alias.yaml', content))
+        assert cfg.destroy_ship_work_mode == expected
+
+    def test_destroy_ship_legacy_value_alias(self, tmp_yaml: Callable[[str, str], Path]):
+        """旧值别名 (不启用/黑名单/白名单、disable/include/exclude) 仍可用。"""
+        content = """\
+emulator:
+  type: "雷电"
+  serial: "emulator-5554"
+  path: "C:/fake/dnplayer.exe"
+destroy_ship_work_mode: 白名单
+"""
+        cfg = UserConfig.from_yaml(tmp_yaml('destroy_legacy.yaml', content))
+        assert cfg.destroy_ship_work_mode == DestroyShipWorkMode.keep_only
 
 
 # ── FightConfig ──
