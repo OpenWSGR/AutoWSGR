@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
-from autowsgr.types import DestroyShipWorkMode, PageName, ShipType
+from autowsgr.types import DestroyShipScope, PageName, ShipType
 from autowsgr.ui.build_page import BuildPage, BuildTab
 from autowsgr.ui.utils import click_and_wait_for_page
 
@@ -67,10 +67,10 @@ def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
     是否调用本函数由调用方的 ``dock_full_destroy`` / ``full_destroy`` 开关决定;
     此处只关心「怎么拆」::
 
-    - ``destroy_ship_work_mode == disable``: 不启用舰种分类, 走快速拆解路线
+    - ``destroy_ship_scope == all``: 拆解全部, 不启用舰种分类, 走快速拆解路线
       (``ship_types=None`` → 不打开过滤器, 快速全选解装全部)。
-    - ``include`` (黑名单): 解装 ``destroy_ship_types`` 指定舰种。
-    - ``exclude`` (白名单): 解装除 ``destroy_ship_types`` 外的所有舰种。
+    - ``destroy_only`` (拆解舰种): 解装 ``destroy_ship_types`` 指定舰种。
+    - ``keep_only`` (保留舰种): 解装除 ``destroy_ship_types`` 外的所有舰种。
 
     ``remove_equipment`` 取自 ``remove_equipment_mode``。
 
@@ -86,18 +86,18 @@ def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
     Returns
     -------
     bool
-        ``True`` 已执行解装; ``False`` 仅在白名单覆盖全部舰种、无可解装对象时返回
+        ``True`` 已执行解装; ``False`` 仅在保留舰种覆盖全部舰种、无可解装对象时返回
         (此时船坞仍满, 调用方据此保持 DOCK_FULL)。
     """
     cfg = ctx.config
-    mode = cfg.destroy_ship_work_mode
+    scope = cfg.destroy_ship_scope
 
-    if mode == DestroyShipWorkMode.disable:
-        # 不启用舰种分类: 不过滤, 直接走快速全选拆解路线
+    if scope == DestroyShipScope.all:
+        # 拆解全部: 不过滤, 直接走快速全选拆解路线
         ship_types = None
-    elif mode == DestroyShipWorkMode.include:
+    elif scope == DestroyShipScope.destroy_only:
         ship_types = cfg.destroy_ship_types or None
-    else:  # exclude (白名单): 解装除指定舰种外的所有
+    else:  # keep_only (保留舰种): 解装除指定舰种外的所有
         protected = set(cfg.destroy_ship_types)
         # 防战筛选坐标尚未校准，自动解装保留该舰种，避免误点其他分类。
         ship_types = [
@@ -106,7 +106,7 @@ def destroy_ships_auto(ctx: GameContext, *, from_dialog: bool = False) -> bool:
         if ShipType.AABG not in protected:
             _log.warning('[OPS] 防战筛选坐标未校准，本轮自动解装保留防战')
         if not ship_types:
-            _log.warning('[OPS] 白名单包含全部舰种, 无可解装对象, 跳过')
+            _log.warning('[OPS] 保留舰种覆盖全部舰种, 无可解装对象, 跳过')
             return False
 
     if from_dialog:

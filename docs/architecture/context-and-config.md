@@ -95,7 +95,7 @@ UserConfig (顶层)
 ├── dock_full_destroy: bool      # 船坞满自动清空
 ├── repair_manually: bool        # 手动修理模式
 ├── bathroom_count: int          # 修理位置总数
-├── destroy_ship_work_mode       # 解装模式 (disable/include/exclude)
+├── destroy_ship_scope            # 解装范围 (all/destroy_only/keep_only)
 ├── destroy_ship_types           # 解装舰种列表
 └── remove_equipment_mode: bool  # 解装前卸装备
 ```
@@ -155,7 +155,7 @@ ConfigManager.load(path)
   ├─ path 为 None → 自动检测当前目录 usersettings.yaml
   ├─ load_yaml(path) → dict
   └─ UserConfig(**dict) → Pydantic v2 校验
-       ├─ field_validator: 类型强转 (destroy_ship_work_mode 中文别名)
+       ├─ field_validator: 类型强转 (destroy_ship_scope 中文别名)
        ├─ model_validator: 日志目录自动生成时间戳
        └─ frozen=True → 不可变配置对象
 ```

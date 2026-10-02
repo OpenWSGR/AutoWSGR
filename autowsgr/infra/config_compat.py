@@ -17,6 +17,7 @@
 - ``emulator_type`` / ``emulator_start_cmd`` / ``emulator_name`` (顶层平铺)
   → 嵌套 ``emulator`` 块 (``type`` / ``path`` / ``serial``)
 - ``check_update`` / ``show_map_node`` (顶层废弃) — 删除
+- ``destroy_ship_work_mode`` → ``destroy_ship_scope`` (仅改名, 值别名运行期仍兼容)
 - 计划文件 ``fleet`` 前导空占位 (classic 1-indexed) → dev 0-indexed
 """
 
@@ -123,6 +124,7 @@ def migrate_raw_config(data: Any) -> Any:
     _migrate_delay(data)
     _migrate_emulator_legacy(data)
     _migrate_misc_legacy(data)
+    _migrate_destroy_ship_scope(data)
     return data
 
 
@@ -245,6 +247,25 @@ def _migrate_misc_legacy(data: dict[str, Any]) -> None:
     for key in dropped:
         del data[key]
     _log.warning('[compat] classic 顶层字段 {} 已废弃 (新版不使用), 已删除。', '/'.join(dropped))
+
+
+def _migrate_destroy_ship_scope(data: dict[str, Any]) -> None:
+    """destroy_ship_work_mode → destroy_ship_scope (仅改名, 值原样透传)。
+
+    值 (不启用/黑名单/白名单/disable/include/exclude) 由
+    :class:`~autowsgr.infra.config.UserConfig` 校验器 ``_coerce_destroy_scope``
+    继续兼容; 本函数只把旧键名换成新键名, 让迁移产物使用新命名。
+    """
+    if 'destroy_ship_work_mode' not in data:
+        return
+    legacy = data.pop('destroy_ship_work_mode')
+    if 'destroy_ship_scope' in data:
+        _log.warning(
+            '[compat] 同时存在 destroy_ship_work_mode 与 destroy_ship_scope, 以新键为准, 旧键已删除。',
+        )
+        return
+    data['destroy_ship_scope'] = legacy
+    _log.info('[compat] destroy_ship_work_mode 已重命名为 destroy_ship_scope。')
 
 
 def _migrate_plan_fleet(data: dict[str, Any]) -> None:

@@ -1,6 +1,6 @@
-"""destroy_ships_auto 模式调度单元测试 (无设备)。
+"""destroy_ships_auto 范围调度单元测试 (无设备)。
 
-验证 disable / include / exclude 三种工作模式 + remove_equipment 的派发逻辑,
+验证 all / destroy_only / keep_only 三种解装范围 + remove_equipment 的派发逻辑,
 以及 ``from_dialog`` 弹窗直达路线 (点弹窗「解装」直达建造页后复用
 destroy_ships)。通过 monkeypatch 拦截导航 / UI 层, 不触发真实 IO。
 """
@@ -11,7 +11,7 @@ import pytest
 
 from autowsgr.ops import destroy as destroy_module
 from autowsgr.ops.destroy import CLICK_DOCK_DIALOG_DESTROY
-from autowsgr.types import DestroyShipWorkMode, PageName, ShipType
+from autowsgr.types import DestroyShipScope, PageName, ShipType
 
 
 class _FakeConfig:
@@ -19,11 +19,11 @@ class _FakeConfig:
 
     def __init__(
         self,
-        mode: DestroyShipWorkMode,
+        scope: DestroyShipScope,
         types: list[ShipType] | None = None,
         remove_eq: bool = True,
     ) -> None:
-        self.destroy_ship_work_mode = mode
+        self.destroy_ship_scope = scope
         self.destroy_ship_types = types or []
         self.remove_equipment_mode = remove_eq
 
@@ -51,39 +51,39 @@ def recorded(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     return calls
 
 
-def test_disable_uses_quick_route_no_filter(recorded: list[dict]):
-    """disable (不启用舰种分类): 不过滤, 走快速拆解路线, 解装全部。"""
+def test_all_uses_quick_route_no_filter(recorded: list[dict]):
+    """all (拆解全部): 不过滤, 走快速拆解路线, 解装全部。"""
     from autowsgr.ops.destroy import destroy_ships_auto
 
-    ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.disable))
+    ctx = _FakeCtx(_FakeConfig(DestroyShipScope.all))
     assert destroy_ships_auto(ctx) is True
     assert recorded == [{'ship_types': None, 'remove_equipment': True}]
 
 
-def test_include_passes_listed_types(recorded: list[dict]):
+def test_destroy_only_passes_listed_types(recorded: list[dict]):
     from autowsgr.ops.destroy import destroy_ships_auto
 
     types = [ShipType.DD, ShipType.CL]
-    ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.include, types=types, remove_eq=False))
+    ctx = _FakeCtx(_FakeConfig(DestroyShipScope.destroy_only, types=types, remove_eq=False))
     assert destroy_ships_auto(ctx) is True
     assert recorded == [{'ship_types': types, 'remove_equipment': False}]
 
 
-def test_include_empty_types_means_all(recorded: list[dict]):
-    """include + 空舰种列表 → ship_types=None (不过滤, 全量解装)。"""
+def test_destroy_only_empty_types_means_all(recorded: list[dict]):
+    """destroy_only + 空舰种列表 → ship_types=None (不过滤, 全量解装)。"""
     from autowsgr.ops.destroy import destroy_ships_auto
 
-    ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.include))
+    ctx = _FakeCtx(_FakeConfig(DestroyShipScope.destroy_only))
     assert destroy_ships_auto(ctx) is True
     assert recorded == [{'ship_types': None, 'remove_equipment': True}]
 
 
-def test_exclude_computes_complement(recorded: list[dict]):
-    """exclude (白名单): 解装除指定舰种外的所有非 Other 舰种。"""
+def test_keep_only_computes_complement(recorded: list[dict]):
+    """keep_only (保留舰种): 解装除指定舰种外的所有非 Other 舰种。"""
     from autowsgr.ops.destroy import destroy_ships_auto
 
     protected = [ShipType.CV]
-    ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.exclude, types=protected))
+    ctx = _FakeCtx(_FakeConfig(DestroyShipScope.keep_only, types=protected))
     assert destroy_ships_auto(ctx) is True
 
     call = recorded[0]
@@ -96,12 +96,12 @@ def test_exclude_computes_complement(recorded: list[dict]):
     assert call['remove_equipment'] is True
 
 
-def test_exclude_all_types_returns_false(recorded: list[dict]):
-    """白名单覆盖全部非 Other 舰种 → 无可解装对象 → 返回 False。"""
+def test_keep_only_all_types_returns_false(recorded: list[dict]):
+    """保留舰种覆盖全部非 Other 舰种 → 无可解装对象 → 返回 False。"""
     from autowsgr.ops.destroy import destroy_ships_auto
 
     all_real = [t for t in ShipType if t is not ShipType.Other]
-    ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.exclude, types=all_real))
+    ctx = _FakeCtx(_FakeConfig(DestroyShipScope.keep_only, types=all_real))
     assert destroy_ships_auto(ctx) is False
     assert recorded == []
 
@@ -136,7 +136,7 @@ class TestFromDialogDispatch:
         )
 
         types = [ShipType.DD, ShipType.CL]
-        ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.include, types=types, remove_eq=False))
+        ctx = _FakeCtx(_FakeConfig(DestroyShipScope.destroy_only, types=types, remove_eq=False))
         assert destroy_ships_auto(ctx, from_dialog=True) is True
         # 先点弹窗「解装」直达建造页, 再复用 destroy_ships (其 goto_page 幂等直达)
         assert calls == [
@@ -160,12 +160,12 @@ class TestFromDialogDispatch:
             lambda *_a, **_k: calls.append(('destroy',)),
         )
 
-        ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.disable))
+        ctx = _FakeCtx(_FakeConfig(DestroyShipScope.all))
         assert destroy_ships_auto(ctx) is True
         assert calls == [('destroy',)]
 
     def test_from_dialog_exhausted_whitelist_skips_all(self, monkeypatch: pytest.MonkeyPatch):
-        """白名单覆盖全部舰种 → 弹窗不点、解装不执行。"""
+        """保留舰种覆盖全部舰种 → 弹窗不点、解装不执行。"""
         from autowsgr.ops.destroy import destroy_ships_auto
 
         calls: list[tuple] = []
@@ -181,6 +181,6 @@ class TestFromDialogDispatch:
         )
 
         all_real = [t for t in ShipType if t is not ShipType.Other]
-        ctx = _FakeCtx(_FakeConfig(DestroyShipWorkMode.exclude, types=all_real))
+        ctx = _FakeCtx(_FakeConfig(DestroyShipScope.keep_only, types=all_real))
         assert destroy_ships_auto(ctx, from_dialog=True) is False
         assert calls == []

@@ -17,7 +17,7 @@ from autowsgr.infra import (
 )
 from autowsgr.infra.config import resolve_ocr_gpu_enabled
 from autowsgr.types import (
-    DestroyShipWorkMode,
+    DestroyShipScope,
     EmulatorType,
     OSType,
     RepairMode,
@@ -224,15 +224,39 @@ emulator:
   type: "雷电"
   serial: "emulator-5554"
   path: "C:/fake/dnplayer.exe"
-destroy_ship_work_mode: 1
+destroy_ship_scope: 1
 destroy_ship_types:
   - "驱逐"
   - "轻巡"
 """
         path = tmp_yaml('destroy.yaml', content)
         cfg = UserConfig.from_yaml(path)
-        assert cfg.destroy_ship_work_mode == DestroyShipWorkMode.include
+        assert cfg.destroy_ship_scope == DestroyShipScope.destroy_only
         assert len(cfg.destroy_ship_types) == 2
+
+    def test_destroy_ship_scope_chinese_alias(self, tmp_yaml: Callable[[str, str], Path]):
+        """中文别名 拆解全部 / 拆解舰种 / 保留舰种 均映射到对应枚举。"""
+        content = """\
+emulator:
+  type: "雷电"
+  serial: "emulator-5554"
+  path: "C:/fake/dnplayer.exe"
+destroy_ship_scope: 拆解舰种
+"""
+        cfg = UserConfig.from_yaml(tmp_yaml('destroy_alias.yaml', content))
+        assert cfg.destroy_ship_scope == DestroyShipScope.destroy_only
+
+    def test_destroy_ship_legacy_key_compatible(self, tmp_yaml: Callable[[str, str], Path]):
+        """旧键名 destroy_ship_work_mode 与旧值别名仍可用 (不被 extra='ignore' 丢弃)。"""
+        content = """\
+emulator:
+  type: "雷电"
+  serial: "emulator-5554"
+  path: "C:/fake/dnplayer.exe"
+destroy_ship_work_mode: 白名单
+"""
+        cfg = UserConfig.from_yaml(tmp_yaml('destroy_legacy.yaml', content))
+        assert cfg.destroy_ship_scope == DestroyShipScope.keep_only
 
 
 # ── FightConfig ──
@@ -401,6 +425,24 @@ class TestConfigCompat:
         out = migrate_raw_config({'check_update': False, 'show_map_node': True})
         assert 'check_update' not in out
         assert 'show_map_node' not in out
+
+    def test_destroy_ship_scope_renamed_by_migrate(self):
+        """destroy_ship_work_mode → destroy_ship_scope 仅改名, 值透传。"""
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config({'destroy_ship_work_mode': '黑名单'})
+        assert 'destroy_ship_work_mode' not in out
+        assert out['destroy_ship_scope'] == '黑名单'
+
+    def test_migrate_keeps_new_key_when_both_present(self):
+        """同时存在新旧键 → 以新键为准, 旧键删除。"""
+        from autowsgr.infra.config_compat import migrate_raw_config
+
+        out = migrate_raw_config(
+            {'destroy_ship_work_mode': '黑名单', 'destroy_ship_scope': '保留舰种'},
+        )
+        assert out['destroy_ship_scope'] == '保留舰种'
+        assert 'destroy_ship_work_mode' not in out
 
     # ── detect 与 migrate 一致性 (防漂移) ──
 
