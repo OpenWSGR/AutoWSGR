@@ -1,0 +1,8 @@
+# 20260930 最强之舟 E5 示例；沿用参考仓库单战后回港策略，实机使用前检查舰队。
+event: "20260930"
+chapter: E
+map: 5
+selected_nodes: [A]
+node_defaults:
+  proceed: False
+  formation: 4
