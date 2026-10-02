@@ -95,7 +95,7 @@ UserConfig (顶层)
 ├── dock_full_destroy: bool      # 船坞满自动清空
 ├── repair_manually: bool        # 手动修理模式
 ├── bathroom_count: int          # 修理位置总数
-├── destroy_ship_work_mode       # 解装模式 (disable/include/exclude)
+├── destroy_ship_work_mode       # 解装范围 (all/destroy_only/keep_only)
 ├── destroy_ship_types           # 解装舰种列表
 └── remove_equipment_mode: bool  # 解装前卸装备
 ```
