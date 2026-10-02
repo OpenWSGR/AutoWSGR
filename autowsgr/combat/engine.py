@@ -310,9 +310,7 @@ class CombatEngine(PhaseHandlersMixin):
         candidates: list[CombatPhase] = []
         if end_phase is not None:
             candidates.append(end_phase)
-        for phase in resolve_successors(
-            self._plan.transitions, self._phase, self._last_action
-        ):
+        for phase in resolve_successors(self._plan.transitions, self._phase, self._last_action):
             if phase not in candidates:
                 candidates.append(phase)
 
