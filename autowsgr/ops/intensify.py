@@ -226,6 +226,8 @@ def auto_intensify_native(  # noqa: C901, PLR0912, PLR0915
     current_slot_idx = 0
     max_scrolls = 10
     scroll_count = 0
+    consecutive_empty_scrolls = 0
+    max_consecutive_empty_scrolls = 2
     exhausted_stats: set[str] = set()
     initial_dock_count: int | None = None
     final_dock_count: int | None = None
@@ -237,6 +239,7 @@ def auto_intensify_native(  # noqa: C901, PLR0912, PLR0915
         and consecutive_no_match < max_consecutive_no_match
         and scroll_count <= max_scrolls
         and len(exhausted_stats) < 4
+        and consecutive_empty_scrolls < max_consecutive_empty_scrolls
     ):
         s_home = device.screenshot()
         if is_intensify_home_screen(s_home):
@@ -284,14 +287,22 @@ def auto_intensify_native(  # noqa: C901, PLR0912, PLR0915
                     _log.info('[OPS] 选中目标舰 (行 {}, 列 {}), 需求属性: {}', r_idx, c_idx, needed)
                     target_chosen = True
                     target_needed_stats = needed
+                    consecutive_empty_scrolls = 0
                     break
 
         if not target_chosen:
-            if len(exhausted_stats) >= 4:
-                _log.info('[OPS] 所有四项强化属性均已确认无可用素材，强化流程提前完成')
+            consecutive_empty_scrolls += 1
+            if (
+                len(exhausted_stats) >= 4
+                or consecutive_empty_scrolls >= max_consecutive_empty_scrolls
+            ):
+                _log.info(
+                    '[OPS] 连续 {} 个视口未选出目标或强化属性均已确认无可用素材，强化流程提前完成',
+                    consecutive_empty_scrolls,
+                )
                 break
             _log.info('[OPS] 当前视口卡槽全部已尝试，向上翻页寻找后续目标...')
-            device.shell('input swipe 500 792 500 360 800')
+            device.shell('input swipe 800 800 800 300 500')
             time.sleep(1.2)
             current_slot_idx = 0
             scroll_count += 1
