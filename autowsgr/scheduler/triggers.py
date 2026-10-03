@@ -420,7 +420,12 @@ class NormalFightTrigger(Trigger):
             )
         # 船坞已满且未解装 (解装成功轮 dock_full_destroyed=True 不在此分支):
         # 会话级停止: 无法继续打满, 常规战不再产出, 直到清船/解装后重启脚本。
-        if result.flag == ConditionFlag.DOCK_FULL and not result.dock_full_destroyed:
+        # 仅 stop_dock_full 开启时置位 — 关闭时保持旧挂机语义 (空转重试)。
+        if (
+            self._stop_dock_full
+            and result.flag == ConditionFlag.DOCK_FULL
+            and not result.dock_full_destroyed
+        ):
             self._dock_full_stopped = True
             _log.warning(
                 '[Trigger] {} 船坞已满且无法解装, 常规战停止 (清船/解装后重启脚本)',

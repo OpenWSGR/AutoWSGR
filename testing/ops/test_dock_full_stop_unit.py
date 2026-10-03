@@ -63,6 +63,7 @@ def test_dock_full_stopped_persists_over_repeated_calls():
     """置位后多次 should_fire 持续返回 None, 不再出现 break 后又产出的循环。"""
     trigger, _ = _make_trigger()
     ctx = _ctx()
+    assert trigger.should_fire(ctx) is not None  # 先产出 (设置 _current)
     trigger._on_done(CombatResult(flag=ConditionFlag.DOCK_FULL, dock_full_destroyed=False))
 
     assert trigger.should_fire(ctx) is None
@@ -94,6 +95,7 @@ def test_stop_dock_full_disabled_keeps_old_semantics():
     trigger, _ = _make_trigger(stop_dock_full=False)
     ctx = _ctx()
 
+    assert trigger.should_fire(ctx) is not None  # 先产出 (设置 _current)
     trigger._on_done(CombatResult(flag=ConditionFlag.DOCK_FULL, dock_full_destroyed=False))
 
     assert trigger.dock_full_stopped is False
@@ -108,6 +110,7 @@ def test_dock_full_stopped_survives_reset():
     """reset() (跨日) 不清除船坞满停止 (物理阻塞不因跨日自动缓解)。"""
     trigger, plan = _make_trigger()
     ctx = _ctx()
+    assert trigger.should_fire(ctx) is not None  # 先产出 (设置 _current)
     trigger._on_done(CombatResult(flag=ConditionFlag.DOCK_FULL, dock_full_destroyed=False))
 
     trigger.reset()
