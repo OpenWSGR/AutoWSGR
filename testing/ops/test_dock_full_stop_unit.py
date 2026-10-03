@@ -48,7 +48,7 @@ def _make_trigger(
 
 def test_dock_full_stopped_when_enabled_not_destroyed():
     """默认 (stop_dock_full=True): DOCK_FULL 且未解装 → 会话级停止, 不再产出。"""
-    trigger, plan = _make_trigger()
+    trigger, _plan = _make_trigger()
     ctx = _ctx()
     assert trigger.should_fire(ctx) is not None
 
