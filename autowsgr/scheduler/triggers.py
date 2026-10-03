@@ -299,6 +299,7 @@ class NormalFightTrigger(Trigger):
         stop_max_loot: bool = False,
         loot_limit: int = 50,
         quick_repair_limit: int | None = None,
+        stop_dock_full: bool = True,
     ) -> None:
         super().__init__(priority=priority, name=name)
         self._plans = plans
@@ -307,12 +308,21 @@ class NormalFightTrigger(Trigger):
         self._stop_max_loot = stop_max_loot
         self._loot_limit = loot_limit
         self._quick_repair_limit = quick_repair_limit
+        self._stop_dock_full = stop_dock_full
         self._current: NormalFightPlan | None = None
         # 无限 plan (target=None) 的轮询游标
         self._round_robin = 0
         # 是否被禁用 (不再产出任务)。启动校准计数器失败 (OCR 不可用) 等场景由
         # 调度层设置; 持续整个会话, reset() 不清除 (OCR 可用性不跨日变化)。
         self._disabled = False
+        # 船坞已满且未解装 → 会话级停止产出。reset() 不清除: 船坞满是物理
+        # 阻塞, 不因跨日自动缓解, 需清船/解装后重启脚本。
+        self._dock_full_stopped = False
+
+    @property
+    def dock_full_stopped(self) -> bool:
+        """本触发器是否已因船坞满且未解装而停止 (会话级, reset 不清除)。"""
+        return self._dock_full_stopped
 
     def disable(self, reason: str = '') -> None:
         """禁用本触发器 (不再产出任务)。
@@ -373,6 +383,8 @@ class NormalFightTrigger(Trigger):
             and ctx.quick_repair_used >= self._quick_repair_limit
         ):
             return True
+        if self._stop_dock_full and self._dock_full_stopped:
+            return True
         return not self._has_plan()
 
     def _on_done(self, result: CombatResult) -> None:
@@ -405,6 +417,19 @@ class NormalFightTrigger(Trigger):
                 self.name,
                 self._current.name,
                 '/'.join(f'{c.node}>={c.grade}' for c in self._current.conditions),
+            )
+        # 船坞已满且未解装 (解装成功轮 dock_full_destroyed=True 不在此分支):
+        # 会话级停止: 无法继续打满, 常规战不再产出, 直到清船/解装后重启脚本。
+        # 仅 stop_dock_full 开启时置位 — 关闭时保持旧挂机语义 (空转重试)。
+        if (
+            self._stop_dock_full
+            and result.flag == ConditionFlag.DOCK_FULL
+            and not result.dock_full_destroyed
+        ):
+            self._dock_full_stopped = True
+            _log.warning(
+                '[Trigger] {} 船坞已满且无法解装, 常规战停止 (清船/解装后重启脚本)',
+                self.name,
             )
 
     def reset(self) -> None:

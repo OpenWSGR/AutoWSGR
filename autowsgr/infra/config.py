@@ -442,10 +442,14 @@ class UserConfig(BaseModel):
     """UI 操作后随机延迟下界 (秒)。兼容层把 classic 的 delay 同时迁为本字段与 _max。"""
     operation_delay_max: float = 0.0
     """UI 操作后随机延迟上界 (秒)。"""
-    dock_full_mode: DockFullAction = DockFullAction.auto
-    """船坞满处理模式: 0=关闭, 1=解装, 2=强化, 3=自动(先强化后解装)"""
+    dock_full_mode: DockFullAction | None = None
+    """船坞满处理模式: 0=关闭, 1=解装, 2=强化, 3=自动(先强化后解装)。
+
+    ``None``=未配置: 运行时回退到旧字段 ``dock_full_destroy``
+    (True → 1 解装, False → 0 关闭), 保持旧配置兼容。
+    """
     dock_full_destroy: bool = True
-    """兼容旧版布尔字段"""
+    """兼容旧版布尔字段 (仅当 ``dock_full_mode`` 为 None 时作为回退依据)"""
     repair_manually: bool = False
     """是否手动修理"""
     bathroom_count: int = 2
