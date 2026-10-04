@@ -93,11 +93,19 @@ def run_yaml_plan(
     scheduler.register_trigger(trigger)
 
     # 打满即退: run_daily 是常驻挂机循环, 由看门狗在本计划达标后置停止信号收尾。
-    # completed 由触发器 on_done 原地更新 (同一对象引用), 此处直接读自身状态即可
+    # 与触发器 should_fire 共用同一耗尽判断 (_is_exhausted): 打满达标次数, 或
+    # 船坞满且未解装 (stop_dock_full 默认开启) 本计划无法继续 → 置停止信号退出。
+    # completed / dock_full_stopped 均由触发器 on_done 原地更新 (同一对象引用)。
+    # 船坞满原因已在调度器/触发器日志提示, 此处只记统一收尾日志。
     def _watchdog() -> None:
         while not ctx.stop_event.is_set():
-            if fight_plan.completed >= times:
-                _log.info('[PlanRunner] {} 已打满 {} 次达标场次, 停止调度', yaml_path, times)
+            if trigger._is_exhausted(ctx):
+                _log.info(
+                    '[PlanRunner] {} 调度结束 (达标 {} / {} 次)',
+                    yaml_path,
+                    fight_plan.completed,
+                    times,
+                )
                 ctx.stop_event.set()
                 return
             ctx.stop_event.wait(_POLL_INTERVAL)
