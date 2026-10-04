@@ -92,10 +92,15 @@ class TestResolveSuccessors:
         assert result == [CombatPhase.EXERCISE_PAGE]
 
     def test_exercise_transitions_slow(self):
-        """慢速 (collect_result_info=True): 经验页入状态机逐页推进，允许穿透直接回演习页。"""
+        """慢速 (collect_result_info=True): 经验页入状态机逐页推进。
+
+        #558 起 RESULT 候选保留穿透终点: 关闭战果页的点击可能跨过经验页
+        直达结束页 (见 state.py _build_single_transitions)。
+        """
         exercise = build_transitions(
             ModeCategory.SINGLE, CombatPhase.EXERCISE_PAGE, collect_result_info=True
         )
+        # RESULT 首选落点仍是 EXP_SETTLEMENT (逐页推进), 另含穿透终点兜底
         assert resolve_successors(exercise, CombatPhase.RESULT, '') == [
             CombatPhase.EXP_SETTLEMENT,
             CombatPhase.EXERCISE_PAGE,
@@ -115,11 +120,15 @@ class TestResolveSuccessors:
         assert CombatPhase.GET_SHIP in result
 
     def test_normal_result_only_reaches_exp_when_slow(self):
-        """MAP 类 (慢速): RESULT 包含经验结算页及穿透后继。"""
+        """MAP 类 (慢速): RESULT 首选经验结算页, 后续从经验页到达掉落/前进/终态。
+
+        #558 起 RESULT 候选额外保留穿透落点 (点击可能跨过经验页直达掉落/前进页),
+        见 state.py _build_map_transitions。
+        """
         normal = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=True)
         result = resolve_successors(normal, CombatPhase.RESULT, '')
-        assert result[0] == CombatPhase.EXP_SETTLEMENT
-        assert CombatPhase.PROCEED in result
+        assert result[0] == CombatPhase.EXP_SETTLEMENT  # 期望落点仍为首选
+        assert CombatPhase.PROCEED in result  # 穿透候选兜底 (防 7.5s 超时)
         assert CombatPhase.MAP_PAGE in result
         assert CombatPhase.GET_SHIP in result
         after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
