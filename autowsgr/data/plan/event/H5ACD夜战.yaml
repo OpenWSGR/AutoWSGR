@@ -1,0 +1,9 @@
+# 20260930 最强之舟 H5 示例；沿用参考仓库单战后回港策略，实机使用前检查舰队。
+# 带路：驻防 I 点
+event: "20260930"
+chapter: H
+map: 5
+selected_nodes: [A]
+node_defaults:
+  proceed: True
+  formation: 4

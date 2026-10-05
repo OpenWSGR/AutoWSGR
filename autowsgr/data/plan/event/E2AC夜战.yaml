@@ -1,0 +1,13 @@
+# 20260930 最强之舟 E2 示例；沿用参考仓库单战后回港策略，实机使用前检查舰队。
+# 带路：旗舰为航母 驱逐 ≤ 2
+event: "20260930"
+chapter: E
+map: 2
+selected_nodes: [A, C]
+node_defaults:
+  proceed: True
+  formation: 4
+
+node_args:
+  C:
+    proceed: False
