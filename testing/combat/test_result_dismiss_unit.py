@@ -21,6 +21,7 @@ import pytest
 from autowsgr.combat import handlers as handlers_mod
 from autowsgr.combat.handlers import PhaseHandlersMixin
 from autowsgr.combat.state import CombatPhase
+from autowsgr.types import ConditionFlag
 
 
 class _Host(PhaseHandlersMixin):
@@ -120,6 +121,7 @@ class TestResultSuccessors:
             CombatPhase.EVENT_MAP_PAGE,
             CombatPhase.GET_SHIP,
             CombatPhase.EXP_SETTLEMENT,
+            CombatPhase.GARRISON,
         }
 
     def test_fast_result_excludes_exp(self):
@@ -130,6 +132,7 @@ class TestResultSuccessors:
             CombatPhase.FLAGSHIP_SEVERE_DAMAGE,
             CombatPhase.MAP_PAGE,
             CombatPhase.GET_SHIP,
+            CombatPhase.GARRISON,
         }
 
     def test_campaign_result_no_end_phase(self):
@@ -140,6 +143,7 @@ class TestResultSuccessors:
             CombatPhase.FLAGSHIP_SEVERE_DAMAGE,
             CombatPhase.GET_SHIP,
             CombatPhase.EXP_SETTLEMENT,
+            CombatPhase.GARRISON,
         }
 
     def test_exp_settlement_excludes_self(self):
@@ -157,6 +161,43 @@ class TestResultSuccessors:
         assert CombatPhase.GET_SHIP not in successors
         assert CombatPhase.EXP_SETTLEMENT not in successors
         assert CombatPhase.MAP_PAGE in successors
+
+    def test_map_result_includes_garrison(self):
+        """落点集合含驻防 (非必现, 供复检识别弹出后交主循环)。
+
+        驻防仅存在于 MAP 转移图, SINGLE 无法进入该状态; 落点集合无需按
+        模式区分, 统一含 GARRISON。
+        """
+        host, _, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE, collect_result_info=True)
+        assert CombatPhase.GARRISON in host._result_successors(CombatPhase.RESULT)
+
+
+class TestHandleGarrison:
+    """_handle_garrison — 点击取消即强制回港。"""
+
+    def test_returns_fight_end(self):
+        """取消驻防 = 回港: 返回 FIGHT_END, 引擎立即结束战斗 (与 PROCEED 回港同语义)。"""
+        host, _device, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE)
+        flag = host._handle_garrison()
+        assert flag == ConditionFlag.FIGHT_END
+
+    def test_clicks_garrison_cancel_coordinate(self):
+        """点击驻防取消坐标 Coords.GARRISON_CANCEL (与 actions.click_garrison_cancel 一致)。"""
+        from autowsgr.combat.actions import Coords
+
+        host, device, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE)
+        host._handle_garrison()
+        device.click.assert_called_once_with(*Coords.GARRISON_CANCEL)
+
+    def test_records_auto_return_event(self):
+        """记录 AUTO_RETURN 事件 (action='驻防回港')。"""
+        host, _, _ = _make_host([], end_phase=CombatPhase.MAP_PAGE)
+        host._handle_garrison()
+        host._history.add.assert_called_once()
+        event = host._history.add.call_args.args[0]
+        assert event.event_type.name == 'AUTO_RETURN'
+        assert event.action == '驻防回港'
+        assert event.node == 'A'
 
 
 class TestHandleResultModes:

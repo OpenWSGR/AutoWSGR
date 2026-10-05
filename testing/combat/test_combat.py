@@ -76,6 +76,15 @@ class TestResolveSuccessors:
         result = resolve_successors(normal, CombatPhase.FORMATION, '')
         assert CombatPhase.FIGHT_PERIOD in result
 
+    def test_map_after_result_includes_garrison(self):
+        """MAP 模式: 驻防 (非必现) 挂在结算共同后继 after_result 上,
+        掉落/无掉落路径都可能弹出; 取消驻防 = 强制回港, 只到结束页。"""
+        normal = MODE_TRANSITIONS[CombatMode.NORMAL]
+        for phase in (CombatPhase.RESULT, CombatPhase.EXP_SETTLEMENT, CombatPhase.GET_SHIP):
+            result = resolve_successors(normal, phase, '')
+            assert CombatPhase.GARRISON in result, f'{phase.name} 后继应含 GARRISON'
+        assert resolve_successors(normal, CombatPhase.GARRISON, '') == [CombatPhase.MAP_PAGE]
+
     def test_battle_transitions(self):
         battle = MODE_TRANSITIONS[CombatMode.BATTLE]
         # SINGLE 模式无 PROCEED，直接从 START_FIGHT 开始

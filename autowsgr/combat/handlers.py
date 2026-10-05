@@ -16,6 +16,7 @@ from autowsgr.combat.actions import (
     click_enter_fight,
     click_fight_condition,
     click_formation,
+    click_garrison_cancel,
     click_image,
     click_night_battle,
     click_proceed,
@@ -63,6 +64,7 @@ _PHASE_HANDLERS: dict[CombatPhase, str] = {
     CombatPhase.RESULT: '_handle_result',
     CombatPhase.EXP_SETTLEMENT: '_handle_exp_settlement',
     CombatPhase.GET_SHIP: '_handle_get_ship',
+    CombatPhase.GARRISON: '_handle_garrison',
     CombatPhase.PROCEED: '_handle_proceed',
     CombatPhase.FLAGSHIP_SEVERE_DAMAGE: '_handle_flagship_severe_damage',
     CombatPhase.DOCK_FULL: '_handle_dock_full',
@@ -513,10 +515,14 @@ class PhaseHandlersMixin:
         到达点逐页推进); 快速: 经验页是 pass_through 过渡页, 不在到达集。
 
         RESULT 之后: PROCEED / 终态页 / GET_SHIP / 旗舰大破 (+经验页, 慢速);
-        EXP_SETTLEMENT 之后: 同上但去掉 EXP_SETTLEMENT 自身;
-        GET_SHIP 之后: 同上但去掉 GET_SHIP 自身。
+        驻防 (MAP 模式, 非必现) / EXP_SETTLEMENT 之后: 同上但去掉
+        EXP_SETTLEMENT 自身; GET_SHIP 之后: 同上但去掉 GET_SHIP 自身。
         """
-        successors = [CombatPhase.PROCEED, CombatPhase.FLAGSHIP_SEVERE_DAMAGE]
+        successors = [
+            CombatPhase.PROCEED,
+            CombatPhase.FLAGSHIP_SEVERE_DAMAGE,
+            CombatPhase.GARRISON,  # 驻防: 仅 MAP 转移图含此状态
+        ]
         end_phase = self._plan.end_phase
         if end_phase is not None:
             successors.append(end_phase)
@@ -548,6 +554,21 @@ class PhaseHandlersMixin:
         )
         self._click_result_until_closed(CombatPhase.GET_SHIP)
         return ConditionFlag.FIGHT_CONTINUE
+
+    def _handle_garrison(self) -> ConditionFlag:
+        """处理驻防提示 — 点击取消即强制回港，结束战斗。"""
+        _log.info('[Combat] 检测到驻防，点击取消 (回港)')
+        click_garrison_cancel(self._device)
+        self._last_action = 'garrison_cancel'
+
+        self._history.add(
+            CombatEvent(
+                event_type=EventType.AUTO_RETURN,
+                node=self._node,
+                action='驻防回港',
+            )
+        )
+        return ConditionFlag.FIGHT_END
 
     def _handle_proceed(self) -> ConditionFlag:
         """处理继续前进 / 回港决策。
