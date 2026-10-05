@@ -19,9 +19,13 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        github.event.action == 'created' &&
+       github.event.issue.pull_request == null &&
        contains(github.event.comment.body, '@github-actions') &&
        github.event.comment.user.type != 'Bot')
     runs-on: ubuntu-latest
+    concurrency:
+      group: ai-issue-analysis-${{ github.event.issue.number || github.event.inputs.issue_number || github.run_id }}
+      cancel-in-progress: true
     permissions:
       contents: read
       issues: write
