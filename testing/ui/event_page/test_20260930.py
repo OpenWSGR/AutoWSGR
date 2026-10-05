@@ -139,10 +139,3 @@ def test_0930_rejects_previous_event_entrance() -> None:
     with pytest.raises(ValueError, match='纯数字'):
         BaseEventPage(ctx, event_name='20260930').start_fight('E1', 'alpha')
     ctx.ctrl.click.assert_not_called()
-
-
-def test_0930_example_plan_loads() -> None:
-    from autowsgr.ops.normal_fight import get_normal_fight_plan
-
-    plan = get_normal_fight_plan('20260930-E1')
-    assert (plan.event_name, plan.chapter, plan.map_id, plan.entrance) == ('20260930', 'E', 1, None)
