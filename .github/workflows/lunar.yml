@@ -18,11 +18,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # # Optional, change as you wish or comment out to use default
           # LLM settings
-          OPENAI_BASE_URL: https://api.deepseek.com/v1 # https://api.openai.com/v1
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MODEL: deepseek-chat # gpt-4o-mini
-          TEMPERATURE: 1.0 # 1.0
-          MAX_TOKENS: 8192 # 4096
+          OPENAI_BASE_URL: ${{ vars.LUNAR_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.LUNAR_API_KEY }}
+          MODEL: ${{ vars.LUNAR_MODEL }}
+          TEMPERATURE: 1.0
+          MAX_TOKENS: 8192
           # Lunar settings
-          LANGUAGE: Chinese # Chinese
+          LANGUAGE: Chinese
           IGNORE_PATTERNS: autowsgr/data/**/* # glob pattern or regex pattern to ignore files, separated by comma
