@@ -2,7 +2,7 @@ name: AI Issue Analysis
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened]
   issue_comment:
     types: [created]
   workflow_dispatch:
@@ -13,10 +13,9 @@ on:
         type: number
 
 jobs:
-  copilot-analysis:
+  ai-analysis:
     if: |
-      (github.event_name == 'issues' &&
-       (github.event.action == 'opened' || github.event.action == 'reopened')) ||
+      (github.event_name == 'issues' && github.event.action == 'opened') ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        github.event.action == 'created' &&
@@ -31,34 +30,36 @@ jobs:
       contents: read
       issues: write
     steps:
-      # 推荐配套：
-      # - .claude/skills/generic-issue-log-analysis/SKILL.md
       - name: Analyze issue with AI
         id: analysis
         uses: MistEO/ai-issue-analysis@main
         with:
-          # 请在 https://github.com/settings/personal-access-tokens 添加一个token，填写到仓库 secret 里（请确保你有 Copilot Pro）
-          copilot-github-token: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          bot-name: "@github-actions"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # 模型默认使用 gpt-5.3-codex；可通过仓库变量 COPILOT_MODEL 覆盖。
-          copilot-model: ${{ vars.COPILOT_MODEL || 'gpt-5.3-codex' }}
-          # 推理强度可通过仓库变量 COPILOT_REASONING_EFFORT 覆盖（默认 high）。
-          copilot-reasoning-effort: ${{ vars.COPILOT_REASONING_EFFORT || 'high' }}
+          # --- 选择 agent（三选一：claude / codex / copilot）---
+          agent: codex
 
-      - name: 查看完整输入输出
+          # --- 统一认证 ---
+          api-key: ${{ secrets.LUNAR_API_KEY }}
+          api-base-url: ${{ vars.LUNAR_BASE_URL }}
+          model: ${{ vars.LUNAR_MODEL }}
+
+          # --- 通用配置 ---
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          bot-name: "@github-actions"
+          reasoning-effort: xhigh  # 思考等级，默认 xhigh；Claude: --effort / Codex: model_reasoning_effort / Copilot: --reasoning-effort
+
+      - name: Show outputs
         if: always()
         env:
           ANALYSIS_PROMPT: ${{ steps.analysis.outputs.analysis-prompt }}
           ISSUE_NUMBER: ${{ steps.analysis.outputs.issue-number }}
           COMMENT_ID: ${{ steps.analysis.outputs.comment-id }}
           COMMENT_URL: ${{ steps.analysis.outputs.comment-url }}
-          COPILOT_OUTPUT: ${{ steps.analysis.outputs.copilot-output }}
+          AGENT_OUTPUT: ${{ steps.analysis.outputs.agent-output }}
           FINAL_CONCLUSION: ${{ steps.analysis.outputs.final-conclusion }}
         run: |
           printf '%s\n' "$ANALYSIS_PROMPT"
           echo "issue_number=$ISSUE_NUMBER"
           echo "comment_id=$COMMENT_ID"
           echo "comment_url=$COMMENT_URL"
-          printf '%s\n' "$COPILOT_OUTPUT"
+          printf '%s\n' "$AGENT_OUTPUT"
           printf '%s\n' "$FINAL_CONCLUSION"
