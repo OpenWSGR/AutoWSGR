@@ -72,6 +72,10 @@ class Coords:
     CLICK_RESULT = (0.953, 0.954)
     """点击战果页面继续。"""
 
+    # ── 驻防 ──
+    GARRISON_CANCEL = (0.624, 0.565)
+    """驻防取消按钮 (与强化/解装确认弹窗取消钮 ≈(0.62, 0.57) 同布局)。"""
+
     # ── 加速点击 ──
     SPEED_UP_NORMAL = (0.260, 0.963)
     """常规战移动加速点击。"""
@@ -175,6 +179,11 @@ def click_proceed(device: AndroidController, go_forward: bool) -> None:
 def click_result(device: AndroidController) -> None:
     """点击战果页面继续。"""
     device.click(*Coords.CLICK_RESULT)
+
+
+def click_garrison_cancel(device: AndroidController) -> None:
+    """点击驻防取消按钮 (回港)。"""
+    device.click(*Coords.GARRISON_CANCEL)
 
 
 def click_speed_up(device: AndroidController, *, battle_mode: bool = False) -> None:

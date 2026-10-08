@@ -160,6 +160,11 @@ PHASE_SIGNATURES: dict[CombatPhase, PhaseSignature] = {
         default_timeout=5.0,
         after_match_delay=1.0,
     ),
+    CombatPhase.GARRISON: PhaseSignature(
+        template_key=TemplateKey.GARRISON,
+        default_timeout=3.0,  # 非必现: 等待窗口短
+        confidence=0.85,
+    ),
     CombatPhase.FLAGSHIP_SEVERE_DAMAGE: PhaseSignature(
         template_key=TemplateKey.FLAGSHIP_DAMAGE,
         default_timeout=7.5,

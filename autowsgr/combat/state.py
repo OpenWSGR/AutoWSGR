@@ -63,6 +63,10 @@ class CombatPhase(Enum):
     GET_SHIP = auto()
     """获取舰船掉落。"""
 
+    # ── 驻防 ──
+    GARRISON = auto()
+    """驻防提示（结算结束出门前，掉落/无掉落均可能出现）。"""
+
     # ── 旗舰大破 ──
     FLAGSHIP_SEVERE_DAMAGE = auto()
     """旗舰大破强制回港。"""
@@ -155,7 +159,8 @@ def _build_map_transitions(
     ]
 
     # RESULT 之后
-    after_result = [CombatPhase.PROCEED]
+    # 驻防 (非必现) 与继续前进是互斥分支: 出现驻防即强制回港, 不再有PROCEED、
+    after_result = [CombatPhase.GARRISON, CombatPhase.PROCEED]
     if ep is not None:
         after_result.append(ep)
     after_result += [CombatPhase.GET_SHIP, CombatPhase.FLAGSHIP_SEVERE_DAMAGE]
@@ -224,6 +229,9 @@ def _build_map_transitions(
 
     # GET_SHIP 后继 = 经验结算后继 去掉 GET_SHIP 自身
     t[CombatPhase.GET_SHIP] = [p for p in after_result if p != CombatPhase.GET_SHIP]
+
+    # 取消驻防 = 强制回港 (与 PROCEED 点"回港"同语义), 后续只可能是结束页。
+    t[CombatPhase.GARRISON] = [ep] if ep is not None else []
 
     if ep is not None:
         t[CombatPhase.FLAGSHIP_SEVERE_DAMAGE] = [ep]
