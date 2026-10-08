@@ -52,6 +52,7 @@ class CombatTemplates:
     | RESULT_PAGE               | combat/result_page_540p.png          |
     | GET_SHIP                  | combat/get_ship_540p.png             |
     | GET_ITEM                  | combat/get_item_540p.png             |
+    | GARRISON                  | combat/garrison_540p.png             |
     | END_MAP_PAGE              | combat/end_map_page_540p.png         |
     | END_BATTLE_PAGE           | combat/end_battle_page_540p.png      |
     | END_EXERCISE_PAGE         | combat/end_exercise_page_540p.png    |
@@ -72,6 +73,7 @@ class CombatTemplates:
     RESULT_PAGE = LazyTemplate('combat/result_page_540p.png', 'result_page')
     GET_SHIP = LazyTemplate('combat/get_ship_540p.png', 'get_ship')
     GET_ITEM = LazyTemplate('combat/get_item_540p.png', 'get_item')
+    GARRISON = LazyTemplate('combat/garrison_540p.png', 'garrison')
 
     # ── 战斗终止态 ──
     END_MAP_PAGE = LazyTemplate('combat/end_map_page_540p.png', 'end_map_page')
