@@ -223,3 +223,149 @@ def test_unselectable_target_consumes_nothing_and_next_target_can_run(
     assert result.batches[0].target_name == '目标1'
     assert result.batches[0].materials == ['A']
     assert planned_inventories == [['A', 'B', 'C'], ['A', 'B', 'C']]
+
+
+def test_is_expedition_slot_detects_orange_banner() -> None:
+    screen = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    assert not intensify.is_expedition_slot(screen, 0, 0)
+
+    # 填充 slot 0, 0 的橙黄色横条区域 (y: 340..375, x: 182-80..182+80)
+    screen[340:375, 102:262] = (80, 180, 240)  # BGR 橙黄色
+    assert intensify.is_expedition_slot(screen, 0, 0)
+    assert not intensify.is_expedition_slot(screen, 0, 1)
+
+
+def test_auto_intensify_native_workflow_switches_target_when_no_material(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clicks: list[tuple[float, float]] = []
+
+    class FakeNativeDevice:
+        def __init__(self) -> None:
+            self.step = 0
+
+        def click(self, x: float, y: float) -> None:
+            clicks.append((round(x, 4), round(y, 4)))
+
+        def shell(self, _cmd: str) -> None:
+            pass
+
+        def screenshot(self) -> np.ndarray:
+            return np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(
+        'autowsgr.ui.material_first_intensify.is_intensify_home_screen', lambda _s: True
+    )
+    monkeypatch.setattr('autowsgr.ui.live_intensify.is_target_selector', lambda _s: True)
+    monkeypatch.setattr(
+        'autowsgr.ui.material_first_intensify.is_material_selector_screen', lambda _s: True
+    )
+    monkeypatch.setattr(intensify, 'is_expedition_slot', lambda _s, _r, _c: False)
+
+    # 模拟第一次目标缺对空 (无素材)，第二次目标缺火力 (有素材，强化后变满)
+    needed_results = iter([{'anti_air'}, {'firepower'}, set()])
+    monkeypatch.setattr(
+        intensify,
+        'get_home_target_needed_stats',
+        lambda _s: next(needed_results, set()),
+    )
+    has_mat_results = iter([False, True])
+    monkeypatch.setattr(
+        'autowsgr.ui.material_inventory_scanner.has_selected_material',
+        lambda _s: next(has_mat_results),
+    )
+    monkeypatch.setattr('autowsgr.ui.live_intensify.is_intensify_confirmation', lambda _s: False)
+    monkeypatch.setattr(intensify, 'goto_page', lambda *_args: None)
+    monkeypatch.setattr(intensify.time, 'sleep', lambda _s: None)
+
+    class FakeNavController:
+        def __init__(self, _device: object) -> None:
+            pass
+
+        def ensure_intensify_home(self, _ctx: object | None = None) -> None:
+            pass
+
+    monkeypatch.setattr(intensify, 'MaterialFirstIntensifyController', FakeNavController)
+
+    device = FakeNativeDevice()
+    ctx = SimpleNamespace(
+        config=SimpleNamespace(emulator=SimpleNamespace(serial='emulator-5558')),
+        ctrl=SimpleNamespace(),
+    )
+
+    result = intensify.auto_intensify_native(device, ctx, max_batches=1)
+
+    assert result.success is True
+    assert result.total_batches == 1
+    # 验证确实发生了换目标返回操作 (_CLICK_SELECTOR_BACK = (0.048, 0.088))
+    assert (0.048, 0.088) in clicks
+
+
+def test_auto_intensify_native_skips_target_when_stats_already_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clicks: list[tuple[float, float]] = []
+
+    class FakeNativeDevice:
+        def click(self, x: float, y: float) -> None:
+            clicks.append((round(x, 4), round(y, 4)))
+
+        def shell(self, _cmd: str) -> None:
+            pass
+
+        def screenshot(self) -> np.ndarray:
+            return np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(
+        'autowsgr.ui.material_first_intensify.is_intensify_home_screen', lambda _s: True
+    )
+    monkeypatch.setattr('autowsgr.ui.live_intensify.is_target_selector', lambda _s: True)
+    monkeypatch.setattr(
+        'autowsgr.ui.material_first_intensify.is_material_selector_screen', lambda _s: True
+    )
+    monkeypatch.setattr(intensify, 'is_expedition_slot', lambda _s, _r, _c: False)
+
+    # 目标1 缺对空 (无素材)，目标2 同样只缺对空 (直接跳过，不用进素材页)，目标3 缺装甲 (有素材，强化后变满)
+    needed_results = iter([{'anti_air'}, {'anti_air'}, {'armor'}, set()])
+    monkeypatch.setattr(
+        intensify,
+        'get_home_target_needed_stats',
+        lambda _s: next(needed_results, set()),
+    )
+    has_mat_calls: list[int] = []
+
+    def mock_has_mat(_s: object) -> bool:
+        has_mat_calls.append(len(has_mat_calls))
+        # 第一次进素材页是目标1，返回 False
+        # 第二次进素材页应该是目标3，返回 True
+        return len(has_mat_calls) > 1
+
+    monkeypatch.setattr(
+        'autowsgr.ui.material_inventory_scanner.has_selected_material',
+        mock_has_mat,
+    )
+    monkeypatch.setattr('autowsgr.ui.live_intensify.is_intensify_confirmation', lambda _s: False)
+    monkeypatch.setattr(intensify, 'goto_page', lambda *_args: None)
+    monkeypatch.setattr(intensify.time, 'sleep', lambda _s: None)
+
+    class FakeNavController:
+        def __init__(self, _device: object) -> None:
+            pass
+
+        def ensure_intensify_home(self, _ctx: object | None = None) -> None:
+            pass
+
+    monkeypatch.setattr(intensify, 'MaterialFirstIntensifyController', FakeNavController)
+
+    device = FakeNativeDevice()
+    ctx = SimpleNamespace(
+        config=SimpleNamespace(emulator=SimpleNamespace(serial='emulator-5558')),
+        ctrl=SimpleNamespace(),
+    )
+
+    result = intensify.auto_intensify_native(device, ctx, max_batches=1)
+
+    assert result.success is True
+    assert result.total_batches == 1
+    # 关键断言：目标2 由于缺口也是 anti_air (已耗尽)，被直接跳过，素材选择页只被调用了 2 次 (目标1 和 目标3)
+    assert len(has_mat_calls) == 2

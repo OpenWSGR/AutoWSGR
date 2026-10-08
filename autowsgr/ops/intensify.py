@@ -11,10 +11,13 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from autowsgr.infra import resolve_ocr_gpu_enabled
 from autowsgr.infra.logger import get_logger
@@ -40,6 +43,7 @@ from autowsgr.ui.intensify_workflow import (
     TargetObservation,
 )
 from autowsgr.ui.live_intensify import (
+    _HOME_STAT_PANEL_CROPS,
     IntensifyHomePanelObservation,
     is_intensify_confirmation,
     read_intensify_home_panel,
@@ -68,9 +72,61 @@ _CLICK_DISMISS_ANIMATION = (0.5, 0.5)
 _CLICK_MATERIAL_CONFIRM = (0.915, 0.906)
 _CLICK_TARGET_CLOSE = (0.048, 0.088)
 _CLICK_SELECTOR_BACK = (0.048, 0.088)
+_CLICK_TARGET_SLOT = (0.107, 0.500)
+_CLICK_MATERIAL_SLOT = (0.2630, 0.3380)
+_CLICK_AUTO_SELECT_BUTTON = (0.9117, 0.7917)
 
 _COL_CENTERS = (182, 393, 604, 815, 1026, 1237, 1448)
 _ROW_CENTERS = (360, 792)
+
+
+def is_expedition_slot(screen: np.ndarray, r_idx: int, c_idx: int) -> bool:
+    """检测目标选择页中的卡槽是否处于远征中（具有橙黄色横条标记）。"""
+    r = screen[:, :, 2].astype(int)
+    g = screen[:, :, 1].astype(int)
+    b = screen[:, :, 0].astype(int)
+    orange_mask = (r > 200) & (g > 130) & (g < 220) & (b > 40) & (b < 150)
+    col_x = _COL_CENTERS[c_idx]
+    y_band = (340, 375) if r_idx == 0 else (770, 805)
+    sub = orange_mask[y_band[0] : y_band[1], col_x - 80 : col_x + 80]
+    return np.count_nonzero(sub) > 500
+
+
+def get_home_target_needed_stats(screen: np.ndarray) -> set[str]:
+    """检查强化首页当前目标舰仍需要强化的属性集合。"""
+    import cv2
+
+    height, width = screen.shape[:2]
+    stat_names = ['firepower', 'torpedo', 'armor', 'anti_air']
+    needed: set[str] = set()
+    for name, bounds in zip(stat_names, _HOME_STAT_PANEL_CROPS, strict=True):
+        x1, y1, x2, y2 = bounds
+        crop = screen[int(height * y1) : int(height * y2), int(width * x1) : int(width * x2)]
+        hsv = cv2.cvtColor(crop, cv2.COLOR_RGB2HSV)
+        max_hsv = hsv[: int(crop.shape[0] * 0.5), int(crop.shape[1] * 0.7) :]
+        orange = cv2.inRange(max_hsv, np.array([10, 150, 150]), np.array([30, 255, 255]))
+        if (orange > 0).mean() >= 0.05:
+            continue
+        cyan = cv2.inRange(hsv, np.array([85, 120, 120]), np.array([115, 255, 255]))
+        if (cyan > 0).mean() >= 0.02:
+            needed.add(name)
+    return needed
+
+
+def read_dock_capacity(screen: np.ndarray, ocr: object | None = None) -> int | None:
+    """读取素材选择页/船坞右上角当前在坞船只总数。"""
+    import cv2
+
+    if ocr is None or not hasattr(ocr, 'recognize'):
+        return None
+    crop = screen[30:80, 1680:1880]
+    enlarged = cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    results = ocr.recognize(enlarged, allowlist='0123456789/')
+    for r in results:
+        m = re.search(r'(\d+)\s*/\s*(\d+)', r.text)
+        if m:
+            return int(m.group(1))
+    return None
 
 
 class _UnsetPolicyOption:
@@ -143,6 +199,228 @@ def _material_click_steps(
     return tuple(steps)
 
 
+def auto_intensify_native(  # noqa: C901, PLR0912, PLR0915
+    device: AdbLosslessMaterialDevice,
+    ctx: GameContext,
+    *,
+    max_batches: int = 50,
+) -> AutoIntensifyExecutionResult:
+    """使用游戏内置原生自动选择功能执行快速自动强化。"""
+    t_start = time.monotonic()
+    _log.info('[OPS] 开始游戏原生自动强化')
+
+    from autowsgr.ui.live_intensify import is_target_selector
+    from autowsgr.ui.material_first_intensify import (
+        MaterialFirstIntensifyController,
+        is_intensify_home_screen,
+        is_material_selector_screen,
+    )
+    from autowsgr.ui.material_inventory_scanner import has_selected_material
+
+    nav_controller = MaterialFirstIntensifyController(device)
+    nav_controller.ensure_intensify_home(ctx=ctx)
+
+    executed_batches: list[IntensifyBatchExecutionReport] = []
+    consecutive_no_match = 0
+    max_consecutive_no_match = 14
+    current_slot_idx = 0
+    max_scrolls = 10
+    scroll_count = 0
+    consecutive_empty_scrolls = 0
+    max_consecutive_empty_scrolls = 2
+    exhausted_stats: set[str] = set()
+    initial_dock_count: int | None = None
+    final_dock_count: int | None = None
+    last_known_dock: int | None = None
+    batch_consumed_counts: list[int] = []
+
+    while (
+        len(executed_batches) < max_batches
+        and consecutive_no_match < max_consecutive_no_match
+        and scroll_count <= max_scrolls
+        and len(exhausted_stats) < 4
+        and consecutive_empty_scrolls < max_consecutive_empty_scrolls
+    ):
+        s_home = device.screenshot()
+        if is_intensify_home_screen(s_home):
+            device.click(*_CLICK_TARGET_SLOT)
+            time.sleep(1.0)
+
+        s_target = device.screenshot()
+        if not is_target_selector(s_target):
+            _log.warning('[OPS] 未能打开目标选择页，尝试重试')
+            time.sleep(1.0)
+            continue
+
+        target_chosen = False
+        target_needed_stats: set[str] = set()
+        while current_slot_idx < 14:
+            r_idx = current_slot_idx // 7
+            c_idx = current_slot_idx % 7
+            current_slot_idx += 1
+            if not is_expedition_slot(s_target, r_idx, c_idx):
+                click_x = _COL_CENTERS[c_idx] / 1920
+                click_y = _ROW_CENTERS[r_idx] / 1080
+                device.click(click_x, click_y)
+                time.sleep(1.0)
+                s_selected = device.screenshot()
+                if is_intensify_home_screen(s_selected):
+                    needed = get_home_target_needed_stats(s_selected)
+                    if not needed:
+                        _log.info('[OPS] 目标已强化满，跳过 (行 {}, 列 {})', r_idx, c_idx)
+                        device.click(*_CLICK_TARGET_SLOT)
+                        time.sleep(1.0)
+                        s_target = device.screenshot()
+                        continue
+                    if needed.issubset(exhausted_stats):
+                        _log.info(
+                            '[OPS] 目标缺口 {} 中的所有属性在当前素材库中已确认无可用素材，跳过该目标 (行 {}, 列 {})',
+                            needed,
+                            r_idx,
+                            c_idx,
+                        )
+                        device.click(*_CLICK_TARGET_SLOT)
+                        time.sleep(1.0)
+                        s_target = device.screenshot()
+                        continue
+
+                    _log.info('[OPS] 选中目标舰 (行 {}, 列 {}), 需求属性: {}', r_idx, c_idx, needed)
+                    target_chosen = True
+                    target_needed_stats = needed
+                    consecutive_empty_scrolls = 0
+                    break
+
+        if not target_chosen:
+            consecutive_empty_scrolls += 1
+            if (
+                len(exhausted_stats) >= 4
+                or consecutive_empty_scrolls >= max_consecutive_empty_scrolls
+            ):
+                _log.info(
+                    '[OPS] 连续 {} 个视口未选出目标或强化属性均已确认无可用素材，强化流程提前完成',
+                    consecutive_empty_scrolls,
+                )
+                break
+            _log.info('[OPS] 当前视口卡槽全部已尝试，向上翻页寻找后续目标...')
+            device.shell('input swipe 800 800 800 300 500')
+            time.sleep(1.2)
+            current_slot_idx = 0
+            scroll_count += 1
+            continue
+
+        # 对当前目标舰持续执行自动选择强化
+        while len(executed_batches) < max_batches and len(exhausted_stats) < 4:
+            device.click(*_CLICK_MATERIAL_SLOT)
+            time.sleep(1.0)
+            s_mat_page = device.screenshot()
+            if not is_material_selector_screen(s_mat_page):
+                _log.warning('[OPS] 未进入素材选择页')
+                break
+
+            dock_before = read_dock_capacity(s_mat_page, getattr(ctx, 'ocr', None))
+            if dock_before is not None:
+                if initial_dock_count is None:
+                    initial_dock_count = dock_before
+                if last_known_dock is not None and last_known_dock > dock_before:
+                    batch_consumed_counts.append(last_known_dock - dock_before)
+                last_known_dock = dock_before
+
+            device.click(*_CLICK_AUTO_SELECT_BUTTON)
+            time.sleep(0.8)
+            s_mat = device.screenshot()
+            if not has_selected_material(s_mat):
+                if target_needed_stats:
+                    exhausted_stats.update(target_needed_stats)
+                    _log.info(
+                        '[OPS] 当前目标缺口 {} 无法匹配任何素材，记录这些属性素材已耗尽 (已耗尽集合: {})',
+                        target_needed_stats,
+                        exhausted_stats,
+                    )
+                else:
+                    _log.info('[OPS] 当前目标无匹配素材，返回更换下一艘目标')
+                device.click(*_CLICK_SELECTOR_BACK)
+                time.sleep(1.0)
+                consecutive_no_match += 1
+                break
+
+            # 成功选出素材
+            consecutive_no_match = 0
+            device.click(*_CLICK_MATERIAL_CONFIRM)
+            time.sleep(1.0)
+            device.click(*_CLICK_INTENSIFY_BUTTON)
+            time.sleep(1.5)
+            s_diag = device.screenshot()
+            if is_intensify_confirmation(s_diag):
+                device.click(*_CLICK_CONFIRM_DIALOG)
+                time.sleep(1.5)
+
+            time.sleep(3.5)
+            device.click(*_CLICK_DISMISS_ANIMATION)
+            time.sleep(1.0)
+            device.click(*_CLICK_DISMISS_ANIMATION)
+            time.sleep(1.0)
+
+            # 检查强化后该目标的剩余缺口
+            s_after_batch = device.screenshot()
+            if is_intensify_home_screen(s_after_batch):
+                target_needed_stats = get_home_target_needed_stats(s_after_batch)
+                if not target_needed_stats:
+                    _log.info('[OPS] 当前目标舰所有属性已强化满')
+                elif target_needed_stats.issubset(exhausted_stats):
+                    _log.info(
+                        '[OPS] 当前目标舰剩余缺口 {} 已在素材耗尽集合中，换下一目标',
+                        target_needed_stats,
+                    )
+
+            executed_batches.append(
+                IntensifyBatchExecutionReport(
+                    target_name='auto_target',
+                    target_index=current_slot_idx - 1,
+                    materials=['auto_materials'],
+                    gains=ShipStats(),
+                    stats_before=ShipStats(),
+                    stats_after=ShipStats(),
+                )
+            )
+            _log.info('[OPS] 成功完成原生强化批次 {}/{}', len(executed_batches), max_batches)
+            if not target_needed_stats or target_needed_stats.issubset(exhausted_stats):
+                break
+
+    # 在退出前尝试再读一次最终船坞容量以得出准确总消耗
+    try:
+        device.click(*_CLICK_TARGET_SLOT)
+        time.sleep(1.0)
+        final_dock_count = read_dock_capacity(device.screenshot(), getattr(ctx, 'ocr', None))
+        device.click(*_CLICK_SELECTOR_BACK)
+        time.sleep(0.8)
+    except Exception as err:
+        _log.debug('最终读取船坞容量失败: {}', err)
+
+    _log.info('[OPS] 原生自动强化完成，返回主页面')
+    goto_page(ctx, PageName.MAIN)
+    elapsed = time.monotonic() - t_start
+
+    if (
+        initial_dock_count is not None
+        and final_dock_count is not None
+        and initial_dock_count >= final_dock_count
+    ):
+        total_mats = initial_dock_count - final_dock_count
+    elif batch_consumed_counts:
+        total_mats = sum(batch_consumed_counts)
+    else:
+        total_mats = len(executed_batches) * 5
+
+    return AutoIntensifyExecutionResult(
+        success=True,
+        total_batches=len(executed_batches),
+        total_materials_used=total_mats,
+        batches=executed_batches,
+        elapsed_seconds=elapsed,
+        message=f'原生自动强化完成: 执行 {len(executed_batches)} 个批次，消耗约 {total_mats} 艘素材',
+    )
+
+
 def auto_intensify(  # noqa: C901, PLR0912, PLR0915
     ctx: GameContext,
     *,
@@ -155,6 +433,23 @@ def auto_intensify(  # noqa: C901, PLR0912, PLR0915
     maximum_rarity: int = 6,
 ) -> AutoIntensifyExecutionResult:
     """执行完整的自动化强化全流程。"""
+    is_mocked_planner = (
+        not hasattr(plan_ordered_intensify_batches, '__code__')
+        or plan_ordered_intensify_batches.__module__ != 'autowsgr.ui.intensify_planner'
+    )
+    if not is_mocked_planner and os.getenv('AUTOWSGR_USE_LEGACY_INTENSIFY', '').lower() not in {
+        '1',
+        'true',
+    }:
+        serial = getattr(ctx.config.emulator, 'serial', None)
+        if (not isinstance(serial, str) or not serial.strip()) and ctx.ctrl is not None:
+            serial = getattr(ctx.ctrl, 'serial', None)
+        if not isinstance(serial, str) or not serial.strip():
+            raise RuntimeError('自动强化必须连接有效的模拟器设备')
+        device = AdbLosslessMaterialDevice(serial)
+        device.verify_cetus()
+        return auto_intensify_native(device, ctx, max_batches=max_batches)
+
     global _session_target_inventory_baseline  # noqa: PLW0603
     t_start = time.monotonic()
     _log.info('[OPS] 开始自动强化')

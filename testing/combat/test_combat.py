@@ -138,6 +138,8 @@ class TestResolveSuccessors:
         result = resolve_successors(normal, CombatPhase.RESULT, '')
         assert result[0] == CombatPhase.EXP_SETTLEMENT  # 期望落点仍为首选
         assert CombatPhase.PROCEED in result  # 穿透候选兜底 (防 7.5s 超时)
+        assert CombatPhase.MAP_PAGE in result
+        assert CombatPhase.GET_SHIP in result
         after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
         assert CombatPhase.PROCEED in after_exp
         assert CombatPhase.MAP_PAGE in after_exp
