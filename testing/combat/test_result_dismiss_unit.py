@@ -181,6 +181,29 @@ class TestHandleResultModes:
         # 始终采集: 快速模式也记录战果事件 (计数器/触发器依赖)
         host._history.add.assert_called_once()
 
+    @pytest.mark.parametrize('mode', ['battle', 'decisive'])
+    def test_campaign_dismisses_exp_without_changing_decisive(self, monkeypatch, mode):
+        """战役关闭经验页；决战仍由调用方负责最后一次结算点击。"""
+        from types import SimpleNamespace
+
+        from autowsgr.combat.recognizer import CombatRecognizer
+
+        host, _, _ = _make_host([], end_phase=CombatPhase.RESULT)
+        host._plan.mode = mode
+        host._recognizer = CombatRecognizer(SimpleNamespace(ctrl=None, ocr=None))
+        events = []
+        monkeypatch.setattr(handlers_mod, 'click_result', lambda *_: events.append('click'))
+        monkeypatch.setattr(host, '_wait_for_exp_settlement', lambda: events.append('exp-ready'))
+        monkeypatch.setattr(
+            host._recognizer, 'identify_current_runtime', lambda *_: CombatPhase.PROCEED
+        )
+        host._handle_result()
+        expected = ['click', 'exp-ready']
+        if mode == 'battle':
+            expected.append('click')
+        assert events == expected
+        host._history.add.assert_called_once()
+
     def test_slow_collects_grade_mvp_and_records(self):
         """慢速: 采集评级/MVP 记入战斗历史, 经验页是到达点 (只点一次)。"""
         host, device, _ = _make_host([CombatPhase.EXP_SETTLEMENT], collect_result_info=True)
