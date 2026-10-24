@@ -48,6 +48,9 @@ ENTRANCE_TO_GREEK = {'a': 'α', 'b': 'β'}
 # 与常规战 '0' 起始一致 —— NodeTracker 初始节点 '0' 即可直接匹配, 无需特殊适配。
 _START_NODE_REMAP = {'α': '0', 'β': '0'}
 
+# 起点附近的像素抖动不能作为首段航向。
+_START_POSITION_TOLERANCE = 0.01
+
 _log = get_logger('combat.tracker')
 
 
@@ -454,12 +457,28 @@ class NodeTracker:
         )
         return None
 
+    def _movement_origin(self, position: tuple[float, float]) -> tuple[float, float] | None:
+        """保存船位，首帧以地图起点补足航向；起点附近抖动不作采样基准。"""
+        previous = self._last_ship_position
+        self._last_ship_position = position
+        if previous is not None or self._current_node != '0':
+            return previous
+
+        start = self._map_data.get('0')
+        if start is None:
+            return None
+        if _euclidean_distance(*position, start.x, start.y) <= _START_POSITION_TOLERANCE:
+            self._last_ship_position = None
+            return None
+        return (start.x, start.y)
+
     def update_node(self) -> str:
         """根据当前舰船位置判定所在节点。
 
         当舰船位置发生变化（与上次不同）时，遍历候选节点（当前节点 + next_nodes），
         优先按"到当前速度方向射线的最小距离"选择节点；
         若射线距离相同，再按欧几里得距离打破平局。
+        首帧以地图起点为方向基准，避免只捕获一帧就进入索敌时仍停留在起点。
 
         地图必须包含路由信息 (next_nodes)，否则无法判定。
 
@@ -475,11 +494,11 @@ class NodeTracker:
         if self._ship_position == self._last_ship_position:
             return self._current_node
 
-        prev_position = self._last_ship_position
-        self._last_ship_position = self._ship_position
+        # 首段可能只捕获一帧，随后索敌画面会遮住地图；用已知起点补足方向。
+        prev_position = self._movement_origin(self._ship_position)
         sx, sy = self._ship_position
 
-        # 速度方向（上一帧 -> 当前帧）；首帧退化为欧氏距离模式
+        # 速度方向（上一帧或地图起点 -> 当前帧）；无法确定时保持未知节点。
         has_ray = False
         vx = 0.0
         vy = 0.0
@@ -490,11 +509,12 @@ class NodeTracker:
 
         if not has_ray:
             _log.debug(
-                '[NodeTracker] 首帧无速度方向，按欧氏距离判断节点: {}，位置: ({:.3f}, {:.3f})',
+                '[NodeTracker] has_ray=False，保持当前节点: {}，位置: ({:.3f}, {:.3f})',
                 self._current_node,
                 sx,
                 sy,
             )
+            return self._current_node
 
         current_data = self._map_data.get(self._current_node)
 

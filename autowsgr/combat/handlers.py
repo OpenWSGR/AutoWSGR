@@ -32,6 +32,8 @@ from autowsgr.combat.actions import (
     get_ship_drop,
     image_exist,
 )
+from autowsgr.combat.history import CombatEvent, CombatHistory, EventType, FightResult
+from autowsgr.combat.plan import MODE_CATEGORIES, CombatMode, CombatPlan, NodeDecision
 from autowsgr.combat.recognition import (
     SHIP_DROP_PAGE_SIGNATURE,
     detect_mvp,
@@ -41,16 +43,13 @@ from autowsgr.combat.recognizer import (
     EXP_SETTLEMENT_TIMEOUT_SECONDS,
     EXP_SETTLEMENT_STABLE_SECONDS,
 )
+from autowsgr.combat.rules import RuleResult
+from autowsgr.combat.state import CombatPhase, ModeCategory
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, Formation, ShipDamageState
 from autowsgr.ui.utils import wait_leave_page
 from autowsgr.vision import ImageChecker
-
-from .history import CombatEvent, CombatHistory, EventType, FightResult
-from .plan import CombatMode, CombatPlan, NodeDecision
-from .rules import RuleResult
-from .state import CombatPhase
 
 
 if TYPE_CHECKING:
@@ -148,6 +147,14 @@ class PhaseHandlersMixin:
 
     # ── 各状态处理器 ─────────────────────────────────────────────────────────
 
+    def _node_rejection_reason(self) -> str | None:
+        """地图起点是未确认位置，不能因计划包含 0 或允许全部节点就放行。"""
+        if MODE_CATEGORIES.get(self._plan.mode) is ModeCategory.MAP and self._node == '0':
+            return '地图节点尚未识别'
+        if not self._plan.is_selected_node(self._node):
+            return '不在预设点'
+        return None
+
     def _handle_fight_condition(self) -> ConditionFlag:
         """处理战况选择。
         TODO: 需测试
@@ -183,8 +190,10 @@ class PhaseHandlersMixin:
 
         decision = self._get_current_decision()
 
-        # 白名单检查
-        if not self._plan.is_selected_node(self._node):
+        # 先确认位置，再检查白名单；起点 0 不能充当实际战斗节点。
+        rejection_reason = self._node_rejection_reason()
+        if rejection_reason is not None:
+            _log.info('[Combat] 节点 {}: {}，索敌后撤退', self._node, rejection_reason)
             click_retreat(self._device)
             self._last_action = 'retreat'
             self._history.add(
@@ -192,7 +201,7 @@ class PhaseHandlersMixin:
                     event_type=EventType.SPOT_ENEMY,
                     node=self._node,
                     action='撤退',
-                    extra={'reason': '不在预设点'},
+                    extra={'reason': rejection_reason},
                 )
             )
             return ConditionFlag.FIGHT_END
@@ -290,14 +299,16 @@ class PhaseHandlersMixin:
         decision = self._get_current_decision()
         is_from_spot_enemy = self._last_action in ('fight', 'detour')
 
-        # 白名单检查
-        if not self._plan.is_selected_node(self._node):
+        # 阵型页已无法撤退，位置未确认或节点未启用时沿用 SL 退出。
+        rejection_reason = self._node_rejection_reason()
+        if rejection_reason is not None:
+            _log.info('[Combat] 节点 {}: {}，阵型页执行 SL', self._node, rejection_reason)
             self._history.add(
                 CombatEvent(
                     event_type=EventType.FORMATION,
                     node=self._node,
                     action='SL',
-                    extra={'reason': '不在预设点'},
+                    extra={'reason': rejection_reason},
                 )
             )
             return ConditionFlag.SL
@@ -724,7 +735,14 @@ class PhaseHandlersMixin:
         self._node_count += 1
         decision = self._get_current_decision()
 
-        should_proceed = decision.proceed and check_blood(self._ship_stats, decision.proceed_stop)
+        rejection_reason = self._node_rejection_reason()
+        should_proceed = (
+            rejection_reason is None
+            and decision.proceed
+            and check_blood(self._ship_stats, decision.proceed_stop)
+        )
+        if rejection_reason is not None:
+            _log.info('[Combat] 节点 {}: {}，战后回港', self._node, rejection_reason)
 
         _log.info('[Combat] 继续前进决策: {}', '前进' if should_proceed else '回港')
         click_proceed(self._device, go_forward=should_proceed)
