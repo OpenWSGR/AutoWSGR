@@ -431,11 +431,11 @@ class PhaseHandlersMixin:
         _log.info('[Combat] 战果: {} 节点: {}', fight_result, self._node)
 
         # ── 关闭结算界面 ──
-        if self._plan.collect_result_info:
+        if self._plan.collect_result_info and self._plan.mode != CombatMode.BATTLE:
             # 慢速: 经验页入状态机逐页推进
             self._click_result_until_closed(CombatPhase.RESULT)
         else:
-            # 快速: 经验页是过渡页, 点击直接穿行
+            # 快速或战役: 战役在 RESULT 结束，调用方不会再关闭经验页。
             self._click_result_until_closed(
                 CombatPhase.RESULT,
                 pass_through=(CombatPhase.EXP_SETTLEMENT,),
