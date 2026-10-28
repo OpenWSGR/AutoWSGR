@@ -32,8 +32,9 @@ from autowsgr.infra.logger import get_logger
 from autowsgr.ops.navigate import goto_page
 from autowsgr.types import GameAPP, PageName
 from autowsgr.ui.main_page import MainPage
+from autowsgr.ui.page import get_current_page
 from autowsgr.ui.start_screen_page import StartScreenPage
-from autowsgr.ui.utils import NavigationError
+from autowsgr.ui.utils import NavigationError, wait_for_page
 
 
 if TYPE_CHECKING:
@@ -123,11 +124,13 @@ def wait_for_game_ui(
     *,
     timeout: float = _STARTUP_TIMEOUT,
     interval: float = _STARTUP_POLL_INTERVAL,
+    allow_start_screen: bool = True,
 ) -> bool:
     # TODO: 游戏更新处理
     """等待游戏进入任意可识别的游戏页面或启动画面。
 
-    通过反复截图，直到出现主页面或启动画面任意一种状态。
+    通过反复截图，直到出现已注册游戏页面（含主页面浮层）或启动画面。
+    点击进入后应禁用 ``allow_start_screen``，避免仍停留在启动页时提前成功。
 
     Parameters
     ----------
@@ -137,6 +140,8 @@ def wait_for_game_ui(
         等待超时 (秒)。
     interval:
         轮询间隔 (秒)。
+    allow_start_screen:
+        是否接受「点击进入」画面。点击进入后等待游戏页面时应为 ``False``。
 
     Returns
     -------
@@ -152,14 +157,37 @@ def wait_for_game_ui(
 
         # 出现「点击进入」画面
         if StartScreenPage.is_current_page(screen):
-            _log.info('[Startup] 检测到启动画面')
-            return True
+            if allow_start_screen:
+                _log.info('[Startup] 检测到启动画面')
+                return True
+        else:
+            # 启动页不参与游戏页识别，防止宽松签名将它误判成游戏内页面。
+            page = get_current_page(screen)
+            if page is not None:
+                _log.info('[Startup] 检测到游戏页面: {}', page)
+                return True
 
         _log.debug('[Startup] 游戏尚未就绪，等待 {:.1f}s…', interval)
         time.sleep(interval)
 
     _log.warning('[Startup] 等待游戏 UI 超时 ({:.0f}s)', timeout)
     return False
+
+
+def _enter_from_start_screen(
+    ctrl: AndroidController,
+    *,
+    timeout: float = _STARTUP_TIMEOUT,
+) -> bool:
+    """若停留在启动页则点击进入，在剩余预算内等待游戏页面；返回是否执行了进入操作。"""
+    deadline = time.monotonic() + timeout
+    if not StartScreenPage.is_current_page(ctrl.screenshot()):
+        return False
+    StartScreenPage(ctrl).click_enter()
+    remaining = max(0.0, deadline - time.monotonic())
+    if not wait_for_game_ui(ctrl, timeout=remaining, allow_start_screen=False):
+        raise TimeoutError('点击启动画面后超时，未进入游戏')
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -173,12 +201,13 @@ def start_game(
     *,
     startup_timeout: float = _STARTUP_TIMEOUT,
 ) -> None:
-    """冷启动游戏，直到进入主页面为止。
+    """冷启动游戏，直到进入可识别的游戏页面（可能含登录浮层）。
 
     流程::
 
-        启动 App → 等待加载 → 若在启动画面则点击进入
-            → 消除登录浮层 → 导航到主页面
+        启动 App → 等待加载 → 若在启动画面则点击进入 → 等待游戏页面
+
+    需要消除登录浮层并确认主页面时，使用 :func:`ensure_game_ready`。
 
     Parameters
     ----------
@@ -187,7 +216,7 @@ def start_game(
     package:
         游戏包名，默认官服。
     startup_timeout:
-        等待启动画面出现的超时 (秒)。
+        启动 App 后等待启动画面及点击进入后的总等待预算 (秒)。
 
     Raises
     ------
@@ -196,16 +225,13 @@ def start_game(
     """
     _log.info('[Startup] 启动游戏 (package={})', package)
     ctrl.start_app(package)
+    deadline = time.monotonic() + startup_timeout
 
     # 等待游戏 UI 就绪
     if not wait_for_game_ui(ctrl, timeout=startup_timeout):
         raise TimeoutError(f'游戏启动超时 ({startup_timeout}s)，未检测到任何已知页面')
 
-    # 若在启动画面，点击进入，然后等待进入主流程（检测登录浮层）
-    if StartScreenPage.is_current_page(ctrl.screenshot()):
-        StartScreenPage(ctrl).click_enter()
-        if not wait_for_game_ui(ctrl, timeout=30.0):
-            raise TimeoutError('点击启动画面后超时，未进入游戏')
+    _enter_from_start_screen(ctrl, timeout=max(0.0, deadline - time.monotonic()))
 
     _log.info('[Startup] 游戏加载完成')
 
@@ -233,11 +259,12 @@ def restart_game(
     start_game(ctrl, package, startup_timeout=startup_timeout)
 
 
-def handle_daily_overlays(ctx: GameContext) -> None:
+def handle_daily_overlays(ctx: GameContext, *, force: bool = False) -> None:
     """每日首次主页面浮层处理 (新闻公告 → 每日签到 → 活动预约)。
 
     时间戳 gate: 每天 0 点后第一次调用才真正截图检测并消除浮层,
     当天已处理过则直接返回 (零开销), 避免每次回主页都重复检测。
+    启动和恢复流程使用 ``force=True``，处理同一天重新登录时再次出现的浮层。
 
     触发时机 (启动 / 任务执行前 / 挂机等待) 均可安全调用:
     - 登录后弹出「新闻公告」→ 勾选「不再显示」+ 点左上角 X
@@ -248,10 +275,8 @@ def handle_daily_overlays(ctx: GameContext) -> None:
     直到画面干净或无浮层可关为止。
     """
     today = date.today()  # noqa: DTZ011  # 本地墙上时钟 (游戏 0 点刷新)
-    if ctx.daily_overlay_date == today:
+    if not force and ctx.daily_overlay_date == today:
         return
-    # 先标记再执行: 即使本次消除中断, 当天也不会反复重试
-    ctx.daily_overlay_date = today
 
     page = MainPage(ctx)
     for attempt in range(_OVERLAY_DISMISS_MAX):
@@ -279,6 +304,7 @@ def handle_daily_overlays(ctx: GameContext) -> None:
             continue
 
         # ③ 既无浮层又无确认按钮 → 主页干净, 流程完成
+        ctx.daily_overlay_date = today
         return
 
 
@@ -298,7 +324,16 @@ def go_main_page(ctx: GameContext, *, dismiss_overlays: bool = True) -> None:
     _log.info('[Startup] 导航到主页面')
     goto_page(ctx, PageName.MAIN)
     if dismiss_overlays:
-        handle_daily_overlays(ctx)
+        handle_daily_overlays(ctx, force=True)
+        wait_for_page(
+            ctx.ctrl,
+            lambda screen: (
+                MainPage.is_base_page(screen) and MainPage.detect_overlay(screen) is None
+            ),
+            timeout=_OVERLAY_DISMISS_TIMEOUT,
+            interval=_OVERLAY_DISMISS_DELAY,
+            target=PageName.MAIN,
+        )
 
 
 def recover_to_main_or_restart(
@@ -306,12 +341,18 @@ def recover_to_main_or_restart(
     app: GameAPP | str = GameAPP.official,
     *,
     timeout: float = _RECOVERY_TO_MAIN_TIMEOUT,
+    dismiss_overlays: bool = True,
 ) -> None:
     """页面异常时优先回主页面，超时后强制重启游戏。"""
     ctrl = ctx.ctrl
     package = app.package_name if isinstance(app, GameAPP) else app
 
-    from .navigate import identify_current_page
+    from autowsgr.ops.navigate import identify_current_page
+
+    # 进程存在不代表已经登录；启动页不能交给游戏内导航处理。
+    if _enter_from_start_screen(ctrl):
+        go_main_page(ctx, dismiss_overlays=dismiss_overlays)
+        return
 
     page = identify_current_page(ctx)
     if page is not None:
@@ -322,7 +363,9 @@ def recover_to_main_or_restart(
 
     while time.monotonic() < deadline:
         try:
-            goto_page(ctx, PageName.MAIN)
+            # 加载背景可能在前面的页面识别重试期间才切换到启动页。
+            _enter_from_start_screen(ctrl)
+            go_main_page(ctx, dismiss_overlays=dismiss_overlays)
             _log.info('[Startup] 页面恢复成功，已回到主页面')
         except NavigationError as exc:
             _log.debug('[Startup] 恢复主页面失败，继续重试: {}', exc)
@@ -332,6 +375,7 @@ def recover_to_main_or_restart(
 
     _log.warning('[Startup] 页面恢复超时，执行强制重启游戏')
     restart_game(ctrl, package)
+    go_main_page(ctx, dismiss_overlays=dismiss_overlays)
 
 
 def ensure_game_ready(
@@ -341,12 +385,12 @@ def ensure_game_ready(
     startup_timeout: float = _STARTUP_TIMEOUT,
     dismiss_overlays: bool = True,
 ) -> None:
-    """确保游戏已启动并处于可识别页面。
+    """确保游戏已启动并位于主页面，默认清除登录浮层。
 
     这是最常用的顶层入口，适合脚本开头调用：
 
     - 游戏未运行 → 冷启动
-    - 游戏已运行 → 直接消除浮层并导航到主页面
+    - 游戏已运行 → 处理启动页或恢复页面，再导航到主页面
 
     Parameters
     ----------
@@ -377,9 +421,8 @@ def ensure_game_ready(
         _log.info('[Startup] 游戏未运行，正在启动…')
         start_game(ctrl, package, startup_timeout=startup_timeout)
     else:
-        recover_to_main_or_restart(ctx, package)
+        recover_to_main_or_restart(ctx, package, dismiss_overlays=dismiss_overlays)
         _log.info('[Startup] 游戏已在运行')
 
+    go_main_page(ctx, dismiss_overlays=dismiss_overlays)
     _log.info('[Startup] 游戏就绪')
-    if dismiss_overlays:
-        handle_daily_overlays(ctx)
