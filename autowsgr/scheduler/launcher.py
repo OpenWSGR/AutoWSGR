@@ -123,6 +123,7 @@ class Launcher:
         self._ctrl = ScrcpyController(
             serial=cfg.emulator.serial,
             config=cfg.emulator,
+            package_name=cfg.account.game_app.package_name,
         )
         self._ctrl.connect()
         return self._ctrl
@@ -225,16 +226,25 @@ class Launcher:
     def launch(self, ensure_game: bool = True) -> GameContext:
         """一步完成: 加载配置 → 连接 → 构造上下文 → 启动游戏。
 
+        上下文构建或游戏启动失败时，断开已建立的控制器连接再抛出原异常。
+
         Returns
         -------
         GameContext
             完全就绪的游戏上下文。
         """
         self.load_config()
-        self.connect()
-        ctx = self.build_context()
-        if ensure_game:
-            self.ensure_ready(ctx)
+        ctrl = self.connect()
+        try:
+            ctx = self.build_context()
+            if ensure_game:
+                self.ensure_ready(ctx)
+        except BaseException:
+            try:
+                ctrl.disconnect()
+            except Exception:
+                _log.opt(exception=True).warning('[Launcher] 启动失败后断开设备连接时发生异常')
+            raise
         _log.info('[Launcher] 启动完成，游戏已就绪')
         return ctx
 
