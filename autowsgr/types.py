@@ -375,14 +375,18 @@ class ShipType(StrEnum):
 
 
 class DestroyShipWorkMode(IntEnum):
-    """拆解工作模式。"""
+    """解装范围: ``destroy_ship_types`` 列表的用途。"""
 
-    disable = 0
-    """不启用舰种分类"""
-    include = 1
-    """只拆指定舰种"""
-    exclude = 2
-    """拆除指定舰种以外的所有舰种"""
+    all = 0
+    """拆解全部 (不按舰种分类, 走快速拆解路线)"""
+    destroy_only = 1
+    """拆解舰种 (只拆列表内舰种)"""
+    keep_only = 2
+    """保留舰种 (列表内舰种保留, 其余全拆)"""
+
+    disable = 0  # 旧成员名, 等价 all
+    include = 1  # 旧成员名, 等价 destroy_only
+    exclude = 2  # 旧成员名, 等价 keep_only
 
 
 class DockFullAction(IntEnum):

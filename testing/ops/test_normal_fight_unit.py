@@ -490,7 +490,7 @@ class TestDockFullDialogRoute:
         assert result.dock_full_destroyed is True
 
     def test_destroy_exhausted_whitelist_keeps_flag(self, monkeypatch: pytest.MonkeyPatch):
-        """白名单覆盖全部舰种 → 无可解装对象 → 保持 DOCK_FULL。"""
+        """保留舰种覆盖全部舰种 → 无可解装对象 → 保持 DOCK_FULL。"""
         import autowsgr.ops.destroy as destroy_module
 
         monkeypatch.setattr(destroy_module, 'destroy_ships_auto', lambda _ctx, **_k: False)
