@@ -15,18 +15,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from autowsgr.infra import NodeConfig, load_yaml
-from autowsgr.infra.logger import get_logger
-from autowsgr.types import FightCondition, Formation, RepairMode
-
-from .fleet import FleetPreset, fleet_presets_from_yaml
-from .rules import RuleEngine
-from .state import (
+from autowsgr.combat.fleet import FleetPreset, fleet_presets_from_yaml
+from autowsgr.combat.rules import RuleEngine
+from autowsgr.combat.state import (
     CombatPhase,
     ModeCategory,
     PhaseBranch,
     build_transitions,
 )
+from autowsgr.infra import NodeConfig, load_yaml
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import FightCondition, Formation, RepairMode
 
 
 _log = get_logger('combat')
