@@ -16,7 +16,7 @@ from autowsgr.combat.history import (
     FightResult,
     grade_condition_met,
 )
-from autowsgr.combat.node_tracker import MapNodeData, _resolve_event_map_path
+from autowsgr.combat.node_fusion.coordinates import MapNodeData, _resolve_event_map_path
 from autowsgr.combat.plan import (
     _MODE_SPECS,
     MODE_TRANSITIONS,
@@ -884,7 +884,7 @@ class TestCombatPlanEntrance:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# node_tracker load_event 测试
+# 活动地图坐标加载测试
 # ═══════════════════════════════════════════════════════════════════════════════
 
 

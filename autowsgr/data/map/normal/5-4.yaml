@@ -35,7 +35,8 @@ E:
   position:
   - 0.507
   - 0.876
-  next: []
+  next:
+  - G
 F:
   position:
   - 0.468
@@ -47,7 +48,6 @@ G:
   - 0.245
   - 0.758
   next:
-  - E
   - H
 H:
   position:

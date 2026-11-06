@@ -14,6 +14,7 @@ CombatEngine
 ├── PhaseHandlersMixin      各阶段处理器 (操作+决策)
 ├── CombatPlan              作战计划 (YAML 驱动)
 │   └── NodeDecision        每节点战术 (阵型/夜战/规则)
+├── TrackingSession         融合追踪与当前位置确认
 ├── CombatHistory           战斗事件记录
 └── state.py                CombatPhase 枚举 + 转移图
 ```
@@ -31,7 +32,7 @@ fight(plan)
     │
     ├─ _reset()                           # 重置状态
     ├─ 构造 CombatRecognizer
-    ├─ 加载 NodeTracker (常规战/活动战)
+    ├─ 创建 TrackingSession (常规战/活动战)
     │
     └─ while True:
          │
@@ -382,29 +383,30 @@ class CombatResult:
 
 ## 节点追踪器
 
-**文件**: `autowsgr/combat/node_tracker.py`
+**目录**: `autowsgr/combat/node_fusion/`
 
-MAP 模式下，通过跟踪我方舰队图标在地图上的移动来确定当前节点：
+MAP 模式由 `TrackingSession` 采集带解码帧号和单调时间的船位、页面、敌情和操作，
+交给 `FusionTracker` 进行前向计算、Viterbi 回溯及后向平滑；完整地图资料约束合法路线。
+距离、射线、敌情、历史路线约束和最终结果分别写入调试日志。融合确认的当前节点
+是唯一决策来源，航段的预测目的点不等于已经到达。
 
-```python
-class NodeTracker:
-    def __init__(self, map_data: MapNodeData)
-    def update_ship_position(screen: ndarray)  # 检测舰队图标位置
-    def update_node() -> str                   # 根据位置判断当前节点
-    def reset()
-```
+`TrackingMap.load()` / `load_event()` 优先读取 Tracking JSON，文件缺失时通过
+`coordinates.py` 读取旧 YAML。旧版裸数组按 960×540 像素坐标归一化，无起点的地图
+不补造坐标。加载器保留未知字段：缺路由不同于终点，缺迂回属性不同于不可迂回，
+未知类型也不能当作空白点。非法坐标、路由引用等损坏资料明确报错。
 
-地图节点数据从 `data/map/` 加载：
+融合模型按资料自动启用可用部分。缺敌情或迂回属性仅省略相应节点的证据；缺起点、
+节点类型或路由时，使用几何和已有敌情定位，不根据战斗次数推进。完整路由仍能约束
+可达范围，缺路由则不采用拓扑硬约束。每次出征输出一次降级 WARNING，说明来源、
+缺失项及受限能力。推断异常或证据不足、歧义无法消除时，当前位置才保持未知。
 
-```python
-MapNodeData.load(chapter, map_id) -> MapNodeData | None
-MapNodeData.load_event(event_name, chapter, map_id) -> MapNodeData | None
-```
-
-首帧船位使用地图起点 `0` 作为移动方向基准，再按现有路由和射线规则判定节点。
-这可以处理出发动画只捕获到一帧、随后地图被索敌界面遮挡的情况。起点附近
-距离不超过 0.01（归一化坐标）的抖动不用于推断航向；地图没有起点或没有有效
-船位时，不猜测实际节点。
+底层设备仅提供通用帧元数据；融合状态、兼容策略、错误处理和日志都放在独立模块中。
+完整标量回放日志默认关闭，由 `log.node_fusion_replay: true` 开启。启用后冻结地图
+快照、参数及能力声明，离线回放核对指纹和模型版本；旧日志没有快照
+时仍校验同名地图指纹。实现和回放说明见
+[融合模块文档](../../autowsgr/combat/node_fusion/README.md)，测试集中在
+[`testing/combat/node_fusion/`](../../testing/combat/node_fusion/)。
+每趟结束独立统计可核对的敌情识别结果，输出 INFO 增量与进程累计；不依赖回放开关。
 
 在常规战和活动战中，`0` 只代表起点／尚未识别的位置，即使它出现在
 `selected_nodes` 中，或白名单为空，也不能作为实际战斗节点放行。进入索敌页

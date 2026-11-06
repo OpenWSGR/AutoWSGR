@@ -1,0 +1,625 @@
+{
+  "0": {
+    "type": "NULL",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.321,
+      0.709
+    ],
+    "next": [
+      "A",
+      "B",
+      "C"
+    ],
+    "enemy_formations": []
+  },
+  "A": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.507,
+      0.791
+    ],
+    "next": [
+      "D"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 2,
+        "ships": [
+          "重巡",
+          "重巡",
+          "潜艇",
+          "潜艇",
+          "潜艇",
+          "潜艇"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "潜艇",
+          "潜艇",
+          "潜艇",
+          "潜艇"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "潜艇",
+          "潜艇",
+          "潜艇",
+          "潜艇",
+          "潜艇"
+        ]
+      }
+    ]
+  },
+  "B": {
+    "type": "AIR_ATTACK",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.516,
+      0.541
+    ],
+    "next": [
+      "E",
+      "J"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 2,
+        "ships": [
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "C": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.217,
+      0.472
+    ],
+    "next": [
+      "F",
+      "G"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "轻巡"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "D": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.688,
+      0.752
+    ],
+    "next": [
+      "H",
+      "I"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "战巡",
+          "战巡",
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "战列",
+          "轻母",
+          "轻母",
+          "重巡",
+          "轻巡",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "战列",
+          "航母",
+          "航母",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "E": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.673,
+      0.542
+    ],
+    "next": [
+      "I"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 2,
+        "ships": [
+          "战巡",
+          "战巡",
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "防驱"
+        ]
+      },
+      {
+        "formation": 4,
+        "ships": [
+          "战列",
+          "战巡",
+          "战巡",
+          "轻巡",
+          "轻巡",
+          "防驱"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "航母",
+          "轻母",
+          "重巡",
+          "重巡",
+          "轻巡",
+          "轻巡"
+        ]
+      }
+    ]
+  },
+  "F": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.391,
+      0.263
+    ],
+    "next": [
+      "J",
+      "K"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 3,
+        "ships": [
+          "战列",
+          "重巡",
+          "轻母",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "航母",
+          "航母",
+          "轻母",
+          "轻母",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "战列",
+          "战列",
+          "重巡",
+          "重巡",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "G": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.227,
+      0.194
+    ],
+    "next": [],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "战列",
+          "战列",
+          "战巡",
+          "重巡",
+          "重巡",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 4,
+        "ships": [
+          "航母",
+          "轻母",
+          "战列",
+          "重巡",
+          "驱逐",
+          "潜艇"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "航母",
+          "轻母",
+          "战巡",
+          "重巡",
+          "轻巡",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "H": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.844,
+      0.849
+    ],
+    "next": [],
+    "enemy_formations": [
+      {
+        "formation": 3,
+        "ships": [
+          "战列",
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "导驱",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "战列",
+          "重巡",
+          "驱逐",
+          "驱逐",
+          "潜艇",
+          "潜艇"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "战列",
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "导驱",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "I": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.821,
+      0.626
+    ],
+    "next": [
+      "M"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "战巡",
+          "战巡",
+          "重巡",
+          "重巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "战巡",
+          "战巡",
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "战巡",
+          "战巡",
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "J": {
+    "type": "AIR_ATTACK",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.595,
+      0.373
+    ],
+    "next": [
+      "M"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "战列",
+          "战列",
+          "轻巡",
+          "轻巡",
+          "航母",
+          "轻母"
+        ]
+      },
+      {
+        "formation": 4,
+        "ships": [
+          "战列",
+          "战列",
+          "驱逐",
+          "驱逐",
+          "航母",
+          "轻母"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "航母",
+          "航母",
+          "战列",
+          "重巡",
+          "轻巡",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "K": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.578,
+      0.195
+    ],
+    "next": [
+      "L"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 2,
+        "ships": [
+          "航母",
+          "重巡",
+          "战巡",
+          "战巡",
+          "轻巡",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "战列",
+          "战列",
+          "轻巡",
+          "轻母",
+          "轻巡",
+          "轻巡"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "航母",
+          "战列",
+          "轻母",
+          "轻母",
+          "轻巡",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "L": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.749,
+      0.22
+    ],
+    "next": [
+      "M"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 4,
+        "ships": [
+          "航母",
+          "航母",
+          "航母",
+          "驱逐",
+          "重巡",
+          "重巡"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "战列",
+          "战列",
+          "驱逐",
+          "驱逐",
+          "重巡",
+          "重巡"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "航母",
+          "航母",
+          "航母",
+          "驱逐",
+          "重巡",
+          "重巡"
+        ]
+      }
+    ]
+  },
+  "M": {
+    "type": "BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.875,
+      0.32
+    ],
+    "next": [],
+    "enemy_formations": [
+      {
+        "formation": 3,
+        "ships": [
+          "航母",
+          "航母",
+          "航母",
+          "驱逐",
+          "重巡",
+          "重巡"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "战列",
+          "战列",
+          "战列",
+          "重巡",
+          "重巡",
+          "潜艇"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "航母",
+          "航母",
+          "航母",
+          "驱逐",
+          "重巡",
+          "重巡"
+        ]
+      }
+    ]
+  }
+}

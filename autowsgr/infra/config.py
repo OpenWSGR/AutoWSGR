@@ -153,6 +153,8 @@ class LogConfig(BaseModel):
     """日志保存根目录"""
     dir: Path | None = None
     """日志保存路径。自动按日期生成"""
+    node_fusion_replay: bool = False
+    """是否额外记录节点融合的标量回放文件；不影响普通 DEBUG 日志。"""
 
     # 细粒度显示开关 (仅保留有效开关; classic 遗留的 show_map_node /
     # show_android_input / show_enemy_rules / show_fight_stage /

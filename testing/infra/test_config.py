@@ -15,7 +15,7 @@ from autowsgr.infra import (
     OCRConfig,
     UserConfig,
 )
-from autowsgr.infra.config import resolve_ocr_gpu_enabled
+from autowsgr.infra.config import LogConfig, resolve_ocr_gpu_enabled
 from autowsgr.types import (
     DestroyShipWorkMode,
     EmulatorType,
@@ -581,6 +581,15 @@ class TestPlanCompat:
 
 
 # ── LogConfig (setup_logger) ──
+
+
+@pytest.mark.parametrize(
+    ('settings', 'expected'), [({}, False), ({'node_fusion_replay': True}, True)]
+)
+def test_node_fusion_replay_is_opt_in(settings: dict, expected: bool) -> None:
+    config = LogConfig.model_validate(settings)
+    assert config.node_fusion_replay is expected
+    assert config.model_dump()['node_fusion_replay'] is expected
 
 
 class TestSetupLogger:

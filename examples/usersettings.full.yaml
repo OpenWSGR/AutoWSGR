@@ -51,6 +51,7 @@ log:
   level: DEBUG                     # DEBUG / INFO / WARNING / ERROR / CRITICAL
   root: logs                        # 日志保存根目录
   # dir: null                      # 日志保存路径; null = 自动按日期生成
+  node_fusion_replay: false         # 保存完整节点回放 JSONL；诊断时开启，默认不保存
 
   # 细粒度显示开关
   show_decisive_battle_info: true

@@ -216,7 +216,7 @@ python tools/debug_screenshot.py -i screenshot.png --roi 0.5,0.5,0.8,0.8
 | `loot_rec` | 战利品/舰船数量 OCR | `data.json` |
 | `misson_rec` | 任务页面识别 | `data.json` |
 | `mvp` | MVP 舰船识别 | `data.json` |
-| `node_tracker` | 地图节点追踪 | 文件名约定 |
+| `node_fusion` | 地图节点融合追踪 | 包目录约定 |
 | `recognize_node` | 节点类型识别 | 文件名约定 |
 | `repair` | 维修卡 OCR | `data.json` |
 | `ship_drop` | 舰船掉落识别 | `data.json` |

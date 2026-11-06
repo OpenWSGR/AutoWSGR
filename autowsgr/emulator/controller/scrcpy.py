@@ -22,15 +22,21 @@ import socket
 import struct
 import threading
 import time
+from itertools import count
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from autowsgr.emulator.controller.protocol import AndroidController, DeviceInfo
+from autowsgr.emulator.detector import (
+    _find_adb,
+    detect_emulators,
+    prompt_user_select,
+    resolve_serial,
+)
+from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.infra import EmulatorConfig, EmulatorConnectionError
 from autowsgr.infra.config import operation_delay
 from autowsgr.infra.logger import caller_info, get_logger
-
-from ..detector import _find_adb, detect_emulators, prompt_user_select, resolve_serial
-from .protocol import AndroidController, DeviceInfo
 
 
 if TYPE_CHECKING:
@@ -72,7 +78,22 @@ _KEY_ACTION_UP = 1
 _POINTER_ID_FINGER = -2
 
 # 同一手势内相邻控制消息（如 DOWN→UP、按键 DOWN→UP）之间的最小间隔。
-_MIN_GESTURE_INTERVAL = 0.01  # 10ms
+_MIN_GESTURE_INTERVAL = 0.01  # 10 毫秒
+
+# 视频流标识不会复用，其他控制器重连后也不会与旧标识冲突。
+_STREAM_IDS = count(1)
+_FRAME_IDS = count(1)
+_STREAM_ID_LOCK = threading.Lock()
+
+
+def _next_stream_id() -> int:
+    with _STREAM_ID_LOCK:
+        return next(_STREAM_IDS)
+
+
+def _next_frame_id() -> int:
+    with _STREAM_ID_LOCK:
+        return next(_FRAME_IDS)
 
 
 class ScrcpyController(AndroidController):
@@ -118,6 +139,9 @@ class ScrcpyController(AndroidController):
         self._device: AdbDevice | None = None
         self._resolution: tuple[int, int] = (0, 0)
         self._last_frame: np.ndarray | None = None
+        self._stream_id = _next_stream_id()
+        self._last_frame_sequence: int | None = None
+        self._last_frame_captured_at: float | None = None
 
         # scrcpy 连接状态
         self._alive = False
@@ -158,7 +182,7 @@ class ScrcpyController(AndroidController):
         if wsize:
             self._resolution = (wsize[0], wsize[1])
         else:
-            self._resolution = (960, 540)  # fallback
+            self._resolution = (960, 540)  # 备用值
             _log.warning('[Emulator] 无法获取设备分辨率，使用默认值 960x540')
 
         # ── 部署并启动 scrcpy-server ──
@@ -324,26 +348,33 @@ class ScrcpyController(AndroidController):
 
     def _start_decode_thread(self) -> None:
         """启动后台 H264 解码线程。"""
+        with self._frame_lock:
+            self._stream_id = _next_stream_id()
+            self._last_frame = None
+            self._last_frame_sequence = None
+            self._last_frame_captured_at = None
+            self._frame_ready.clear()
         self._alive = True
         self._decode_thread = threading.Thread(
             target=self._stream_loop,
+            args=(self._stream_id,),
             name='scrcpy-decode',
             daemon=True,
         )
         self._decode_thread.start()
 
-    def _stream_loop(self) -> None:
+    def _stream_loop(self, stream_id: int) -> None:
         """后台解码循环：接收 H264 流并解码为 numpy 帧。"""
         import av
 
         codec = av.CodecContext.create('h264', 'r')
         video_sock = self._video_socket
         assert video_sock is not None
-        while self._alive:
+        while self._alive and stream_id == self._stream_id:
             try:
                 raw = video_sock.recv(0x10000)
                 if not raw:
-                    if self._alive:
+                    if self._alive and stream_id == self._stream_id:
                         _log.warning('[Emulator] scrcpy 视频流已断开')
                         self._alive = False
                     break
@@ -351,28 +382,30 @@ class ScrcpyController(AndroidController):
                 for packet in codec.parse(raw):
                     for frame in codec.decode(packet):
                         rgb = frame.to_ndarray(format='rgb24')
-                        h, w = rgb.shape[:2]
-
-                        with self._frame_lock:
-                            self._last_frame = rgb
-                            if self._resolution != (w, h):
-                                _log.info(
-                                    '[Emulator] scrcpy 视频分辨率: {}x{}',
-                                    w,
-                                    h,
-                                )
-                                self._resolution = (w, h)
-
-                        if not self._frame_ready.is_set():
-                            self._frame_ready.set()
+                        self._publish_frame(rgb, stream_id)
 
             except BlockingIOError:
                 time.sleep(0.01)
             except (ConnectionError, OSError) as exc:
-                if self._alive:
+                if self._alive and stream_id == self._stream_id:
                     _log.warning('[Emulator] scrcpy 视频流异常: {}', exc)
                     self._alive = False
                 break
+
+    def _publish_frame(self, image: np.ndarray, stream_id: int) -> None:
+        """原子发布图像与解码元数据，丢弃已停用视频流的帧。"""
+        with self._frame_lock:
+            if stream_id != self._stream_id:
+                return
+            self._last_frame = image
+            # 进程级帧序号覆盖全部视频流和连接会话。
+            self._last_frame_sequence = _next_frame_id()
+            self._last_frame_captured_at = time.monotonic()
+            h, w = image.shape[:2]
+            if self._resolution != (w, h):
+                _log.info('[Emulator] scrcpy 视频分辨率: {}x{}', w, h)
+                self._resolution = (w, h)
+            self._frame_ready.set()
 
     def disconnect(self) -> None:
         serial = self._serial or 'auto'
@@ -380,7 +413,10 @@ class ScrcpyController(AndroidController):
 
         self._device = None
         self._resolution = (0, 0)
-        self._last_frame = None
+        with self._frame_lock:
+            self._last_frame = None
+            self._last_frame_sequence = None
+            self._last_frame_captured_at = None
         _log.info('[Emulator] 已断开设备连接: {}', serial)
 
     @property
@@ -394,6 +430,13 @@ class ScrcpyController(AndroidController):
         return self._device
 
     def _close_video_channel(self) -> None:
+        # 等待解码线程退出前先停用视频流，避免接收或解码阻塞的线程
+        # 超过等待时限后继续发布旧帧。
+        with self._frame_lock:
+            self._alive = False
+            self._stream_id = _next_stream_id()
+            self._frame_ready.clear()
+
         if self._control_socket is not None:
             try:
                 self._control_socket.close()
@@ -425,7 +468,10 @@ class ScrcpyController(AndroidController):
     def _reopen_stream(self) -> None:
         """在保持 ADB 设备连接的前提下重建 scrcpy 视频流与控制流。"""
         self._close_video_channel()
-        self._last_frame = None
+        with self._frame_lock:
+            self._last_frame = None
+            self._last_frame_sequence = None
+            self._last_frame_captured_at = None
         self._deploy_server()
         self._start_server()
         self._connect_video_socket()
@@ -532,8 +578,8 @@ class ScrcpyController(AndroidController):
             _TYPE_INJECT_KEYCODE,
             action,
             key_code,
-            0,  # repeat
-            0,  # metastate
+            0,  # 重复次数
+            0,  # 修饰键状态
         )
         self._send_control(data)
 
@@ -599,12 +645,18 @@ class ScrcpyController(AndroidController):
     # ── 截图 ──
 
     def screenshot(self) -> np.ndarray:
+        return self.capture_frame().image
+
+    def capture_frame(self) -> CapturedFrame:
+        """在同一次加锁读取中返回当前解码帧及其序号、时间。"""
         self._ensure_stream_alive()
 
         start = time.monotonic()
         while True:
             with self._frame_lock:
                 frame = self._last_frame
+                sequence = self._last_frame_sequence
+                captured_at = self._last_frame_captured_at
 
             if frame is not None:
                 elapsed = time.monotonic() - start
@@ -615,7 +667,11 @@ class ScrcpyController(AndroidController):
                     h,
                     elapsed,
                 )
-                return frame
+                return CapturedFrame(
+                    image=frame,
+                    sequence=sequence,
+                    captured_at=captured_at if captured_at is not None else time.monotonic(),
+                )
 
             if not self._alive:
                 self._ensure_stream_alive()
