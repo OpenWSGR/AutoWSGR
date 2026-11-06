@@ -1,0 +1,35 @@
+{
+  "0": {
+    "type": "NULL",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.368,
+      0.677
+    ],
+    "next": [
+      "A"
+    ],
+    "enemy_formations": []
+  },
+  "A": {
+    "type": "BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.614,
+      0.458
+    ],
+    "next": [],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "补给",
+          "补给",
+          "补给"
+        ]
+      }
+    ]
+  }
+}
