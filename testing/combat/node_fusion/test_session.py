@@ -17,7 +17,6 @@ from autowsgr.combat import handlers as handlers_module
 from autowsgr.combat.engine import CombatEngine
 from autowsgr.combat.node_fusion import FusionObservation, NodeEstimate
 from autowsgr.combat.node_fusion import integration as integration_module
-from autowsgr.combat.node_fusion.calibration import CalibrationTotals
 from autowsgr.combat.node_fusion.enemy import EnemyObservation
 from autowsgr.combat.node_fusion.integration import TrackingSession
 from autowsgr.combat.node_fusion.map import TrackingMap
@@ -110,7 +109,6 @@ def calibration_session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Trac
         }
     )
     monkeypatch.setattr(TrackingMap, 'load', lambda *_: metadata)
-    monkeypatch.setattr(integration_module, 'CALIBRATION_TOTALS', CalibrationTotals())
     session = TrackingSession.start(CombatPlan(chapter=2, map_id=1), tmp_path)
     assert session is not None
     assert session.tracker is not None
@@ -404,35 +402,42 @@ def test_engine_applies_replay_setting(
     assert (tmp_path / 'node-fusion').exists() is record_replay
 
 
-def test_end_reports_recognition_statistics_once_without_replay(
+def test_finish_stays_silent_when_recognition_matches(
     monkeypatch: pytest.MonkeyPatch,
     calibration_session: TrackingSession,
     frame: CapturedFrame,
     evidence: EnemyObservation,
-    tmp_path: Path,
 ) -> None:
     session = calibration_session
-    info = MagicMock()
-    monkeypatch.setattr(integration_module._log, 'info', info)
+    warning = MagicMock()
+    monkeypatch.setattr(integration_module._log, 'warning', warning)
     session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame, '0', evidence)
-    assert session.current_node == 'A'
     session.action('end', CombatPhase.RESULT, 'A', timestamp=13.0)
     session.finish()
     session.finish()
+    warning.assert_not_called()
 
-    info.assert_called_once()
-    assert '[NodeFusion统计]' in info.call_args.args[0]
-    payload = json.loads(info.call_args.args[-1])
-    assert payload['completed_sorties'] == 1
-    assert payload['delta'] == payload['cumulative']
-    assert payload['delta']['samples'] == 1
-    assert payload['delta']['located'] == 1
-    assert payload['delta']['ships']['correct'] == 6
-    assert payload['delta']['ships']['errors'] == 0
-    assert 'formation' not in payload['delta']
-    assert 'detour' not in payload['delta']
-    assert session.log_path is None
-    assert not list(tmp_path.iterdir())
+
+def test_finish_warns_with_feedback_details_on_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    calibration_session: TrackingSession,
+    frame: CapturedFrame,
+    evidence: EnemyObservation,
+) -> None:
+    session = calibration_session
+    wrong = replace(evidence, raw_slots=('BB',) * 6)
+    warning = MagicMock()
+    monkeypatch.setattr(integration_module._log, 'warning', warning)
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame, '0', wrong)
+    session.action('end', CombatPhase.RESULT, 'A', timestamp=13.0)
+    session.finish()
+
+    warning.assert_called_once()
+    text = warning.call_args.args[0].format(*warning.call_args.args[1:])
+    assert '请反馈' in text
+    assert '地图 2-1' in text
+    assert '节点 A' in text
+    assert '槽1 驱逐→BB(战列)' in text
 
 
 def test_statistics_failure_warns_without_disabling_node_control(
@@ -453,7 +458,7 @@ def test_statistics_failure_warns_without_disabling_node_control(
     assert engine.current_node == 'A'
     calculate = MagicMock(side_effect=RuntimeError('统计失败'))
     warning, info, formation = MagicMock(), MagicMock(), MagicMock()
-    monkeypatch.setattr(integration_module, 'recognition_stats', calculate)
+    monkeypatch.setattr(integration_module, 'recognition_mismatches', calculate)
     monkeypatch.setattr(integration_module._log, 'warning', warning)
     monkeypatch.setattr(integration_module._log, 'info', info)
     monkeypatch.setattr(handlers_module, 'click_formation', formation)
@@ -462,7 +467,7 @@ def test_statistics_failure_warns_without_disabling_node_control(
     session.finish()
     calculate.assert_called_once_with(tracker)
     warning.assert_called_once()
-    assert '[NodeFusion统计]' in warning.call_args.args[0]
+    assert '[NodeFusion校验]' in warning.call_args.args[0]
     info.assert_not_called()
     assert session.tracker is tracker
     assert engine.current_node == 'A'

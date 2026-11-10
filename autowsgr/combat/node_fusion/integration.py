@@ -17,7 +17,11 @@ from uuid import uuid4
 from autowsgr_native.vessel_type import VesselType
 
 from autowsgr import __version__
-from autowsgr.combat.node_fusion.calibration import CALIBRATION_TOTALS, recognition_stats
+from autowsgr.combat.node_fusion.calibration import (
+    NATIVE_VERSION,
+    SlotMismatch,
+    recognition_mismatches,
+)
 from autowsgr.combat.node_fusion.enemy import EnemyObservation, observe_enemy
 from autowsgr.combat.node_fusion.map import TrackingMap
 from autowsgr.combat.node_fusion.model import FusionObservation, FusionProfile, FusionTracker
@@ -92,6 +96,7 @@ class TrackingSession:
         self.phase_is_new_encounter = False
         self._last_motion = float('-inf')
         self._sortie_id = uuid4().hex
+        self._map_label = '?'
         self._statistics_tracker: FusionTracker | None = None
         self._statistics_finished = False
 
@@ -108,6 +113,11 @@ class TrackingSession:
         session = cls()
         if record_replay:
             session._open_log(log_dir)
+        session._map_label = (
+            f'{plan.event_name} {plan.chapter}-{plan.map_id}'
+            if plan.event_name
+            else f'{plan.chapter}-{plan.map_id}'
+        )
         try:
             if plan.mode == CombatMode.NORMAL:
                 metadata = TrackingMap.load(plan.chapter, plan.map_id)
@@ -209,28 +219,29 @@ class TrackingSession:
         self._record({'kind': 'disabled', 'reason': reason})
 
     def finish(self) -> None:
-        """出征结束后输出一次可相加的识别统计；失败不影响游戏或累计旧结果。"""
+        """出征结束后核对舰类识别；不符时告警请求反馈，全程一致保持静默。"""
         if self._statistics_finished or self._statistics_tracker is None:
             return
         self._statistics_finished = True
-        tracker = self._statistics_tracker
         try:
-            stats = recognition_stats(tracker)
-            record = CALIBRATION_TOTALS.add(self._sortie_id, stats)
-            if record is not None:
-                record['map_sha256'] = tracker.map_data.fingerprint
-                record['profile'] = asdict(tracker.profile)
-                ships = record['cumulative']['ships']
-                _log.info(
-                    '[NodeFusion统计] native舰类独立校验累计：核对{}次/不符{}次/缺失{}次；'
-                    '增量、累计及混淆计数: {}',
-                    ships['correct'] + ships['errors'],
-                    ships['errors'],
-                    ships['missing'],
-                    json.dumps(record, ensure_ascii=False, separators=(',', ':')),
-                )
+            mismatches = recognition_mismatches(self._statistics_tracker)
         except Exception as exc:
-            _log.warning('[NodeFusion统计] 本趟统计未完成，不加入累计: {}', exc)
+            _log.warning('[NodeFusion校验] 本趟校验未完成，不影响游戏: {}', exc)
+            return
+        by_node: dict[str, list[SlotMismatch]] = {}
+        for item in mismatches:
+            by_node.setdefault(item.node, []).append(item)
+        for node, items in by_node.items():
+            detail = '；'.join(
+                f'槽{item.slot} {item.expected}→{item.code}({item.recognized})' for item in items
+            )
+            _log.warning(
+                '[NodeFusion校验] 舰类识别与地图签名不符，请反馈：地图 {} 节点 {}：{}（native {}）',
+                self._map_label,
+                node,
+                detail,
+                NATIVE_VERSION,
+            )
 
     def publish(self, observation: FusionObservation) -> NodeEstimate | None:
         if self.tracker is None:
