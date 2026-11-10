@@ -11,6 +11,7 @@ from autowsgr.infra.logger import get_logger
 
 # 地图数据根目录
 _MAP_DATA_ROOT = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'normal'
+_EVENT_MAP_DATA_ROOT = _MAP_DATA_ROOT.parent / 'event'
 
 # 活动入口标识 (内部 a/b) ↔ 地图文件名希腊字母 (α/β)；仅活动地图有 α/β 入口概念
 ENTRANCE_TO_GREEK = {'a': 'α', 'b': 'β'}
@@ -52,10 +53,7 @@ def read_coordinate_map(path: Path) -> dict[str, Any]:
             node = dict(value)
             targets = node.get('next')
             if isinstance(targets, list):
-                node['next'] = [
-                    remap.get(target, target) if isinstance(target, str) else target
-                    for target in targets
-                ]
+                node['next'] = [remap.get(str(target), str(target)) for target in targets]
             nodes[name] = node
         else:
             raise TypeError(f'Invalid coordinate metadata at node {name}')
@@ -233,7 +231,7 @@ class MapNodeData:
         MapNodeData | None
             加载成功返回数据对象；文件不存在或匹配歧义返回 ``None``。
         """
-        _event_root = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'event'
+        _event_root = _EVENT_MAP_DATA_ROOT
         path = _resolve_event_map_path(_event_root, event_name, chapter, map_id, entrance)
         if path is None or not path.exists():
             _log.warning(
@@ -257,19 +255,29 @@ class MapNodeData:
         nodes: dict[str, NodePosition] = {}
 
         for key, value in raw.items():
-            # 活动入口节点 α/β 映射为起始点 '0' (见 _START_NODE_REMAP)
+            # 活动入口节点 α/β 映射为起始点 '0' (见 _START_NODE_REMAP)；
+            # α/β 入口按规范拆分为单独文件，同文件多入口归并后拒绝。
             name = _START_NODE_REMAP.get(str(key), str(key))
+            if name in nodes:
+                raise ValueError(
+                    f'Duplicate map node after entrance remap: {name!r}'
+                    '（α/β 入口必须按入口拆分为单独文件）'
+                )
 
             if isinstance(value, dict):
                 # 格式: {"position": [x, y], "next": ["B", "C"]}
                 pos = value.get('position', [0, 0])
-                raw_next = value.get('next', [])
-                rel_x = pos[0]
-                rel_y = pos[1]
+                if not isinstance(pos, list) or len(pos) != 2:
+                    _log.warning("[地图坐标] 忽略坐标非法的节点 '{}': {}", name, pos)
+                    continue
+                raw_next = value.get('next') or []
+                if not isinstance(raw_next, list):
+                    _log.warning("[地图坐标] 忽略非法 next 列表 '{}': {}", name, raw_next)
+                    raw_next = []
                 nodes[name] = NodePosition(
                     name=name,
-                    x=rel_x,
-                    y=rel_y,
+                    x=pos[0],
+                    y=pos[1],
                     next_nodes=[_START_NODE_REMAP.get(str(n), str(n)) for n in raw_next],
                 )
             else:

@@ -963,6 +963,37 @@ class TestLoadEvent:
         assert MapNodeData.load_event('20260730', 'H', 99, 'a') is None
 
 
+class TestParse:
+    """MapNodeData._parse 对新格式 YAML 的严格解析。"""
+
+    def test_dual_entrance_file_is_rejected(self):
+        """数据规范要求 α/β 入口按入口拆分为单独文件；混在一个文件里直接拒绝。"""
+        raw = {
+            'α': {'position': [0.1, 0.2], 'next': ['A']},
+            'β': {'position': [0.9, 0.2], 'next': ['B']},
+        }
+        with pytest.raises(ValueError, match='Duplicate map node'):
+            MapNodeData._parse(raw)
+
+    def test_malformed_position_is_skipped_with_warning(self):
+        raw = {
+            'A': {'position': [0.1], 'next': ['B']},  # 长度不足
+            'B': {'position': 'bad', 'next': []},  # 非列表
+            'C': {'position': [0.5, 0.5], 'next': ['B']},  # 正常
+        }
+        data = MapNodeData._parse(raw)
+        assert list(data.node_names) == ['C']
+
+    def test_invalid_next_falls_back_to_empty_list(self):
+        raw = {
+            'A': {'position': [0.5, 0.5], 'next': None},  # YAML 空值
+            'B': {'position': [0.5, 0.6], 'next': 'ABC'},  # 字符串不得逐字符拆分
+        }
+        data = MapNodeData._parse(raw)
+        assert data.get('A').next_nodes == []
+        assert data.get('B').next_nodes == []
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # GradeCondition + grade_condition_met (战果条件)
 # ═══════════════════════════════════════════════════════════════════════════════
