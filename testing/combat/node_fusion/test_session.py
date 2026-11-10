@@ -383,7 +383,10 @@ def test_default_session_keeps_debug_without_replay_serialization(
     snapshot.assert_not_called()
     serializer.assert_not_called()
     estimate_copy.assert_not_called()
-    # 逐帧诊断不进入线上日志；推断继续运行即可。
+    # 逐帧诊断不进入线上日志；到达帧只输出一行归因摘要。
+    assert all('[NodeFusion] 帧=' not in c.args[0] for c in debug.call_args_list)
+    attribution = [c for c in debug.call_args_list if '[NodeFusion归因]' in c.args[0]]
+    assert attribution
     assert not list(tmp_path.iterdir())
 
 
@@ -434,6 +437,92 @@ def test_finish_warns_with_feedback_details_on_mismatch(
     assert '地图 2-1' in text
     assert '节点 A' in text
     assert '槽1 驱逐→BB(战列)' in text
+
+
+def test_arrival_logs_attribution_with_channel_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+    calibration_session: TrackingSession,
+    frame: CapturedFrame,
+    evidence: EnemyObservation,
+) -> None:
+    session = calibration_session
+    debug = MagicMock()
+    monkeypatch.setattr(integration_module._log, 'debug', debug)
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame, '0', evidence)
+    assert session.current_node == 'A'
+
+    calls = [call for call in debug.call_args_list if '[NodeFusion归因]' in call.args[0]]
+    attribution = calls[0].args[0].format(*calls[0].args[1:])
+    # 单候选图：索敌前与敌情均无次名，标注唯一。
+    assert '节点=A' in attribution
+    assert '索敌前A(唯一)(0帧)' in attribution
+    assert '敌情A(唯一)' in attribution
+    assert 'margin=1.000' in attribution
+
+
+def test_arrival_attribution_lists_tied_enemy_candidates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    metadata = TrackingMap.from_dict(
+        {
+            '0': {
+                'position': [0.1, 0.2],
+                'next': ['A'],
+                'type': 'NULL',
+                'detour': False,
+                'enemy_formations': [],
+            },
+            'A': {
+                'position': [0.3, 0.2],
+                'next': ['B', 'C'],
+                'type': 'FIGHT',
+                'detour': False,
+                'enemy_formations': [{'formation': 1, 'ships': ['战列'] * 6}],
+            },
+            'B': {
+                'position': [0.6, 0.2],
+                'next': [],
+                'type': 'FIGHT',
+                'detour': False,
+                'enemy_formations': [{'formation': 1, 'ships': ['驱逐'] * 6}],
+            },
+            'C': {
+                'position': [0.6, 0.5],
+                'next': [],
+                'type': 'FIGHT',
+                'detour': False,
+                'enemy_formations': [{'formation': 1, 'ships': ['驱逐'] * 6}],
+            },
+        }
+    )
+    monkeypatch.setattr(TrackingMap, 'load', lambda *_: metadata)
+    session = TrackingSession.start(CombatPlan(chapter=2, map_id=1), tmp_path)
+    assert session is not None
+    debug = MagicMock()
+    monkeypatch.setattr(integration_module._log, 'debug', debug)
+    blank = np.zeros((540, 960, 3), dtype=np.uint8)
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, CapturedFrame(blank, 1, 1.0), '0')
+    session.publish(FusionObservation('action', 1.5, action='proceed', clicked=True))
+    session.publish(FusionObservation('motion', 2.0, frame_id=2, position=(0.4, 0.2)))
+    session.publish(FusionObservation('motion', 4.0, frame_id=3, position=(0.6, 0.2)))
+    enemy = EnemyObservation(
+        raw_slots=('DD',) * 6,
+        ships=('驱逐',) * 6,
+        formation=1,
+        formation_text='单纵阵',
+        formation_confidence=0.95,
+        detour=None,
+        detour_score=None,
+    )
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, CapturedFrame(blank, 4, 5.0), 'A', enemy)
+    assert session.current_node == 'B'
+
+    calls = [call for call in debug.call_args_list if '[NodeFusion归因]' in call.args[0]]
+    attribution = calls[-1].args[0].format(*calls[-1].args[1:])
+    # B/C 签名完全相同：敌情两候选并列，列出并列成员与自然对数分差。
+    assert '敌情B>C+0.0' in attribution
+    assert '(2帧)' in attribution
+    assert '节点=B' in attribution
 
 
 def test_statistics_failure_warns_without_disabling_node_control(

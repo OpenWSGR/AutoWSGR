@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 import time
 from dataclasses import asdict
 from importlib.metadata import version
@@ -69,6 +70,22 @@ _ENCOUNTER_PHASES = frozenset(
 )
 
 
+def _channel_summary(weights: dict[str, float]) -> str:
+    """单路独立分布：首名压过次名的自然对数分差；无次名标注唯一。"""
+    ranked = sorted(
+        ((node, weight) for node, weight in weights.items() if weight > 0.0),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    if not ranked:
+        return '-'
+    if len(ranked) == 1:
+        return f'{ranked[0][0]}(唯一)'
+    top, second = ranked[0], ranked[1]
+    gap = math.log(top[1]) - math.log(second[1])
+    return f'{top[0]}>{second[0]}+{gap:.1f}'
+
+
 class _TimedClickDevice:
     """仅在本模块代理实际点击，记录发送时间，不改共享点击接口。"""
 
@@ -98,6 +115,7 @@ class TrackingSession:
         self._last_motion = float('-inf')
         self._sortie_id = uuid4().hex
         self._map_label = '?'
+        self._motion_frames = 0
         self._statistics_tracker: FusionTracker | None = None
         self._statistics_finished = False
 
@@ -168,7 +186,8 @@ class TrackingSession:
             )
             session._record({'kind': 'profile', 'profile': asdict(profile)})
         session._warn_degradation(metadata)
-        _log.info('[NodeFusion] 融合追踪已接管节点判定；回放记录: {}', session.log_path or '已关闭')
+        if session.log_path is not None:
+            _log.info('[NodeFusion] 回放记录: {}', session.log_path)
         return session
 
     @staticmethod
@@ -268,7 +287,8 @@ class TrackingSession:
                     'estimate': summary,
                 }
             )
-        # 逐帧诊断只在回放 JSONL 里保留；线上日志仅到达帧输出归因摘要。
+        if observation.kind == 'motion' and self.estimate.ignored is None:
+            self._motion_frames += 1
         return self.estimate
 
     def motion(self, frame: CapturedFrame | None, decision_node: str) -> None:
@@ -292,6 +312,28 @@ class TrackingSession:
                 decision_node=decision_node,
                 detector_status=self.detector.detection_status,
             )
+        )
+
+    def _log_attribution(self, estimate: NodeEstimate) -> None:
+        """到达帧输出各证据通道的独立候选集，便于定位某点位的弱判据。"""
+        diagnostics = estimate.diagnostics
+
+        def channel(name: str) -> str:
+            row = diagnostics.get(name)
+            weights = row.get('weights') if isinstance(row, dict) else None
+            return _channel_summary(weights or {})
+
+        ranked = sorted(estimate.node_weights.values(), reverse=True)
+        margin = ranked[0] - ranked[1] if len(ranked) > 1 else 1.0
+        frames = self._motion_frames
+        self._motion_frames = 0
+        _log.debug(
+            '[NodeFusion归因] 节点={} 索敌前{}({}帧) 敌情{} margin={:.3f}',
+            estimate.current_node or '?',
+            channel('history_prior'),
+            frames,
+            channel('enemy'),
+            margin,
         )
 
     def phase(
@@ -325,6 +367,8 @@ class TrackingSession:
                 None,
             )
             self.phase_is_new_encounter = row is not None and row['transition'] == 'new_encounter'
+            if self.phase_is_new_encounter:
+                self._log_attribution(estimate)
 
     def enemy_observation(
         self,
