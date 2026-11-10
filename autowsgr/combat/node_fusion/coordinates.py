@@ -10,8 +10,7 @@ from autowsgr.infra.logger import get_logger
 
 
 # 地图数据根目录
-_MAP_DATA_ROOT = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'normal'
-_EVENT_MAP_DATA_ROOT = _MAP_DATA_ROOT.parent / 'event'
+_EVENT_MAP_DATA_ROOT = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'event'
 
 # 活动入口标识 (内部 a/b) ↔ 地图文件名希腊字母 (α/β)；仅活动地图有 α/β 入口概念
 ENTRANCE_TO_GREEK = {'a': 'α', 'b': 'β'}
@@ -172,32 +171,6 @@ class MapNodeData:
 
     def __len__(self) -> int:
         return len(self._nodes)
-
-    @classmethod
-    def load(cls, chapter: int | str, map_id: int | str) -> MapNodeData | None:
-        """从 YAML 文件加载常规地图节点数据。
-
-        参数
-        ----------
-        chapter:
-            章节号。
-        map_id:
-            地图号。
-
-        返回值
-        -------
-        MapNodeData | None
-            加载成功返回数据对象；文件不存在返回 ``None``。
-        """
-        path = _MAP_DATA_ROOT / f'{chapter}-{map_id}.yaml'
-        if not path.exists():
-            _log.warning('[地图坐标] 地图文件不存在: {}', path)
-            return None
-
-        from autowsgr.infra.file_utils import load_yaml
-
-        raw: dict[str, Any] = load_yaml(path)
-        return cls._parse(raw)
 
     @classmethod
     def load_event(

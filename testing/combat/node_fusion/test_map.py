@@ -12,6 +12,7 @@ import pytest
 from autowsgr_native.vessel_type import VesselType
 
 from autowsgr.combat.node_fusion import map as tracking_map
+from autowsgr.combat.node_fusion.coordinates import read_coordinate_map
 from autowsgr.combat.node_fusion.map import TrackingMap
 
 
@@ -72,9 +73,7 @@ def test_packaged_event_maps_keep_verified_routes(chapter: str, map_id: int) -> 
 
     metadata = TrackingMap.load_event('20260930', chapter, map_id)
     assert metadata is not None
-    coordinates = load_yaml(
-        tracking_map._MAP_ROOT.parents[1] / 'event' / '20260930' / f'{chapter}-{map_id}.yaml'
-    )
+    coordinates = load_yaml(tracking_map._EVENT_MAP_ROOT / '20260930' / f'{chapter}-{map_id}.yaml')
     assert set(metadata.nodes) == set(coordinates)
     for name, node in metadata.nodes.items():
         assert node.position == tuple(coordinates[name]['position'])
@@ -378,53 +377,40 @@ def test_old_maps_keep_multiple_known_entrances_separate(chapter: str, map_id: i
     assert not metadata.capabilities['encounter_history']
 
 
-def test_multiple_entrance_map_rejects_contradictory_type(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setattr(tracking_map, '_MAP_ROOT', tmp_path / 'tracking')
-    monkeypatch.setattr(tracking_map, '_COORDINATE_ROOT', tmp_path)
-    (tmp_path / 'normal').mkdir()
-    (tmp_path / 'normal' / '99-1.yaml').write_text(
-        'α: {position: [0.1, 0.2], type: FIGTH}\nβ: [100, 200]\n', encoding='utf-8'
-    )
+# 常规图不再回退坐标 YAML；旧格式的解析行为仍被活动回退路径使用，直接验证。
+def test_multiple_entrance_map_rejects_contradictory_type(tmp_path: Path) -> None:
+    path = tmp_path / '99-1.yaml'
+    path.write_text('α: {position: [0.1, 0.2], type: FIGHT}\nβ: [100, 200]\n', encoding='utf-8')
     with pytest.raises(ValueError, match='entry node'):
-        TrackingMap.load(99, 1)
+        read_coordinate_map(path)
 
 
-def test_json_precedes_yaml_and_invalid_json_never_silently_falls_back(
+def test_event_json_precedes_yaml_and_invalid_json_never_silently_falls_back(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    json_root = tmp_path / 'tracking'
-    json_root.mkdir()
-    coordinate_root = tmp_path / 'coordinates'
-    (coordinate_root / 'normal').mkdir(parents=True)
-    (coordinate_root / 'normal' / '2-1.yaml').write_text(
-        'A: [405, 98]\nB: [600, 200]\n', encoding='utf-8'
-    )
-    monkeypatch.setattr(tracking_map, '_MAP_ROOT', json_root)
-    monkeypatch.setattr(tracking_map, '_COORDINATE_ROOT', coordinate_root)
-    fallback = TrackingMap.load(2, 1)
+    # 扁平化后活动的 JSON 与回退 YAML 同目录，按扩展名区分。
+    event_root = tmp_path / 'event' / '20220928'
+    monkeypatch.setattr(tracking_map, '_EVENT_MAP_ROOT', tmp_path / 'event')
+    event_root.mkdir(parents=True)
+    (event_root / 'E-1.yaml').write_text('A: [405, 98]\nB: [600, 200]\n', encoding='utf-8')
+    fallback = TrackingMap.load_event('20220928', 'E', 1)
     assert fallback is not None
     assert fallback.source.endswith('.yaml')
     assert not fallback.capabilities['encounter_history']
-    target = json_root / '2-1.json'
+    target = event_root / 'E-1.json'
     target.write_text(json.dumps(_simple()), encoding='utf-8')
-    preferred = TrackingMap.load(2, 1)
+    preferred = TrackingMap.load_event('20220928', 'E', 1)
     assert preferred is not None
     assert preferred.source.endswith('.json')
     assert preferred.capabilities['encounter_history']
     target.write_text('{broken', encoding='utf-8')
     with pytest.raises(json.JSONDecodeError):
-        TrackingMap.load(2, 1)
+        TrackingMap.load_event('20220928', 'E', 1)
 
 
 @pytest.mark.parametrize('body', ['A: [961, 20]', 'A: [20, 541]', 'A: [true, 20]', 'A: [20]'])
-def test_old_pixel_map_rejects_invalid_positions(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, body: str
-) -> None:
-    monkeypatch.setattr(tracking_map, '_MAP_ROOT', tmp_path / 'tracking')
-    monkeypatch.setattr(tracking_map, '_COORDINATE_ROOT', tmp_path)
-    (tmp_path / 'normal').mkdir()
-    (tmp_path / 'normal' / '99-1.yaml').write_text(body, encoding='utf-8')
+def test_old_pixel_map_rejects_invalid_positions(tmp_path: Path, body: str) -> None:
+    path = tmp_path / '99-1.yaml'
+    path.write_text(body, encoding='utf-8')
     with pytest.raises(ValueError, match='position'):
-        TrackingMap.load(99, 1)
+        read_coordinate_map(path)

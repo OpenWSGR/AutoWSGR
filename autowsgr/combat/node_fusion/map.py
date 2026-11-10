@@ -19,9 +19,8 @@ from autowsgr_native.vessel_type import VesselType
 from autowsgr.combat.node_fusion.coordinates import _resolve_event_map_path, read_coordinate_map
 
 
-_MAP_ROOT = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'tracking' / 'normal'
+_MAP_ROOT = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'normal'
 _EVENT_MAP_ROOT = _MAP_ROOT.parent / 'event'
-_COORDINATE_ROOT = _MAP_ROOT.parents[1]
 _SILENT_TYPES = frozenset({'NULL', 'REWARD', 'LOSS'})
 _NODE_TYPES = _SILENT_TYPES | {'FIGHT', 'BOSS', 'LITTLE_BOSS', 'AIR_ATTACK', 'SPECIAL_POINT'}
 # 从实际安装的 native 枚举取得中文舰类，空槽哨兵不属于敌舰类别。
@@ -225,7 +224,7 @@ class TrackingMap:
         try:
             raw = json.loads(path.read_text(encoding='utf-8'))
         except FileNotFoundError:
-            return cls._load_coordinates(_COORDINATE_ROOT / 'normal' / f'{chapter}-{map_id}.yaml')
+            return None
         return cls.from_dict(raw, source=str(path.resolve()))
 
     @classmethod
@@ -257,7 +256,7 @@ class TrackingMap:
             raw = json.loads(path.read_text(encoding='utf-8'))
         except FileNotFoundError:
             coordinate_path = _resolve_event_map_path(
-                _COORDINATE_ROOT / 'event', event_name, chapter, map_id, entrance
+                _EVENT_MAP_ROOT, event_name, chapter, map_id, entrance
             )
             return cls._load_coordinates(coordinate_path)
         return cls.from_dict(raw, source=str(path.resolve()))
