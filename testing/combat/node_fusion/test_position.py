@@ -59,3 +59,16 @@ def test_yellow_cluster_requires_minimum_area(screen: np.ndarray) -> None:
     assert ShipPositionDetector._find_yellow_cluster(screen) == pytest.approx(
         (409.5 / 960, 209.5 / 540)
     )
+
+
+def test_recheck_pixel_near_left_edge_clips_instead_of_wrapping(screen: np.ndarray) -> None:
+    """质心贴近左缘时 cx-0.03 为负：应裁剪到边缘列，不得借负索引回绕到右侧。"""
+    screen[:, :] = (231, 220, 100)
+    screen[:, -40:] = (0, 0, 255)  # 右缘涂蓝：若回绕到右侧，左侧检查必然失败
+    assert ShipPositionDetector()._recheck_pixel((0.01, 0.5), screen) is True
+
+
+def test_recheck_pixel_near_right_edge_clips_instead_of_raising(screen: np.ndarray) -> None:
+    """质心贴近右缘时 cx+0.03 超过 1.0：应裁剪到最后一个像素列，不抛 IndexError。"""
+    screen[:, :] = (231, 220, 100)
+    assert ShipPositionDetector()._recheck_pixel((0.99, 0.5), screen) is True
