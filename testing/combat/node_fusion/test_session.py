@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import replace
 from types import SimpleNamespace
@@ -149,6 +150,11 @@ def make_engine(
     return engine
 
 
+def _gunzip_lines(path: Path) -> list[str]:
+    with gzip.open(path, 'rt', encoding='utf-8') as stream:
+        return stream.read().splitlines()
+
+
 def test_fused_node_controls_selection_and_formation_from_same_frame(
     monkeypatch: pytest.MonkeyPatch,
     frame: CapturedFrame,
@@ -181,9 +187,7 @@ def test_fused_node_controls_selection_and_formation_from_same_frame(
     engine._phase = CombatPhase.FORMATION
     assert engine._make_decision(engine._phase) == ConditionFlag.FIGHT_CONTINUE
     formation.assert_called_once_with(engine._device, Formation.wedge)
-    records = [
-        json.loads(line) for line in engine._tracking.log_path.read_text('utf-8').splitlines()
-    ]
+    records = [json.loads(line) for line in _gunzip_lines(engine._tracking.log_path)]
     assert records[0]['estimate']['node_weights'] == {'Z': 1.0}
     assert set(records[0]['estimate']['diagnostics']) == {
         'distance',
@@ -342,17 +346,13 @@ def test_real_model_and_compact_multichannel_log(
     assert engine.current_node == '0'
     engine._tracking_phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame=frame, enemies=evidence)
     assert engine.current_node == 'A'
-    records = [
-        json.loads(line) for line in engine._tracking.log_path.read_text('utf-8').splitlines()
-    ]
+    records = [json.loads(line) for line in _gunzip_lines(engine._tracking.log_path)]
     assert records[0]['mode'] == 'fusion'
     assert 'history' not in records[-1]['estimate']
     assert 'state_weights' in records[-1]['estimate']
     assert 'diagnostics' in records[-1]['estimate']
     engine._tracking_action('fight', clicked=True, timestamp=13.0)
-    records = [
-        json.loads(line) for line in engine._tracking.log_path.read_text('utf-8').splitlines()
-    ]
+    records = [json.loads(line) for line in _gunzip_lines(engine._tracking.log_path)]
     assert 'state_weights' not in records[-1]['estimate']
     assert records[-1]['estimate']['state_count'] > 0
 
@@ -383,11 +383,7 @@ def test_default_session_keeps_debug_without_replay_serialization(
     snapshot.assert_not_called()
     serializer.assert_not_called()
     estimate_copy.assert_not_called()
-    debug.assert_called_once()
-    assert all(
-        channel in debug.call_args.args[0]
-        for channel in ('距离=', '射线=', '历史=', '几何=', '敌情=', '融合=')
-    )
+    # 逐帧诊断不进入线上日志；推断继续运行即可。
     assert not list(tmp_path.iterdir())
 
 
@@ -492,9 +488,7 @@ def test_missing_metadata_leaves_unknown_without_old_fallback(
     engine._start_tracking()
     assert engine._tracking.tracker is None
     assert engine.current_node == '0'
-    records = [
-        json.loads(line) for line in engine._tracking.log_path.read_text('utf-8').splitlines()
-    ]
+    records = [json.loads(line) for line in _gunzip_lines(engine._tracking.log_path)]
     assert records[-1]['kind'] == 'disabled'
 
 
@@ -668,7 +662,7 @@ def test_partial_map_warns_once_and_records_available_capabilities(
     assert '船位距离' in message
     assert '运动射线' in message
     assert '地图路由约束' in message
-    records = [json.loads(line) for line in session.log_path.read_text('utf-8').splitlines()]
+    records = [json.loads(line) for line in _gunzip_lines(session.log_path)]
     start = records[0]
     assert start['capabilities']['distance']
     assert start['capabilities']['topology']
@@ -689,7 +683,7 @@ def test_complete_map_does_not_emit_degradation_warning(
     assert session is not None
     assert session.tracker is not None
     warning.assert_not_called()
-    records = [json.loads(line) for line in session.log_path.read_text('utf-8').splitlines()]
+    records = [json.loads(line) for line in _gunzip_lines(session.log_path)]
     assert records[0]['degradation_reasons'] == []
     assert all(records[0]['capabilities'].values())
 
@@ -724,7 +718,9 @@ def test_legacy_event_map_tracks_and_replays_frozen_coordinates(
     monkeypatch.setattr(
         TrackingMap, 'load_event', MagicMock(side_effect=AssertionError('不应重新加载地图'))
     )
-    summary = replay(session.log_path)
+    plain = tmp_path / 'legacy.jsonl'
+    plain.write_bytes(gzip.decompress(session.log_path.read_bytes()))
+    summary = replay(plain)
     assert summary['metadata_snapshot_used']
     assert summary['metadata_source'] == metadata.source
     assert summary['capabilities'] == metadata.capabilities

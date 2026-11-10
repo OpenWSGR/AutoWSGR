@@ -281,6 +281,7 @@ def test_partial_enemy_templates_keep_unknown_fleet_neutral() -> None:
     tracker = _tracker(
         {
             'A': _node((0.2, 0.2)),
+            'D': _node((0.9, 0.2)),
             'B': _node((0.5, 0.5), ships=('驱逐',) * 6),
             'C': _node((0.8, 0.8), ships=('战列',) * 6),
         }
@@ -300,7 +301,9 @@ def test_partial_enemy_templates_keep_unknown_fleet_neutral() -> None:
     assert arrived.anomaly is None
     assert arrived.node_weights['C'] > arrived.node_weights['A'] > arrived.node_weights['B'] > 0
     assert arrived.current_node is None
-    assert arrived.diagnostics['enemy']['robust_log_factor']['A'] == 0
+    # A/D 均无变体：敌情证据对二者贡献相同（中性），不反向惩罚无资料节点。
+    enemy_weights = arrived.diagnostics['enemy']['weights']
+    assert enemy_weights['A'] == pytest.approx(enemy_weights['D'])
 
 
 def test_matching_detour_supports_known_node_against_unknown_metadata() -> None:
@@ -319,7 +322,9 @@ def test_matching_detour_supports_known_node_against_unknown_metadata() -> None:
     )
     assert arrived.node_weights['A'] > moving.node_weights['A']
     assert arrived.node_weights['B'] > 0
-    assert arrived.diagnostics['enemy']['robust_log_factor']['B'] == 0
+    # B 无变体也无迂回属性：敌情证据保持中性，只有 A 获得迂回正票。
+    enemy_weights = arrived.diagnostics['enemy']['weights']
+    assert enemy_weights['A'] > enemy_weights['B']
 
 
 def test_temporary_destination_before_arrival_does_not_become_an_absorbing_state() -> None:

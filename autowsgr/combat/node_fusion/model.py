@@ -869,7 +869,7 @@ class FusionTracker:
         }
 
     def _enemy_diagnostics(self, obs: FusionObservation) -> dict[str, Any]:
-        """按同一真实变体展示敌情各分项及联合支持度，不使用历史节点筛选。"""
+        """按同一真实变体展示敌情支持度汇总；逐变体明细由重放复得。"""
         enemy = obs.enemies
         if enemy is None:
             return {'available': False, 'reason': '本次没有新的索敌证据', 'weights': {}}
@@ -880,11 +880,7 @@ class FusionTracker:
         )
         if not any(signature.ships) and signature.formation is None and signature.detour is None:
             return {'available': False, 'reason': '六槽、阵型及迂回信息均缺失', 'weights': {}}
-        variants: dict[str, list[dict[str, Any]]] = {}
-        joint_scores: dict[str, float] = {}
         robust_scores: dict[str, float] = {}
-        ships_scores: dict[str, float] = {}
-        formation_scores: dict[str, float] = {}
         supported_nodes = []
         for name, node in self.map_data.nodes.items():
             if name == '0' or node.silent:
@@ -898,31 +894,12 @@ class FusionTracker:
                     _State(name, _SPOT, -1, evidence=(signature,))
                 )
                 continue
-            rows, robust = [], []
-            for index, variant in enumerate(node.enemy_formations):
-                ships, formation = self._fleet_components(variant, (signature,))
-                rows.append(
-                    {
-                        'ships': variant.ships,
-                        'formation': variant.formation,
-                        'ships_log_likelihood': ships,
-                        'formation_log_likelihood': formation,
-                        'joint_log_likelihood': ships + formation,
-                    }
-                )
-                robust.append(self._enemy_factor(_State(name, _SPOT, index, evidence=(signature,))))
-            variants[name] = rows
-            count = math.log(len(rows))
-            ships_scores[name] = (
-                _logsum(np.array([row['ships_log_likelihood'] for row in rows])) - count
-            )
-            formation_scores[name] = (
-                _logsum(np.array([row['formation_log_likelihood'] for row in rows])) - count
-            )
-            joint_scores[name] = (
-                _logsum(np.array([row['joint_log_likelihood'] for row in rows])) - count
-            )
-            robust_scores[name] = _logsum(np.array(robust)) - count
+            robust = [
+                self._enemy_factor(_State(name, _SPOT, index, evidence=(signature,)))
+                for index in range(len(node.enemy_formations))
+            ]
+            robust_scores[name] = _logsum(np.array(robust)) - math.log(len(robust))
+        ranked = sorted(robust_scores.items(), key=lambda item: item[1], reverse=True)
         return {
             'available': bool(supported_nodes),
             'reason': None if supported_nodes else '地图缺少与本次观察对应的敌情或迂回资料',
@@ -931,12 +908,16 @@ class FusionTracker:
             'ships': signature.ships,
             'formation': signature.formation,
             'detour': signature.detour,
-            'ships_log_likelihood': ships_scores,
-            'formation_log_likelihood': formation_scores,
-            'joint_log_likelihood': joint_scores,
-            'robust_log_factor': robust_scores,
+            'robust_top': (
+                {
+                    'node': ranked[0][0],
+                    'log_factor': ranked[0][1],
+                    'lead_nats': ranked[0][1] - ranked[1][1] if len(ranked) > 1 else ranked[0][1],
+                }
+                if ranked
+                else None
+            ),
             'weights': self._normalized_logs(robust_scores),
-            'variants': variants,
         }
 
     def _diagnostics(self, event_id: int) -> dict[str, Any]:

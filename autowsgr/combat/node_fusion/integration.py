@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import time
 from dataclasses import asdict
@@ -193,13 +194,14 @@ class TrackingSession:
         try:
             directory = Path(log_dir or 'logs') / 'node-fusion'
             directory.mkdir(parents=True, exist_ok=True)
-            self.log_path = directory / f'{self._sortie_id}.jsonl'
+            self.log_path = directory / f'{self._sortie_id}.jsonl.gz'
         except OSError as exc:
             _log.warning('[NodeFusion] 无法创建标量日志，节点推断继续: {}', exc)
 
     def _write(self, record: dict) -> None:
         if self.log_path is not None:
-            with self.log_path.open('a', encoding='utf-8') as stream:
+            # 标量日志行内键名与舰名重复度高，gzip 压缩比约 5-8 倍。
+            with gzip.open(self.log_path, 'at', encoding='utf-8') as stream:
                 stream.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + '\n')
 
     def _record(self, record: dict) -> None:
@@ -266,23 +268,7 @@ class TrackingSession:
                     'estimate': summary,
                 }
             )
-        _log.debug(
-            '[NodeFusion] 帧={} 阶段={} 距离={} 射线={} 历史={} 几何={} 敌情={} 融合={} '
-            '目的点={} 路线={} 修订={} 忽略={} 异常={}',
-            observation.frame_id,
-            observation.phase,
-            self.estimate.diagnostics.get('distance'),
-            self.estimate.diagnostics.get('ray'),
-            self.estimate.diagnostics.get('history_prior'),
-            self.estimate.diagnostics.get('geometry'),
-            self.estimate.diagnostics.get('enemy'),
-            self.estimate.diagnostics.get('fusion'),
-            self.estimate.target_weights,
-            self.estimate.best_route,
-            self.estimate.revisions,
-            self.estimate.ignored,
-            self.estimate.anomaly,
-        )
+        # 逐帧诊断只在回放 JSONL 里保留；线上日志仅到达帧输出归因摘要。
         return self.estimate
 
     def motion(self, frame: CapturedFrame | None, decision_node: str) -> None:

@@ -173,7 +173,7 @@ def test_current_node_requires_an_arrival_and_excludes_departure_intent() -> Non
     assert replace(pending_detour, anomaly='无法解释').current_node is None
 
 
-def test_enemy_diagnostics_preserve_joint_variants_and_separate_history_prior() -> None:
+def test_enemy_diagnostics_summarize_support_and_separate_history_prior() -> None:
     tracker = FusionTracker(
         TrackingMap.from_dict(
             {
@@ -189,14 +189,13 @@ def test_enemy_diagnostics_preserve_joint_variants_and_separate_history_prior() 
     channels = result.diagnostics
     assert channels['history_prior']['weights'] == pytest.approx({'A': 0.5, 'B': 0.5})
     enemy = channels['enemy']
-    assert enemy['joint_log_likelihood']['B'] > enemy['joint_log_likelihood']['A']
+    # 诊断只保留节点级汇总；逐变体明细由重放同一观测流复得。
     assert enemy['weights']['B'] > enemy['weights']['A']
+    assert enemy['robust_top']['node'] == 'B'
+    assert enemy['robust_top']['lead_nats'] > 0
+    assert 'variants' not in enemy
+    assert 'joint_log_likelihood' not in enemy
     assert result.node_weights['B'] > result.node_weights['A']
-    assert len(enemy['variants']['A']) == 2
-    for row in enemy['variants']['A']:
-        assert row['joint_log_likelihood'] == pytest.approx(
-            row['ships_log_likelihood'] + row['formation_log_likelihood']
-        )
 
 
 def test_repeated_six_slot_read_is_not_six_more_votes_per_frame() -> None:
