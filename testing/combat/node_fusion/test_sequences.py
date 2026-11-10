@@ -158,7 +158,7 @@ def _node(
     silent: bool = False,
 ) -> dict[str, Any]:
     return {
-        'type': 'NULL' if silent else 'FIGTH',
+        'type': 'NULL' if silent else 'FIGHT',
         'detour': False,
         'position': [0.5, 0.5],
         'next': list(next_nodes),

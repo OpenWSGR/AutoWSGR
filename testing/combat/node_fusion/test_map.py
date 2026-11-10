@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _node(next_nodes: tuple[str, ...] = (), node_type: str = 'FIGTH') -> dict[str, Any]:
+def _node(next_nodes: tuple[str, ...] = (), node_type: str = 'FIGHT') -> dict[str, Any]:
     return {
         'type': node_type,
         'detour': False,
@@ -284,7 +284,7 @@ def test_load_missing_and_malformed_files(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(tracking_map, '_MAP_ROOT', tmp_path)
     assert TrackingMap.load(99, 99) is None
     bad = _simple()
-    bad['0']['type'] = 'FIGTH'
+    bad['0']['type'] = 'FIGHT'
     bad['0']['enemy_formations'] = [{'formation': 1, 'ships': ['驱逐']}]
     (tmp_path / '2-1.json').write_text(json.dumps(bad), encoding='utf-8')
     with pytest.raises(ValueError, match='entry node'):

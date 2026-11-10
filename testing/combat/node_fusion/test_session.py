@@ -103,7 +103,7 @@ def calibration_session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Trac
             'A': {
                 'position': [0.5, 0.2],
                 'next': [],
-                'type': 'FIGTH',
+                'type': 'FIGHT',
                 'detour': False,
                 'enemy_formations': [{'formation': 2, 'ships': ['驱逐'] * 6}],
             },

@@ -29,7 +29,7 @@ def _node(
     return {
         'position': list(position),
         'next': list(next_nodes),
-        'type': 'NULL' if silent else 'FIGTH',
+        'type': 'NULL' if silent else 'FIGHT',
         'detour': False,
         'enemy_formations': [] if silent else [{'formation': 1, 'ships': [ship] * 6}],
     }

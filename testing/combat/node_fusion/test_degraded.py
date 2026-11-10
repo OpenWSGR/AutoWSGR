@@ -211,8 +211,8 @@ def test_missing_enemy_only_keeps_stage_and_route_history_without_motion() -> No
     tracker = _tracker(
         {
             '0': _node((0.05, 0.1), ['A'], 'NULL', False),
-            'A': _node((0.2, 0.2), ['B'], 'FIGTH', False),
-            'B': _node((0.8, 0.8), [], 'FIGTH', False),
+            'A': _node((0.2, 0.2), ['B'], 'FIGHT', False),
+            'B': _node((0.8, 0.8), [], 'FIGHT', False),
         }
     )
     assert tracker.map_data.capabilities['encounter_history']
@@ -228,8 +228,8 @@ def test_known_detour_is_evidence_even_when_enemy_variants_are_missing() -> None
     tracker = _tracker(
         {
             '0': _node((0.05, 0.1), ['A', 'B'], 'NULL', False),
-            'A': _node((0.2, 0.2), [], 'FIGTH', True),
-            'B': _node((0.8, 0.8), [], 'FIGTH', False),
+            'A': _node((0.2, 0.2), [], 'FIGHT', True),
+            'B': _node((0.8, 0.8), [], 'FIGHT', False),
         }
     )
     arrived = tracker.observe(
@@ -245,8 +245,8 @@ def test_unknown_detour_is_not_treated_as_a_negative_button_observation() -> Non
     tracker = _tracker(
         {
             '0': _node((0.05, 0.1), ['A', 'B'], 'NULL', False),
-            'A': _node((0.2, 0.2), [], 'FIGTH', None, ('驱逐',) * 6),
-            'B': _node((0.8, 0.8), [], 'FIGTH', False, ('驱逐',) * 6),
+            'A': _node((0.2, 0.2), [], 'FIGHT', None, ('驱逐',) * 6),
+            'B': _node((0.8, 0.8), [], 'FIGHT', False, ('驱逐',) * 6),
         }
     )
     arrived = tracker.observe(

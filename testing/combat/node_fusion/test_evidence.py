@@ -19,7 +19,7 @@ def _node(
     detour: bool = False,
 ) -> dict[str, Any]:
     return {
-        'type': 'FIGTH' if variants else 'NULL',
+        'type': 'FIGHT' if variants else 'NULL',
         'position': [0.5, 0.5],
         'next': next_nodes,
         'detour': detour,

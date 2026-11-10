@@ -14,7 +14,7 @@
     "enemy_formations": []
   },
   "A": {
-    "type": "FIGTH",
+    "type": "FIGHT",
     "detour": false,
     "night": false,
     "position": [
@@ -62,7 +62,7 @@
     ]
   },
   "B": {
-    "type": "FIGTH",
+    "type": "FIGHT",
     "detour": false,
     "night": false,
     "position": [
@@ -109,7 +109,7 @@
     ]
   },
   "C": {
-    "type": "FIGTH",
+    "type": "FIGHT",
     "detour": false,
     "night": false,
     "position": [
@@ -170,7 +170,7 @@
     "enemy_formations": []
   },
   "E": {
-    "type": "FIGTH",
+    "type": "FIGHT",
     "detour": false,
     "night": false,
     "position": [
@@ -217,7 +217,7 @@
     ]
   },
   "F": {
-    "type": "FIGTH",
+    "type": "FIGHT",
     "detour": false,
     "night": false,
     "position": [
@@ -262,7 +262,7 @@
     ]
   },
   "G": {
-    "type": "FIGTH",
+    "type": "FIGHT",
     "detour": false,
     "night": false,
     "position": [
