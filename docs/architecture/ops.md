@@ -147,11 +147,22 @@ DecisiveResult
 |------------------------------------|-----------------------------------|
 | `is_game_running(ctrl, package)`   | 检查游戏进程是否运行                |
 | `is_on_main_page(ctrl)`           | 截图检测是否在主页面                |
-| `wait_for_game_ui(ctrl, timeout)` | 轮询等待游戏 UI 就绪               |
-| `start_game(ctrl, app, package)`  | 启动游戏并等待                     |
-| `go_main_page(ctrl)`              | 导航到主页面                       |
-| `restart_game(ctrl, app)`         | 完整重启周期 (停止→启动→等待)       |
+| `wait_for_game_ui(ctrl, timeout=..., allow_start_screen=True)` | 等待启动页或已注册游戏页面 |
+| `start_game(ctrl, package)`       | 启动游戏、点击进入并等待游戏内页面   |
+| `go_main_page(ctx)`               | 导航到主页面、清除浮层并确认基础页面 |
+| `restart_game(ctrl, package)`     | 完整重启周期 (停止→启动→等待)       |
 | `ensure_game_ready(ctx, app)`     | 确保游戏就绪 (启动+检查+到主页面)   |
+
+进程存在并不表示游戏已经登录。`ensure_game_ready` 会处理已运行但仍停留在
+「点击进入」画面的情况；冷启动与恢复流程共用相同的进入检查。
+`wait_for_game_ui` 也接受主页面、公告/签到浮层和其他已注册游戏页面，
+点击进入后使用 `allow_start_screen=False`，防止尚未离开启动页便报告成功。
+冷启动的加载和登录共用 `startup_timeout` 总预算（默认 120 秒），
+登录阶段不再被固定的 30 秒等待提前截断。
+
+默认就绪流程在导航后重新检查登录浮层，即使当天已经处理过，也会处理重启后
+再次出现的公告。清理后确认主页面基础状态，才返回可供调度器使用的上下文。
+仅需等待游戏内页面而不处理主页面时，可直接调用 `start_game`。
 
 ### 页面导航
 

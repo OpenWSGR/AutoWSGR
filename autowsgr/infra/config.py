@@ -65,6 +65,8 @@ class EmulatorConfig(BaseModel):
     """模拟器可执行文件路径。None = 自动检测"""
     serial: str | None = None
     """ADB serial 地址。None = 自动检测"""
+    display_id: int | None = Field(default=None, ge=0)
+    """Android 显示屏编号。None = 按游戏包名自动检测；0 为默认显示屏。"""
     process_name: str | None = None
     """模拟器进程名。None = 自动推断"""
 
