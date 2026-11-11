@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import pytest
 
-from autowsgr.combat.node_tracker import MapNodeData
+from autowsgr.combat.node_fusion.coordinates import MapNodeData
 from autowsgr.infra.exceptions import ActionFailedError
 from autowsgr.types import PageName, ShipType
 from autowsgr.ui.build_page import BuildPage

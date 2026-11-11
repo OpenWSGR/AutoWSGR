@@ -113,6 +113,9 @@ UserConfig (顶层)
 
 #### LogConfig
 
+`node_fusion_replay` 默认为 `false`。设为 `true` 才保存逐帧节点融合 JSONL，供离线回放；
+不影响节点推断、普通 DEBUG 诊断或每趟结束时的 INFO 识别统计。
+
 特殊属性 `effective_channels`：合并布尔开关 (`show_*_debug`) 与显式 `channels` 字典，生成最终通道级别映射。显式 `channels` 优先级高于布尔开关。
 
 通道映射关系：

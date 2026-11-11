@@ -13,7 +13,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from time import monotonic
 from typing import TYPE_CHECKING
+
+from autowsgr.emulator.frame import CapturedFrame
 
 
 if TYPE_CHECKING:
@@ -79,6 +82,11 @@ class AndroidController(ABC):
             截图超时或设备无响应。
         """
         ...
+
+    def capture_frame(self) -> CapturedFrame:
+        """兼容截图实现；未知帧标识保留 None，时间为本次采集完成时间。"""
+        image = self.screenshot()
+        return CapturedFrame(image=image, sequence=None, captured_at=monotonic())
 
     # ── 触控 ──
 

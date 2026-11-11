@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from autowsgr.combat.state import CombatPhase
+from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra import get_logger
 from autowsgr.vision import (
@@ -15,8 +17,6 @@ from autowsgr.vision import (
     PixelRule,
     PixelSignature,
 )
-
-from .state import CombatPhase
 
 
 if TYPE_CHECKING:
@@ -225,6 +225,18 @@ class CombatRecognizer:
     def __init__(self, ctx: GameContext) -> None:
         self._ctx = ctx
         self._device = ctx.ctrl
+        self.last_frame: CapturedFrame | None = None
+        self.last_match: CapturedFrame | None = None
+
+    def capture_frame(self) -> CapturedFrame:
+        """保留截图的来源序号/采集时间；兼容只实现 screenshot 的控制器。"""
+        capture = getattr(self._device, 'capture_frame', None)
+        frame = capture() if callable(capture) else None
+        if not isinstance(frame, CapturedFrame):
+            captured_at = time.monotonic()
+            frame = CapturedFrame(self._device.screenshot(), None, captured_at)
+        self.last_frame = frame
+        return frame
 
     @staticmethod
     def _match_template(
@@ -318,6 +330,7 @@ class CombatRecognizer:
             phase_sigs.append((phase, sig))
 
         deadline = time.time() + max_timeout
+        self.last_match = None
 
         _log.debug(
             '[Combat] 等待状态: {} (超时 {:.1f}s)',
@@ -330,7 +343,8 @@ class CombatRecognizer:
             if self._ctx.stop_event.is_set():
                 raise CombatStopRequestedError('任务被用户停止')
 
-            screen = self._device.screenshot()
+            frame = self.capture_frame()
+            screen = frame.image
             if poll_action is not None:
                 poll_action(screen)
 
@@ -342,6 +356,7 @@ class CombatRecognizer:
                 ):
                     continue
                 if self._match_phase(screen, sig):
+                    self.last_match = frame
                     if sig.after_match_delay > 0:
                         time.sleep(sig.after_match_delay)
                     _log.debug('[Combat] 匹配到状态: {}', phase.name)

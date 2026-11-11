@@ -69,10 +69,11 @@ class PixelChecker:
         screen:
             截图 (HxWx3, RGB)。
         x, y:
-            像素的相对坐标（左上角为 0.0，右下角趋近 1.0）。
+            像素的相对坐标（左上角为 0.0，右下角趋近 1.0）；越界裁剪到边缘。
         """
         h, w = screen.shape[:2]
-        px, py = int(x * w), int(y * h)
+        px = min(max(int(x * w), 0), w - 1)
+        py = min(max(int(y * h), 0), h - 1)
         rgb = screen[py, px]
         return Color(r=int(rgb[0]), g=int(rgb[1]), b=int(rgb[2]))
 

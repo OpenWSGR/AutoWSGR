@@ -1,0 +1,275 @@
+{
+  "0": {
+    "type": "NULL",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.638,
+      0.875
+    ],
+    "next": [
+      "A",
+      "B"
+    ],
+    "enemy_formations": []
+  },
+  "A": {
+    "type": "FIGHT",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.518,
+      0.73
+    ],
+    "next": [
+      "C"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 2,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "B": {
+    "type": "FIGHT",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.693,
+      0.596
+    ],
+    "next": [
+      "D"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 2,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 2,
+        "ships": [
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "C": {
+    "type": "FIGHT",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.4,
+      0.663
+    ],
+    "next": [
+      "E"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 3,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "D": {
+    "type": "FIGHT",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.637,
+      0.322
+    ],
+    "next": [
+      "F"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 1,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "E": {
+    "type": "BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.234,
+      0.64
+    ],
+    "next": [],
+    "enemy_formations": [
+      {
+        "formation": 1,
+        "ships": [
+          "战列",
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "轻母",
+          "轻母",
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "F": {
+    "type": "FIGHT",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.417,
+      0.396
+    ],
+    "next": [
+      "E",
+      "G"
+    ],
+    "enemy_formations": [
+      {
+        "formation": 3,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "轻巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      },
+      {
+        "formation": 3,
+        "ships": [
+          "重巡",
+          "轻巡",
+          "轻巡",
+          "驱逐",
+          "驱逐"
+        ]
+      }
+    ]
+  },
+  "G": {
+    "type": "NULL",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.292,
+      0.269
+    ],
+    "next": [],
+    "enemy_formations": []
+  }
+}

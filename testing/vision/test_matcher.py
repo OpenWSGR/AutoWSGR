@@ -301,6 +301,17 @@ class TestPixelCheckerSingle:
         assert c.g == 22
         assert c.b == 33
 
+    def test_get_pixel_clips_out_of_range_coordinates(self):
+        """越界相对坐标裁剪到边缘：负坐标不借负索引回绕，超 1.0 不抛 IndexError。"""
+        screen = np.zeros((10, 20, 3), dtype=np.uint8)
+        screen[:, :] = [200, 200, 200]  # 底色
+        screen[:, 0] = [1, 1, 1]  # 左边缘列
+        screen[:, -1] = [9, 9, 9]  # 右边缘列
+        assert PixelChecker.get_pixel(screen, x=-0.05, y=0.5) == Color(r=1, g=1, b=1)
+        assert PixelChecker.get_pixel(screen, x=1.05, y=0.5) == Color(r=9, g=9, b=9)
+        assert PixelChecker.get_pixel(screen, x=0.5, y=-0.05) == Color(r=200, g=200, b=200)
+        assert PixelChecker.get_pixel(screen, x=0.5, y=1.05) == Color(r=200, g=200, b=200)
+
     def test_check_pixel_match(self):
         screen = solid_screen(100, 150, 200)
         assert PixelChecker.check_pixel(screen, 0.5, 0.5, Color.of(100, 150, 200)) is True
