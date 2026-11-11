@@ -17,10 +17,14 @@
     - _handle_result
     - _handle_get_ship
     - _handle_proceed
-- node_tracker
+- node_fusion
 - recognition
     - recognize_enemy_ships
     - recognize_enemy_formation
+
+地图轮询和遭遇页面的 DEBUG 日志分别记录距离、射线、敌情、历史路线约束及融合结果。
+船位检测只返回本帧位置，`detection_status` 区分页面遮挡、无候选簇、像素校验失败和成功。
+融合结果是唯一节点来源；导航目标不当作已到达点。详细字段见 [融合模块文档](node_fusion/README.md)。
 
 ### 脱机测试（未做）
 
@@ -40,7 +44,7 @@
 
 - 7-46SS
     - fight
-    - node_tracker
+    - node_fusion
     - _handle_get_ship
     - _handle_proceed
 
@@ -189,6 +193,21 @@ class NodeDecision:
 - **`enemy_rules` / `formation_rules`**: 索敌成功时，应用的规则引擎，用于决定战术选择，包括是否撤退，阵形选择。
 - **`SL_when_*`**: 在特定失败条件下是否进行 SL。
 - **`formation_when_spot_enemy_fails`**: 在索敌失败时选择的阵型。
+
+## 节点融合追踪器
+
+地图战斗统一使用 [`node_fusion/`](node_fusion/README.md)，无需计划开关。
+完整历史、地图路由、船位和敌情共同决定当前节点，并记录各路诊断及历史修订。
+旧节点算法与旧配置项已移除；演习、战役等单点战不需要地图追踪。
+
+Tracking JSON 不存在时自动读取旧 YAML 坐标。缺少敌情、迂回属性、节点类型或路由时，
+融合模型保留可用证据并输出降级警告；仅有坐标的地图也能使用距离与运动射线。
+未知字段不会补成终点、空白点或不可迂回。缺少类型或路由时不按战斗次数推进节点，
+仍无法确认当前位置时继续执行未知节点的撤退、SL 或回港处理。
+
+相关自动测试集中在 [`testing/combat/node_fusion/`](../../testing/combat/node_fusion/)。
+完整回放默认关闭，配置 `log.node_fusion_replay: true` 后保存地图快照及逐帧观测。
+每趟结束仍输出简短的识别核对统计和运行累计；回放时核对指纹，避免换图。
 
 ## 未来计划
 

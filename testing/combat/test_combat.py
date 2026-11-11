@@ -16,12 +16,7 @@ from autowsgr.combat.history import (
     FightResult,
     grade_condition_met,
 )
-from autowsgr.combat.node_tracker import (
-    MapNodeData,
-    NodePosition,
-    NodeTracker,
-    _resolve_event_map_path,
-)
+from autowsgr.combat.node_fusion.coordinates import MapNodeData, _resolve_event_map_path
 from autowsgr.combat.plan import (
     _MODE_SPECS,
     MODE_TRANSITIONS,
@@ -897,36 +892,8 @@ class TestCombatPlanEntrance:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# node_tracker load_event 测试
+# 活动地图坐标加载测试
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestNodeTracker:
-    """节点追踪器在第一帧尚无速度方向时的定位测试。"""
-
-    @staticmethod
-    def _make_tracker() -> NodeTracker:
-        map_data = MapNodeData(
-            {
-                '0': NodePosition('0', 0.20, 0.60, ['A']),
-                'A': NodePosition('A', 0.50, 0.50, []),
-            }
-        )
-        return NodeTracker(map_data)
-
-    def test_first_position_near_first_node_updates_immediately(self) -> None:
-        """首个有效画面已接近 A 点时，不应等到下一段移动才更新节点。"""
-        tracker = self._make_tracker()
-        object.__setattr__(tracker, '_ship_position', (0.49, 0.50))
-
-        assert tracker.update_node() == 'A'
-
-    def test_first_position_near_start_keeps_zero(self) -> None:
-        """首个有效画面仍靠近地图起点时，应继续保留未知起始节点。"""
-        tracker = self._make_tracker()
-        object.__setattr__(tracker, '_ship_position', (0.21, 0.60))
-
-        assert tracker.update_node() == '0'
 
 
 class TestResolveEventMapPath:
@@ -1002,6 +969,37 @@ class TestLoadEvent:
 
     def test_missing_returns_none(self):
         assert MapNodeData.load_event('20260730', 'H', 99, 'a') is None
+
+
+class TestParse:
+    """MapNodeData._parse 对新格式 YAML 的严格解析。"""
+
+    def test_dual_entrance_file_is_rejected(self):
+        """数据规范要求 α/β 入口按入口拆分为单独文件；混在一个文件里直接拒绝。"""
+        raw = {
+            'α': {'position': [0.1, 0.2], 'next': ['A']},
+            'β': {'position': [0.9, 0.2], 'next': ['B']},
+        }
+        with pytest.raises(ValueError, match='Duplicate map node'):
+            MapNodeData._parse(raw)
+
+    def test_malformed_position_is_skipped_with_warning(self):
+        raw = {
+            'A': {'position': [0.1], 'next': ['B']},  # 长度不足
+            'B': {'position': 'bad', 'next': []},  # 非列表
+            'C': {'position': [0.5, 0.5], 'next': ['B']},  # 正常
+        }
+        data = MapNodeData._parse(raw)
+        assert list(data.node_names) == ['C']
+
+    def test_invalid_next_falls_back_to_empty_list(self):
+        raw = {
+            'A': {'position': [0.5, 0.5], 'next': None},  # YAML 空值
+            'B': {'position': [0.5, 0.6], 'next': 'ABC'},  # 字符串不得逐字符拆分
+        }
+        data = MapNodeData._parse(raw)
+        assert data.get('A').next_nodes == []
+        assert data.get('B').next_nodes == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
