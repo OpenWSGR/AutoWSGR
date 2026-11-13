@@ -8,14 +8,20 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
+import cv2
 import numpy as np
 import pytest
 
 from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.image_resources._lazy import load_template
+from autowsgr.infra import DecisiveConfig
+from autowsgr.types import ShipDamageState
+from autowsgr.ui.battle.constants import BLOOD_BAR_PROBE
 from autowsgr.ui.decisive import ship_list as module
+from autowsgr.ui.decisive.map_controller import DecisiveMapController
 from autowsgr.ui.decisive.ship_list import DecisiveInventoryScanError, DecisiveShipListWalker
 from autowsgr.ui.utils.ship_list_geometry import ShipListGeometryReader
+from autowsgr.vision import OCRResult
 
 
 if TYPE_CHECKING:
@@ -385,3 +391,159 @@ def test_stop_during_final_ocr_cannot_publish_inventory(
     monkeypatch.setattr(module, 'locate_ship_rows', read)
     with pytest.raises(InterruptedError):
         scan.scan()
+
+
+def _navigation_screen(template_name: str) -> np.ndarray:
+    image = np.full((720, 1280, 3), 40, dtype=np.uint8)
+    template = load_template(template_name)
+    patch = cv2.resize(
+        template.image, (round(template.width * 4 / 3), round(template.height * 4 / 3))
+    )
+    height, width = patch.shape[:2]
+    image[:height, 1280 - width :] = patch
+    for x, y in BLOOD_BAR_PROBE.values():
+        image[int(y * 720), int(x * 1280)] = (43, 87, 112)
+    return image
+
+
+@pytest.fixture
+def inventory_controller(walker: Callable) -> DecisiveMapController:
+    listing = _page((('甲', '乙'),))
+    scanner = walker([listing])
+    device = scanner._ctrl
+    device.phase = 'prepare'
+    prepare = _navigation_screen('page/fight_prepare_540p.png')
+    map_screen = _navigation_screen('decisive/decisive_map_540p.png')
+    device.screenshot = lambda: {
+        'prepare': prepare,
+        'choose': device.pages[0].image,
+        'map': map_screen,
+    }[device.phase]
+    device.capture_frame = lambda: CapturedFrame(device.screenshot(), next(sequence), 1.0)
+    sequence = iter(range(1, 1000))
+
+    def click(x: float, y: float, **_kwargs: object) -> None:
+        if x <= 0.05 and y <= 0.06:
+            device.phase = 'prepare' if device.phase == 'choose' else 'map'
+        elif device.phase == 'prepare':
+            device.phase = 'choose'
+
+    device.click = MagicMock(side_effect=click)
+    scanner._ctx.ocr.recognize.return_value = []
+    controller = DecisiveMapController(scanner._ctx, DecisiveConfig())
+    controller.enter_formation = MagicMock()
+    return controller
+
+
+def test_check_fleet_returns_only_after_full_scan_and_verified_return(
+    inventory_controller: DecisiveMapController,
+) -> None:
+    fleet, damage, available = inventory_controller.check_fleet()
+
+    assert fleet == [None] * 6
+    assert damage == dict.fromkeys(range(6), ShipDamageState.NO_SHIP)
+    assert available == {'甲', '乙'}
+    assert inventory_controller._ctrl.phase == 'map'
+    assert inventory_controller._ctx.ocr.recognize.call_count == 1
+
+
+def test_empty_candidates_preserve_the_verified_fleet_in_total_inventory(
+    inventory_controller: DecisiveMapController,
+) -> None:
+    image = inventory_controller._ctrl.screenshot()
+    x, y = BLOOD_BAR_PROBE[0]
+    image[int(y * 720), int(x * 1280)] = (75, 168, 118)
+    inventory_controller._ctx.ocr.recognize.side_effect = [
+        [],
+        [OCRResult(text='U-96', confidence=0.99)],
+    ]
+    inventory_controller._ctrl.pages[0] = _page((), leave=True, empty_background=True)
+
+    fleet, _damage, available = inventory_controller.check_fleet()
+
+    assert fleet == ['U-96', None, None, None, None, None]
+    assert available == {'U-96'}
+    assert inventory_controller._ctrl.phase == 'map'
+
+
+def test_check_fleet_rejects_occupied_unreadable_slot_before_opening_list(
+    inventory_controller: DecisiveMapController,
+) -> None:
+    image = inventory_controller._ctrl.screenshot()
+    x, y = BLOOD_BAR_PROBE[0]
+    image[int(y * 720), int(x * 1280)] = (75, 168, 118)
+
+    with pytest.raises(DecisiveInventoryScanError, match='未识别的占用槽'):
+        inventory_controller.check_fleet()
+    inventory_controller._ctrl.click.assert_not_called()
+    assert inventory_controller._ctx.ocr.recognize.call_count == 3
+
+
+@pytest.mark.parametrize('missing_rounds', [1, 2])
+@pytest.mark.parametrize('recovered_name', ['U-96', '列克星敦'])
+def test_check_fleet_fills_only_unknown_names_without_target_context(
+    inventory_controller: DecisiveMapController, missing_rounds: int, recovered_name: str
+) -> None:
+    image = inventory_controller._ctrl.screenshot()
+    x, y = BLOOD_BAR_PROBE[0]
+    image[int(y * 720), int(x * 1280)] = (75, 168, 118)
+    inventory_controller._ctx.ocr.recognize.side_effect = [
+        *([[]] * missing_rounds),
+        [OCRResult(text=recovered_name, confidence=0.99)],
+    ]
+
+    fleet, damage, available = inventory_controller.check_fleet()
+
+    assert fleet == [recovered_name, None, None, None, None, None]
+    assert damage[0] == ShipDamageState.NORMAL
+    assert available == {'甲', '乙', recovered_name}
+    assert inventory_controller._ctx.ocr.recognize.call_count == missing_rounds + 1
+    assert inventory_controller._ctrl.phase == 'map'
+
+
+def test_check_fleet_stop_before_name_retry_never_navigates(
+    inventory_controller: DecisiveMapController,
+) -> None:
+    image = inventory_controller._ctrl.screenshot()
+    x, y = BLOOD_BAR_PROBE[0]
+    image[int(y * 720), int(x * 1280)] = (75, 168, 118)
+
+    def interrupted_ocr(*_args: object, **_kwargs: object) -> list:
+        inventory_controller._ctx.stop_event.set()
+        return []
+
+    inventory_controller._ctx.ocr.recognize.side_effect = interrupted_ocr
+    with pytest.raises(InterruptedError):
+        inventory_controller.check_fleet()
+    inventory_controller._ctrl.click.assert_not_called()
+    assert inventory_controller._ctx.ocr.recognize.call_count == 1
+
+
+def test_check_fleet_stop_during_name_retry_never_navigates(
+    inventory_controller: DecisiveMapController,
+) -> None:
+    image = inventory_controller._ctrl.screenshot()
+    x, y = BLOOD_BAR_PROBE[0]
+    image[int(y * 720), int(x * 1280)] = (75, 168, 118)
+
+    def interrupted_ocr(*_args: object, **_kwargs: object) -> list:
+        if inventory_controller._ctx.ocr.recognize.call_count == 1:
+            return []
+        inventory_controller._ctx.stop_event.set()
+        return [OCRResult(text='U-96', confidence=0.99)]
+
+    inventory_controller._ctx.ocr.recognize.side_effect = interrupted_ocr
+    with pytest.raises(InterruptedError):
+        inventory_controller.check_fleet()
+    inventory_controller._ctrl.click.assert_not_called()
+    assert inventory_controller._ctx.ocr.recognize.call_count == 2
+
+
+def test_check_fleet_stops_in_list_when_inventory_is_incomplete(
+    inventory_controller: DecisiveMapController,
+) -> None:
+    inventory_controller._ctrl.pages[0].hits.pop()
+
+    with pytest.raises(DecisiveInventoryScanError, match='三次后仍不完整'):
+        inventory_controller.check_fleet()
+    assert inventory_controller._ctrl.phase == 'choose'

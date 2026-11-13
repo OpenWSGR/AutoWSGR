@@ -189,7 +189,8 @@ class DecisiveBattlePage:
         """识别当前决战章节的小关进度 (0-3)。
 
         检查每个小关位置像素颜色，白色 (250,244,253) 为已通过。
-        返回当前正在进行的小关编号; 3 表示全部通过。
+        返回首个未通过小关的零基索引 (0-2)；3 表示全部通过。
+        业务层使用的小关编号 (1-3) 须在入口边界转换，不能直接使用此进度值。
         """
         check_points = _STAGE_CHECK_POINTS.get(chapter)
         if check_points is None:
@@ -204,10 +205,10 @@ class DecisiveBattlePage:
                 _STAGE_CHECK_COLOR,
                 _STAGE_CHECK_TOLERANCE,
             ):
-                _log.info('[决战] 识别决战地图参数, 第 {} 小节正在进行', i)
+                _log.info('[决战] 识别决战地图参数, 第 {} 小节正在进行', i + 1)
                 return i
 
-        _log.info('[决战] 识别决战地图参数, 第 3 小节正在进行')
+        _log.info('[决战] 识别决战地图参数, 3 个小节已全部通过')
         return 3
 
     def detect_stage(self, screen: np.ndarray, chapter: int) -> int:
