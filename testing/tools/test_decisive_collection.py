@@ -23,17 +23,26 @@ from autowsgr.combat.plan import CombatMode, CombatPlan
 from autowsgr.combat.state import CombatPhase
 from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.image_resources import Templates
-from autowsgr.infra import DecisiveConfig, UserConfig
+from autowsgr.infra import DecisiveConfig, EmulatorConfig, UserConfig
 from autowsgr.ops.decisive.controller import DecisiveController, DecisiveResult
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ops.decisive.tracking import DecisiveTrackingSession
-from autowsgr.types import ConditionFlag, DecisiveEntryStatus, DecisivePhase, Formation
+from autowsgr.types import ConditionFlag, DecisiveEntryStatus, DecisivePhase, Formation, OSType
 from autowsgr.ui.decisive.map_controller import DecisiveMapController
 
 from tools.decisive.collect import CollectionController, RecordingCombatEngine, main, parse_args
 from tools.decisive.recording import FileStopEvent, RecordingDevice, SampleArchive
 from tools.decisive.replay_collection import convert_collection
+
+
+def _user_config(**kwargs: object) -> UserConfig:
+    """固定环境的 UserConfig 工厂, 避免 os_type/emulator 默认值依赖宿主平台。"""
+    return UserConfig(
+        emulator=EmulatorConfig(serial='127.0.0.1:5555', path='/tmp/emulator'),
+        os_type=OSType.linux,
+        **kwargs,  # type: ignore[arg-type]
+    )
 
 
 def _map_pixels() -> np.ndarray:
@@ -186,7 +195,7 @@ def collector_after_battle(
     ctx = SimpleNamespace(
         ctrl=SimpleNamespace(capture_frame=capture, screenshot=lambda: capture().image),
         ocr=None,
-        config=UserConfig(decisive_battle=config),
+        config=_user_config(decisive_battle=config),
         stop_event=threading.Event(),
     )
     archive = SampleArchive(tmp_path / 'collection')
@@ -941,7 +950,8 @@ def test_reward_resume_dispatches_fifty_remaining_battles_without_extra_round(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     ctx = SimpleNamespace(
-        ctrl=MagicMock(), config=UserConfig(decisive_battle=DecisiveConfig(chapter=6))
+        ctrl=MagicMock(),
+        config=_user_config(decisive_battle=DecisiveConfig(chapter=6)),
     )
     controller = MagicMock()
     controller.run_stage_clear.return_value = DecisiveResult.CHAPTER_CLEAR
@@ -979,7 +989,7 @@ def test_reward_resume_dispatches_fifty_remaining_battles_without_extra_round(
 def test_first_round_dispatch_respects_explicit_entry_resume(
     from_entry: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    config = UserConfig(decisive_battle=DecisiveConfig(chapter=6))
+    config = _user_config(decisive_battle=DecisiveConfig(chapter=6))
     ctx = SimpleNamespace(ctrl=MagicMock(), config=config)
     controller = MagicMock()
     controller.run.return_value = DecisiveResult.CHAPTER_CLEAR

@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from autowsgr.infra import DecisiveConfig, UserConfig
+from autowsgr.infra import DecisiveConfig, EmulatorConfig, UserConfig
 from autowsgr.ops.decisive.controller import DecisiveController
-from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
+from autowsgr.types import DecisivePhase, FleetSelection, OSType, ShipDamageState
 from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
 from autowsgr.ui.decisive.fleet_ocr import recognize_fleet_options
 
@@ -27,7 +27,12 @@ def _controller(*, strict: bool = False) -> DecisiveController:
     ctx = SimpleNamespace(
         ctrl=MagicMock(),
         ocr=MagicMock(),
-        config=UserConfig(decisive_battle=config),
+        # 显式固定环境, 避免 os_type/emulator 默认值依赖宿主平台 (非 WSL Linux CI 会抛错)
+        config=UserConfig(
+            emulator=EmulatorConfig(serial='127.0.0.1:5555', path='/tmp/emulator'),
+            os_type=OSType.linux,
+            decisive_battle=config,
+        ),
         stop_event=threading.Event(),
         update_ship_damage=MagicMock(),
         is_ship_available=lambda _name: True,
