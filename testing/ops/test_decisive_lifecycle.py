@@ -26,8 +26,8 @@ from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
 from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
 
 
-def _chapter_overview(completed: int) -> np.ndarray:
-    """构造真实入口模板和明确完成标记；验证页面进度到领域小关的边界。"""
+def _chapter_overview(visible_nodes: int, *, chapter: int = 6) -> np.ndarray:
+    """合成入口像素契约：亮起的节点包含当前小关，不代表已通过数量。"""
     image = np.full((720, 1280, 3), 40, dtype=np.uint8)
     template = Templates.Decisive.ENTRY_CHALLENGING
     patch = cv2.resize(
@@ -36,9 +36,16 @@ def _chapter_overview(completed: int) -> np.ndarray:
     )
     height, width = patch.shape[:2]
     image[600 : 600 + height, 500 : 500 + width] = patch
-    for index, (x, y) in enumerate(((0.606, 0.375), (0.532, 0.703), (0.862, 0.644))):
+    points = {
+        1: ((0.4115, 0.4019), (0.6604, 0.4630), (0.8396, 0.7093)),
+        6: ((0.606, 0.375), (0.532, 0.703), (0.862, 0.644)),
+    }[chapter]
+    for index, (x, y) in enumerate(points):
         px, py = int(x * 1280), int(y * 720)
-        image[py - 2 : py + 3, px - 2 : px + 3] = (250, 244, 253) if index < completed else 40
+        # 颜色取自首环已亮、0/30 的真实总览；这里只验证识别与消费契约。
+        image[py - 2 : py + 3, px - 2 : px + 3] = (
+            (254, 246, 251) if index < visible_nodes else (0, 81, 189)
+        )
     assert DecisiveBattlePage.is_current_page(image).matched
     return image
 
@@ -65,7 +72,7 @@ def controller(monkeypatch: pytest.MonkeyPatch) -> DecisiveController:
     ctrl._logic = DecisiveLogic(ctrl._config, ctrl._state, ctx=ctrl._ctx)
     ctrl._map = MagicMock()
     frame = CapturedFrame(np.zeros((2, 2, 3), dtype=np.uint8), 1, 1.0)
-    ctrl._ctrl.screenshot.return_value = _chapter_overview(0)
+    ctrl._ctrl.screenshot.return_value = _chapter_overview(1)
     ctrl._map.wait_for_stable_map_frame.return_value = frame
     ctrl._map.detect_decisive_phase.return_value = DecisivePhase.PREPARE_COMBAT
     ctrl._map.recognize_node.return_value = None
@@ -107,6 +114,7 @@ def test_unknown_and_soft_a_recovery_scan_real_fleet(
 def test_chapter_one_unknown_entry_preserves_recovery_scan(controller: DecisiveController) -> None:
     controller._config = controller._config.model_copy(update={'chapter': 1})
     controller._state.chapter = 1
+    controller._ctrl.screenshot.return_value = _chapter_overview(1, chapter=1)
     controller._tracking = None
     controller._handle_enter_map()
     controller._handle_prepare_combat()
@@ -130,17 +138,18 @@ def test_stop_during_repair_never_starts_another_battle(controller: DecisiveCont
 
 
 @pytest.mark.parametrize(
-    ('following_status', 'completed', 'valid'),
+    ('following_status', 'visible_nodes', 'valid'),
     [
-        (DecisiveEntryStatus.REFRESHED, 0, True),
-        (DecisiveEntryStatus.REFRESHED, 1, False),
-        (DecisiveEntryStatus.REFRESH, 0, False),
+        (DecisiveEntryStatus.REFRESHED, 1, True),
+        (DecisiveEntryStatus.REFRESHED, 0, False),
+        (DecisiveEntryStatus.REFRESHED, 2, False),
+        (DecisiveEntryStatus.REFRESH, 1, False),
     ],
 )
 def test_reset_needs_verified_first_stage_before_certain_a(
     controller: DecisiveController,
     following_status: DecisiveEntryStatus,
-    completed: int,
+    visible_nodes: int,
     valid: bool,
 ) -> None:
     controller._inventory_refresh_required = False
@@ -148,7 +157,7 @@ def test_reset_needs_verified_first_stage_before_certain_a(
         DecisiveEntryStatus.REFRESH,
         following_status,
     ]
-    controller._ctrl.screenshot.return_value = _chapter_overview(completed)
+    controller._ctrl.screenshot.return_value = _chapter_overview(visible_nodes)
     controller._battle_page.reset_chapter.return_value = True
     if not valid:
         with pytest.raises(RuntimeError, match='拒绝假定 A 起点'):
@@ -168,28 +177,24 @@ def test_reset_needs_verified_first_stage_before_certain_a(
     assert not session.sample_node_label
 
 
-@pytest.mark.parametrize('completed', [0, 1, 2])
-def test_entry_converts_page_progress_to_domain_stage(
-    controller: DecisiveController, completed: int
+@pytest.mark.parametrize('stage', [1, 2, 3])
+def test_entry_preserves_current_stage_from_visible_nodes(
+    controller: DecisiveController, stage: int
 ) -> None:
-    controller._ctrl.screenshot.return_value = _chapter_overview(completed)
+    screen = _chapter_overview(stage)
+    assert DecisiveBattlePage.recognize_stage(screen, 6) == stage
+    controller._ctrl.screenshot.return_value = screen
 
     controller._handle_enter_map()
 
-    assert controller.state.stage == completed + 1
+    assert controller.state.stage == stage
     assert controller.state.phase == DecisivePhase.WAITING_FOR_MAP
-    assert controller._ensure_tracking().stage == completed + 1
+    assert controller._ensure_tracking().stage == stage
     controller._battle_page.click_enter_map.assert_called_once()
 
 
-def test_completed_page_conflicts_with_active_entry(controller: DecisiveController) -> None:
-    controller._ctrl.screenshot.return_value = _chapter_overview(3)
-
-    with pytest.raises(RuntimeError, match='已全部完成'):
-        controller._handle_enter_map()
-
-    controller._battle_page.click_enter_map.assert_not_called()
-    assert controller.state.phase != DecisivePhase.CHAPTER_CLEAR
+def test_unlit_nodes_do_not_identify_first_stage() -> None:
+    assert DecisiveBattlePage.recognize_stage(_chapter_overview(0), 6) == 0
 
 
 def test_unverified_retreat_does_not_create_a_start_prior(controller: DecisiveController) -> None:

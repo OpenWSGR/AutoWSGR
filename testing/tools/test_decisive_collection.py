@@ -457,12 +457,32 @@ def test_entry_stage_mismatch_does_not_apply_user_label() -> None:
     controller._record = MagicMock()
     controller._first_entry = (1, 'A')
     controller._battle_page.detect_entry_status.return_value = DecisiveEntryStatus.CHALLENGING
-    controller._battle_page.detect_stage.return_value = 1
+    controller._battle_page.detect_stage.return_value = 2
     with pytest.raises(RuntimeError, match='停止复核标签'):
         controller._handle_enter_map()
     assert controller._label_node is None
     assert controller._known_start_stage is None
     controller._battle_page.click_enter_map.assert_not_called()
+
+
+@pytest.mark.parametrize('stage', [1, 2, 3])
+def test_entry_accepts_matching_current_stage_without_offset(stage: int) -> None:
+    """页面边界已返回领域小关号；采集器直接核对调用者确认的起点。"""
+    controller = _collection_controller()
+    controller._record = MagicMock()
+    controller._first_entry = (stage, 'A')
+    controller._battle_page.detect_entry_status.return_value = DecisiveEntryStatus.CHALLENGING
+    controller._battle_page.detect_stage.return_value = stage
+
+    controller._handle_enter_map()
+
+    assert controller.state.stage == stage
+    assert controller.state.phase == DecisivePhase.WAITING_FOR_MAP
+    assert controller._label_stage == stage
+    assert controller._label_node == 'A'
+    assert controller._known_start_stage == stage
+    assert controller._first_entry is None
+    controller._battle_page.click_enter_map.assert_called_once()
 
 
 def test_prediction_changes_never_overwrite_independent_label() -> None:
@@ -527,7 +547,7 @@ def test_reset_then_next_stage_preserves_confirmed_a_and_new_session(
         DecisiveEntryStatus.REFRESHED,
     ]
     controller._battle_page.reset_chapter.return_value = True
-    controller._battle_page.detect_stage.return_value = 0
+    controller._battle_page.detect_stage.return_value = 1
     controller._handle_enter_map()
     assert controller._known_start_stage == 1
     assert controller._label_node == 'A'
@@ -547,7 +567,7 @@ def test_reset_then_next_stage_preserves_confirmed_a_and_new_session(
     assert controller._inventory_refresh_required
     controller._battle_page.detect_entry_status.side_effect = None
     controller._battle_page.detect_entry_status.return_value = DecisiveEntryStatus.CHALLENGING
-    controller._battle_page.detect_stage.return_value = 1
+    controller._battle_page.detect_stage.return_value = 2
     controller._handle_enter_map()
     assert controller.label_source == 'confirmed_stage_clear'
     assert controller._label_node == 'A'

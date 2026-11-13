@@ -170,13 +170,8 @@ class DecisivePhaseHandlers(DecisiveBase):
     # ── 进入与等待 ────────────────────────────────────────────────────────
 
     def _detect_entry_stage(self) -> int:
-        """将总览页零基进度转换为领域小关；完成标记不能替代通关结算验证。"""
-        progress = self._battle_page.detect_stage(self._ctrl.screenshot(), self._config.chapter)
-        if progress == 3:
-            raise RuntimeError('决战入口标记已全部完成，与当前入口状态冲突；停止并保留现场')
-        if progress not in (0, 1, 2):
-            raise RuntimeError(f'决战入口进度无效: {progress}')
-        return progress + 1
+        """沿用旧版直接读取小关号；入口标记不能替代真实通关结算。"""
+        return self._battle_page.detect_stage(self._ctrl.screenshot(), self._config.chapter)
 
     def _handle_enter_map(self) -> None:
         """检测入口状态 → 按需重置 → 点击进入地图 → 转到 WAITING_FOR_MAP。
