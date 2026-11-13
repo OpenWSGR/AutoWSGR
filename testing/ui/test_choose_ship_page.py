@@ -1,17 +1,172 @@
 """测试选船页的舰名比较逻辑。"""
 
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 from autowsgr.combat.fleet import ShipSelector
+from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.types import ShipType
 from autowsgr.ui.choose_ship_page import ChooseShipPage
+from autowsgr.ui.decisive.ship_list import ShipListViewport
 from autowsgr.ui.utils.ship_list import LevelOCRRetryNeededError
 from autowsgr.vision import OCRResult
 from autowsgr.vision.ocr import set_ship_name_match_confidence
 from autowsgr.vision.ocr_rules import EasyOCRProfile, set_user_ship_name_aliases
+
+
+class TestDecisiveViewportSelection:
+    """选择端消费已验证视口；几何与完整性另由 walker 算法测试及独立实机验收覆盖。"""
+
+    @staticmethod
+    def _viewport(sequence: int, *hits: tuple[str, float, float, float]) -> SimpleNamespace:
+        return SimpleNamespace(
+            frame=CapturedFrame(
+                np.zeros((720, 1280, 3), dtype=np.uint8), sequence, float(sequence)
+            ),
+            hits=hits,
+        )
+
+    def test_empty_viewport_returns_no_selection_without_clicking_or_leaving(self):
+        """空视口是 provider 的接口输入，此处不证明空背景像素或实机识别。"""
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object(), stop_event=threading.Event())
+        page = ChooseShipPage(ctx)
+        viewport = ShipListViewport(self._viewport(1).frame, (), at_top=True, at_bottom=True)
+        with (
+            patch('autowsgr.ui.decisive.ship_list.DecisiveShipListWalker') as walker,
+            patch.object(page, '_wait_leave_current_page') as leave,
+        ):
+            walker.return_value.viewports.return_value = iter([viewport])
+            assert page.change_single_ship(ShipSelector(name='U-96'), use_search=False) is None
+
+        ctx.ctrl.click.assert_not_called()
+        ctx.ctrl.swipe.assert_not_called()
+        ctx.ctrl.screenshot.assert_not_called()
+        leave.assert_not_called()
+
+    def test_decisive_selection_uses_the_current_deep_viewport_coordinates(self):
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object(), stop_event=threading.Event())
+        page = ChooseShipPage(ctx)
+        rows = [
+            ('胡德', '声望', '反击', '威尔士亲王', '罗德尼', '纳尔逊', '前卫'),
+            (
+                '俾斯麦',
+                '提尔比茨',
+                '沙恩霍斯特',
+                '格奈森瑙',
+                '齐柏林伯爵',
+                '欧根亲王',
+                '舍尔海军上将',
+            ),
+            ('华盛顿', '北卡罗来纳', '南达科他', '马萨诸塞', '阿拉巴马', '印第安纳', '衣阿华'),
+            ('新泽西', '密苏里', '威斯康星', '蒙大拿', '列克星敦', '萨拉托加', '大黄蜂'),
+            ('约克城', '企业', '突击者', '埃塞克斯', '香格里拉', '无畏', '独立'),
+            ('普林斯顿', '贝劳伍德', '兰利', '圣哈辛托', '卡伯特', '巴丹', 'U-96'),
+        ]
+        viewports = []
+        for index in range(5):
+            hits = [
+                (
+                    name,
+                    (180 + column * 140) / 1280,
+                    (300 + row * 280) / 720,
+                    (320 + row * 280) / 720,
+                )
+                for row, names in enumerate(rows[index : index + 2])
+                for column, name in enumerate(names)
+            ]
+            viewports.append(self._viewport(index + 1, *hits))
+        with (
+            patch('autowsgr.ui.decisive.ship_list.DecisiveShipListWalker') as walker,
+            patch.object(page, '_click_ship_in_list') as ordinary,
+            patch.object(page, '_wait_leave_current_page') as leave,
+            patch('autowsgr.ui.choose_ship_page.time.sleep'),
+        ):
+            walker.return_value.viewports.return_value = iter(viewports)
+            assert page.change_single_ship(ShipSelector(name='U-96'), use_search=False) == 'U-96'
+
+        walker.assert_called_once_with(ctx, ctx.ocr)
+        ordinary.assert_not_called()
+        ctx.ctrl.click.assert_called_once_with(1020 / 1280, 580 / 720)
+        ctx.ctrl.screenshot.assert_not_called()
+        leave.assert_called_once()
+
+    def test_decisive_selection_preserves_shared_type_constraints(self):
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object(), stop_event=threading.Event())
+        page = ChooseShipPage(ctx)
+        with (
+            patch('autowsgr.ui.decisive.ship_list.DecisiveShipListWalker') as walker,
+            patch.object(page, '_detect_hit_ship_type', return_value=ShipType.CV),
+            patch('autowsgr.ui.choose_ship_page.time.sleep'),
+        ):
+            walker.return_value.viewports.return_value = iter(
+                [self._viewport(1, ('U-96', 0.2, 0.3, 0.4))]
+            )
+            assert page._click_decisive_ship_in_list('U-96', ship_type=(ShipType.SS,)) is None
+
+        ctx.ctrl.click.assert_not_called()
+
+    def test_decisive_selection_does_not_hide_traversal_failure(self):
+        from autowsgr.ui.decisive.ship_list import DecisiveInventoryScanError
+
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object(), stop_event=threading.Event())
+        page = ChooseShipPage(ctx)
+
+        def interrupted():
+            yield self._viewport(1, ('U-47', 0.2, 0.3, 0.4))
+            raise DecisiveInventoryScanError('unproven overlap')
+
+        with (
+            patch('autowsgr.ui.decisive.ship_list.DecisiveShipListWalker') as walker,
+            patch.object(page, '_wait_leave_current_page') as leave,
+            pytest.raises(DecisiveInventoryScanError, match='unproven overlap'),
+        ):
+            walker.return_value.viewports.return_value = interrupted()
+            page.change_single_ship(ShipSelector(name='U-96'), use_search=False)
+
+        ctx.ctrl.click.assert_not_called()
+        leave.assert_not_called()
+
+    @pytest.mark.parametrize('stop_during', ['constraints', 'delay'])
+    def test_decisive_selection_stops_before_click_when_requested_during_preparation(
+        self, stop_during: str
+    ):
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object(), stop_event=threading.Event())
+        page = ChooseShipPage(ctx)
+
+        def read_type(*_args) -> ShipType:
+            if stop_during == 'constraints':
+                ctx.stop_event.set()
+            return ShipType.SS
+
+        def delay(seconds: float) -> None:
+            assert seconds == 1.0
+            if stop_during == 'delay':
+                ctx.stop_event.set()
+
+        with (
+            patch('autowsgr.ui.decisive.ship_list.DecisiveShipListWalker') as walker,
+            patch.object(page, '_detect_hit_ship_type', side_effect=read_type),
+            patch.object(page, '_wait_leave_current_page') as leave,
+            patch('autowsgr.ui.choose_ship_page.time.sleep', side_effect=delay) as sleep,
+        ):
+            walker.return_value.viewports.return_value = iter(
+                [self._viewport(1, ('U-96', 0.2, 0.3, 0.4))]
+            )
+            with pytest.raises(InterruptedError, match='停止'):
+                page.change_single_ship(
+                    ShipSelector(name='U-96', ship_types=(ShipType.SS,)), use_search=False
+                )
+
+        ctx.ctrl.click.assert_not_called()
+        leave.assert_not_called()
+        if stop_during == 'constraints':
+            sleep.assert_not_called()
+        else:
+            sleep.assert_called_once_with(1.0)
 
 
 class TestShipNameMatching:
@@ -188,6 +343,24 @@ class TestShipTypeProbeRoutes:
 
 
 class TestIndependentShipRules:
+    def test_ordinary_search_keeps_three_attempts_and_original_click_delay(self):
+        ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object())
+        page = ChooseShipPage(ctx)
+        with (
+            patch(
+                'autowsgr.ui.choose_ship_page.locate_ship_rows',
+                side_effect=[[], [], [('U-96', 0.2, 0.3, 0.4)]],
+            ) as locate,
+            patch('autowsgr.ui.choose_ship_page.time.sleep') as delay,
+        ):
+            assert page._click_ship_in_list('U-96') == 'U-96'
+
+        assert locate.call_count == 3
+        assert ctx.ctrl.screenshot.call_count == 3
+        assert ctx.ctrl.swipe.call_count == 2
+        assert [call.args for call in delay.call_args_list] == [(0.5,), (0.5,), (1.0,)]
+        ctx.ctrl.click.assert_called_once_with(0.2, 0.3)
+
     def test_single_rule_uses_its_own_constraints(self):
         ctx = SimpleNamespace(ctrl=MagicMock(), ocr=object())
         page = ChooseShipPage(ctx)
