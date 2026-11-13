@@ -5,11 +5,13 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from autowsgr.combat.node_fusion.map import SHIP_TYPES, TrackingMap
 from autowsgr.infra.file_utils import load_yaml
-from autowsgr.infra.logger import get_logger
 
 
-_log = get_logger('decisive')
+_ENEMY_SPEC_PATH = (
+    Path(__file__).resolve().parents[2] / 'data' / 'map' / 'decisive_battle' / 'enemy_spec.yaml'
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -43,10 +45,21 @@ _KEY_POINTS: dict[int, list[str]] = {
 @lru_cache(maxsize=1)
 def _load_enemy_spec_data() -> dict:
     """加载决战 enemy_spec.yaml 数据。"""
-    data_path = (
-        Path(__file__).resolve().parents[2] / 'data' / 'map' / 'decisive_battle' / 'enemy_spec.yaml'
-    )
-    return load_yaml(data_path)
+    return load_yaml(_ENEMY_SPEC_PATH)
+
+
+def _enemy_slots(raw: object, location: str) -> list[str | None]:
+    """移除旧资料的首位占位，保留空槽位置并补足六槽；缺失资料不构造舰队。"""
+    if raw is None or raw == []:
+        return []
+    if not isinstance(raw, list) or not 1 <= len(raw) <= 7 or raw[0] not in ('', None):
+        raise ValueError(f'决战敌情必须包含首位占位和至多六槽: {location}')
+    slots = [ship if ship not in ('', None) else None for ship in raw[1:]]
+    if any(
+        ship is not None and (not isinstance(ship, str) or ship not in SHIP_TYPES) for ship in slots
+    ):
+        raise ValueError(f'决战敌情包含未知中文舰类: {location}: {slots!r}')
+    return slots + [None] * (6 - len(slots))
 
 
 class MapData:
@@ -70,7 +83,7 @@ class MapData:
         -------
         str
             终止节点字母 (如 ``'H'``, ``'J'``)。
-            若 chapter/stage 超出范围，返回 ``'J'`` 作为安全回退。
+            若 chapter/stage 超出范围，抛出 ``ValueError``。
         """
         if 1 <= chapter < len(_MAP_END) and 1 <= stage <= 3:
             return _MAP_END[chapter][stage]
@@ -118,23 +131,34 @@ class MapData:
         return node in MapData.get_key_points(chapter, stage)
 
     @staticmethod
-    def get_enemy(chapter: int, stage: int, node: str) -> list[str]:
-        """获取指定章节/小关/节点的敌方编成。"""
+    def get_enemy(chapter: int, stage: int, node: str) -> list[str | None]:
+        """获取有序六槽中文舰类；空槽为 None，缺失节点资料返回空列表。"""
+        if not 1 <= chapter <= 6 or not 1 <= stage <= 3:
+            return []
         try:
             data = _load_enemy_spec_data()
             enemy_data = data.get('enemy', [])
             chapter_data = enemy_data[chapter]
             stage_data = chapter_data[stage]
-            node_data = stage_data.get(node.upper())
-            if isinstance(node_data, list):
-                return [str(x) for x in node_data if x]
-        except Exception:
-            _log.debug(
-                '[决战] 敌方规格数据查询失败: chapter={}, stage={}, node={}',
-                chapter,
-                stage,
-                node,
-                exc_info=True,
-            )
+        except (IndexError, TypeError):
             return []
-        return []
+        if not isinstance(stage_data, dict):
+            return []
+        return _enemy_slots(stage_data.get(node.upper()), f'{chapter}-{stage} {node}')
+
+    @staticmethod
+    def tracking_map(chapter: int, stage: int) -> TrackingMap:
+        """构造小关顺序地图；不为未知阵型、坐标或敌情伪造观测。"""
+        end = MapData.get_stage_end_node(chapter, stage)
+        names = [chr(value) for value in range(ord('A'), ord(end) + 1)]
+        raw = {}
+        for index, name in enumerate(names):
+            ships = MapData.get_enemy(chapter, stage, name)
+            raw[name] = {
+                'position': None,
+                'next': names[index + 1 : index + 2],
+                'type': 'FIGHT',
+                'detour': None,
+                'enemy_formations': ([{'formation': None, 'ships': ships}] if any(ships) else None),
+            }
+        return TrackingMap.from_dict(raw, source=str(_ENEMY_SPEC_PATH))
