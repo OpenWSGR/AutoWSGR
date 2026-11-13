@@ -24,6 +24,7 @@ from autowsgr.combat.node_fusion.map import TrackingMap
 from autowsgr.combat.node_fusion.replay import replay
 from autowsgr.combat.plan import CombatMode, CombatPlan, NodeDecision
 from autowsgr.combat.recognizer import CombatRecognizer
+from autowsgr.combat.rules import RuleEngine
 from autowsgr.combat.state import CombatPhase
 from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.types import ConditionFlag, Formation
@@ -60,6 +61,9 @@ def estimate(
 
 
 class RecordingFusion:
+    dynamics = 'map'
+    initial = None
+
     def __init__(self) -> None:
         self.observations = []
         self.result = estimate()
@@ -113,6 +117,24 @@ def calibration_session(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Trac
     session = TrackingSession.start(CombatPlan(chapter=2, map_id=1), tmp_path)
     assert session is not None
     assert session.tracker is not None
+    return session
+
+
+@pytest.fixture(params=[CombatMode.NORMAL, CombatMode.EVENT])
+def map_decision_session(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    calibration_session: TrackingSession,
+    tmp_path: Path,
+) -> TrackingSession:
+    if request.param == CombatMode.NORMAL:
+        return calibration_session
+    metadata = calibration_session.tracker.map_data
+    monkeypatch.setattr(TrackingMap, 'load_event', lambda *_: metadata)
+    session = TrackingSession.start(
+        CombatPlan(mode=CombatMode.EVENT, event_name='baseline', chapter='E', map_id=1), tmp_path
+    )
+    assert session is not None
     return session
 
 
@@ -550,7 +572,7 @@ def test_statistics_failure_warns_without_disabling_node_control(
 
     session.finish()
     session.finish()
-    calculate.assert_called_once_with(tracker)
+    calculate.assert_called_once_with(tracker, combat_mode=CombatMode.NORMAL)
     warning.assert_called_once()
     assert '[NodeFusion校验]' in warning.call_args.args[0]
     info.assert_not_called()
@@ -722,6 +744,64 @@ def test_enemy_reader_failure_still_uses_phase_history(
     assert engine._tracking.tracker.observations[-1].enemies is None
 
 
+@pytest.mark.parametrize('mode', [CombatMode.NORMAL, CombatMode.EVENT])
+@pytest.mark.parametrize('rule_kind', ['enemy', 'formation'])
+def test_map_reader_failure_preserves_retreat_rules(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: CapturedFrame,
+    tmp_path: Path,
+    mode: str,
+    rule_kind: str,
+) -> None:
+    engine = make_engine(frame, tmp_path)
+    engine._plan.mode = mode
+    decision = engine._plan.nodes['Z']
+    if rule_kind == 'enemy':
+        decision.enemy_rules = RuleEngine.from_legacy_rules([['BB >= 2', 'retreat']])
+    else:
+        decision.formation_rules = RuleEngine.from_formation_rules([['单纵阵', 'retreat']])
+    observe = MagicMock(side_effect=ValueError('本帧采集失败'))
+    enemies = MagicMock(return_value={'BB': 3, 'ALL': 6})
+    formation = MagicMock(return_value='单纵阵')
+    retreat, enter = MagicMock(), MagicMock()
+    monkeypatch.setattr(integration_module, 'observe_enemy', observe)
+    monkeypatch.setattr(handlers_module, 'get_enemy_info', enemies)
+    monkeypatch.setattr(handlers_module, 'get_enemy_formation', formation)
+    monkeypatch.setattr(handlers_module, 'image_exist', lambda *_: False)
+    monkeypatch.setattr(handlers_module, 'click_retreat', retreat)
+    monkeypatch.setattr(handlers_module, 'click_enter_fight', enter)
+
+    assert engine._make_decision(CombatPhase.SPOT_ENEMY_SUCCESS) == ConditionFlag.FIGHT_END
+    assert engine.current_node == 'Z'
+    retreat.assert_called_once_with(engine._device)
+    enter.assert_not_called()
+    observe.assert_called_once_with(frame.image, engine._ocr, mode='fight')
+    enemies.assert_called_once_with(engine._device, mode='fight')
+    formation.assert_called_once_with(engine._device, engine._ocr)
+    # 兜底识别只用于本场战术，不能冒充失败的原帧证据写回模型。
+    original = engine._tracking.tracker.observations[0]
+    assert original.frame_id == frame.sequence
+    assert original.enemies is None
+
+
+def test_decisive_reader_failure_does_not_repeat_native_recognition(
+    monkeypatch: pytest.MonkeyPatch, frame: CapturedFrame, tmp_path: Path
+) -> None:
+    engine = make_engine(frame, tmp_path)
+    engine._plan.mode = CombatMode.DECISIVE
+    observe = MagicMock(side_effect=ValueError('本帧采集失败'))
+    monkeypatch.setattr(integration_module, 'observe_enemy', observe)
+    monkeypatch.setattr(handlers_module, 'get_enemy_info', MagicMock(side_effect=AssertionError))
+    monkeypatch.setattr(
+        handlers_module, 'get_enemy_formation', MagicMock(side_effect=AssertionError)
+    )
+
+    assert engine._collect_spot_evidence() == ({}, '', None)
+    observe.assert_called_once_with(frame.image, engine._ocr, mode='fight')
+    assert engine.current_node == 'Z'
+    assert engine._tracking.tracker.observations[-1].enemies is None
+
+
 def test_partial_map_warns_once_and_records_available_capabilities(
     monkeypatch: pytest.MonkeyPatch, frame: CapturedFrame, tmp_path: Path
 ) -> None:
@@ -815,3 +895,63 @@ def test_legacy_event_map_tracks_and_replays_frozen_coordinates(
     assert summary['capabilities'] == metadata.capabilities
     assert summary['degradation_reasons'] == metadata.degradation_reasons
     assert summary['online_comparison'] == {'compared': 2, 'matches': 2, 'mismatches': []}
+
+
+def test_publish_and_action_keep_distinct_decision_projection(
+    map_decision_session: TrackingSession,
+    frame: CapturedFrame,
+) -> None:
+    session = map_decision_session
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame, '0')
+    session.publish(FusionObservation('action', 13.0, action='detour', clicked=True))
+    assert session.current_node == session.estimate.current_node == 'A'
+    session.action('detour', CombatPhase.SPOT_ENEMY_SUCCESS, 'A', clicked=False, timestamp=14.0)
+    assert session.current_node == 'A'
+
+    session.action('detour', CombatPhase.SPOT_ENEMY_SUCCESS, 'A', clicked=True, timestamp=15.0)
+
+    assert session.current_node == '0'
+    assert session.estimate.current_node == 'A'
+    session.publish(FusionObservation('phase', 16.0, phase='SPOT_ENEMY_SUCCESS', frame_id=74))
+    assert session.current_node == '0'
+    session.phase(CombatPhase.FORMATION, replace(frame, captured_at=17.0, sequence=75), '0')
+    assert session.current_node == 'A'
+
+
+def test_nonencounter_and_direct_publish_anomaly_preserve_published_node(
+    map_decision_session: TrackingSession,
+    frame: CapturedFrame,
+) -> None:
+    session = map_decision_session
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame, '0')
+    session.phase(CombatPhase.MAP_PAGE, replace(frame, captured_at=13.0, sequence=74), 'A')
+    assert session.current_node == 'A'
+    assert session.estimate.current_node is None
+    session.publish(FusionObservation('phase', 14.0, phase='FORMATION', frame_id=75))
+    assert session.estimate.anomaly
+    assert session.current_node == 'A'
+
+    session.phase(CombatPhase.FORMATION, replace(frame, captured_at=15.0, sequence=76), 'A')
+
+    assert session.estimate.ignored == 'same phase evidence segment'
+    assert session.estimate.anomaly
+    assert session.estimate.event_id != session.tracker.estimate.event_id
+    assert session.current_node == '0'
+    session.fail('synthetic device failure')
+    assert session.current_node == '0'
+    assert session.estimate is None
+
+
+@pytest.mark.parametrize('attribute', ['estimate', 'current_node'])
+def test_callers_cannot_replace_session_decision_outputs(
+    calibration_session: TrackingSession, frame: CapturedFrame, attribute: str
+) -> None:
+    session = calibration_session
+    session.phase(CombatPhase.SPOT_ENEMY_SUCCESS, frame, '0')
+    estimate_before = session.estimate
+
+    with pytest.raises(AttributeError):
+        setattr(session, attribute, None if attribute == 'estimate' else 'Z')
+
+    assert session.estimate is estimate_before
+    assert session.current_node == 'A'
