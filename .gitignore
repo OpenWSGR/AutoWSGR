@@ -5,6 +5,9 @@ log/
 
 # 测试图片包
 test_pkg/
+# Local decisive captures and raw replay samples; keep outside published history.
+/testing/fixtures/decisive-clear/
+/testing/fixtures/decisive-observations/
 dev/
 copilot-instructions.md
 

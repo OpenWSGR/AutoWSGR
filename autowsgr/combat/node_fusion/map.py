@@ -35,8 +35,8 @@ SHIP_TYPES = frozenset(
 class EnemyVariant:
     """一条阵型与有序舰队组成的联合敌情记录。"""
 
-    formation: int
-    ships: tuple[str, ...]
+    formation: int | None
+    ships: tuple[str | None, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +44,7 @@ class TrackingNode:
     """包含归一化坐标及合法敌情变体的地图节点。"""
 
     name: str
-    position: tuple[float, float]
+    position: tuple[float, float] | None
     next_nodes: tuple[str, ...] | None
     node_type: str | None
     detour: bool | None
@@ -65,23 +65,26 @@ class Route:
 
 
 def _parse_variant(raw: Any, node: str) -> EnemyVariant:
-    if not isinstance(raw, dict) or set(raw) != {'formation', 'ships'}:
+    if not isinstance(raw, dict) or 'ships' not in raw or raw.keys() - {'formation', 'ships'}:
         raise ValueError(f'Invalid enemy variant at node {node}')
-    formation, ships = raw['formation'], raw['ships']
-    if type(formation) is not int or not 1 <= formation <= 5:
+    formation, ships = raw.get('formation'), raw['ships']
+    if formation is not None and (type(formation) is not int or not 1 <= formation <= 5):
         raise ValueError(f'Invalid enemy formation at node {node}: {formation!r}')
     if not isinstance(ships, list) or not 1 <= len(ships) <= 6:
         raise ValueError(f'Enemy fleet at node {node} must contain 1..6 ships')
-    if any(not isinstance(ship, str) or ship not in SHIP_TYPES for ship in ships):
+    if any(
+        ship is not None and (not isinstance(ship, str) or ship not in SHIP_TYPES) for ship in ships
+    ):
         raise ValueError(
-            f'Installed native does not support Chinese enemy ship type at node {node}: {ships!r}'
+            f'Invalid enemy ship type at node {node} (expected None or a Chinese '
+            f'ship type supported by the installed native): {ships!r}'
         )
     return EnemyVariant(formation, tuple(ships))
 
 
 def _parse_node(name: str, raw: Any) -> TrackingNode:
-    if not isinstance(raw, dict) or 'position' not in raw:
-        raise ValueError(f'Missing position at node {name}')
+    if not isinstance(raw, dict):
+        raise ValueError(f'Invalid metadata at node {name}')  # noqa: TRY004 -- 解析错误统一 ValueError。
     allowed = {'type', 'detour', 'position', 'next', 'enemy_formations', 'night'}
     if raw.keys() - allowed:
         raise ValueError(f'Unknown tracking fields at node {name}')
@@ -93,13 +96,14 @@ def _parse_node(name: str, raw: Any) -> TrackingNode:
         'night' in raw and type(raw['night']) is not bool
     ):
         raise ValueError(f'Invalid boolean metadata at node {name}')
-    position = raw['position']
-    if not isinstance(position, list) or len(position) != 2:
-        raise ValueError(f'Invalid position at node {name}')
-    if any(
-        type(x) not in (int, float) or not 0 <= x <= 1 or not math.isfinite(x) for x in position
-    ):
-        raise ValueError(f'Position at node {name} must be finite and normalized')
+    position = raw.get('position')
+    if position is not None:
+        if not isinstance(position, list) or len(position) != 2:
+            raise ValueError(f'Invalid position at node {name}')
+        if any(
+            type(x) not in (int, float) or not 0 <= x <= 1 or not math.isfinite(x) for x in position
+        ):
+            raise ValueError(f'Position at node {name} must be finite and normalized')
     # 缺失路由与明确终点不同，不用空列表填补未知信息。
     next_nodes = raw.get('next')
     if next_nodes is not None:
@@ -125,7 +129,7 @@ def _parse_node(name: str, raw: Any) -> TrackingNode:
         raise ValueError(f'Enemy variants disagree with node type at {name}')
     return TrackingNode(
         name,
-        (float(position[0]), float(position[1])),
+        (float(position[0]), float(position[1])) if position is not None else None,
         tuple(next_nodes) if next_nodes is not None else None,
         node_type,
         detour,
@@ -142,11 +146,13 @@ class TrackingMap:
 
     @property
     def capabilities(self) -> dict[str, bool]:
-        """按实际资料声明能力；局部缺失不会改写成否定信息。"""
+        """声明资料支持的证据；encounter_history 指普通地图的入口与完整路由资料。"""
         encounters = [node for name, node in self.nodes.items() if name != '0' and not node.silent]
         topology = all(node.next_nodes is not None for node in self.nodes.values())
         node_types = all(node.node_type is not None for node in encounters)
-        positions = any(name != '0' for name in self.nodes)
+        positions = any(
+            name != '0' and node.position is not None for name, node in self.nodes.items()
+        )
         return {
             'distance': positions,
             'ray': positions,
@@ -159,36 +165,32 @@ class TrackingMap:
 
     @property
     def degradation_reasons(self) -> tuple[str, ...]:
-        """列出缺失信息及其影响，供出征时一次性警告。"""
+        """只列资料缺失；初始化和合法推进的具体语义由场景策略决定。"""
         reasons = []
         if '0' not in self.nodes:
-            reasons.append('缺少起始点：仅使用实际船位初始化，不启用遭遇次数推进')
+            reasons.append('缺少起始点 0 声明：初始化和合法转移由场景策略决定')
         missing_routes = [name for name, node in self.nodes.items() if node.next_nodes is None]
         if missing_routes:
-            reasons.append(f'缺少路由({", ".join(missing_routes)})：停用拓扑硬约束及遭遇次数推进')
+            reasons.append(f'缺少路由({", ".join(missing_routes)})：这些节点的后继未声明')
         missing_types = [
             name for name, node in self.nodes.items() if name != '0' and node.node_type is None
         ]
         if missing_types:
-            reasons.append(
-                f'缺少节点类型({", ".join(missing_types)})：停用空白点跨越及遭遇次数推进'
-            )
+            reasons.append(f'缺少节点类型({", ".join(missing_types)})：未声明是否允许无战斗经过')
         encounters = [node for name, node in self.nodes.items() if name != '0' and not node.silent]
         missing_enemies = [node.name for node in encounters if not node.enemy_formations]
         if missing_enemies:
-            reasons.append(f'缺少敌情({", ".join(missing_enemies)})：这些节点不进行阵容阵型匹配')
+            reasons.append(f'缺少敌情({", ".join(missing_enemies)})：这些节点没有已知阵容阵型模板')
         missing_detours = [node.name for node in encounters if node.detour is None]
         if missing_detours:
-            reasons.append(
-                f'缺少迂回属性({", ".join(missing_detours)})：这些节点不进行迂回按钮匹配'
-            )
+            reasons.append(f'缺少迂回属性({", ".join(missing_detours)})：是否支持迂回未知')
         return tuple(reasons)
 
     def to_dict(self) -> dict[str, Any]:
         """导出可重建的元数据快照，保留未知值，不包含本机路径。"""
         return {
             name: {
-                'position': list(node.position),
+                'position': list(node.position) if node.position is not None else None,
                 'next': list(node.next_nodes) if node.next_nodes is not None else None,
                 'type': node.node_type,
                 'detour': node.detour,

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import zlib
 from dataclasses import fields
 from pathlib import Path
 from typing import Any
@@ -21,11 +22,39 @@ from autowsgr.combat.node_fusion import (
 )
 from autowsgr.combat.node_fusion.enemy import EnemyObservation
 from autowsgr.combat.node_fusion.map import TrackingMap
+from autowsgr.combat.plan import CombatMode
+
+
+SCHEMA_VERSION = 4
+
+
+def _decompress_gzip(content: bytes) -> tuple[bytes, list[str]]:
+    """逐个校验 gzip member，仅恢复最后一个短写 member 已解出的 JSON 前缀。"""
+    parts = []
+    while content:
+        prefix = content[:3]
+        if prefix != b'\x1f\x8b\x08'[: len(prefix)]:
+            raise ValueError('Invalid gzip log: invalid member header')
+        decoder = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+        try:
+            parts.append(decoder.decompress(content))
+        except zlib.error as exc:
+            raise ValueError(f'Invalid gzip log: {exc}') from exc
+        if not decoder.eof:
+            # trailer 短写也保留完整末条记录，但不能声称尾记录已通过完整性校验。
+            return b''.join(parts), [
+                'Recovered truncated final gzip member; tail records lack a complete integrity check'
+            ]
+        content = decoder.unused_data.lstrip(b'\x00')
+    return b''.join(parts), []
 
 
 def _read_records(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
     records, warnings = [], []
-    lines = path.read_bytes().splitlines(keepends=True)
+    content = path.read_bytes()
+    if content.startswith(b'\x1f\x8b'):
+        content, warnings = _decompress_gzip(content)
+    lines = content.splitlines(keepends=True)
     for index, line in enumerate(lines):
         final_unterminated = index == len(lines) - 1 and not line.endswith(b'\n')
         try:
@@ -52,18 +81,10 @@ def _read_records(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
 def _observation(raw: dict[str, Any]) -> FusionObservation:
     values = dict(raw)
-    # 只兼容旧日志字段名，不将当时使用的节点作为推断证据。
-    if 'legacy_node' in values:
-        previous = values.pop('legacy_node')
-        if 'decision_node' in values and values['decision_node'] != previous:
-            raise ValueError('Conflicting recorded decision node labels')
-        values['decision_node'] = previous
     if values.get('position') is not None:
         values['position'] = tuple(values['position'])
     if values.get('enemies') is not None:
         enemy = dict(values['enemies'])
-        # 兼容早期本地日志；阵型 OCR 是否执行不参与 native 舰类统计。
-        enemy.pop('formation_attempted', None)
         enemy['raw_slots'] = tuple(enemy['raw_slots'])
         enemy['ships'] = tuple(enemy['ships'])
         values['enemies'] = EnemyObservation(**enemy)
@@ -86,27 +107,36 @@ def _labels(raw: dict[str, str] | None, observations: int, metadata: TrackingMap
     return result
 
 
-def _metadata(start: dict[str, Any], warnings: list[str]) -> TrackingMap:
-    """优先使用记录时冻结的地图，旧日志则严格核对当前同名地图的指纹。"""
-    chapter, map_id = start['map']
-    if 'metadata_snapshot' in start:
-        metadata = TrackingMap.from_dict(start['metadata_snapshot'])
-    elif start.get('combat_mode') == 'event':
-        metadata = TrackingMap.load_event(
-            start['event_name'], chapter, map_id, start.get('entrance')
-        )
-    else:
-        metadata = TrackingMap.load(chapter, map_id)
-    if metadata is None:
-        raise ValueError(f'Missing tracking metadata for {chapter}-{map_id}')
-    recorded_hash = start.get('metadata_sha256')
-    if recorded_hash is not None and recorded_hash != metadata.fingerprint:
+def _metadata(start: dict[str, Any]) -> TrackingMap:
+    """使用冻结中文地图，并核对身份；不读取可能已经改变的当前资料。"""
+    if 'metadata_snapshot' not in start or 'metadata_sha256' not in start:
+        raise ValueError('Replay v4 requires a frozen metadata snapshot and fingerprint')
+    metadata = TrackingMap.from_dict(start['metadata_snapshot'])
+    if start['metadata_sha256'] != metadata.fingerprint:
         raise ValueError('Tracking metadata fingerprint differs from the recorded sortie')
-    if recorded_hash is None:
-        warnings.append('Metadata fingerprint missing: replay map identity is unverified')
     if 'capabilities' in start and start['capabilities'] != metadata.capabilities:
         raise ValueError('Recorded map capabilities differ from the metadata snapshot')
     return metadata
+
+
+def _context(start: dict[str, Any]) -> tuple[str, dict[str, float] | None]:
+    """恢复场景与初始条件，旧模型日志必须由对应提交回放。"""
+    if start.get('schema_version') != SCHEMA_VERSION:
+        raise ValueError('Recorded schema version differs; use the matching backend revision')
+    if start.get('model_version') != MODEL_VERSION:
+        raise ValueError('Recorded model version differs; use the matching backend revision')
+    mode = start.get('combat_mode')
+    expected = {
+        CombatMode.NORMAL: 'map',
+        CombatMode.EVENT: 'map',
+        CombatMode.DECISIVE: 'decisive',
+    }
+    dynamics = start.get('dynamics')
+    if mode not in expected or dynamics != expected[mode]:
+        raise ValueError('Recorded combat mode and scene dynamics are missing or inconsistent')
+    if 'initial' not in start or not isinstance(start.get('sampling'), dict):
+        raise ValueError('Replay v4 requires explicit initial conditions and sampling parameters')
+    return dynamics, start['initial']
 
 
 def replay(log_path: Path, labels: dict[str, str] | None = None) -> dict[str, Any]:
@@ -117,15 +147,16 @@ def replay(log_path: Path, labels: dict[str, str] | None = None) -> dict[str, An
     if len(starts) != 1 or len(profiles) != 1:
         raise ValueError('Replay requires exactly one start and one complete profile record')
     start, raw_profile = starts[0], profiles[0]['profile']
+    dynamics, initial = _context(start)
     required = {field.name for field in fields(FusionProfile)}
     if not isinstance(raw_profile, dict) or set(raw_profile) != required:
         raise ValueError(
             'Recorded profile is incomplete or incompatible; current defaults are not used'
         )
     profile = FusionProfile(**raw_profile)
-    metadata = _metadata(start, warnings)
+    metadata = _metadata(start)
 
-    tracker = FusionTracker(metadata, profile)
+    tracker = FusionTracker(metadata, profile, dynamics=dynamics, initial=initial)
     raw_observations = [row for row in records if row.get('kind') == 'observation']
     truth = _labels(labels, len(raw_observations), metadata)
     phases, revisions, mismatches, samples = [], [], [], {}
@@ -197,7 +228,12 @@ def replay(log_path: Path, labels: dict[str, str] | None = None) -> dict[str, An
     return {
         'source': str(log_path),
         'map': start['map'],
+        'schema_version': SCHEMA_VERSION,
         'model_version': MODEL_VERSION,
+        'combat_mode': start['combat_mode'],
+        'dynamics': dynamics,
+        'initial': initial,
+        'sampling': start['sampling'],
         'profile': raw_profile,
         'metadata_sha256': metadata.fingerprint,
         'metadata_verified': start.get('metadata_sha256') is not None,

@@ -83,6 +83,8 @@ class CombatEngine(PhaseHandlersMixin):
         self,
         plan: CombatPlan,
         initial_ship_stats: list[ShipDamageState],
+        *,
+        tracking_session: TrackingSession | None = None,
     ) -> CombatResult:
         """执行一次完整的战斗循环。
 
@@ -95,6 +97,8 @@ class CombatEngine(PhaseHandlersMixin):
             作战计划 (阵型、夜战、节点决策等)。
         initial_ship_stats:
             初始血量状态（来自出征准备页面的检测结果）。
+        tracking_session:
+            外层持有的地图会话；单场结束时保留其历史，由拥有者结束整个会话。
 
         返回
         -------
@@ -106,7 +110,14 @@ class CombatEngine(PhaseHandlersMixin):
         )
         self._reset()
 
-        self._start_tracking()
+        if tracking_session is None:
+            self._start_tracking()
+        else:
+            self._tracking = tracking_session
+            # 外注入会话已带定位历史，从其当前节点出发；
+            # 否则每场战斗的首个定位都会报 "0 → X"（0 是新引擎的占位起点）
+            self._node = self._tracking.current_node
+            self._apply_tracking_node()
         if initial_ship_stats is not None:
             self._ship_stats = initial_ship_stats[:]
 
@@ -144,7 +155,8 @@ class CombatEngine(PhaseHandlersMixin):
                 result.flag = ConditionFlag.OPERATION_SUCCESS
                 break
 
-        self._tracking_action('end')
+        if tracking_session is None:
+            self._tracking_action('end')
         result.ship_stats = self._ship_stats[:]
         result.node_count = self._node_count
         _log.info(
@@ -314,6 +326,19 @@ class CombatEngine(PhaseHandlersMixin):
 
     def _get_current_decision(self) -> NodeDecision:
         """获取当前节点的决策。"""
+        if (
+            self._plan.mode == CombatMode.DECISIVE
+            and self._node == '0'
+            and self._tracking is not None
+            and self._tracking.estimate is not None
+        ):
+            decisions = [
+                self._plan.get_node_decision(node)
+                for node, weight in self._tracking.estimate.node_weights.items()
+                if weight > 0 and node in self._plan.nodes
+            ]
+            if decisions and all(decision == decisions[0] for decision in decisions):
+                return decisions[0]
         return self._plan.get_node_decision(self._node)
 
     def _try_recovery(self) -> bool:
@@ -362,7 +387,8 @@ def run_combat(
     plan: CombatPlan,
     *,
     ship_stats: list[ShipDamageState],
+    tracking_session: TrackingSession | None = None,
 ) -> CombatResult:
     """执行一次完整战斗的便捷函数。"""
     engine = CombatEngine(ctx=ctx)
-    return engine.fight(plan, initial_ship_stats=ship_stats)
+    return engine.fight(plan, initial_ship_stats=ship_stats, tracking_session=tracking_session)

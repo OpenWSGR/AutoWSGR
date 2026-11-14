@@ -9,16 +9,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
+from autowsgr.ops.decisive.config import MapData
 from autowsgr.types import FleetSelection, Formation
-
-from .config import MapData
 
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
     from autowsgr.infra import DecisiveConfig
-
-    from .state import DecisiveState
+    from autowsgr.ops.decisive.state import DecisiveState
 
 
 _log = get_logger('ops.decisive')
@@ -33,9 +31,9 @@ def _is_ship(name: str) -> bool:
     return name not in {'长跑训练', '肌肉记忆', '黑科技'}
 
 
-def _count_anti_sub(enemy: list[str]) -> int:
-    """统计敌方反潜单位数量（Legacy: CL/DD/CVL）。"""
-    anti_sub_set = {'CL', 'DD', 'CVL'}
+def _count_anti_sub(enemy: list[str | None]) -> int:
+    """统计轻巡、驱逐、轻母反潜单位，空槽不计入。"""
+    anti_sub_set = {'轻巡', '驱逐', '轻母'}
     return sum(1 for ship_type in enemy if ship_type in anti_sub_set)
 
 
@@ -266,8 +264,8 @@ class DecisiveLogic:
         # TODO: 根据地图数据和关键节点信息做出更智能的选择
         return 0
 
-    def get_formation(self) -> Formation:
-        """根据当前节点敌方编成动态选择阵型。
+    def get_formation(self, node: str | None = None) -> Formation:
+        """根据指定候选节点敌方编成选择阵型；省略节点时使用当前状态。
 
         兼容 Legacy 规则：
         - 当敌方反潜单位数 <= 0，或我方含 U-1206 且反潜单位 <= 1：梯形阵
@@ -276,7 +274,7 @@ class DecisiveLogic:
         enemy = MapData.get_enemy(
             self.config.chapter,
             self.state.stage,
-            self.state.node,
+            self.state.node if node is None else node,
         )
         anti_sub = _count_anti_sub(enemy)
 

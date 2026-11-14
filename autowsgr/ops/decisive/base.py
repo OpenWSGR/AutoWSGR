@@ -13,6 +13,7 @@ from autowsgr.constants import DECISIVE_SKILL_NAMES, update_shipnames
 from autowsgr.infra import DecisiveConfig, get_logger
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
+from autowsgr.ops.decisive.tracking import DecisiveTrackingSession
 from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
 
 
@@ -34,7 +35,7 @@ class DecisiveBase:
         _logic             纯决策模块 (DecisiveLogic)
         _battle_page       决战总览页 UI
         _map               决战地图页 UI
-        _resume_mode       是否恢复进度模式
+        _inventory_refresh_required  编队和完整库存是否需要重新核实
         _has_chosen_fleet  是否已经历过战备舰队获取
         _wait_deadline     等待超时截止时间
         _use_last_fleet_attempts  使用上次舰队尝试次数
@@ -82,10 +83,33 @@ class DecisiveBase:
             ctx,
             merged_config,
         )
-        self._resume_mode: bool = False
+        self._inventory_refresh_required: bool = True
         self._has_chosen_fleet: bool = False
         self._wait_deadline: float = 0.0
         self._use_last_fleet_attempts: int = 0
+        self._tracking: DecisiveTrackingSession | None = None
+        self._known_start_stage: int | None = None
+        self._battle_encounter_id: str | None = None
+
+    def _close_tracking(self) -> None:
+        """整个小关结束或中断时结算一次；单场战斗不拥有会话。"""
+        if self._tracking is not None:
+            self._tracking.finish()
+            self._tracking = None
+        self._battle_encounter_id = None
+
+    def _ensure_tracking(self) -> DecisiveTrackingSession:
+        if self._tracking is None or self._tracking.stage != self._state.stage:
+            self._close_tracking()
+            self._tracking = DecisiveTrackingSession(
+                self._state.chapter,
+                self._state.stage,
+                known_start=self._known_start_stage == self._state.stage,
+                log_dir=self._ctx.config.log.dir,
+                record_replay=self._ctx.config.log.node_fusion_replay,
+            )
+            self._known_start_stage = None
+        return self._tracking
 
     @property
     def state(self) -> DecisiveState:

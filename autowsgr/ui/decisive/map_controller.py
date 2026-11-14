@@ -14,7 +14,8 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Literal
 
 import cv2
 import numpy as np
@@ -40,8 +41,10 @@ from autowsgr.ui.decisive.overlay import (
     is_fleet_acquisition,
 )
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
-from autowsgr.ui.utils.ship_list import recognize_ships_in_list as _recognize_ships
+from autowsgr.ui.page import click_and_wait_for_page
+from autowsgr.ui.utils import recognize_ships_in_list as _recognize_ships
 from autowsgr.vision import (
+    ROI,
     ImageChecker,
     MatchStrategy,
     PixelChecker,
@@ -50,13 +53,15 @@ from autowsgr.vision import (
     get_api_dll,
 )
 
-from ..page import click_and_wait_for_page
-
 
 if TYPE_CHECKING:
+    from typing import NoReturn
+
     from autowsgr.context import GameContext
+    from autowsgr.emulator.frame import CapturedFrame
     from autowsgr.infra import DecisiveConfig
     from autowsgr.vision.api_dll import ApiDll
+    from autowsgr.vision.image_template import ImageMatchDetail
 
 
 _log = get_logger('ui.decisive')
@@ -69,6 +74,39 @@ SKILL_USED = PixelSignature(
         PixelRule.of(0.1977, 0.9361, (245, 245, 245), tolerance=30.0),
     ],
 )
+
+
+STAGE_CLEAR_SELECTED = PixelSignature(
+    name='stage_clear_selected',
+    strategy=MatchStrategy.ALL,
+    rules=[
+        PixelRule.of(x / 1280, y / 720, (253, 253, 253), tolerance=65.0)
+        for x, y in ((238, 248), (560, 248), (238, 447), (557, 447))
+    ],
+)
+
+
+@dataclass(frozen=True, slots=True)
+class MapNodeObservation:
+    """同一 RGB 帧的字母观察；元数据不可变，图像沿用 CapturedFrame 的只读借用。"""
+
+    frame: CapturedFrame
+    icon_x: float | None = None
+    crop_bounds: tuple[int, int, int, int] | None = None
+    raw_node: str | None = None
+    node_label: str | None = None
+    locate_seconds: float = 0.0
+    native_seconds: float | None = None
+    failure: Literal['missing_icon', 'native_error', 'invalid_label'] | None = None
+    error: str | None = None
+
+    @property
+    def crop(self) -> np.ndarray | None:
+        """传给 ApiDll 的原始 RGB 裁剪；不另存一份可能与元数据失配的图像。"""
+        if self.crop_bounds is None:
+            return None
+        left, top, right, bottom = self.crop_bounds
+        return self.frame.image[top:bottom, left:right]
 
 
 class DecisiveMapController:
@@ -142,6 +180,10 @@ class DecisiveMapController:
 
         if screen is None:
             screen = self._ctrl.screenshot()
+
+        # 通关卡过场尚无按钮时也不能透过遮罩认成普通地图并点击编队。
+        if self._has_stage_clear_choices(screen):
+            return None
 
         if ImageChecker.template_exists(
             screen,
@@ -224,94 +266,110 @@ class DecisiveMapController:
             return None
         return float(centroids[best][0]) / bgr.shape[1]
 
-    def dll_recognize_map(self, dll: ApiDll, screen: np.ndarray, center: float) -> str:
+    @staticmethod
+    def _node_crop_bounds(screen: np.ndarray, center: float) -> tuple[int, int, int, int]:
         h, w = screen.shape[:2]
         x1 = max(0, int((center - 0.03) * w))
         x2 = min(w, int((center - 0.03 + 0.042) * w))
-        col_crop = screen[0:h, x1:x2]
-        result = dll.recognize_map(col_crop)
-        # save_image(col_crop, result + '.png')
-        return result
+        return x1, 0, x2, h
 
-    def get_ship_icon_pos(self) -> float | None:
-        detect_screen = self._ctrl.screenshot()
-        # 针对Ex5特调，A节点不选择分支，直接进入战备舰队获取
-        screen_is_fleet_acquisition = is_fleet_acquisition(detect_screen)
-        if screen_is_fleet_acquisition:
-            return -1
-        # _locate_ship_icon 需要 BGR；screenshot() 返回 RGB
-        bgr = cv2.cvtColor(detect_screen, cv2.COLOR_RGB2BGR)
-        icon_rel_x = self._locate_ship_icon(bgr)
-        return icon_rel_x
+    def dll_recognize_map(self, dll: ApiDll, screen: np.ndarray, center: float) -> str:
+        """保留原始字符串接口；与结构化观察共用裁剪规则。"""
+        left, top, right, bottom = self._node_crop_bounds(screen, center)
+        return dll.recognize_map(screen[top:bottom, left:right])
 
-    def get_ship_icon_pos_with_retry(self) -> float | None:
-        _icon_timeout = 10.0
-        _icon_gap = 0.15
-        deadline = time.monotonic() + _icon_timeout
-        icon_rel_x: float | None = None
-        while time.monotonic() < deadline:
-            icon_rel_x = self.get_ship_icon_pos()
-            if icon_rel_x is not None:
-                break
-            time.sleep(_icon_gap)
-        return icon_rel_x
+    def observe_node(self, frame: CapturedFrame) -> MapNodeObservation:
+        """从已有帧定位、裁剪并调用一次 native，不等待、不重截或判断页面。
+
+        页面门禁、主动采样与去重由调用方负责。这里只解析首字符 A-Z，
+        字母是否属于当前小关由会话校验；native 失败保留诊断与分项耗时。
+        """
+        started = time.perf_counter()
+        center = self._locate_ship_icon(cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR))
+        locate_seconds = time.perf_counter() - started
+        if center is None:
+            return MapNodeObservation(frame, locate_seconds=locate_seconds, failure='missing_icon')
+        observation = MapNodeObservation(
+            frame,
+            icon_x=center,
+            crop_bounds=self._node_crop_bounds(frame.image, center),
+            locate_seconds=locate_seconds,
+        )
+        started = time.perf_counter()
+        try:
+            raw = get_api_dll().recognize_map(observation.crop)
+        except Exception as exc:
+            _log.warning('[地图控制器] DLL 节点识别异常', exc_info=True)
+            return replace(
+                observation,
+                failure='native_error',
+                error=f'{type(exc).__name__}: {exc}',
+                native_seconds=time.perf_counter() - started,
+            )
+        native_seconds = time.perf_counter() - started
+        node = raw[:1] if raw else ''
+        valid = bool(node and 'A' <= node <= 'Z')
+        return replace(
+            observation,
+            raw_node=raw,
+            node_label=node if valid else None,
+            native_seconds=native_seconds,
+            failure=None if valid else 'invalid_label',
+        )
 
     def recognize_node(
         self,
-    ) -> str:
-        """DLL 识别当前决战节点字母 (如 ``'A'``, ``'B'``)。
+        frame: CapturedFrame | None = None,
+    ) -> str | None:
+        """读取已有稳定帧；同帧定位和裁剪，失败作为缺失证据交还调用者。
 
-        算法 (无模板依赖):
-
-        1. 轮询截图，通过 **HSV 颜色分割** 定位舰船指示器 X 坐标
-           (地图上最大的橙黄色连通区域)。
-        2. 以舰标 X 为参考裁剪全高竖列，送 DLL ``recognize_map`` 识别。
-        3. DLL 返回 ``'0'`` 时重试 (最多 3 次)，全部失败抛出异常。
+        页面稳定由上层页面等待负责，这里不等待、不重截，也不把失败转换为节点。
         """
-        _max_retry = 3
-        dll = get_api_dll()
+        if frame is None:
+            frame = self._ctrl.capture_frame()
+        if is_fleet_acquisition(frame.image):
+            return 'CHOOSE_FLEET'
+        node = self.observe_node(frame).node_label
+        if node is not None:
+            _log.info('[地图控制器] 识别决战节点: {} (帧 {})', node, frame.sequence)
+            return node
+        return None
 
-        for retry in range(_max_retry + 1):
-            icon_rel_x: float | None = self.get_ship_icon_pos_with_retry()
-            for retry_icon in range(_max_retry + 1):
-                time.sleep(0.5)
-                icon_rel_x_now = self.get_ship_icon_pos_with_retry()
-                if icon_rel_x_now == -1:
-                    return 'CHOOSE_FLEET'
-                if icon_rel_x_now == icon_rel_x:
-                    _log.debug('[地图控制器] 舰船指示器位置: X={:.5f}', icon_rel_x)
-                    break
-                _log.debug(
-                    '[地图控制器] 舰船指示器位置偏移, 重试{:d}: X1={:.5f}, X2={:.5f}',
-                    retry_icon,
-                    icon_rel_x,
-                    icon_rel_x_now,
+    def wait_for_stable_map_frame(self, timeout: float = 5.0) -> CapturedFrame:
+        """复用地图等待：两个不同帧确认地图，有舰标时另外验证位移稳定。"""
+        deadline = time.monotonic() + timeout
+        previous = None
+        previous_center = None
+        while time.monotonic() < deadline:
+            if self._ctx.stop_event.is_set():
+                raise InterruptedError('等待决战地图时收到停止请求')
+            frame = self._ctrl.capture_frame()
+            if (
+                is_decisive_map_page(frame.image)
+                and detect_decisive_overlay(frame.image) is None
+                and not self._has_stage_clear_choices(frame.image)
+            ):
+                center = self._locate_ship_icon(cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR))
+                distinct = previous is not None and (
+                    frame.sequence != previous.sequence
+                    if frame.sequence is not None and previous.sequence is not None
+                    else frame.captured_at > previous.captured_at
                 )
-                icon_rel_x = icon_rel_x_now
-
-            if icon_rel_x is None:
-                raise RuntimeError('决战节点识别失败: 舰船指示器超时未出现')
-
-            # 2. 取新截图，按舰标 X 裁剪竖列
-            fresh_screen = self._ctrl.screenshot()
-
-            # 3. DLL 识别
-            try:
-                result = self.dll_recognize_map(dll, fresh_screen, icon_rel_x)
-                if result != '0':
-                    _log.info('[地图控制器] 识别决战节点: {}', result[0])
-                    return result[0]
-            except Exception:
-                _log.warning('[地图控制器] DLL 节点识别异常', exc_info=True)
-
-            if retry >= _max_retry:
-                break
-            _log.warning(
-                '[地图控制器] 节点识别失败, 正在重试第 {} 次',
-                retry + 1,
-            )
-
-        raise RuntimeError(f'决战节点识别失败: 重试 {_max_retry + 1} 次后仍无法识别')
+                if distinct and (
+                    (center is None and previous_center is None)
+                    or (
+                        center is not None
+                        and previous_center is not None
+                        and abs(center - previous_center) * frame.image.shape[1] <= 2
+                    )
+                ):
+                    return frame
+                if previous is None or distinct:
+                    previous, previous_center = frame, center
+            else:
+                previous, previous_center = None, None
+            time.sleep(0.05)
+        raise TimeoutError('决战地图未取得两个稳定的独立帧')
 
     # ══════════════════════════════════════════════════════════════════════
     # 战备舰队获取 overlay
@@ -449,6 +507,10 @@ class DecisiveMapController:
             - *damage*: 各槽位血量状态
             - *all_ships*: 所有可用舰船名 (含编队成员)
         """
+        # TODO(2de0cf4f 回退): legacy 只识别选船列表首屏, 会漏掉首屏以下的舰船。
+        # 完整遍历 (DecisiveShipListWalker, 2de0cf4f) 因入场动画竞态
+        # (页面签名先于下拉文字就绪, 筛选检查误杀, 2026-11-14 实机日志) 已回退。
+        # 待有真实 issue 证明首屏漏船影响决策时, 修复竞态后再恢复完整遍历。
         _log.info('[地图控制器] 扫描当前编队与可用舰船')
 
         self.enter_formation()
@@ -580,95 +642,151 @@ class DecisiveMapController:
         self._ctrl.click(*CLICK_LEAVE)
         time.sleep(2.0)
 
-    def confirm_stage_clear(self) -> list[str]:  # noqa: PLR0912
-        """小关通关后确认弹窗并收集掉落舰船。"""
-        from autowsgr.combat import recognize_ship_drop
+    @staticmethod
+    def _has_stage_clear_choices(screen: np.ndarray) -> bool:
+        """两侧实图标题在各自卡片位置出现，排除奖励或一般确认窗。"""
         from autowsgr.image_resources import Templates
-        from autowsgr.ui.utils import confirm_operation
 
-        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0, delay=2.0)
-        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0, delay=2.0)
+        for template, roi in (
+            (Templates.Decisive.STAGE_CLEAR_TITLE, ROI(0.18, 0.32, 0.45, 0.42)),
+            (Templates.Decisive.STAGE_CLEAR_ABANDON, ROI(0.55, 0.32, 0.83, 0.42)),
+        ):
+            if not ImageChecker.template_exists(screen, template, roi=roi, confidence=0.9):
+                return False
+        return True
 
-        ship_templates = [
-            Templates.Symbol.GET_SHIP,
-            Templates.Symbol.GET_ITEM,
-        ]
-        entry_templates = Templates.Decisive.entry_status_templates()
-        collected: list[str] = []
-        for _ in range(10):
-            # 等待掉落弹窗出现
-            if ImageChecker.template_exists(
-                self._ctrl.screenshot(),
-                ship_templates,
-                confidence=0.8,
-            ):
-                break
-            time.sleep(0.25)
-        while True:
-            screen = self._ctrl.screenshot()
-            detail = ImageChecker.find_any(
-                screen,
-                ship_templates,
-                confidence=0.8,
+    @staticmethod
+    def _stage_clear_button(screen: np.ndarray) -> ImageMatchDetail | None:
+        """通关卡和实际确认按钮必须同帧可见，过场动画不产生可点击坐标。"""
+        from autowsgr.image_resources import Templates
+
+        if not DecisiveMapController._has_stage_clear_choices(screen):
+            return None
+        return ImageChecker.find_template(
+            screen, Templates.Confirm.CONFIRM_4, roi=ROI(0.4, 0.78, 0.6, 0.91), confidence=0.88
+        )
+
+    def is_stage_clear(self, screen: np.ndarray) -> bool:
+        """独立识别真实通关选择页，不依赖预测节点、OCR 或单个通用确认按钮。"""
+        return self._stage_clear_button(screen) is not None
+
+    @staticmethod
+    def _has_reward_drop(screen: np.ndarray) -> bool:
+        """菜单和已展开的对话框共同确认掉落页，装饰角仅作识别证据。"""
+        from autowsgr.image_resources import Templates
+
+        return ImageChecker.find_any(
+            screen,
+            [Templates.Symbol.GET_SHIP, Templates.Symbol.GET_ITEM],
+            roi=ROI(0.0, 0.7, 0.16, 1.0),
+            confidence=0.85,
+        ) is not None and ImageChecker.template_exists(
+            screen,
+            Templates.Decisive.REWARD_DIALOG_CORNER,
+            roi=ROI(0.78, 0.88, 0.89, 0.98),
+            confidence=0.88,
+        )
+
+    def _raise_clear_error(self, screen: np.ndarray, reason: str) -> NoReturn:
+        """结算失败保存最后实际画面，拒绝盲点或将半途结算当作下一关。"""
+        from pathlib import Path
+
+        from autowsgr.infra.logger import save_image
+
+        try:
+            path = save_image(
+                screen, 'decisive-clear-error', Path(self._ctx.config.log.dir) / 'images'
             )
-            if detail is None:
-                time.sleep(1.0)
-                screen = self._ctrl.screenshot()
-                detail = ImageChecker.find_any(
+            _log.error('[地图控制器] {}；现场={}', reason, path)
+        except Exception as exc:
+            _log.warning('[地图控制器] 通关现场保存失败: {}', exc)
+        raise RuntimeError(reason)
+
+    _STAGE_CLEAR_TIMEOUT = 45.0
+
+    def confirm_stage_clear(self, *, resume_rewards: bool = False) -> list[str]:  # noqa: PLR0912
+        """按实际控件结算奖励，两个独立帧确认返回入口后才结束小关。
+
+        左侧「确认通关」必须处于选中状态才能确认，避免误选「放弃」。
+        掉落展示只在菜单和完整对话框同时可见时推进；过场动画不点击。
+        只有调用者明确恢复已确认的结算时，才允许从完整掉落页继续。
+        """
+        from autowsgr.combat import recognize_ship_drop
+        from autowsgr.combat.actions import Coords
+        from autowsgr.image_resources import Templates
+
+        if self._ctx.stop_event.is_set():
+            raise InterruptedError('决战通关结算时收到停止请求')
+        frame = self._ctrl.capture_frame()
+        if resume_rewards and not self._has_reward_drop(frame.image):
+            self._raise_clear_error(frame.image, '未确认完整掉落页面，拒绝恢复决战通关奖励结算')
+        if not resume_rewards and not self.is_stage_clear(frame.image):
+            self._raise_clear_error(frame.image, '未确认真实决战通关页面，拒绝结算操作')
+        deadline = time.monotonic() + self._STAGE_CLEAR_TIMEOUT
+        collected: list[str] = []
+        last_frame = None
+        last_drop = None
+        entry_frames = 0
+        confirmed_clear = resume_rewards
+        while time.monotonic() < deadline:
+            if self._ctx.stop_event.is_set():
+                raise InterruptedError('决战通关结算时收到停止请求')
+            token = frame.sequence if frame.sequence is not None else frame.captured_at
+            if token == last_frame:
+                time.sleep(0.05)
+                frame = self._ctrl.capture_frame()
+                continue
+            last_frame = token
+            screen = frame.image
+            clear_button = self._stage_clear_button(screen)
+            if clear_button is not None:
+                selected = PixelChecker.check_signature(screen, STAGE_CLEAR_SELECTED).matched
+                # 先点击实际左卡，再等待新帧确认选中；绝不确认右侧放弃选项。
+                self._ctrl.click(*(clear_button.center if selected else (0.31, 0.48)))
+                confirmed_clear = confirmed_clear or selected
+                entry_frames = 0
+            elif confirmed_clear:
+                confirm = ImageChecker.find_any(
                     screen,
-                    ship_templates,
-                    confidence=0.8,
+                    Templates.Confirm.all(),
+                    roi=ROI(0.25, 0.15, 0.8, 0.93),
+                    confidence=0.88,
                 )
-                if detail is None:
-                    break
-
-            ship_drop = recognize_ship_drop(screen, ocr=self._ocr)
-            _log.info(f'[地图控制器] 检测到掉落: {ship_drop.ship_name}({ship_drop.ship_type})')
-            collected.append(ship_drop.ship_name)
-            self._ctrl.click(0.953, 0.954)
-            time.sleep(0.5)
-            confirm_operation(self._ctrl, timeout=1.0)
-
-        # 掉落处理结束后，继续等待回到决战入口页，避免奖励弹窗残留导致后续状态识别超时
-        settle_deadline = time.monotonic() + 12.0
-        reward_ack_pos = (0.953, 0.954)
-        while time.monotonic() < settle_deadline:
-            screen = self._ctrl.screenshot()
-            if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
-                _log.info('[地图控制器] 小关通关结算完成，已回到决战入口页')
-                break
-
-            reward_detail = ImageChecker.find_any(screen, ship_templates, confidence=0.8)
-            if reward_detail is not None:
-                _log.info("[地图控制器] 结算阶段仍有奖励弹窗: '{}'", reward_detail.template_name)
-                self._ctrl.click(*reward_ack_pos)
-                time.sleep(0.35)
-                confirm_operation(self._ctrl, timeout=0.8)
-                confirm_operation(self._ctrl, timeout=0.8)
-                continue
-
-            if confirm_operation(self._ctrl, timeout=0.8):
-                continue
-
+                if confirm is not None:
+                    self._ctrl.click(*confirm.center)
+                    entry_frames = 0
+                    last_drop = None
+                elif self._has_reward_drop(screen):
+                    try:
+                        drop = recognize_ship_drop(screen, ocr=self._ocr)
+                        if drop.ship_name and drop.ship_name != last_drop:
+                            collected.append(drop.ship_name)
+                            last_drop = drop.ship_name
+                    except Exception as exc:
+                        # 舰名只用于反馈，不让一次 OCR 失败改变已确认的控件操作。
+                        _log.warning('[地图控制器] 掉落舰名读取失败: {}', exc)
+                    # 斜纹角只证明对话框已展开，不是继续按钮；复用掉落页已验证的继续区域。
+                    self._ctrl.click(*Coords.CLICK_RESULT)
+                    entry_frames = 0
+                elif (
+                    ImageChecker.find_any(
+                        screen,
+                        Templates.Decisive.entry_status_templates(),
+                        roi=ROI(0.3, 0.8, 0.78, 1.0),
+                        confidence=0.85,
+                    )
+                    is not None
+                ):
+                    entry_frames += 1
+                    if entry_frames >= 2:
+                        _log.info('[地图控制器] 通关结算完成并确认返回入口，掉落={}', collected)
+                        return collected
+                else:
+                    entry_frames = 0
+                    last_drop = None
             time.sleep(0.3)
-        else:
-            _log.warning('[地图控制器] 小关通关后未能确认已回到决战入口页')
-
-        # settle 循环结束后，如果仍未回到入口页，尝试从地图页返回
-        for _ in range(5):
-            screen = self._ctrl.screenshot()
-            if ImageChecker.find_any(screen, entry_templates, confidence=0.8) is not None:
-                _log.info('[地图控制器] 通过返回按钮回到决战入口页')
-                break
-            _log.debug('[地图控制器] 尝试点击返回按钮回到决战入口页')
-            self._ctrl.click(0.03, 0.06)
-            time.sleep(1.0)
-        else:
-            _log.warning('[地图控制器] 多次尝试后仍未能回到决战入口页')
-
-        if collected:
-            _log.info('[地图控制器] 小关通关共收集 {} 个掉落', len(collected))
-        return collected
+            frame = self._ctrl.capture_frame()
+        self._raise_clear_error(frame.image, '决战通关结算超时，未确认返回入口页，保留现场并停止')
 
     # ══════════════════════════════════════════════════════════════════════
     # 节点间修理

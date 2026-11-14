@@ -12,6 +12,8 @@ from autowsgr.combat.node_fusion.calibration import recognition_mismatches
 from autowsgr.combat.node_fusion.enemy import EnemyObservation
 from autowsgr.combat.node_fusion.map import TrackingMap
 from autowsgr.combat.node_fusion.model import FusionObservation, FusionProfile, FusionTracker
+from autowsgr.combat.plan import CombatMode
+from autowsgr.ops.decisive.config import MapData
 
 
 def _node(
@@ -185,21 +187,51 @@ def test_empty_reference_slots_are_not_reported() -> None:
     assert recognition_mismatches(tracker) == []
 
 
-def test_loot_ap_slot_is_not_an_identification_error() -> None:
+@pytest.mark.parametrize('combat_mode', [CombatMode.NORMAL, CombatMode.EVENT, CombatMode.DECISIVE])
+@pytest.mark.parametrize('slot', range(6))
+def test_loot_ap_exemption_is_only_normal_third_slot(combat_mode: CombatMode, slot: int) -> None:
     tracker = _tracker({'0': _node(('A',), silent=True), 'A': _node((), ship='轻母')})
+    raw_slots = ['CVL'] * 6
+    raw_slots[slot] = 'AP'
     _spot(
         tracker,
         1.0,
-        replace(_enemy(ship='轻母'), raw_slots=('CVL', 'CVL', 'AP', 'CVL', 'CVL', 'CVL')),
+        replace(_enemy(ship='轻母'), raw_slots=tuple(raw_slots)),
     )
-    assert recognition_mismatches(tracker) == []
+    mismatches = recognition_mismatches(tracker, combat_mode=combat_mode)
+    if combat_mode == CombatMode.NORMAL and slot == 2:
+        assert mismatches == []
+    else:
+        assert [(item.slot, item.code, item.expected) for item in mismatches] == [
+            (slot + 1, 'AP', '轻母')
+        ]
 
 
-def test_ap_signature_node_is_excluded_whether_or_not_observation_matches() -> None:
+@pytest.mark.parametrize('combat_mode', [CombatMode.NORMAL, CombatMode.EVENT, CombatMode.DECISIVE])
+def test_ap_signature_node_is_excluded_whether_or_not_observation_matches(
+    combat_mode: CombatMode,
+) -> None:
     for raw_slots in (('AP',) * 6, ('DD',) * 6):
         tracker = _tracker({'0': _node(('A',), silent=True), 'A': _node((), ship='补给')})
         _spot(tracker, 1.0, replace(_enemy(ship='补给'), raw_slots=raw_slots))
-        assert recognition_mismatches(tracker) == []
+        assert recognition_mismatches(tracker, combat_mode=combat_mode) == []
+
+
+@pytest.mark.parametrize('combat_mode', [CombatMode.NORMAL, CombatMode.EVENT, CombatMode.DECISIVE])
+def test_matching_supply_ship_in_mixed_fleet_is_silent(combat_mode: str) -> None:
+    raw = {'0': _node(('A',), silent=True), 'A': _node(())}
+    raw['A']['enemy_formations'][0]['ships'][2] = '补给'
+    tracker = _tracker(raw)
+    _spot(tracker, 1.0, replace(_enemy(), raw_slots=('DD', 'DD', 'AP', 'DD', 'DD', 'DD')))
+    assert recognition_mismatches(tracker, combat_mode=combat_mode) == []
+
+
+def test_all_supply_signature_exemption_preserves_empty_slots() -> None:
+    raw = {'0': _node(('A',), silent=True), 'A': _node(())}
+    raw['A']['enemy_formations'][0]['ships'] = ['补给', '补给', None, None, None, None]
+    tracker = _tracker(raw)
+    _spot(tracker, 1.0, _enemy())
+    assert recognition_mismatches(tracker, combat_mode=CombatMode.DECISIVE) == []
 
 
 def test_all_native_types_recognized_correctly_stay_silent() -> None:
@@ -250,3 +282,57 @@ def test_returning_to_same_node_in_a_cycle_reports_each_encounter() -> None:
     mismatches = recognition_mismatches(tracker)
     assert [item.slot for item in mismatches] == list(range(1, 7))
     assert mismatches[0].node == 'B'
+
+
+def _decisive_spot(
+    tracker: FusionTracker, time: float, encounter_id: str, raw_slots: tuple[str, ...]
+) -> None:
+    tracker.observe(
+        FusionObservation(
+            'phase',
+            time,
+            frame_id=f'spot-{time}',
+            phase='SPOT_ENEMY_SUCCESS',
+            encounter_id=encounter_id,
+            enemies=replace(_enemy(), raw_slots=raw_slots),
+        )
+    )
+
+
+def test_decisive_reference_preserves_known_start_and_verified_progress() -> None:
+    tracker = FusionTracker(MapData.tracking_map(6, 1), dynamics='decisive', initial={'A': 1.0})
+    _decisive_spot(tracker, 1.0, 'first', ('BB', 'CL', 'NO', 'NO', 'NO', 'NO'))
+    tracker.observe(
+        FusionObservation('action', 2.0, action='encounter_complete', encounter_id='first')
+    )
+    tracker.observe(FusionObservation('phase', 3.0, phase='DECISIVE_MAP_READY'))
+    _decisive_spot(tracker, 4.0, 'second', ('DD', 'SS', 'SS', 'NO', 'NO', 'NO'))
+    _decisive_spot(tracker, 5.0, 'second', ('CLT', 'SS', 'SS', 'NO', 'NO', 'NO'))
+    mismatches = recognition_mismatches(tracker, combat_mode=CombatMode.DECISIVE)
+    assert [(item.node, item.slot, item.code, item.encounter_id) for item in mismatches] == [
+        ('A', 1, 'BB', 'first'),
+        ('B', 1, 'DD', 'second'),
+    ]
+    assert [item.event_id for item in mismatches] == [0, 3]
+
+
+def test_decisive_unknown_resume_does_not_use_enemy_to_label_native_feedback() -> None:
+    tracker = FusionTracker(MapData.tracking_map(6, 1), dynamics='decisive')
+    _decisive_spot(tracker, 1.0, 'resume', ('BB', 'CL', 'NO', 'NO', 'NO', 'NO'))
+    assert recognition_mismatches(tracker, combat_mode=CombatMode.DECISIVE) == []
+
+
+def test_airfield_code_and_supply_code_remain_distinct() -> None:
+    tracker = FusionTracker(MapData.tracking_map(6, 1), dynamics='decisive', initial={'J': 1.0})
+    slots = ('AP', 'BB', 'DD', 'BB', 'BC', 'AV')
+    _decisive_spot(tracker, 1.0, 'airport', slots)
+    (mismatch,) = recognition_mismatches(tracker, combat_mode=CombatMode.DECISIVE)
+    assert (mismatch.slot, mismatch.expected, mismatch.code, mismatch.recognized) == (
+        1,
+        '机场',
+        'AP',
+        '补给',
+    )
+    matching = FusionTracker(MapData.tracking_map(6, 1), dynamics='decisive', initial={'J': 1.0})
+    _decisive_spot(matching, 1.0, 'airport', (VesselType.Airfield.as_english(), *slots[1:]))
+    assert recognition_mismatches(matching, combat_mode=CombatMode.DECISIVE) == []

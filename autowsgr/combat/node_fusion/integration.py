@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import math
 import time
 from dataclasses import asdict
 from importlib.metadata import version
@@ -26,7 +25,12 @@ from autowsgr.combat.node_fusion.calibration import (
 )
 from autowsgr.combat.node_fusion.enemy import EnemyObservation, observe_enemy
 from autowsgr.combat.node_fusion.map import TrackingMap
-from autowsgr.combat.node_fusion.model import FusionObservation, FusionProfile, FusionTracker
+from autowsgr.combat.node_fusion.model import (
+    MODEL_VERSION,
+    FusionObservation,
+    FusionProfile,
+    FusionTracker,
+)
 from autowsgr.combat.node_fusion.position import ShipPositionDetector
 from autowsgr.combat.plan import CombatMode
 from autowsgr.combat.state import CombatPhase
@@ -71,7 +75,7 @@ _ENCOUNTER_PHASES = frozenset(
 
 
 def _channel_summary(weights: dict[str, float]) -> str:
-    """单路独立分布：首名压过次名的自然对数分差；无次名标注唯一。"""
+    """单路独立分布：首两名各自的归一化权重；单候选只报首名，空缺记短横。"""
     ranked = sorted(
         ((node, weight) for node, weight in weights.items() if weight > 0.0),
         key=lambda item: item[1],
@@ -80,10 +84,9 @@ def _channel_summary(weights: dict[str, float]) -> str:
     if not ranked:
         return '-'
     if len(ranked) == 1:
-        return f'{ranked[0][0]}(唯一)'
+        return f'{ranked[0][0]} {ranked[0][1]:.2f}'
     top, second = ranked[0], ranked[1]
-    gap = math.log(top[1]) - math.log(second[1])
-    return f'{top[0]}>{second[0]}+{gap:.1f}'
+    return f'{top[0]} {top[1]:.2f} > {second[0]} {second[1]:.2f}'
 
 
 class _TimedClickDevice:
@@ -109,15 +112,30 @@ class TrackingSession:
         self.tracker: FusionTracker | None = None
         self.detector = ShipPositionDetector()
         self.log_path: Path | None = None
-        self.estimate: NodeEstimate | None = None
-        self.current_node = '0'
+        self._last_result: NodeEstimate | None = None
+        self._decision_estimate: NodeEstimate | None = None
         self.phase_is_new_encounter = False
         self._last_motion = float('-inf')
         self._sortie_id = uuid4().hex
         self._map_label = '?'
         self._motion_frames = 0
-        self._statistics_tracker: FusionTracker | None = None
+        self._motion_geometry: dict[str, float] = {}
+        self._history_tracker: FusionTracker | None = None
         self._statistics_finished = False
+        self.combat_mode = CombatMode.NORMAL
+        self.encounter_id: str | None = None
+
+    @property
+    def estimate(self) -> NodeEstimate | None:
+        """最后一次发布的结果，包含未被模型接纳的观察及其拒绝原因。"""
+        return self._last_result
+
+    @property
+    def current_node(self) -> str:
+        """由场景确认的决策节点，不将最新模型结果自动作为已发布决策。"""
+        if self._decision_estimate is None:
+            return '0'
+        return self._decision_estimate.current_node or '0'
 
     @classmethod
     def start(
@@ -130,6 +148,7 @@ class TrackingSession:
         if plan.mode not in (CombatMode.NORMAL, CombatMode.EVENT):
             return None
         session = cls()
+        session.combat_mode = plan.mode
         if record_replay:
             session._open_log(log_dir)
         session._map_label = (
@@ -155,40 +174,66 @@ class TrackingSession:
                 min_travel_seconds=1.0 if plan.mode == CombatMode.NORMAL else None
             )
             session.tracker = FusionTracker(metadata, profile)
-            session._statistics_tracker = session.tracker
+            session._history_tracker = session.tracker
         except Exception as exc:
             session.fail(f'初始化失败: {type(exc).__name__}: {exc}')
             return session
-        if session.log_path is not None:
-            session._record(
-                {
-                    'kind': 'start',
-                    'schema_version': 3,
-                    'backend_version': __version__,
-                    'mode': 'fusion',
-                    'combat_mode': plan.mode,
-                    'map': [plan.chapter, plan.map_id],
-                    'plan': plan.name,
-                    'event_name': plan.event_name,
-                    'entrance': plan.entrance,
-                    'metadata_sha256': metadata.fingerprint,
-                    'metadata_source': metadata.source,
-                    'metadata_snapshot': metadata.to_dict(),
-                    'capabilities': metadata.capabilities,
-                    'degradation_reasons': metadata.degradation_reasons,
-                    'native_version': version('autowsgr-native'),
-                    'native_ship_types': {
-                        name: value.as_chinese()
-                        for name in dir(VesselType)
-                        if isinstance(value := getattr(VesselType, name), VesselType)
-                    },
-                }
-            )
-            session._record({'kind': 'profile', 'profile': asdict(profile)})
+        session._record_start(
+            metadata,
+            profile,
+            map_id=(plan.chapter, plan.map_id),
+            plan_name=plan.name,
+            event_name=plan.event_name,
+            entrance=plan.entrance,
+        )
         session._warn_degradation(metadata)
         if session.log_path is not None:
             _log.info('[NodeFusion] 回放记录: {}', session.log_path)
         return session
+
+    def _record_start(
+        self,
+        metadata: TrackingMap,
+        profile: FusionProfile,
+        *,
+        map_id: tuple[int | str, int | str],
+        plan_name: str,
+        event_name: str | None = None,
+        entrance: str | None = None,
+        sampling: dict[str, Any] | None = None,
+    ) -> None:
+        """冻结模型、初始化与地图；未开启回放时不序列化副本。"""
+        if self.log_path is None or self.tracker is None:
+            return
+        self._record(
+            {
+                'kind': 'start',
+                'schema_version': 4,
+                'model_version': MODEL_VERSION,
+                'backend_version': __version__,
+                'mode': 'fusion',
+                'combat_mode': self.combat_mode,
+                'dynamics': self.tracker.dynamics,
+                'initial': self.tracker.initial,
+                'sampling': sampling or {},
+                'map': list(map_id),
+                'plan': plan_name,
+                'event_name': event_name,
+                'entrance': entrance,
+                'metadata_sha256': metadata.fingerprint,
+                'metadata_source': metadata.source,
+                'metadata_snapshot': metadata.to_dict(),
+                'capabilities': metadata.capabilities,
+                'degradation_reasons': metadata.degradation_reasons,
+                'native_version': version('autowsgr-native'),
+                'native_ship_types': {
+                    name: value.as_chinese()
+                    for name in dir(VesselType)
+                    if isinstance(value := getattr(VesselType, name), VesselType)
+                },
+            }
+        )
+        self._record({'kind': 'profile', 'profile': asdict(profile)})
 
     @staticmethod
     def _warn_degradation(metadata: TrackingMap) -> None:
@@ -233,19 +278,19 @@ class TrackingSession:
 
     def fail(self, reason: str) -> None:
         self.tracker = None
-        self.estimate = None
-        self.current_node = '0'
+        self._last_result = None
+        self._decision_estimate = None
         self.phase_is_new_encounter = False
         _log.error('[NodeFusion] 节点无法确认: {}', reason)
         self._record({'kind': 'disabled', 'reason': reason})
 
     def finish(self) -> None:
         """出征结束后核对舰类识别；不符时告警请求反馈，全程一致保持静默。"""
-        if self._statistics_finished or self._statistics_tracker is None:
+        if self._statistics_finished or self._history_tracker is None:
             return
         self._statistics_finished = True
         try:
-            mismatches = recognition_mismatches(self._statistics_tracker)
+            mismatches = recognition_mismatches(self._history_tracker, combat_mode=self.combat_mode)
         except Exception as exc:
             _log.warning('[NodeFusion校验] 本趟校验未完成，不影响游戏: {}', exc)
             return
@@ -254,21 +299,26 @@ class TrackingSession:
             by_node.setdefault(item.node, []).append(item)
         for node, items in by_node.items():
             detail = '；'.join(
-                f'槽{item.slot} {item.expected}→{item.code}({item.recognized})' for item in items
+                f'槽{item.slot} {item.expected}→{item.code}({item.recognized}) '
+                f'[事件{item.event_id}, 遭遇{item.encounter_id}]'
+                for item in items
             )
             _log.warning(
-                '[NodeFusion校验] 舰类识别与地图签名不符，请反馈：地图 {} 节点 {}：{}（native {}）',
+                '[NodeFusion校验] 舰类识别与地图签名不符，请反馈：模式 {} 地图 {} 节点 {}：{}（native {}）',
+                self.combat_mode,
                 self._map_label,
                 node,
                 detail,
                 NATIVE_VERSION,
             )
+        if by_node and self.log_path is not None:
+            _log.warning('[NodeFusion校验] 复核观测记录: {}', self.log_path)
 
     def publish(self, observation: FusionObservation) -> NodeEstimate | None:
         if self.tracker is None:
             return None
         try:
-            self.estimate = self.tracker.observe(observation)
+            self._last_result = self.tracker.observe(observation)
         except Exception as exc:
             self.fail(f'推断失败: {type(exc).__name__}: {exc}')
             return None
@@ -282,13 +332,29 @@ class TrackingSession:
             self._record(
                 {
                     'kind': 'observation',
-                    'schema_version': 3,
+                    'schema_version': 4,
                     'observation': asdict(observation),
                     'estimate': summary,
                 }
             )
-        if observation.kind == 'motion' and self.estimate.ignored is None:
+        if (
+            observation.kind == 'motion'
+            and self._last_result is not None
+            and self._last_result.ignored is None
+        ):
             self._motion_frames += 1
+            row = self._last_result.diagnostics.get('geometry')
+            weights = row.get('weights') if isinstance(row, dict) else None
+            if weights:
+                self._motion_geometry = dict(weights)
+        if (
+            observation.node_label is not None
+            and self._last_result is not None
+            and self._last_result.ignored is None
+            and not self._last_result.anomaly
+        ):
+            # 地图字母识别是独立裁决点，被接受的读数同样输出一行归因。
+            self._log_attribution(self._last_result)
         return self.estimate
 
     def motion(self, frame: CapturedFrame | None, decision_node: str) -> None:
@@ -314,27 +380,40 @@ class TrackingSession:
             )
         )
 
-    def _log_attribution(self, estimate: NodeEstimate) -> None:
-        """到达帧输出各证据通道的独立候选集，便于定位某点位的弱判据。"""
+    def _log_attribution(self, estimate: NodeEstimate, *, enemy_expected: bool = False) -> None:
+        """裁决点输出各证据通道的独立候选集；只列本事件实际存在的通道。"""
         diagnostics = estimate.diagnostics
 
-        def channel(name: str) -> str:
-            row = diagnostics.get(name)
+        def cell(name: str, key: str) -> str | None:
+            row = diagnostics.get(key)
             weights = row.get('weights') if isinstance(row, dict) else None
-            return _channel_summary(weights or {})
+            return None if not weights else name + _channel_summary(weights)
 
-        ranked = sorted(estimate.node_weights.values(), reverse=True)
-        margin = ranked[0] - ranked[1] if len(ranked) > 1 else 1.0
         frames = self._motion_frames
         self._motion_frames = 0
-        _log.debug(
-            '[NodeFusion归因] 节点={} 索敌前{}({}帧) 敌情{} margin={:.3f}',
-            estimate.current_node or '?',
-            channel('history_prior'),
-            frames,
-            channel('enemy'),
-            margin,
-        )
+        columns: list[str] = []
+        history = cell('历史', 'history_prior')
+        if history is not None:
+            columns.append(history)
+        geometry = cell('几何', 'geometry')
+        if geometry is None and frames and self._motion_geometry:
+            # 索敌裁决点上几何分项已折入先验；改列最近一帧几何候选，帧数为样本量。
+            geometry = '几何' + _channel_summary(self._motion_geometry)
+        if geometry is not None:
+            columns.append(f'{geometry}({frames}帧)')
+        self._motion_geometry = {}
+        enemy = cell('敌情', 'enemy')
+        if enemy is None and enemy_expected:
+            # 索敌事件本应提供敌情：缺失与"模式没有"不同，保留短横。
+            enemy = '敌情-'
+        if enemy is not None:
+            columns.append(enemy)
+        label = cell('识别', 'node_label')
+        if label is not None:
+            columns.append(label)
+        node = estimate.current_node or '?'
+        confidence = max(estimate.node_weights.values(), default=0.0)
+        _log.debug('[NodeFusion归因] 节点{} {:.2f} {}', node, confidence, ' '.join(columns))
 
     def phase(
         self,
@@ -353,22 +432,25 @@ class TrackingSession:
                 phase=phase.name,
                 enemies=enemies,
                 decision_node=decision_node,
+                encounter_id=self.encounter_id,
             )
         )
         if phase not in _ENCOUNTER_PHASES:
             return
         if estimate is None or estimate.anomaly:
-            self.current_node = '0'
+            self._decision_estimate = None
             self.phase_is_new_encounter = False
         elif estimate.ignored is None:
-            self.current_node = estimate.current_node or '0'
+            self._decision_estimate = estimate
             row = next(
                 (row for row in reversed(estimate.history) if row['event_id'] == estimate.event_id),
                 None,
             )
             self.phase_is_new_encounter = row is not None and row['transition'] == 'new_encounter'
             if self.phase_is_new_encounter:
-                self._log_attribution(estimate)
+                self._log_attribution(
+                    estimate, enemy_expected=phase is CombatPhase.SPOT_ENEMY_SUCCESS
+                )
 
     def enemy_observation(
         self,
@@ -412,6 +494,7 @@ class TrackingSession:
                 clicked=clicked,
                 page_left=page_left,
                 decision_node=decision_node,
+                encounter_id=self.encounter_id,
             )
         )
         if (
@@ -420,7 +503,7 @@ class TrackingSession:
             and estimate is not None
             and estimate.ignored is None
         ):
-            self.current_node = '0'
+            self._decision_estimate = None
             self.phase_is_new_encounter = False
         if action == 'end':
             self.finish()

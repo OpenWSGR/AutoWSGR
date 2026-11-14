@@ -123,11 +123,11 @@ _STAGE_CHECK_POINTS: dict[int, list[tuple[float, float]]] = {
 }
 """每章 3 个小关的像素检测点 (相对坐标)。
 
-若检测点颜色接近白色 (250, 244, 253) 表示该小关已通过。
+检测点接近白色 (250, 244, 253) 表示该小关入口已点亮，包含当前小关，不等于已通关。
 """
 
 _STAGE_CHECK_COLOR: Color = Color.of(250, 244, 253)
-"""小关已通过标记颜色 (近白色)。"""
+"""小关入口点亮颜色 (近白色)。"""
 
 _STAGE_CHECK_TOLERANCE: float = 30.0
 """颜色匹配容差。"""
@@ -186,10 +186,10 @@ class DecisiveBattlePage:
 
     @staticmethod
     def recognize_stage(screen: np.ndarray, chapter: int) -> int:
-        """识别当前决战章节的小关进度 (0-3)。
+        """沿用旧版标记检测，返回当前小关号 (1-3)，未识别到入口时返回 0。
 
-        检查每个小关位置像素颜色，白色 (250,244,253) 为已通过。
-        返回当前正在进行的小关编号; 3 表示全部通过。
+        按顺序读取三个入口点亮标记，当前小关也会点亮。返回值直接作为领域小关号，
+        不再加一；3 可表示当前第三小关，不能仅据此宣布章节完成。
         """
         check_points = _STAGE_CHECK_POINTS.get(chapter)
         if check_points is None:
