@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import math
 import time
 from dataclasses import asdict
 from importlib.metadata import version
@@ -76,7 +75,7 @@ _ENCOUNTER_PHASES = frozenset(
 
 
 def _channel_summary(weights: dict[str, float]) -> str:
-    """单路独立分布：首名压过次名的自然对数分差；无次名标注唯一。"""
+    """单路独立分布：首两名各自的归一化权重；单候选只报首名，空缺记短横。"""
     ranked = sorted(
         ((node, weight) for node, weight in weights.items() if weight > 0.0),
         key=lambda item: item[1],
@@ -85,10 +84,9 @@ def _channel_summary(weights: dict[str, float]) -> str:
     if not ranked:
         return '-'
     if len(ranked) == 1:
-        return f'{ranked[0][0]}(唯一)'
+        return f'{ranked[0][0]} {ranked[0][1]:.2f}'
     top, second = ranked[0], ranked[1]
-    gap = math.log(top[1]) - math.log(second[1])
-    return f'{top[0]}>{second[0]}+{gap:.1f}'
+    return f'{top[0]} {top[1]:.2f} > {second[0]} {second[1]:.2f}'
 
 
 class _TimedClickDevice:
@@ -121,6 +119,7 @@ class TrackingSession:
         self._sortie_id = uuid4().hex
         self._map_label = '?'
         self._motion_frames = 0
+        self._motion_geometry: dict[str, float] = {}
         self._history_tracker: FusionTracker | None = None
         self._statistics_finished = False
         self.combat_mode = CombatMode.NORMAL
@@ -338,8 +337,24 @@ class TrackingSession:
                     'estimate': summary,
                 }
             )
-        if observation.kind == 'motion' and self.estimate.ignored is None:
+        if (
+            observation.kind == 'motion'
+            and self._last_result is not None
+            and self._last_result.ignored is None
+        ):
             self._motion_frames += 1
+            row = self._last_result.diagnostics.get('geometry')
+            weights = row.get('weights') if isinstance(row, dict) else None
+            if weights:
+                self._motion_geometry = dict(weights)
+        if (
+            observation.node_label is not None
+            and self._last_result is not None
+            and self._last_result.ignored is None
+            and not self._last_result.anomaly
+        ):
+            # 地图字母识别是独立裁决点，被接受的读数同样输出一行归因。
+            self._log_attribution(self._last_result)
         return self.estimate
 
     def motion(self, frame: CapturedFrame | None, decision_node: str) -> None:
@@ -365,27 +380,40 @@ class TrackingSession:
             )
         )
 
-    def _log_attribution(self, estimate: NodeEstimate) -> None:
-        """到达帧输出各证据通道的独立候选集，便于定位某点位的弱判据。"""
+    def _log_attribution(self, estimate: NodeEstimate, *, enemy_expected: bool = False) -> None:
+        """裁决点输出各证据通道的独立候选集；只列本事件实际存在的通道。"""
         diagnostics = estimate.diagnostics
 
-        def channel(name: str) -> str:
-            row = diagnostics.get(name)
+        def cell(name: str, key: str) -> str | None:
+            row = diagnostics.get(key)
             weights = row.get('weights') if isinstance(row, dict) else None
-            return _channel_summary(weights or {})
+            return None if not weights else name + _channel_summary(weights)
 
-        ranked = sorted(estimate.node_weights.values(), reverse=True)
-        margin = ranked[0] - ranked[1] if len(ranked) > 1 else 1.0
         frames = self._motion_frames
         self._motion_frames = 0
-        _log.debug(
-            '[NodeFusion归因] 节点={} 索敌前{}({}帧) 敌情{} margin={:.3f}',
-            estimate.current_node or '?',
-            channel('history_prior'),
-            frames,
-            channel('enemy'),
-            margin,
-        )
+        columns: list[str] = []
+        history = cell('历史', 'history_prior')
+        if history is not None:
+            columns.append(history)
+        geometry = cell('几何', 'geometry')
+        if geometry is None and frames and self._motion_geometry:
+            # 索敌裁决点上几何分项已折入先验；改列最近一帧几何候选，帧数为样本量。
+            geometry = '几何' + _channel_summary(self._motion_geometry)
+        if geometry is not None:
+            columns.append(f'{geometry}({frames}帧)')
+        self._motion_geometry = {}
+        enemy = cell('敌情', 'enemy')
+        if enemy is None and enemy_expected:
+            # 索敌事件本应提供敌情：缺失与"模式没有"不同，保留短横。
+            enemy = '敌情-'
+        if enemy is not None:
+            columns.append(enemy)
+        label = cell('识别', 'node_label')
+        if label is not None:
+            columns.append(label)
+        node = estimate.current_node or '?'
+        confidence = max(estimate.node_weights.values(), default=0.0)
+        _log.debug('[NodeFusion归因] 节点{} {:.2f} {}', node, confidence, ' '.join(columns))
 
     def phase(
         self,
@@ -420,7 +448,9 @@ class TrackingSession:
             )
             self.phase_is_new_encounter = row is not None and row['transition'] == 'new_encounter'
             if self.phase_is_new_encounter:
-                self._log_attribution(estimate)
+                self._log_attribution(
+                    estimate, enemy_expected=phase is CombatPhase.SPOT_ENEMY_SUCCESS
+                )
 
     def enemy_observation(
         self,

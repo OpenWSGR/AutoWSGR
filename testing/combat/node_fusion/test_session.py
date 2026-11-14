@@ -475,11 +475,10 @@ def test_arrival_logs_attribution_with_channel_candidates(
 
     calls = [call for call in debug.call_args_list if '[NodeFusion归因]' in call.args[0]]
     attribution = calls[0].args[0].format(*calls[0].args[1:])
-    # 单候选图：索敌前与敌情均无次名，标注唯一。
-    assert '节点=A' in attribution
-    assert '索敌前A(唯一)(0帧)' in attribution
-    assert '敌情A(唯一)' in attribution
-    assert 'margin=1.000' in attribution
+    # 单候选图：历史与敌情均无次名，只报首名及其权重，不用特殊记号。
+    assert '节点A 1.00' in attribution
+    assert '历史A 1.00' in attribution
+    assert '敌情A 1.00' in attribution
 
 
 def test_arrival_attribution_lists_tied_enemy_candidates(
@@ -541,10 +540,11 @@ def test_arrival_attribution_lists_tied_enemy_candidates(
 
     calls = [call for call in debug.call_args_list if '[NodeFusion归因]' in call.args[0]]
     attribution = calls[-1].args[0].format(*calls[-1].args[1:])
-    # B/C 签名完全相同：敌情两候选并列，列出并列成员与自然对数分差。
-    assert '敌情B>C+0.0' in attribution
+    # B/C 签名完全相同：敌情两候选并列，权重相同；几何候选按航段展示，帧数只挂在几何通道上。
+    assert '敌情B 0.49 > C 0.49' in attribution
+    assert '几何' in attribution
     assert '(2帧)' in attribution
-    assert '节点=B' in attribution
+    assert '节点B 0.97' in attribution
 
 
 def test_statistics_failure_warns_without_disabling_node_control(

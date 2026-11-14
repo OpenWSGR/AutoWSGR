@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from autowsgr.combat.engine import CombatEngine
+from autowsgr.combat.node_fusion import integration as integration_module
 from autowsgr.combat.node_fusion.enemy import EnemyObservation
 from autowsgr.combat.node_fusion.map import TrackingMap
 from autowsgr.combat.node_fusion.model import FusionObservation
@@ -49,6 +50,25 @@ def metadata(monkeypatch: pytest.MonkeyPatch) -> TrackingMap:
 
 def frame(sequence: int) -> CapturedFrame:
     return CapturedFrame(np.zeros((2, 2, 3), dtype=np.uint8), sequence, float(sequence))
+
+
+def test_label_verdict_logs_attribution(monkeypatch: pytest.MonkeyPatch) -> None:
+    debug = MagicMock()
+    monkeypatch.setattr(integration_module._log, 'debug', debug)
+    session = DecisiveTrackingSession(6, 1)
+    assert session.sample_node_label
+    session.map_ready(frame(1), 'B')
+    assert session.current_node == 'B'
+
+    calls = [call for call in debug.call_args_list if '[NodeFusion归因]' in call.args[0]]
+    assert calls
+    attribution = calls[0].args[0].format(*calls[0].args[1:])
+    # 未知起点：先验均匀，字母识别是唯一新证据；几何与敌情通道本事件不存在，不列出。
+    assert '节点B 0.90' in attribution
+    assert '历史' in attribution
+    assert '识别B 0.90' in attribution
+    assert '几何' not in attribution
+    assert '敌情' not in attribution
 
 
 def test_known_a_skips_sampling_advances_once_and_replays(
