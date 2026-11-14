@@ -24,7 +24,6 @@ import autowsgr.ui.decisive.fleet_ocr as _fleet_ocr
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisivePhase, FleetSelection, ShipDamageState
 from autowsgr.ui.battle.preparation import BattlePreparationPage, RepairStrategy
-from autowsgr.ui.choose_ship_page import ChooseShipPage
 from autowsgr.ui.decisive.overlay import (
     ADVANCE_CARD_POSITIONS,
     CLICK_ADVANCE_CONFIRM,
@@ -42,9 +41,8 @@ from autowsgr.ui.decisive.overlay import (
     is_fleet_acquisition,
 )
 from autowsgr.ui.decisive.preparation import DecisiveBattlePreparationPage
-from autowsgr.ui.decisive.ship_list import DecisiveInventoryScanError, DecisiveShipListWalker
 from autowsgr.ui.page import click_and_wait_for_page
-from autowsgr.ui.utils import wait_for_page
+from autowsgr.ui.utils import recognize_ships_in_list as _recognize_ships
 from autowsgr.vision import (
     ROI,
     ImageChecker,
@@ -489,7 +487,7 @@ class DecisiveMapController:
     def check_fleet(
         self,
     ) -> tuple[list[str | None], dict[int, ShipDamageState], set[str]]:
-        """确认完整库存及返回地图后才返回快照；失败不返回部分库存。
+        """恢复进度时在编队页面扫描当前编队及所有可用舰船。
 
         完整 UI 流程:
 
@@ -498,7 +496,7 @@ class DecisiveMapController:
         3. 进入选船列表扫描所有可用舰船
         4. 返回地图页
 
-        在队成员不出现在候选列表中，因此只有完整列表扫描成功后才合并两者。
+        对齐 legacy ``_check_fleet``: 同时收集编队成员与列表中的舰船。
 
         Returns
         -------
@@ -509,58 +507,55 @@ class DecisiveMapController:
             - *damage*: 各槽位血量状态
             - *all_ships*: 所有可用舰船名 (含编队成员)
         """
+        # TODO(2de0cf4f 回退): legacy 只识别选船列表首屏, 会漏掉首屏以下的舰船。
+        # 完整遍历 (DecisiveShipListWalker, 2de0cf4f) 因入场动画竞态
+        # (页面签名先于下拉文字就绪, 筛选检查误杀, 2026-11-14 实机日志) 已回退。
+        # 待有真实 issue 证明首屏漏船影响决策时, 修复竞态后再恢复完整遍历。
         _log.info('[地图控制器] 扫描当前编队与可用舰船')
-        if self._ctx.stop_event.is_set():
-            raise InterruptedError('扫描决战库存前收到停止请求')
+
         self.enter_formation()
+        time.sleep(0.5)  # 等待编队页加载完成
         page = DecisiveBattlePreparationPage(self._ctx, self._config, self._ocr)
-        wait_for_page(
-            self._ctrl, page.is_current_page, timeout=5.0, source='决战地图', target='出征准备'
-        )
-        snapshot = page.detect_fleet_snapshot()
-        if len(snapshot.names) != 6 or len(snapshot.occupied) != 6:
-            raise DecisiveInventoryScanError('决战编队快照不是六槽，拒绝发布库存')
-        for _ in range(2):
-            if not snapshot.unknown_slots:
-                break
-            if self._ctx.stop_event.is_set():
-                raise InterruptedError('补识别决战舰名前收到停止请求')
-            # 只补尚未识别的舰名，不向识别器提供预期编队或舰名候选上下文。
-            snapshot = page.fill_missing_fleet_snapshot(snapshot, detail_requirements={})
-        if self._ctx.stop_event.is_set():
-            raise InterruptedError('补识别决战舰名时收到停止请求')
-        if snapshot.unknown_slots:
-            raise DecisiveInventoryScanError('决战编队有未识别的占用槽，拒绝发布库存')
-        fleet = snapshot.names
+
         screen = self._ctrl.screenshot()
+        fleet = page.detect_fleet(screen)
         damage = page.detect_ship_damage(screen)
-        if set(damage) != set(range(6)) or any(
-            snapshot.occupied[slot] != (damage[slot] != ShipDamageState.NO_SHIP)
-            for slot in range(6)
-        ):
-            raise DecisiveInventoryScanError('决战编队占用与血量检测不一致，停止库存扫描')
 
-        if self._ctx.stop_event.is_set():
-            raise InterruptedError('扫描决战库存时收到停止请求')
+        # 进入选船列表：先确认已离开出征准备页，再进行一次识别
         page.click_ship_slot(0)
-        wait_for_page(
-            self._ctrl,
-            ChooseShipPage.is_current_page,
-            timeout=5.0,
-            source='出征准备',
-            target='编队选船',
-        )
-        available = DecisiveShipListWalker(self._ctx, self._ocr).scan()
-        all_ships = available | {name for name in fleet if name is not None}
+        deadline = time.monotonic() + 5.0
+        ship_list_screen = None
+        while time.monotonic() < deadline:
+            time.sleep(0.2)
+            screen = self._ctrl.screenshot()
+            if not BattlePreparationPage.is_current_page(screen):
+                ship_list_screen = screen
+                break
 
+        if ship_list_screen is None:
+            _log.warning('[地图控制器] 点击舰船位后未确认进入选船列表，按当前截图继续识别')
+            ship_list_screen = self._ctrl.screenshot()
+        else:
+            time.sleep(0.3)  # 等待选船列表内容稳定
+            ship_list_screen = self._ctrl.screenshot()
+
+        available = _recognize_ships(self._ocr, ship_list_screen)
+        _log.debug('[地图控制器] 选船列表识别结果: {}', sorted(available))
+
+        # 编队中的舰船也计入可用集合
+        all_ships = set(available)
+        for name in fleet:
+            if name is not None:
+                all_ships.add(name)
+
+        # 返回准备页
         self._ctrl.click(0.05, 0.05)
-        wait_for_page(
-            self._ctrl, page.is_current_page, timeout=5.0, source='编队选船', target='出征准备'
-        )
+        time.sleep(1.0)
+
+        # 返回地图页
         page.go_back()
-        self.wait_for_stable_map_frame()
-        if self._ctx.stop_event.is_set():
-            raise InterruptedError('决战库存扫描完成前收到停止请求')
+        time.sleep(1.0)
+
         _log.info(
             '[地图控制器] 编队={}, 可用舰船={}',
             fleet,

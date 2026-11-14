@@ -23,13 +23,6 @@ import cv2
 from autowsgr.constants import SHIPNAMES, normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import PageName
-from autowsgr.ui.utils import wait_for_page, wait_leave_page
-from autowsgr.ui.utils.ship_list import (
-    LevelOCRRetryNeededError,
-    extract_ship_type_from_text,
-    locate_ship_rows,
-    read_ship_level_at_card,
-)
 from autowsgr.vision import (
     MatchStrategy,
     PageMatch,
@@ -40,10 +33,16 @@ from autowsgr.vision import (
 from autowsgr.vision.ocr import _fuzzy_match
 from autowsgr.vision.ocr_rules import EasyOCRProfile
 
+from .utils import wait_for_page, wait_leave_page
+from .utils.ship_list import (
+    LevelOCRRetryNeededError,
+    extract_ship_type_from_text,
+    locate_ship_rows,
+    read_ship_level_at_card,
+)
+
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
-
     import numpy as np
 
     from autowsgr.combat.fleet import ShipSelector
@@ -247,8 +246,7 @@ class ChooseShipPage:
         """按一条明确规则更换舰船，或移除当前槽位舰船。
 
         使用 DLL 行定位 + OCR 在选船列表中查找目标舰船并点击。
-        普通出征最多识别 ``_OCR_MAX_ATTEMPTS`` 轮；决战使用有界的完整列表遍历，
-        每次重新进入都重新定位，页面或覆盖证据不完整时抛扫描异常。
+        最多重试 ``_OCR_MAX_ATTEMPTS`` 次, 每次失败后向上滚动列表。
 
         Parameters
         ----------
@@ -280,8 +278,7 @@ class ChooseShipPage:
             self.ensure_search_box()
             self.input_ship_name(search_name)
             self.ensure_dismiss_keyboard()
-        find_ship = self._click_ship_in_list if use_search else self._click_decisive_ship_in_list
-        matched = find_ship(
+        matched = self._click_ship_in_list(
             selector.name,
             ship_type=selector.ship_types or None,
             min_level=selector.min_level,
@@ -408,100 +405,6 @@ class ChooseShipPage:
         )
         return result
 
-    def _select_visible_ship(
-        self,
-        screen: np.ndarray,
-        hits: Sequence[tuple[str, float, float, float]],
-        name: str,
-        *,
-        ship_type: tuple[ShipType, ...] | None,
-        min_level: int | None,
-        max_level: int | None,
-        relaxed_constraints: bool,
-        check_stop: Callable[[], None] | None = None,
-    ) -> tuple[str | None, bool]:
-        """共用当前视口的候选约束及点击，不决定列表如何遍历。
-
-        决战提供的 check_stop 在原有点击延迟前后检查停止；普通调用保留原流程。
-        """
-        selected_hit: tuple[str, float, float] | None = None
-        relaxed_hits: list[tuple[int, bool, int, tuple[str, float, float]]] = []
-        retry_level_ocr = False
-        for hit_index, (matched, cx, cy, row_key) in enumerate(hits):
-            if not self._matches_ship_name(name, matched):
-                continue
-            constraint = self._check_hit_constraints(
-                self._preferred_ocr,
-                screen,
-                matched,
-                cx,
-                cy,
-                row_key,
-                ship_type=ship_type,
-                min_level=min_level,
-                max_level=max_level,
-                relaxed_constraints=relaxed_constraints,
-            )
-            retry_level_ocr = retry_level_ocr or constraint.retry_level_ocr
-            if not constraint.accepted:
-                continue
-            hit = (matched, cx, cy)
-            if constraint.is_fallback:
-                relaxed_hits.append((*constraint.fallback_priority, hit_index, hit))
-                continue
-            selected_hit = hit
-            break
-        if selected_hit is None and relaxed_hits:
-            selected_hit = min(relaxed_hits, key=lambda candidate: candidate[:3])[3]
-        if selected_hit is None:
-            return None, retry_level_ocr
-        matched, cx, cy = selected_hit
-        if check_stop is not None:
-            check_stop()
-        _log.debug("[UI] 选船 DLL+OCR -> '{}'，点击 ({:.3f}, {:.3f})", name, cx, cy)
-        time.sleep(1.0)
-        if check_stop is not None:
-            check_stop()
-        self._ctrl.click(cx, cy)
-        return matched, retry_level_ocr
-
-    def _click_decisive_ship_in_list(
-        self,
-        name: str,
-        *,
-        ship_type: tuple[ShipType, ...] | None = None,
-        min_level: int | None = None,
-        max_level: int | None = None,
-        relaxed_constraints: bool = False,
-    ) -> str | None:
-        """决战从实际顶部遍历完整视口，始终使用本次观察的目标位置。"""
-        from autowsgr.ui.decisive.ship_list import (
-            DecisiveInventoryScanError,
-            DecisiveShipListWalker,
-        )
-
-        def check_stop() -> None:
-            if self._ctx.stop_event.is_set():
-                raise InterruptedError('决战选船点击前收到停止请求')
-
-        walker = DecisiveShipListWalker(self._ctx, self._preferred_ocr)
-        for viewport in walker.viewports():
-            selected, retry_level_ocr = self._select_visible_ship(
-                viewport.frame.image,
-                viewport.hits,
-                name,
-                ship_type=ship_type,
-                min_level=min_level,
-                max_level=max_level,
-                relaxed_constraints=relaxed_constraints,
-                check_stop=check_stop,
-            )
-            if selected is not None:
-                return selected
-            if retry_level_ocr and not relaxed_constraints:
-                raise DecisiveInventoryScanError('决战选船等级证据不足，保留现场并停止')
-        return None
-
     def _click_ship_in_list(
         self,
         name: str,
@@ -559,16 +462,60 @@ class ChooseShipPage:
                 max_level,
                 relaxed_constraints,
             )
-            matched, retry_level_ocr = self._select_visible_ship(
-                screen,
-                hits,
-                name,
-                ship_type=ship_type,
-                min_level=min_level,
-                max_level=max_level,
-                relaxed_constraints=relaxed_constraints,
-            )
-            if matched is not None:
+            selected_hit: tuple[str, float, float] | None = None
+            relaxed_hits: list[tuple[int, bool, int, tuple[str, float, float]]] = []
+            retry_level_ocr = False
+
+            for hit_index, (matched, cx, cy, row_key) in enumerate(hits):
+                if not self._matches_ship_name(name, matched):
+                    continue
+
+                constraint = self._check_hit_constraints(
+                    ocr,
+                    screen,
+                    matched,
+                    cx,
+                    cy,
+                    row_key,
+                    ship_type=ship_type,
+                    min_level=min_level,
+                    max_level=max_level,
+                    relaxed_constraints=relaxed_constraints,
+                )
+                retry_level_ocr = retry_level_ocr or constraint.retry_level_ocr
+                if not constraint.accepted:
+                    continue
+
+                hit = (matched, cx, cy)
+                if constraint.is_fallback:
+                    relaxed_hits.append(
+                        (
+                            *constraint.fallback_priority,
+                            hit_index,
+                            hit,
+                        ),
+                    )
+                    continue
+
+                selected_hit = hit
+                break
+
+            if selected_hit is None and relaxed_hits:
+                selected_hit = min(relaxed_hits, key=lambda candidate: candidate[:3])[3]
+
+            if selected_hit is not None:
+                matched, cx, cy = selected_hit
+                # 当前不判断“远征中”“维修中”等不可选状态；如需支持，应在点击前增加卡片状态识别。
+                _log.debug(
+                    "[UI] 选船 DLL+OCR -> '{}' (第 {}/{} 次), 点击 ({:.3f}, {:.3f})",
+                    name,
+                    attempt + 1,
+                    _OCR_MAX_ATTEMPTS,
+                    cx,
+                    cy,
+                )
+                time.sleep(1.0)
+                self._ctrl.click(cx, cy)
                 return matched
 
             if retry_level_ocr and not relaxed_constraints:
