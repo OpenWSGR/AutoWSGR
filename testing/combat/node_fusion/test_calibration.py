@@ -189,7 +189,7 @@ def test_empty_reference_slots_are_not_reported() -> None:
 
 @pytest.mark.parametrize('combat_mode', [CombatMode.NORMAL, CombatMode.EVENT, CombatMode.DECISIVE])
 @pytest.mark.parametrize('slot', range(6))
-def test_loot_ap_exemption_is_only_normal_third_slot(combat_mode: str, slot: int) -> None:
+def test_loot_ap_exemption_is_only_normal_third_slot(combat_mode: CombatMode, slot: int) -> None:
     tracker = _tracker({'0': _node(('A',), silent=True), 'A': _node((), ship='轻母')})
     raw_slots = ['CVL'] * 6
     raw_slots[slot] = 'AP'
@@ -208,7 +208,9 @@ def test_loot_ap_exemption_is_only_normal_third_slot(combat_mode: str, slot: int
 
 
 @pytest.mark.parametrize('combat_mode', [CombatMode.NORMAL, CombatMode.EVENT, CombatMode.DECISIVE])
-def test_ap_signature_node_is_excluded_whether_or_not_observation_matches(combat_mode: str) -> None:
+def test_ap_signature_node_is_excluded_whether_or_not_observation_matches(
+    combat_mode: CombatMode,
+) -> None:
     for raw_slots in (('AP',) * 6, ('DD',) * 6):
         tracker = _tracker({'0': _node(('A',), silent=True), 'A': _node((), ship='补给')})
         _spot(tracker, 1.0, replace(_enemy(ship='补给'), raw_slots=raw_slots))

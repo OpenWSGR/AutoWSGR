@@ -863,7 +863,7 @@ def test_shared_observation_leaves_stage_membership_validation_to_session(
 
 
 def test_unknown_start_does_not_invent_confirmed_a() -> None:
-    args = parse_args(['--output', 'samples'])
+    args = parse_args(['--config', 'settings.yaml', '--output', 'samples'])
     assert args.start_node is None
 
 
@@ -874,12 +874,22 @@ def test_next_round_entry_rejects_missing_progress_or_conflicting_map_label(
     extra: list[str],
 ) -> None:
     with pytest.raises(SystemExit):
-        parse_args(['--output', 'samples', '--start-at-entry', *extra])
+        parse_args(['--config', 'settings.yaml', '--output', 'samples', '--start-at-entry', *extra])
 
 
 def test_next_round_entry_parses_only_remaining_rounds() -> None:
     args = parse_args(
-        ['--output', 'samples', '--start-at-entry', '--round-offset', '1', '--rounds', '2']
+        [
+            '--config',
+            'settings.yaml',
+            '--output',
+            'samples',
+            '--start-at-entry',
+            '--round-offset',
+            '1',
+            '--rounds',
+            '2',
+        ]
     )
     assert args.start_at_entry
     assert args.round_offset + args.rounds == 3
@@ -889,7 +899,16 @@ def test_next_round_entry_parses_only_remaining_rounds() -> None:
 def test_reward_resume_is_exclusive_with_map_or_new_round_entry(conflicting: list[str]) -> None:
     with pytest.raises(SystemExit):
         parse_args(
-            ['--output', 'samples', '--resume-stage-clear', '--round-offset', '1', *conflicting]
+            [
+                '--config',
+                'settings.yaml',
+                '--output',
+                'samples',
+                '--resume-stage-clear',
+                '--round-offset',
+                '1',
+                *conflicting,
+            ]
         )
 
 
@@ -966,6 +985,8 @@ def test_reward_resume_dispatches_fifty_remaining_battles_without_extra_round(
     assert (
         main(
             [
+                '--config',
+                str(tmp_path / 'settings.yaml'),
                 '--output',
                 str(tmp_path),
                 '--round-offset',
@@ -1001,7 +1022,7 @@ def test_first_round_dispatch_respects_explicit_entry_resume(
     monkeypatch.setattr(
         'tools.decisive.collect.subprocess.check_output', lambda *_args, **_kwargs: 'fixed-commit'
     )
-    args = ['--output', str(tmp_path), '--rounds', '2']
+    args = ['--config', str(tmp_path / 'settings.yaml'), '--output', str(tmp_path), '--rounds', '2']
     if from_entry:
         args += ['--round-offset', '1', '--start-at-entry']
     assert main(args) == 0

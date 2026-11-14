@@ -422,7 +422,7 @@ class CollectionController(DecisiveController):
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=Path('D:/Games/autowsgr/user_settings.yaml'))
+    parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--rounds', type=int, default=3, help='本次尚需完成的章数')
     parser.add_argument('--round-offset', type=int, default=0, help='之前已经完成的章数')

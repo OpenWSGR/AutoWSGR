@@ -750,7 +750,7 @@ def test_map_reader_failure_preserves_retreat_rules(
     monkeypatch: pytest.MonkeyPatch,
     frame: CapturedFrame,
     tmp_path: Path,
-    mode: str,
+    mode: CombatMode,
     rule_kind: str,
 ) -> None:
     engine = make_engine(frame, tmp_path)

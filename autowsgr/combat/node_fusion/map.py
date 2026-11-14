@@ -76,7 +76,8 @@ def _parse_variant(raw: Any, node: str) -> EnemyVariant:
         ship is not None and (not isinstance(ship, str) or ship not in SHIP_TYPES) for ship in ships
     ):
         raise ValueError(
-            f'Installed native does not support Chinese enemy ship type at node {node}: {ships!r}'
+            f'Invalid enemy ship type at node {node} (expected None or a Chinese '
+            f'ship type supported by the installed native): {ships!r}'
         )
     return EnemyVariant(formation, tuple(ships))
 

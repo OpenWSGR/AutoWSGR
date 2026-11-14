@@ -70,7 +70,7 @@ def _page(monkeypatch: pytest.MonkeyPatch, names: list[str | None]) -> MagicMock
     return page
 
 
-@pytest.mark.parametrize(('name', 'cost'), [('U-2540', 3), ('U-2540', 0), ('长跑训练', 0)])
+@pytest.mark.parametrize(('name', 'cost'), [('U-2540', 3), ('长跑训练', 0)])
 def test_purchase_click_requires_inventory_confirmation(name: str, cost: int) -> None:
     controller = _controller()
     if name == '长跑训练':

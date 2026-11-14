@@ -84,6 +84,9 @@ def test_partial_coordinates_preserve_available_later_segments(missing_node: str
     terms = moving.diagnostics['geometry']['terms']
     assert terms['B->C']['distance_px'] == pytest.approx(0.0)
     assert all(missing_node not in segment.split('->') for segment in terms)
+    if missing_node == '0':
+        # 正向断言：缺坐标节点的下游航段仍在证据里，实现丢段时测试应失败
+        assert 'A->B' in terms
     arrived = _phase(tracker, 2.0, 'FORMATION')
     assert arrived.anomaly is None
     assert arrived.current_node == 'C'

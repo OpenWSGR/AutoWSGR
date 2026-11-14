@@ -114,6 +114,9 @@ class CombatEngine(PhaseHandlersMixin):
             self._start_tracking()
         else:
             self._tracking = tracking_session
+            # 外注入会话已带定位历史，从其当前节点出发；
+            # 否则每场战斗的首个定位都会报 "0 → X"（0 是新引擎的占位起点）
+            self._node = self._tracking.current_node
             self._apply_tracking_node()
         if initial_ship_stats is not None:
             self._ship_stats = initial_ship_stats[:]

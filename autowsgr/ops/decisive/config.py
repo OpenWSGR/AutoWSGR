@@ -133,7 +133,7 @@ class MapData:
     @staticmethod
     def get_enemy(chapter: int, stage: int, node: str) -> list[str | None]:
         """获取有序六槽中文舰类；空槽为 None，缺失节点资料返回空列表。"""
-        if not 1 <= chapter <= 6 or not 1 <= stage <= 3:
+        if not 1 <= chapter < len(_MAP_END) or not 1 <= stage <= 3:
             return []
         try:
             data = _load_enemy_spec_data()
