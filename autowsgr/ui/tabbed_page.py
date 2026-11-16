@@ -14,9 +14,11 @@
 1. **标签栏探测** — 5 个固定位置，恰好 1 个蓝色 + 其余暗色
    → 确认为标签页，蓝色索引 = 激活标签 (0-4)
 
-2. **模板匹配** — 对标签栏区域 (顶部 7.5%、左侧 63%) 进行自适应
-   二值化，缩放到标准尺寸 (600x40) 后与 5 个参考模板逐一比较，
-   取覆盖度 (coverage) 最高者为页面类型。
+2. **模板匹配** — 对标签栏区域 (顶部 7.5%) 进行自适应二值化，
+   缩放到标准尺寸后与 5 个参考模板逐一比较，取覆盖度 (coverage)
+   最高者为页面类型。裁剪宽度按页面区分: 地图页取左侧 78%
+   (含第 5 个标签「决战」)，其余页面取 63%；对应标准宽度
+   743 / 600 像素 (同一线性比例)。
 
 模板匹配原理
 ------------
@@ -142,10 +144,31 @@ _CROP_Y: float = 0.075
 """标签栏裁剪高度比例 (顶部 7.5%)。"""
 
 _CROP_X: float = 0.63
-"""标签栏裁剪宽度比例 (左侧 63%)。"""
+"""标签栏默认裁剪宽度比例 (左侧 63%) — 建造/强化/任务/好友页。"""
+
+_CROP_X_MAP: float = 0.78
+"""地图页裁剪宽度比例 — 需含第 5 个标签「决战」(中心 x≈0.698, tab 右缘 ≈0.76)。"""
+
+_STRIP_CROP_X: dict[TabbedPageType, float] = {
+    TabbedPageType.MAP: _CROP_X_MAP,
+    TabbedPageType.BUILD: _CROP_X,
+    TabbedPageType.INTENSIFY: _CROP_X,
+    TabbedPageType.MISSION: _CROP_X,
+    TabbedPageType.FRIEND: _CROP_X,
+}
+"""各页面类型对应的标签栏裁剪宽度 (屏幕宽度比例)。"""
 
 _REF_W: int = 600
-"""模板标准宽度 (像素)。"""
+"""基准标准宽度 (像素) — 对应裁剪宽度 ``_CROP_X`` (0.63)。"""
+
+
+def _ref_width(x_end: float) -> int:
+    """裁剪宽度 *x_end* 对应的标准宽度 (像素)。
+
+    与基准保持同一线性比例: 0.63 → 600, 0.78 → 743。
+    """
+    return round(_REF_W * x_end / _CROP_X)
+
 
 _REF_H: int = 40
 """模板标准高度 (像素)。"""
@@ -160,7 +183,8 @@ _ADAPTIVE_C: int = -5
 def _load_templates() -> dict[TabbedPageType, np.ndarray]:
     """从 ``autowsgr/ui/templates/`` 加载 5 个参考模板。
 
-    模板为二值 PNG (0/255)，尺寸 600x40。
+    模板为二值 PNG (0/255)，尺寸与页面类型的裁剪宽度对应:
+    地图页 743x40 (含决战 tab)，其余 600x40。
 
     Returns
     -------
@@ -190,28 +214,31 @@ def _get_templates() -> dict[TabbedPageType, np.ndarray]:
     return _load_templates()
 
 
-def _binarize_tabbar(screen: np.ndarray) -> np.ndarray:
+def _binarize_tabbar(screen: np.ndarray, x_end: float = _CROP_X) -> np.ndarray:
     """将截图标签栏区域二值化并缩放到标准尺寸。
 
     步骤:
 
-    1. 裁剪顶部 7.5%、左侧 63% (标签栏区域)
+    1. 裁剪顶部 7.5%、左侧 *x_end* 比例 (标签栏区域)
     2. 转灰度
     3. 自适应阈值二值化 (高斯, blockSize=21, C=-5)
-    4. 缩放到 600x40 (最近邻插值)
+    4. 缩放到 ``_ref_width(x_end)`` x 40 (最近邻插值)
 
     Parameters
     ----------
     screen:
         截图 (HxWx3, RGB 或 BGR 均可用于灰度转换)。
+    x_end:
+        裁剪宽度 (屏幕宽度比例)。地图页需传 ``_CROP_X_MAP`` (0.78)
+        以包含决战 tab。
 
     Returns
     -------
     np.ndarray
-        布尔数组 (600x40)，True = 白色像素。
+        布尔数组 (宽 ``_ref_width(x_end)`` x 40)，True = 白色像素。
     """
     h, w = screen.shape[:2]
-    crop = screen[0 : int(h * _CROP_Y), 0 : int(w * _CROP_X)]
+    crop = screen[0 : int(h * _CROP_Y), 0 : int(w * x_end)]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     binary = cv2.adaptiveThreshold(
         gray,
@@ -221,7 +248,7 @@ def _binarize_tabbar(screen: np.ndarray) -> np.ndarray:
         _ADAPTIVE_BLOCK,
         _ADAPTIVE_C,
     )
-    resized = cv2.resize(binary, (_REF_W, _REF_H), interpolation=cv2.INTER_NEAREST)
+    resized = cv2.resize(binary, (_ref_width(x_end), _REF_H), interpolation=cv2.INTER_NEAREST)
     return resized > 0
 
 
@@ -252,7 +279,8 @@ def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
     """通过模板匹配识别标签页面类型。
 
     对标签栏区域二值化后，与 5 个参考模板逐一比较覆盖度，
-    取最高者。
+    取最高者。各页面类型使用各自的裁剪宽度 (见 ``_STRIP_CROP_X``)，
+    同一裁剪宽度的二值化结果只计算一次。
 
     Parameters
     ----------
@@ -269,11 +297,14 @@ def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
     if not templates:
         return None
 
-    test_bin = _binarize_tabbar(screen)
+    test_bins: dict[float, np.ndarray] = {}
     best_type: TabbedPageType | None = None
     best_score = -1.0
     for page_type, tmpl in templates.items():
-        score = _coverage(test_bin, tmpl)
+        x_end = _STRIP_CROP_X[page_type]
+        if x_end not in test_bins:
+            test_bins[x_end] = _binarize_tabbar(screen, x_end)
+        score = _coverage(test_bins[x_end], tmpl)
         if score > 0.6 and score > best_score:
             best_score = score
             best_type = page_type
