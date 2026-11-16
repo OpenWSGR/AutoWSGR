@@ -213,7 +213,12 @@ def _build_map_transitions(
     # 只能从经验页到达。默认慢速模式进入状态机逐页采集 grade/MVP;
     # 仅显式传入 collect_result_info=False 时才将经验页作为过渡页穿行。
     if collect_result_info:
-        t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT]
+        # 经验页是期望落点, 但不是唯一可能的落点: RESULT 关闭时的点击可能被
+        # 入场动画吞掉而重试, 重试的一击会直接跨过经验页落到掉落页/前进页/
+        # 驻防页 (上游 #558 实机统计: 40 次超时, 每次 7.5s, 整局判 failed)。
+        # 若候选只放 EXP_SETTLEMENT, 这类穿透必然干等到超时; 因此把 after_result
+        # 一并列为候选, 穿透后引擎按当前页继续, 掉落仍由 _handle_get_ship 捕获。
+        t[CombatPhase.RESULT] = [CombatPhase.EXP_SETTLEMENT, *after_result]
     else:
         t[CombatPhase.RESULT] = list(after_result)
     t[CombatPhase.EXP_SETTLEMENT] = list(after_result)

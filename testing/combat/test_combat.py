@@ -111,20 +111,21 @@ class TestResolveSuccessors:
         ]
 
     def test_normal_result_enters_exp_by_default(self):
-        """MAP 类默认完整采集：RESULT 先进入经验结算页。"""
+        """MAP 类默认完整采集：RESULT 首选经验结算页。"""
         normal = MODE_TRANSITIONS[CombatMode.NORMAL]
         result = resolve_successors(normal, CombatPhase.RESULT, '')
-        assert result == [CombatPhase.EXP_SETTLEMENT]
+        # 经验页是首选落点; 其后跟随 after_result 作为穿透候选 (上游 #558)。
+        assert result[0] is CombatPhase.EXP_SETTLEMENT
         after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
         assert CombatPhase.PROCEED in after_exp
         assert CombatPhase.MAP_PAGE in after_exp
         assert CombatPhase.GET_SHIP in after_exp
 
-    def test_normal_result_only_reaches_exp_when_slow(self):
-        """MAP 类 (慢速): RESULT 只到经验结算页, 掉落/前进/终态从经验页到达。"""
+    def test_normal_result_prefers_exp_when_slow(self):
+        """MAP 类 (慢速): RESULT 首选经验结算页, 掉落/前进/终态仍从经验页到达。"""
         normal = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=True)
         result = resolve_successors(normal, CombatPhase.RESULT, '')
-        assert result == [CombatPhase.EXP_SETTLEMENT]
+        assert result[0] is CombatPhase.EXP_SETTLEMENT
         after_exp = resolve_successors(normal, CombatPhase.EXP_SETTLEMENT, '')
         assert CombatPhase.PROCEED in after_exp
         assert CombatPhase.MAP_PAGE in after_exp
@@ -1102,7 +1103,9 @@ class TestCombatPlanConditions:
         """无 grade 条件的计划默认进入经验结算页。"""
         plain = CombatPlan.from_dict({})
         plain_successors = resolve_successors(plain.transitions, CombatPhase.RESULT, '')
-        assert plain_successors == [CombatPhase.EXP_SETTLEMENT]
+        assert plain_successors[0] is CombatPhase.EXP_SETTLEMENT
+        # 驻防 (#570) 挂在 after_result 上, 必须能从 RESULT 到达, 否则识别永不触发。
+        assert CombatPhase.GARRISON in plain_successors
 
         fast = build_transitions(ModeCategory.MAP, CombatPhase.MAP_PAGE, collect_result_info=False)
         fast_successors = resolve_successors(fast, CombatPhase.RESULT, '')
