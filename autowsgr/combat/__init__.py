@@ -1,7 +1,7 @@
 """战斗系统 — 独立于 UI 框架的战斗状态机引擎。"""
 
-from .engine import CombatEngine, run_combat
-from .fleet import (
+from autowsgr.combat.engine import CombatEngine, run_combat
+from autowsgr.combat.fleet import (
     ALLOWED_SHIP_TYPE_CODES,
     FleetPreset,
     FleetSelectionSource,
@@ -11,17 +11,24 @@ from .fleet import (
     fleet_slot_from_api,
     resolve_fleet_selection,
 )
-from .history import CombatEvent, CombatHistory, CombatResult, FightResult, grade_condition_met
-from .node_tracker import MapNodeData, NodeTracker
-from .plan import CombatMode, CombatPlan, GradeCondition, NodeDecision
-from .recognition import (
+from autowsgr.combat.history import (
+    CombatEvent,
+    CombatHistory,
+    CombatResult,
+    FightResult,
+    grade_condition_met,
+)
+from autowsgr.combat.node_fusion import FusionTracker, NodeEstimate
+from autowsgr.combat.node_fusion.coordinates import MapNodeData
+from autowsgr.combat.plan import CombatMode, CombatPlan, GradeCondition, NodeDecision
+from autowsgr.combat.recognition import (
     SHIP_DROP_PAGE_SIGNATURE,
     ShipDropResult,
     recognize_enemy_formation,
     recognize_ship_drop,
 )
-from .rules import RuleEngine, RuleResult
-from .state import CombatPhase
+from autowsgr.combat.rules import RuleEngine, RuleResult
+from autowsgr.combat.state import CombatPhase
 
 
 __all__ = [
@@ -38,10 +45,11 @@ __all__ = [
     'FleetPreset',
     'FleetSelectionSource',
     'FleetSlotRule',
+    'FusionTracker',
     'GradeCondition',
     'MapNodeData',
     'NodeDecision',
-    'NodeTracker',
+    'NodeEstimate',
     'ResolvedFleetSelection',
     'RuleEngine',
     'RuleResult',

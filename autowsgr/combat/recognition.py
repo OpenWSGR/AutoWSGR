@@ -26,6 +26,7 @@ _log = get_logger('combat.recognition')
 
 if TYPE_CHECKING:
     from autowsgr.vision import OCREngine
+    from autowsgr.vision.ocr import OCRResult
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -98,6 +99,31 @@ RESULT_BLOOD_BAR_PROBE: dict[int, tuple[float, float]] = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+def recognize_enemy_slots(
+    screen: np.ndarray,
+    mode: str = 'fight',
+    *,
+    dll: ApiDll | None = None,
+) -> tuple[str, ...]:
+    """返回 native 原始舰类槽位，保留顺序以及 ``NO`` 占位。
+
+    返回长度不在这里修正，调用者可识别不完整结果，避免补位掩盖接口异常。
+    """
+    if dll is None:
+        dll = get_api_dll()
+
+    areas = _SCAN_AREAS.get(mode)
+    if areas is None:
+        raise ValueError(f'不支持的模式: {mode!r}，可选: {list(_SCAN_AREAS)}')
+
+    img = Image.fromarray(screen).convert('L').resize((960, 540))
+    img_arr = np.array(img)
+    crops = [img_arr[top:bottom, left:right] for left, top, right, bottom in areas]
+    result_str = dll.recognize_enemy(crops)
+    _log.debug('[识别] DLL 返回: {}', result_str)
+    return tuple(result_str.split())
+
+
 def recognize_enemy_ships(
     screen: np.ndarray,
     mode: str = 'fight',
@@ -128,27 +154,7 @@ def recognize_enemy_ships(
         舰类缩写 → 数量，如 ``{"BB": 2, "CV": 1, "DD": 3, "ALL": 6}``。
         仅包含数量 > 0 的条目。
     """
-    if dll is None:
-        dll = get_api_dll()
-
-    areas = _SCAN_AREAS.get(mode)
-    if areas is None:
-        raise ValueError(f'不支持的模式: {mode!r}，可选: {list(_SCAN_AREAS)}')
-
-    # 转换为 960x540 灰度
-    img = Image.fromarray(screen).convert('L')
-    img = img.resize((960, 540))
-    img_arr = np.array(img)
-
-    # 裁切 6 张缩略图
-    crops: list[np.ndarray] = []
-    for left, top, right, bottom in areas:
-        crops.append(img_arr[top:bottom, left:right])
-
-    # DLL 识别
-    result_str = dll.recognize_enemy(crops)
-    types = result_str.split()
-    _log.debug('[识别] DLL 返回: {}', result_str)
+    types = recognize_enemy_slots(screen, mode, dll=dll)
 
     # 统计
     counts: dict[str, int] = {}
@@ -167,6 +173,20 @@ def recognize_enemy_ships(
 # ═══════════════════════════════════════════════════════════════════════════════
 # 敌方阵型识别
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+def read_enemy_formation(screen: np.ndarray, ocr: OCREngine) -> OCRResult:
+    """读取阵型文字，保留 OCR 原文、置信度和文字边界。"""
+    cropped = _FORMATION_ROI.crop(screen)
+    return ocr.recognize_single(cropped, allowlist=_FORMATION_ALLOWLIST)
+
+
+def normalize_enemy_formation(text: str) -> str:
+    """将已识别阵型关键词转换为标准名，未知文本原样返回。"""
+    for key, name in _FORMATION_NAMES.items():
+        if key in text:
+            return name
+    return text
 
 
 def recognize_enemy_formation(
@@ -189,9 +209,7 @@ def recognize_enemy_formation(
     str
         阵型名称（如 ``"单纵阵"``），识别失败时返回空字符串。
     """
-    cropped = _FORMATION_ROI.crop(screen)
-
-    result = ocr.recognize_single(cropped, allowlist=_FORMATION_ALLOWLIST)
+    result = read_enemy_formation(screen, ocr)
     text = result.text.strip()
 
     if not text:
@@ -199,10 +217,10 @@ def recognize_enemy_formation(
         return ''
 
     # 尝试精确匹配
-    for key, name in _FORMATION_NAMES.items():
-        if key in text:
-            _log.info('[识别] 敌方阵型: {}', name)
-            return name
+    name = normalize_enemy_formation(text)
+    if name in _FORMATION_NAMES.values():
+        _log.info('[识别] 敌方阵型: {}', name)
+        return name
 
     # 模糊返回原文
     _log.info('[识别] 敌方阵型 (原文): {}', text)

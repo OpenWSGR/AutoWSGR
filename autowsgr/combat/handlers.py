@@ -30,20 +30,20 @@ from autowsgr.combat.actions import (
     get_ship_drop,
     image_exist,
 )
+from autowsgr.combat.history import CombatEvent, CombatHistory, EventType, FightResult
+from autowsgr.combat.plan import MODE_CATEGORIES, CombatMode, CombatPlan, NodeDecision
 from autowsgr.combat.recognition import detect_mvp
+from autowsgr.combat.rules import RuleResult
+from autowsgr.combat.state import CombatPhase, ModeCategory
 from autowsgr.image_resources import TemplateKey
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ConditionFlag, Formation, ShipDamageState
 from autowsgr.ui.utils import wait_leave_page
 from autowsgr.vision import ImageChecker
 
-from .history import CombatEvent, CombatHistory, EventType, FightResult
-from .plan import CombatMode, CombatPlan, NodeDecision
-from .rules import RuleResult
-from .state import CombatPhase
-
 
 if TYPE_CHECKING:
+    from autowsgr.combat.node_fusion.enemy import EnemyObservation
     from autowsgr.combat.recognizer import CombatRecognizer
     from autowsgr.emulator import AndroidController
     from autowsgr.vision import OCREngine
@@ -108,15 +108,19 @@ class PhaseHandlersMixin:
         每个状态通过 ``_PHASE_HANDLERS`` 映射到对应的处理器方法；
         处理器执行完毕后，若当前状态是终止阶段则返回 ``FIGHT_END``。
 
-        Parameters
+        参数
         ----------
         phase:
             当前识别到的战斗状态。
 
-        Returns
+        返回
         -------
         ConditionFlag
         """
+        # 索敌页先同屏采集敌情；所有阶段在实际操作前使用融合结果确认节点。
+        if phase is not CombatPhase.SPOT_ENEMY_SUCCESS:
+            self._tracking_phase(phase)
+
         # ── 派发处理器 ──
         handler_name = _PHASE_HANDLERS.get(phase)
         if handler_name is not None:
@@ -139,12 +143,22 @@ class PhaseHandlersMixin:
 
     # ── 各状态处理器 ─────────────────────────────────────────────────────────
 
+    def _node_rejection_reason(self) -> str | None:
+        """地图起点是未确认位置，不能因计划包含 0 或允许全部节点就放行。"""
+        if MODE_CATEGORIES.get(self._plan.mode) is ModeCategory.MAP and self._node == '0':
+            return '地图节点尚未识别'
+        if not self._plan.is_selected_node(self._node):
+            return '不在预设点'
+        return None
+
     def _handle_fight_condition(self) -> ConditionFlag:
         """处理战况选择。
         TODO: 需测试
         """
         condition = self._plan.fight_condition
+        action_at = time.monotonic()
         click_fight_condition(self._device, condition)
+        self._tracking_action('condition', clicked=True, timestamp=action_at)
         self._last_action = str(condition.value)
 
         self._history.add(
@@ -155,6 +169,33 @@ class PhaseHandlersMixin:
             )
         )
         return ConditionFlag.FIGHT_CONTINUE
+
+    def _collect_spot_evidence(self) -> tuple[dict[str, int], str, EnemyObservation | None]:
+        """地图战同屏采集融合证据；单点战沿用通用识别接口。"""
+        mode = 'exercise' if self._plan.mode == CombatMode.EXERCISE else 'fight'
+        evidence = self._tracking_enemy_observation(mode)
+        if evidence is None:
+            return (
+                get_enemy_info(self._device, mode=mode),
+                get_enemy_formation(self._device, self._ocr),
+                None,
+            )
+        formation = {
+            1: '单纵阵',
+            2: '复纵阵',
+            3: '轮型阵',
+            4: '梯形阵',
+            5: '单横阵',
+        }.get(evidence.formation, evidence.formation_text)
+        return evidence.counts, formation, evidence
+
+    def _click_detour_with_timestamp(self) -> tuple[bool, float]:
+        """记录真正点击前的时刻，不把模板查找及点击后等待计入航时。"""
+        if self._tracking is None or self._tracking.tracker is None:
+            return click_image(self._device, TemplateKey.BYPASS, 2.5), time.monotonic()
+        return self._tracking.time_click(
+            self._device, lambda device: click_image(device, TemplateKey.BYPASS, 2.5)
+        )
 
     def _handle_spot_enemy(self) -> ConditionFlag:  # noqa: PLR0912
         """处理索敌成功 — 核心决策节点。
@@ -167,29 +208,35 @@ class PhaseHandlersMixin:
         5. 根据结果执行: 撤退 / 迂回 / 设置阵型 / 进入战斗
         """
         # ── 信息采集 ──
-        mode = 'exercise' if self._plan.mode == CombatMode.EXERCISE else 'fight'
-        enemies = get_enemy_info(self._device, mode=mode)
-        enemy_formation = get_enemy_formation(self._device, self._ocr)
+        enemies, enemy_formation, evidence = self._collect_spot_evidence()
         _log.info('[Combat] 敌方编成: {} 阵型: {}', enemies, enemy_formation)
 
         decision = self._get_current_decision()
 
-        # 白名单检查
-        if not self._plan.is_selected_node(self._node):
+        # 先确认位置，再检查白名单；起点 0 不能充当实际战斗节点。
+        rejection_reason = self._node_rejection_reason()
+        if rejection_reason is not None:
+            _log.info('[Combat] 节点 {}: {}，索敌后撤退', self._node, rejection_reason)
+            action_at = time.monotonic()
             click_retreat(self._device)
+            self._tracking_action('retreat', clicked=True, timestamp=action_at)
             self._last_action = 'retreat'
             self._history.add(
                 CombatEvent(
                     event_type=EventType.SPOT_ENEMY,
                     node=self._node,
                     action='撤退',
-                    extra={'reason': '不在预设点'},
+                    extra={'reason': rejection_reason},
                 )
             )
             return ConditionFlag.FIGHT_END
 
         # 检查迂回按钮是否可用
-        can_detour = image_exist(self._device, TemplateKey.BYPASS, 0.8)
+        can_detour = (
+            evidence.detour
+            if evidence is not None
+            else image_exist(self._device, TemplateKey.BYPASS, 0.8)
+        )
         want_detour = can_detour and decision.detour
 
         # 阵型规则优先
@@ -206,7 +253,9 @@ class PhaseHandlersMixin:
         # 应用规则结果
         if rule_action is not None:
             if rule_action.result == RuleResult.RETREAT:
+                action_at = time.monotonic()
                 click_retreat(self._device)
+                self._tracking_action('retreat', clicked=True, timestamp=action_at)
                 self._last_action = 'retreat'
                 self._history.add(
                     CombatEvent(
@@ -229,21 +278,29 @@ class PhaseHandlersMixin:
 
         # 执行迂回
         if want_detour:
-            clicked = click_image(self._device, TemplateKey.BYPASS, 2.5)
-            if clicked:
-                _log.info('[Combat] 执行迂回')
-                spot_templates = TemplateKey.SPOT_ENEMY.templates
-                wait_leave_page(
-                    self._device,
-                    checker=lambda screen: (
-                        ImageChecker.find_any(screen, spot_templates, confidence=0.8) is not None
-                    ),
-                    timeout=10.0,
-                    source='spot_enemy_success',
-                    target='map_routing',
+            clicked, action_at = self._click_detour_with_timestamp()
+            page_left = None
+            try:
+                if clicked:
+                    _log.info('[Combat] 执行迂回')
+                    spot_templates = TemplateKey.SPOT_ENEMY.templates
+                    left_frame = wait_leave_page(
+                        self._device,
+                        checker=lambda screen: (
+                            ImageChecker.find_any(screen, spot_templates, confidence=0.8)
+                            is not None
+                        ),
+                        timeout=10.0,
+                        source='spot_enemy_success',
+                        target='map_routing',
+                    )
+                    page_left = left_frame is not None
+                else:
+                    _log.warning('[Combat] 未找到迂回按钮')
+            finally:
+                self._tracking_action(
+                    'detour', clicked=clicked, page_left=page_left, timestamp=action_at
                 )
-            else:
-                _log.warning('[Combat] 未找到迂回按钮')
             self._last_action = 'detour'
             self._history.add(
                 CombatEvent(
@@ -264,7 +321,9 @@ class PhaseHandlersMixin:
                 _log.warning('[Combat] 未找到远程支援按钮')
 
         # 进入战斗
+        action_at = time.monotonic()
         click_enter_fight(self._device)
+        self._tracking_action('fight', clicked=True, timestamp=action_at)
         self._last_action = 'fight'
         self._history.add(
             CombatEvent(
@@ -279,16 +338,23 @@ class PhaseHandlersMixin:
     def _handle_formation(self) -> ConditionFlag:
         """处理阵型选择。"""
         decision = self._get_current_decision()
-        is_from_spot_enemy = self._last_action in ('fight', 'detour')
+        detour_advanced = (
+            self._last_action == 'detour'
+            and self._tracking is not None
+            and self._tracking.phase_is_new_encounter
+        )
+        is_from_spot_enemy = self._last_action in ('fight', 'detour') and not detour_advanced
 
-        # 白名单检查
-        if not self._plan.is_selected_node(self._node):
+        # 阵型页已无法撤退，位置未确认或节点未启用时沿用 SL 退出。
+        rejection_reason = self._node_rejection_reason()
+        if rejection_reason is not None:
+            _log.info('[Combat] 节点 {}: {}，阵型页执行 SL', self._node, rejection_reason)
             self._history.add(
                 CombatEvent(
                     event_type=EventType.FORMATION,
                     node=self._node,
                     action='SL',
-                    extra={'reason': '不在预设点'},
+                    extra={'reason': rejection_reason},
                 )
             )
             return ConditionFlag.SL
@@ -335,7 +401,9 @@ class PhaseHandlersMixin:
 
         # 选择阵型
         _log.info('[Combat] 阵型选择: {}', formation.name)
+        action_at = time.monotonic()
         click_formation(self._device, formation)
+        self._tracking_action('formation', clicked=True, timestamp=action_at)
 
         self._last_action = str(formation.value)
         self._history.add(
@@ -374,7 +442,9 @@ class PhaseHandlersMixin:
         pursue = decision.night
 
         _log.info('[Combat] 夜战选择: {}', '追击' if pursue else '撤退')
+        action_at = time.monotonic()
         click_night_battle(self._device, pursue=pursue)
+        self._tracking_action('night', clicked=True, timestamp=action_at)
         self._last_action = 'yes' if pursue else 'no'
 
         self._history.add(
@@ -458,7 +528,7 @@ class PhaseHandlersMixin:
             页面盲目连点会穿透中间页, 落点若是 PROCEED 对话框还可能误触
             按钮。轮询窗口耗尽仍认不出才继续点击推进 (真正的未知页)。
 
-        Parameters
+        参数
         ----------
         phase:
             待关闭页面的状态签名 (RESULT / GET_SHIP)。
@@ -580,10 +650,21 @@ class PhaseHandlersMixin:
         self._node_count += 1
         decision = self._get_current_decision()
 
-        should_proceed = decision.proceed and check_blood(self._ship_stats, decision.proceed_stop)
+        rejection_reason = self._node_rejection_reason()
+        should_proceed = (
+            rejection_reason is None
+            and decision.proceed
+            and check_blood(self._ship_stats, decision.proceed_stop)
+        )
+        if rejection_reason is not None:
+            _log.info('[Combat] 节点 {}: {}，战后回港', self._node, rejection_reason)
 
         _log.info('[Combat] 继续前进决策: {}', '前进' if should_proceed else '回港')
+        action_at = time.monotonic()
         click_proceed(self._device, go_forward=should_proceed)
+        self._tracking_action(
+            'proceed' if should_proceed else 'end', clicked=True, timestamp=action_at
+        )
         self._last_action = 'yes' if should_proceed else 'no'
 
         self._history.add(

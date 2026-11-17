@@ -5,20 +5,19 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from autowsgr.infra.logger import get_logger
-from autowsgr.types import ConditionFlag, Formation, ShipDamageState
-
-from .actions import click_speed_up, dismiss_resource_confirm
-from .handlers import PhaseHandlersMixin
-from .history import CombatHistory, CombatResult
-from .node_tracker import MapNodeData, NodeTracker
-from .plan import MODE_CATEGORIES, CombatMode, CombatPlan, NodeDecision
-from .recognizer import (
+from autowsgr.combat.actions import click_speed_up, dismiss_resource_confirm
+from autowsgr.combat.handlers import PhaseHandlersMixin
+from autowsgr.combat.history import CombatHistory, CombatResult
+from autowsgr.combat.plan import MODE_CATEGORIES, CombatMode, CombatPlan, NodeDecision
+from autowsgr.combat.recognizer import (
     CombatRecognitionTimeoutError,
     CombatRecognizer,
     CombatStopRequestedError,
 )
-from .state import CombatPhase, ModeCategory, resolve_successors
+from autowsgr.combat.state import CombatPhase, ModeCategory, resolve_successors
+from autowsgr.emulator.frame import CapturedFrame
+from autowsgr.infra.logger import get_logger
+from autowsgr.types import ConditionFlag, Formation, ShipDamageState
 
 
 if TYPE_CHECKING:
@@ -26,6 +25,8 @@ if TYPE_CHECKING:
 
     import numpy as np
 
+    from autowsgr.combat.node_fusion.enemy import EnemyObservation
+    from autowsgr.combat.node_fusion.integration import TrackingSession
     from autowsgr.context import GameContext
 
 
@@ -44,7 +45,7 @@ class CombatEngine(PhaseHandlersMixin):
     引擎内部自行完成图像匹配、敌方编成/阵型识别、战果等级检测等，
     无需外部注入回调函数，沿袭旧代码 ``Timer`` 内置识别能力的设计。
 
-    Parameters
+    参数
     ----------
     device:
         设备控制器 (截图 + 触控)。
@@ -62,7 +63,7 @@ class CombatEngine(PhaseHandlersMixin):
 
         # 运行时状态 (由 fight() 重置)
         self._plan: CombatPlan = CombatPlan(name='', mode=CombatMode.BATTLE)
-        self._recognizer: CombatRecognizer = None  # type: ignore[assignment]  # set in fight()
+        self._recognizer: CombatRecognizer = None  # type: ignore[assignment]  # 在 fight() 中初始化
         self._phase = CombatPhase.PROCEED
         self._last_action = 'yes'
         self._node = '0'
@@ -70,17 +71,15 @@ class CombatEngine(PhaseHandlersMixin):
         self._history = CombatHistory()
         self._node_count = 0
 
-        # 节点跟踪器 (仅常规战模式有效，由 fight() 初始化)
-        self._tracker: NodeTracker | None = None
-
         # 节点级临时状态
         self._formation_by_rule: Formation | None = None
+        self._tracking: TrackingSession | None = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 公共接口
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def fight(  # noqa: PLR0912
+    def fight(
         self,
         plan: CombatPlan,
         initial_ship_stats: list[ShipDamageState],
@@ -90,14 +89,14 @@ class CombatEngine(PhaseHandlersMixin):
         从当前状态开始，循环执行:
         ``update_state → make_decision`` 直到战斗结束或 SL。
 
-        Parameters
+        参数
         ----------
         plan:
             作战计划 (阵型、夜战、节点决策等)。
         initial_ship_stats:
             初始血量状态（来自出征准备页面的检测结果）。
 
-        Returns
+        返回
         -------
         CombatResult
         """
@@ -107,51 +106,7 @@ class CombatEngine(PhaseHandlersMixin):
         )
         self._reset()
 
-        # 常规战 / 活动战模式下加载地图节点数据并初始化节点追踪器
-        if plan.mode == CombatMode.NORMAL:
-            map_data = MapNodeData.load(plan.chapter, plan.map_id)
-            if map_data is not None:
-                self._tracker = NodeTracker(map_data)
-                _log.info(
-                    '[Combat] 节点追踪器已加载: {}-{} ({} 个节点)',
-                    plan.chapter,
-                    plan.map_id,
-                    len(map_data),
-                )
-            else:
-                self._tracker = None
-                _log.warning(
-                    '[Combat] 无法加载地图数据 {}-{}，节点追踪将不可用',
-                    plan.chapter,
-                    plan.map_id,
-                )
-        elif plan.mode == CombatMode.EVENT and plan.event_name:
-            map_data = MapNodeData.load_event(
-                plan.event_name,
-                plan.chapter,
-                plan.map_id,
-                plan.entrance,
-            )
-            if map_data is not None:
-                self._tracker = NodeTracker(map_data)
-                _log.info(
-                    '[Combat] 活动节点追踪器已加载: {}/{}-{} ({} 个节点)',
-                    plan.event_name,
-                    plan.chapter,
-                    plan.map_id,
-                    len(map_data),
-                )
-            else:
-                self._tracker = None
-                _log.warning(
-                    '[Combat] 无法加载活动地图数据 {}/{}-{}，节点追踪将不可用',
-                    plan.event_name,
-                    plan.chapter,
-                    plan.map_id,
-                )
-        else:
-            self._tracker = None
-
+        self._start_tracking()
         if initial_ship_stats is not None:
             self._ship_stats = initial_ship_stats[:]
 
@@ -189,6 +144,7 @@ class CombatEngine(PhaseHandlersMixin):
                 result.flag = ConditionFlag.OPERATION_SUCCESS
                 break
 
+        self._tracking_action('end')
         result.ship_stats = self._ship_stats[:]
         result.node_count = self._node_count
         _log.info(
@@ -214,10 +170,7 @@ class CombatEngine(PhaseHandlersMixin):
         self._node = '0'
         self._node_count = 0
         self._formation_by_rule = None
-
-        # 重置节点追踪器
-        if self._tracker is not None:
-            self._tracker.reset()
+        self._tracking = None
 
         self._phase = CombatPhase.START_FIGHT
         self._last_action = ''
@@ -265,17 +218,12 @@ class CombatEngine(PhaseHandlersMixin):
             return lambda _: time.sleep(0.5)
         if category is ModeCategory.MAP:
             if self._is_map_routing_phase(last_phase):
-                tracker = self._tracker
                 device = self._device
 
                 def _poll_map(screen: np.ndarray) -> None:
                     click_speed_up(device)
-                    if tracker is not None:
-                        tracker.update_ship_position(screen)
-                        new_node = tracker.update_node()
-                        if new_node != self._node:
-                            self._node = new_node
-                        dismiss_resource_confirm(device, screen)
+                    self._tracking_motion(screen)
+                    dismiss_resource_confirm(device, screen)
 
                 return _poll_map
 
@@ -287,6 +235,78 @@ class CombatEngine(PhaseHandlersMixin):
             return _poll_single
 
         return None
+
+    def _start_tracking(self) -> None:
+        from autowsgr.combat.node_fusion.integration import TrackingSession
+
+        self._tracking = TrackingSession.start(
+            self._plan,
+            self._ctx.config.log.dir,
+            record_replay=self._ctx.config.log.node_fusion_replay,
+        )
+        if self._tracking is not None:
+            self._node = '0'
+
+    def _tracking_motion(self, screen: np.ndarray) -> None:
+        if self._tracking is not None:
+            frame = getattr(self._recognizer, 'last_frame', None)
+            if isinstance(frame, CapturedFrame) and frame.image is screen:
+                self._tracking.motion(frame, self._node)
+
+    def _apply_tracking_node(self) -> None:
+        if self._tracking is None:
+            return
+        node = self._tracking.current_node
+        if node != self._node:
+            _log.info('[NodeFusion] 决策节点: {} → {}', self._node, node)
+            self._formation_by_rule = None
+        elif self._tracking.phase_is_new_encounter:
+            self._formation_by_rule = None
+        self._node = node
+
+    def _tracking_phase(
+        self,
+        phase: CombatPhase,
+        *,
+        frame: CapturedFrame | None = None,
+        enemies: EnemyObservation | None = None,
+    ) -> None:
+        if self._tracking is not None:
+            if frame is None:
+                frame = getattr(self._recognizer, 'last_match', None)
+            self._tracking.phase(phase, frame, self._node, enemies)
+            self._apply_tracking_node()
+
+    def _tracking_enemy_observation(self, mode: str) -> EnemyObservation | None:
+        if self._tracking is None:
+            return None
+        evidence = self._tracking.enemy_observation(
+            getattr(self._recognizer, 'last_match', None),
+            self._ocr,
+            mode,
+            self._node,
+            capture=getattr(self._recognizer, 'capture_frame', None),
+        )
+        self._apply_tracking_node()
+        return evidence
+
+    def _tracking_action(
+        self,
+        action: str,
+        *,
+        clicked: bool | None = None,
+        page_left: bool | None = None,
+        timestamp: float | None = None,
+    ) -> None:
+        if self._tracking is not None:
+            self._tracking.action(
+                action,
+                self._phase,
+                self._node,
+                clicked=clicked,
+                page_left=page_left,
+                timestamp=timestamp,
+            )
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 辅助方法
@@ -320,10 +340,6 @@ class CombatEngine(PhaseHandlersMixin):
             self._phase = result
             return True
         return False
-
-    def set_node(self, node: str) -> None:
-        """设置当前节点（外部调用，如地图追踪更新）。"""
-        self._node = node
 
     @property
     def current_node(self) -> str:

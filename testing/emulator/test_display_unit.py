@@ -142,10 +142,8 @@ def stream_controller(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr('autowsgr.emulator.controller.scrcpy.time.sleep', lambda _seconds: None)
 
     def produce_frame() -> None:
-        ctrl._last_frame = np.full((3, 4, 3), ctrl.display_id, dtype=np.uint8)
-        ctrl._resolution = (4, 3)
+        ctrl._publish_frame(np.full((3, 4, 3), ctrl.display_id, dtype=np.uint8), ctrl._stream_id)
         ctrl._alive = True
-        ctrl._frame_ready.set()
 
     monkeypatch.setattr(ctrl, '_start_decode_thread', produce_frame)
     ctrl._open_stream()
@@ -153,19 +151,26 @@ def stream_controller(monkeypatch: pytest.MonkeyPatch):
     ctrl.disconnect()
 
 
+@pytest.mark.parametrize('capture_method', ['screenshot', 'capture_frame'])
 def test_running_game_migration_rebuilds_video_and_control_together(
     stream_controller: StreamController,
+    capture_method: str,
 ):
     ctrl, device, current, servers = stream_controller
+    previous_frame = ctrl.capture_frame()
     previous_video = ctrl._video_socket
     previous_control = ctrl._control_socket
     current['display'] = 6
     ctrl._last_display_check = float('-inf')
 
-    frame = ctrl.screenshot()
+    captured = getattr(ctrl, capture_method)()
+    frame = captured if capture_method == 'screenshot' else captured.image
 
     assert ctrl.display_id == 6
     assert np.all(frame == 6)
+    fresh_frame = ctrl.capture_frame()
+    assert fresh_frame.sequence > previous_frame.sequence
+    assert fresh_frame.captured_at >= previous_frame.captured_at
     previous_video.shutdown.assert_called_once_with(socket.SHUT_RDWR)
     previous_video.close.assert_called_once()
     previous_control.close.assert_called_once()
@@ -406,7 +411,7 @@ def test_stale_decoder_cannot_publish_frames_or_clear_new_stream(monkeypatch: py
     ctrl._alive = True
     ctrl._last_frame = new_frame
     ctrl._decode_stop = threading.Event()  # 模拟已启动的新一代 worker。
-    ctrl._stream_loop(MagicMock(recv=lambda _size: b'video'), stale_stop)
+    ctrl._stream_loop(MagicMock(recv=lambda _size: b'video'), stale_stop, ctrl._stream_id)
     assert ctrl._alive
     assert ctrl._last_frame is new_frame
 

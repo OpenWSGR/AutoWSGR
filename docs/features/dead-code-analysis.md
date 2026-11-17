@@ -91,9 +91,7 @@ from autowsgr.ui.battle.fleet_change import FleetChangeMixin
 
 以下对象所属类已通过包级 `__all__` 导出，外部脚本可能直接调用：
 
-- `CombatEngine.set_node`
 - `FleetSlotRule.preferred_name`
-- `NodeTracker.ship_position`
 - `Fleet.damage_states`、`Ship.health_ratio`
 - `Color.from_bgr`
 - `BuildPage`、`MainPage`、`MissionPage` 和 `DecisiveMapController` 的公开方法

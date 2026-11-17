@@ -163,7 +163,7 @@ autowsgr/
 │   ├── actions.py           #   战斗操作函数 (点击/检测)
 │   ├── rules.py             #   RuleEngine (索敌规则)
 │   ├── history.py           #   CombatHistory + CombatResult
-│   └── node_tracker.py      #   MapNodeData + NodeTracker
+│   └── node_fusion/         #   融合追踪、船位、敌情与历史回放
 ├── ops/                     # 游戏操作
 │   ├── normal_fight.py      #   NormalFightRunner
 │   ├── campaign.py          #   CampaignRunner
