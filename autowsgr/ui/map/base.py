@@ -15,6 +15,7 @@ from autowsgr.ui.map.data import (
     CLICK_BACK,
     CLICK_EXPEDITION_SKIP,
     CLICK_PANEL,
+    EXPEDITION_BONUS_PROBE,
     EXPEDITION_NOTIF_COLOR,
     EXPEDITION_NOTIF_PROBE,
     EXPEDITION_TOLERANCE,
@@ -92,11 +93,21 @@ class BaseMapPage:
 
     @staticmethod
     def has_expedition_notification(screen: np.ndarray) -> bool:
-        """检测是否有远征完成通知。"""
+        """检测远征完成红点，排除覆盖同一位置的「大成功 x2」长徽章。"""
         x, y = EXPEDITION_NOTIF_PROBE
-        return PixelChecker.get_pixel(screen, x, y).near(
+        if not PixelChecker.get_pixel(screen, x, y).near(
             EXPEDITION_NOTIF_COLOR, EXPEDITION_TOLERANCE
-        )
+        ):
+            return False
+
+        # 旧版 #286 的排除条件在 v2 迁移时遗漏：长徽章会同时覆盖这两个点。
+        bx, by = EXPEDITION_BONUS_PROBE
+        if PixelChecker.get_pixel(screen, bx, by).near(
+            EXPEDITION_NOTIF_COLOR, EXPEDITION_TOLERANCE
+        ):
+            _log.debug('[UI] 远征通知: 排除大成功 x2 长徽章')
+            return False
+        return True
 
     # ═══════════════════════════════════════════════════════════════════════
     # 状态查询 — 侧边栏 (章节位置)

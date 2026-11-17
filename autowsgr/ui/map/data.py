@@ -148,6 +148,12 @@ EXPEDITION_SLOT_TOLERANCE = 30.0
 EXPEDITION_NOTIF_PROBE: tuple[float, float] = (0.4953, 0.0213)
 """远征通知探测点。有远征完成时显示橙色 ≈ (245, 88, 47)。"""
 
+EXPEDITION_BONUS_PROBE: tuple[float, float] = (514 / 960, 11 / 540)
+"""「大成功 x2」长徽章右侧探测点；与通知点同时为红色时排除误报。
+
+沿用 #286 的第二探测点，并转换为相对坐标以适配不同分辨率。
+"""
+
 EXPEDITION_SLOT_PROBES: list[tuple[float, float]] = [
     (0.8516, 0.2736),
     (0.8531, 0.4736),
