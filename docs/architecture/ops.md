@@ -204,7 +204,7 @@ cook(ctx, ...)                 # 食堂烹饪
 **文件**: `autowsgr/ops/destroy.py`
 
 ```python
-destroy_ships(ctx, ...)        # 解装舰船 (黑名单/白名单模式)
+destroy_ships(ctx, ...)        # 解装舰船 (拆解全部/拆解舰种/保留舰种范围)
 ```
 
 ### 补给
