@@ -25,12 +25,6 @@ from autowsgr.types import (
 
 
 @pytest.fixture(autouse=True)
-def _mock_wsl(monkeypatch: pytest.MonkeyPatch):
-    """在非 WSL Linux CI runner 上伪装成 WSL，使 OSType.auto() 不抛异常。"""
-    monkeypatch.setattr(OSType, '_is_wsl', staticmethod(lambda: True))
-
-
-@pytest.fixture(autouse=True)
 def _reset_operation_delay():
     """每个用例前后复位 OPERATION_DELAY 全局, 避免 delay 迁移污染其他用例。"""
     from autowsgr.infra import config

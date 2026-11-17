@@ -1,8 +1,8 @@
 """使用不含敌情观测的历史定位核对 native 敌舰识别；不符时由会话告警请求反馈。
 
 参照节点仍是独立证据形成的估计，并非人工真值。只比较所有合法敌情变体均一致的
-字段，避免用待测识别结果选择最相似的模板，再把它当作正确答案。战利品活动机制
-（单槽观测为 AP 而签名不同、整队为 AP 的过期签名）不算识别错误，同样不告警。
+字段，避免用待测识别结果选择最相似的模板，再把它当作正确答案。普通战第 3 槽
+战利品补给不告警；整队 AP 过期签名的资料豁免是独立规则。
 """
 
 from __future__ import annotations
@@ -13,13 +13,14 @@ from typing import TYPE_CHECKING, Any
 
 from autowsgr_native.vessel_type import VesselType
 
-from autowsgr.combat.node_fusion.map import SHIP_TYPES, TrackingMap
-from autowsgr.combat.node_fusion.model import FusionTracker
+from autowsgr.combat.node_fusion.map import SHIP_TYPES
+from autowsgr.combat.plan import CombatMode
 
 
 if TYPE_CHECKING:
     from autowsgr.combat.node_fusion.enemy import EnemyObservation
     from autowsgr.combat.node_fusion.map import TrackingNode
+    from autowsgr.combat.node_fusion.model import FusionTracker
 
 
 REFERENCE_THRESHOLD = 0.95
@@ -41,12 +42,16 @@ class SlotMismatch:
     expected: str
     code: str
     recognized: str
+    event_id: int
+    encounter_id: str | None
 
 
 def _is_ap_signature(variants: Any) -> bool:
     """全部变体整队为 AP；活动动态点签名可能过期，核对结果不可信。"""
     return bool(variants) and all(
-        bool(item.ships) and all(ship == _AP_SHIP for ship in item.ships) for item in variants
+        any(ship is not None for ship in item.ships)
+        and all(ship in (None, _AP_SHIP) for ship in item.ships)
+        for item in variants
     )
 
 
@@ -54,13 +59,7 @@ def _reference_history(
     tracker: FusionTracker,
 ) -> tuple[dict[int, dict[str, Any]], dict[int, int | None], set[int]]:
     """去掉全部敌情重新平滑；原始敌情读数不参与参照节点或遭遇归属。"""
-    metadata = TrackingMap(
-        {
-            name: replace(node, enemy_formations=None, detour=None)
-            for name, node in tracker.map_data.nodes.items()
-        }
-    )
-    reference = FusionTracker(metadata, tracker.profile)
+    reference = tracker.clone_without_enemy()
     anchors: dict[int, int | None] = {}
     invalid = set()
     last_phase = None
@@ -80,7 +79,7 @@ def _reference_history(
 
 
 def _slot_mismatches(
-    enemy: EnemyObservation | None, node: TrackingNode
+    enemy: EnemyObservation | None, node: TrackingNode, combat_mode: str
 ) -> list[tuple[int, str, str, str]]:
     """核对一次观测；只报真识别错误，不可核对与机制性偏差静默跳过。"""
     variants = node.enemy_formations
@@ -89,7 +88,7 @@ def _slot_mismatches(
         if enemy is not None and enemy.valid_slots and len(enemy.raw_slots) == 6
         else None
     )
-    if _is_ap_signature(variants):
+    if not variants or _is_ap_signature(variants):
         return []
     found = []
     for index in range(6):
@@ -109,14 +108,16 @@ def _slot_mismatches(
             continue
         if value == true_ship:
             continue
-        if value == _AP_SHIP:
-            # 战利品补给舰固定替换敌方某槽，是游戏机制不是识别错误。
+        if value == _AP_SHIP and combat_mode == CombatMode.NORMAL and index == 2:
+            # 只有普通战第 3 槽会被战利品补给替换；活动与决战没有此机制。
             continue
         found.append((index + 1, true_ship, code, value))
     return found
 
 
-def recognition_mismatches(tracker: FusionTracker) -> list[SlotMismatch]:
+def recognition_mismatches(
+    tracker: FusionTracker, *, combat_mode: str = CombatMode.NORMAL
+) -> list[SlotMismatch]:
     """确认定位遭遇中与地图签名不符的槽位；每个独立遭遇只取最早索敌帧。"""
     mismatches: list[SlotMismatch] = []
     if not any(obs.phase == 'SPOT_ENEMY_SUCCESS' for obs in tracker.observations):
@@ -143,11 +144,17 @@ def recognition_mismatches(tracker: FusionTracker) -> list[SlotMismatch]:
             continue
         anchor = anchors.get(event_id)
         key = (
-            ('encounter', encounters[anchor])
-            if anchor in encounters
-            else ('unknown', action_generation)
+            ('id', observation.encounter_id)
+            if observation.encounter_id is not None
+            else (
+                ('encounter', encounters[anchor])
+                if anchor in encounters
+                else ('unknown', action_generation)
+            )
         )
-        if key in seen or ('unknown', action_generation) in seen:
+        if key in seen or (
+            observation.encounter_id is None and ('unknown', action_generation) in seen
+        ):
             # 同一航行段中由无法定位恢复为已定位，仍保留首次原始读数。
             seen.add(key)
             continue
@@ -164,10 +171,18 @@ def recognition_mismatches(tracker: FusionTracker) -> list[SlotMismatch]:
             or row.get('viterbi_node') != best
         ):
             continue
-        for slot, expected, code, recognized in _slot_mismatches(observation.enemies, node):
+        for slot, expected, code, recognized in _slot_mismatches(
+            observation.enemies, node, combat_mode
+        ):
             mismatches.append(
                 SlotMismatch(
-                    node=best, slot=slot, expected=expected, code=code, recognized=recognized
+                    node=best,
+                    slot=slot,
+                    expected=expected,
+                    code=code,
+                    recognized=recognized,
+                    event_id=event_id,
+                    encounter_id=observation.encounter_id,
                 )
             )
     return mismatches

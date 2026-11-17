@@ -175,6 +175,9 @@ class PhaseHandlersMixin:
         mode = 'exercise' if self._plan.mode == CombatMode.EXERCISE else 'fight'
         evidence = self._tracking_enemy_observation(mode)
         if evidence is None:
+            if self._plan.mode == CombatMode.DECISIVE and self._tracking is not None:
+                # 决战会话本帧只采集一次；普通和活动战仍保留下方识别兜底。
+                return {}, '', None
             return (
                 get_enemy_info(self._device, mode=mode),
                 get_enemy_formation(self._device, self._ocr),

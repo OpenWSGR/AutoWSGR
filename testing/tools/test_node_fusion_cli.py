@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 from typing import TYPE_CHECKING
 
-from autowsgr.combat.node_fusion import FusionProfile
+from autowsgr.combat.node_fusion import MODEL_VERSION, FusionProfile
 from autowsgr.combat.node_fusion.map import TrackingMap
 
 from tools.node_fusion.replay import main
@@ -21,7 +21,18 @@ def _write_log(path: Path) -> None:
     metadata = TrackingMap.load(2, 1)
     profile = FusionProfile(min_travel_seconds=None)
     records = [
-        {'kind': 'start', 'map': [2, 1], 'metadata_sha256': metadata.fingerprint},
+        {
+            'kind': 'start',
+            'schema_version': 4,
+            'model_version': MODEL_VERSION,
+            'combat_mode': 'normal',
+            'dynamics': 'map',
+            'initial': None,
+            'sampling': {},
+            'map': [2, 1],
+            'metadata_sha256': metadata.fingerprint,
+            'metadata_snapshot': metadata.to_dict(),
+        },
         {'kind': 'profile', 'profile': asdict(profile)},
     ]
     with gzip.open(path, 'wt', encoding='utf-8') as stream:
