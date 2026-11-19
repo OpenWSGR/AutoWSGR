@@ -119,7 +119,7 @@ def test_2_5_b_c_g_uses_formation_to_separate_identical_fleets() -> None:
     at_b = replay.phase(enemy=_enemy(metadata, 'B'), decision_node='B')
     assert max(at_b.node_weights, key=at_b.node_weights.get) == 'B'
     replay.fight_and_proceed('B')
-    # F 与 G 的六槽完全相同，阵型分别是 2 和 4。
+    # F 与 G 的敌方编队在每个位置的舰种都相同，阵型分别是 2 和 4。
     assert (
         metadata.nodes['F'].enemy_formations[0].ships
         == metadata.nodes['G'].enemy_formations[0].ships

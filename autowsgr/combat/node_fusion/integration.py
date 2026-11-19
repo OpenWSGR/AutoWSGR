@@ -299,12 +299,12 @@ class TrackingSession:
             by_node.setdefault(item.node, []).append(item)
         for node, items in by_node.items():
             detail = '；'.join(
-                f'槽{item.slot} {item.expected}→{item.code}({item.recognized}) '
+                f'敌方编队第 {item.slot} 个位置预期为{item.expected}，识别为{item.recognized}（{item.code}）'
                 f'[事件{item.event_id}, 遭遇{item.encounter_id}]'
                 for item in items
             )
             _log.warning(
-                '[NodeFusion校验] 舰类识别与地图签名不符，请反馈：模式 {} 地图 {} 节点 {}：{}（native {}）',
+                '[NodeFusion校验] 敌舰舰种与地图资料不符，请反馈：模式 {} 地图 {} 节点 {}：{}（native {}）',
                 self.combat_mode,
                 self._map_label,
                 node,

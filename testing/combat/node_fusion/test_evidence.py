@@ -499,7 +499,7 @@ def test_identical_spot_after_timing_boundary_keeps_both_explanations() -> None:
 
 
 def test_missing_enemy_fields_cannot_repeatedly_split_pending_detour_prior() -> None:
-    # 两个节点故意使用相同敌情；丢弃已经识别的槽位不能支持任一种新遭遇解释。
+    # 两个节点故意使用相同敌情。即使漏读此前已识别的舰种，也没有据此判定新遭遇的依据。
     metadata = TrackingMap.from_dict(
         {
             '0': _node(['A'], []),

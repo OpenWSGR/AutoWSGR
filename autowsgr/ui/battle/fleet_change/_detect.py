@@ -9,7 +9,7 @@
 7. OCR 文本只能使用其所在槽位的目标解决歧义。
 8. 目标上下文只接受明确片段或编辑距离内唯一的最近舰名。
 9. 不传 expected_names 时继续使用完整船池匹配。
-最终返回六个槽位的舰名，空槽使用 None。
+按编队从左到右返回舰名，空位或未识别出舰名的位置记为 None。
 普通检测和旧决战流程不会启用目标上下文。
 """
 
@@ -55,7 +55,7 @@ _SHIP_FUZZY_THRESHOLD: int = 2
 
 @dataclass(slots=True)
 class FleetSnapshot:
-    """准备页六个槽位累计得到的最终 OCR 信息。"""
+    """按编队位置汇总是否有船和识别出的舰名，需要时也记录舰种和等级。"""
 
     names: list[str | None]
     occupied: list[bool]
@@ -101,7 +101,7 @@ class FleetSnapshot:
         return bool(self.unknown_slots or self.unknown_type_slots or self.unknown_level_slots)
 
 
-# 负责识别准备页当前六个舰队槽位。
+# 负责识别准备页上编队中的舰船。
 class FleetDetectMixin(BaseBattlePreparation):
     """提供准备页舰队 OCR 检测能力。"""
 
@@ -126,7 +126,7 @@ class FleetDetectMixin(BaseBattlePreparation):
             _log.debug("[准备页] 目标槽位匹配: '{}' -> '{}'", text, matched)
         return matched
 
-    # 识别截图中的六个舰队槽位，并按需使用目标上下文补全舰名。
+    # 识别各编队位置的舰名，必要时参考该位置配置的目标舰名。
     def detect_fleet(
         self,
         screen: np.ndarray | None = None,
@@ -134,7 +134,7 @@ class FleetDetectMixin(BaseBattlePreparation):
         expected_names: Sequence[str | None] | None = None,
         expected_pool: Sequence[str] | None = None,
     ) -> list[str | None]:
-        """返回长度为六的舰名列表，未占用槽位返回 None。"""
+        """按六个编队位置返回舰名列表，空位或未识别出舰名的位置为 None。"""
         # 未传入截图时直接获取当前屏幕。
         if screen is None:
             screen = self._ctrl.screenshot()

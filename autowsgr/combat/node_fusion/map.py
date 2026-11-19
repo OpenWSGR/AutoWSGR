@@ -23,7 +23,7 @@ _MAP_ROOT = Path(__file__).resolve().parents[2] / 'data' / 'map' / 'normal'
 _EVENT_MAP_ROOT = _MAP_ROOT.parent / 'event'
 _SILENT_TYPES = frozenset({'NULL', 'REWARD', 'LOSS'})
 _NODE_TYPES = _SILENT_TYPES | {'FIGHT', 'BOSS', 'LITTLE_BOSS', 'AIR_ATTACK', 'SPECIAL_POINT'}
-# 从实际安装的 native 枚举取得中文舰类，空槽哨兵不属于敌舰类别。
+# 从当前安装的 native 枚举取得中文舰种，排除代表空位或识别失败的 NO。
 SHIP_TYPES = frozenset(
     value.as_chinese()
     for name in dir(VesselType)
