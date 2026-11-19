@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 import types
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
@@ -18,6 +19,10 @@ from autowsgr.context import GameContext
 from autowsgr.scheduler.scheduler import BatchRunnerAdapter, FightTask, TaskScheduler
 from autowsgr.scheduler.triggers import NormalFightPlan, NormalFightTrigger
 from autowsgr.types import ConditionFlag
+
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 # ── 假 runner ──
@@ -679,3 +684,244 @@ def test_register_normal_fight_passes_condition(monkeypatch: pytest.MonkeyPatch)
 
     trigger = sched._triggers[-1]
     assert trigger._plans[0].conditions == (GradeCondition('F', 'S'),)
+
+
+def test_decisive_round_resumes_after_scheduled_repair(monkeypatch: pytest.MonkeyPatch) -> None:
+    """维修还差 738 秒时队列里没有决战、派修；远征到点能执行，到期只续战一次。"""
+    import time
+
+    from autowsgr.ops.decisive.controller import DecisiveResult
+    from autowsgr.ops.decisive.repair import RepairOutcome, RepairStatus
+    from autowsgr.scheduler.triggers import ExpeditionTrigger
+
+    ctx = _FakeCtx()
+    scheduler = TaskScheduler(ctx, expedition_interval=0, idle_sleep=300)
+    clock = 0.0
+    monkeypatch.setattr(time, 'monotonic', lambda: clock)
+    trips: list[float] = []
+    runner = MagicMock()
+    runner.run.side_effect = lambda: (
+        trips.append(clock) or CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    )
+    scheduler.register_trigger(
+        ExpeditionTrigger(name='远征', priority=0, interval=300, task_factory=lambda _ctx: runner)
+    )
+
+    def wait(seconds: float) -> None:
+        nonlocal clock
+        assert not scheduler._queue
+        clock += seconds
+
+    monkeypatch.setattr(ctx.stop_event, 'wait', wait)
+    advance = MagicMock(side_effect=[None, DecisiveResult.CHAPTER_CLEAR])
+    reenter = RepairOutcome(RepairStatus.REENTER)
+    next_repair = MagicMock(side_effect=[RepairOutcome(RepairStatus.NEEDS_BATH), reenter])
+    dispatch = MagicMock(return_value=RepairOutcome(RepairStatus.WAITING, wait_seconds=738))
+    resume = MagicMock()
+
+    assert (
+        scheduler.run_decisive(advance, next_repair, dispatch, resume)
+        is DecisiveResult.CHAPTER_CLEAR
+    )
+    dispatch.assert_called_once_with()
+    assert clock == 738
+    assert trips == [300, 600]
+    resume.assert_called_once_with(reenter)
+    assert advance.call_count == 2
+
+
+@pytest.mark.parametrize('expedition_due', [False, True])
+def test_decisive_nodes_only_park_for_ready_task(expedition_due: bool) -> None:
+    from autowsgr.ops.decisive.controller import DecisiveResult
+
+    ctx = _FakeCtx()
+    scheduler = TaskScheduler(ctx)
+    order = []
+    foreign = MagicMock()
+    foreign.run.side_effect = lambda: (
+        order.append('远征') or CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    )
+    scheduler._maybe_collect_expedition = MagicMock(side_effect=AssertionError('绕过远征触发器'))
+
+    def advance() -> DecisiveResult:
+        if not order:
+            order.append('A')
+            if expedition_due:
+                scheduler._enqueue(FightTask(foreign, priority=0))
+            return DecisiveResult.NODE_COMPLETE
+        order.append('B')
+        return DecisiveResult.CHAPTER_CLEAR
+
+    def park() -> bool:
+        order.append('确认暂离')
+        return True
+
+    assert scheduler.run_decisive(advance, MagicMock(), MagicMock(), MagicMock(), park=park) is (
+        DecisiveResult.CHAPTER_CLEAR
+    )
+    assert order == (['A', '确认暂离', '远征', 'B'] if expedition_due else ['A', 'B'])
+    scheduler._maybe_collect_expedition.assert_not_called()
+
+
+def test_decisive_recovery_precedes_an_unsafe_handoff() -> None:
+    from autowsgr.ops.decisive.controller import DecisiveResult
+
+    scheduler = TaskScheduler(_FakeCtx())
+    order = []
+    foreign = MagicMock()
+    foreign.run.side_effect = lambda: (
+        order.append('远征') or CombatResult(flag=ConditionFlag.OPERATION_SUCCESS)
+    )
+    foreign_task = FightTask(foreign, priority=0)
+
+    def advance() -> DecisiveResult:
+        if not order:
+            order.append('A超时')
+            scheduler._enqueue(foreign_task)
+            return DecisiveResult.RETRY
+        if '恢复A' not in order:
+            assert scheduler._queue == [foreign_task]
+            order.append('恢复A')
+            return DecisiveResult.NODE_COMPLETE
+        order.append('B')
+        return DecisiveResult.CHAPTER_CLEAR
+
+    park = MagicMock(side_effect=[False, True])
+    assert scheduler.run_decisive(advance, MagicMock(), MagicMock(), MagicMock(), park=park) is (
+        DecisiveResult.CHAPTER_CLEAR
+    )
+    assert order == ['A超时', '恢复A', '远征', 'B']
+
+
+@pytest.mark.parametrize('stop', [False, True])
+def test_decisive_interrupted_handoff_preserves_pending_task(stop: bool) -> None:
+    from autowsgr.ops.decisive.controller import DecisiveResult
+
+    ctx = _FakeCtx()
+    scheduler = TaskScheduler(ctx)
+    external = FightTask(MagicMock(), priority=0)
+
+    def advance() -> DecisiveResult:
+        scheduler._enqueue(external)
+        return DecisiveResult.NODE_COMPLETE
+
+    def park() -> bool:
+        if stop:
+            ctx.stop_event.set()
+            return True
+        raise RuntimeError('暂离后未确认总览')
+
+    if stop:
+        assert scheduler.run_decisive(
+            advance, MagicMock(), MagicMock(), MagicMock(), park=park
+        ) is (DecisiveResult.STOPPED)
+    else:
+        with pytest.raises(RuntimeError, match='暂离后未确认总览'):
+            scheduler.run_decisive(advance, MagicMock(), MagicMock(), MagicMock(), park=park)
+    assert scheduler._queue == [external]
+    external.runner.run.assert_not_called()
+
+
+def test_decisive_immediate_resume_deduplicates_dispatch_callback() -> None:
+    from autowsgr.ops.decisive.controller import DecisiveResult
+    from autowsgr.ops.decisive.repair import RepairOutcome, RepairStatus
+    from autowsgr.scheduler.daily_plan import PRIO_DECISIVE
+
+    scheduler = TaskScheduler(_FakeCtx())
+    advance = MagicMock(side_effect=[None, DecisiveResult.CHAPTER_CLEAR])
+    reenter = RepairOutcome(RepairStatus.REENTER)
+
+    def dispatch() -> RepairOutcome:
+        assert [task.priority for task in scheduler._queue] == [PRIO_DECISIVE]
+        return reenter
+
+    resume = MagicMock()
+    assert (
+        scheduler.run_decisive(
+            advance,
+            lambda: RepairOutcome(RepairStatus.NEEDS_BATH, resume_immediately=True),
+            dispatch,
+            resume,
+        )
+        is DecisiveResult.CHAPTER_CLEAR
+    )
+    assert not scheduler._queue
+    assert advance.call_count == 2
+    resume.assert_called_once_with(reenter)
+
+
+def test_decisive_mode_only_registers_enabled_dailies() -> None:
+    from autowsgr.infra.config import DailyAutomationConfig
+
+    cfg = DailyAutomationConfig(
+        auto_expedition=True,
+        auto_exercise=False,
+        auto_battle=False,
+        auto_gain_bonus=False,
+        auto_bath_repair=False,
+        auto_normal_fight=True,
+        normal_fight_tasks=['示例计划'],
+    )
+    settings = types.SimpleNamespace(daily_automation=cfg)
+    scheduler = TaskScheduler.for_decisive(_FakeCtx(), user_config=settings)
+    assert [trigger.name for trigger in scheduler._triggers] == ['远征']
+
+
+def test_failed_daily_fights_let_decisive_node_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """高优先级战役或演习导航失败后，仍能执行已排队的决战节点。"""
+    import time
+
+    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.ops.decisive.controller import DecisiveResult
+
+    cfg = DailyAutomationConfig(
+        auto_battle=True,
+        auto_exercise=True,
+        auto_expedition=False,
+        auto_gain_bonus=False,
+        auto_bath_repair=False,
+    )
+    ctx = _FakeCtx()
+    scheduler = TaskScheduler.for_decisive(
+        ctx, user_config=types.SimpleNamespace(daily_automation=cfg)
+    )
+    attempts: list[str] = []
+    clock = 100.0
+    monkeypatch.setattr(time, 'monotonic', lambda: clock)
+
+    def failing_factory(name: str) -> Callable[[GameContext], object]:
+        def factory(_ctx: GameContext) -> object:
+            attempts.append(name)
+            if len(attempts) > len(scheduler._triggers):
+                ctx.stop_event.set()
+            runner = MagicMock()
+            runner.run.side_effect = RuntimeError('未能进入页面')
+            return runner
+
+        return factory
+
+    for trigger in scheduler._triggers:
+        monkeypatch.setattr(trigger, '_task_factory', failing_factory(trigger.name))
+
+    result = scheduler.run_decisive(
+        lambda: DecisiveResult.CHAPTER_CLEAR,
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        park=lambda: True,
+    )
+    assert result is DecisiveResult.CHAPTER_CLEAR
+    assert attempts == [trigger.name for trigger in scheduler._triggers]
+    clock += 600
+    assert all(trigger.should_fire(ctx) is not None for trigger in scheduler._triggers)
+
+
+def test_pending_normal_fight_survives_midnight_without_duplicate() -> None:
+    plan = NormalFightPlan(factory=lambda _ctx: object(), name='x', fleet_id=1, target=1)
+    trigger = NormalFightTrigger(priority=100, name='常规战', plans=[plan])
+    ctx = _FakeCtx()
+    pending = trigger.should_fire(ctx)
+    trigger.reset()
+    assert trigger.should_fire(ctx) is None
+    pending.on_done(CombatResult(flag=ConditionFlag.OPERATION_SUCCESS))
+    assert plan.completed == 1

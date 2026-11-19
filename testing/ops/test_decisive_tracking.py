@@ -227,6 +227,36 @@ def test_ignored_completion_keeps_local_encounter(monkeypatch: pytest.MonkeyPatc
     assert session.current_node == 'A'
 
 
+@pytest.mark.parametrize('overlay', [DecisivePhase.ADVANCE_CHOICE, DecisivePhase.CHOOSE_FLEET])
+def test_late_overlay_after_result_preempts_map(
+    monkeypatch: pytest.MonkeyPatch, overlay: DecisivePhase
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(tracking_module.time, 'monotonic', lambda: now[0])
+    monkeypatch.setattr(
+        tracking_module.time, 'sleep', lambda delay: now.__setitem__(0, now[0] + delay)
+    )
+    controller = DecisiveController.__new__(DecisiveController)
+    controller._ctx = SimpleNamespace(stop_event=threading.Event())
+    controller._state = DecisiveState(chapter=6, stage=1)
+    controller._ctrl = MagicMock()
+    controller._ctrl.capture_frame.side_effect = [frame(i) for i in (1, 1, 2, 3)]
+    controller._map = MagicMock()
+    controller._map.is_stage_clear.return_value = False
+    controller._map.detect_decisive_phase.side_effect = [
+        None,
+        DecisivePhase.PREPARE_COMBAT,
+        overlay,
+    ]
+    session = MagicMock()
+    controller._wait_for_post_combat_page(session)
+
+    assert controller.state.phase is overlay
+    controller._map.continue_combat_result.assert_called_once()
+    session.map_ready.assert_called_once()
+    assert session.map_ready.call_args.args[0].sequence == 3
+
+
 @pytest.mark.parametrize('real_clear', [False, True])
 def test_controller_waits_for_page_and_submits_one_step(
     monkeypatch: pytest.MonkeyPatch, real_clear: bool
@@ -238,6 +268,8 @@ def test_controller_waits_for_page_and_submits_one_step(
     controller = DecisiveController.__new__(DecisiveController)
     controller._ctx = SimpleNamespace(stop_event=threading.Event())
     controller._ctrl = MagicMock()
+    controller._repairs = MagicMock()
+    controller._repairs.park_after_settlement.return_value = False
     controller._ctrl.capture_frame.return_value = frame(4)
     controller._state = DecisiveState(chapter=6, stage=1, node=session.current_node)
     controller._tracking = session

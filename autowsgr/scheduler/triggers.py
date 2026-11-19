@@ -88,8 +88,7 @@ class Trigger:
         raise NotImplementedError
 
     def reset(self) -> None:
-        """跨日/跨时段重置。子类按需重写。"""
-        self._idle = True
+        """跨日/跨时段只重置周期数据。已经排队的任务仍由完成回调解锁。"""
 
     def _build_task(
         self,
@@ -125,12 +124,15 @@ class ExhaustibleTrigger(Trigger):
         task_factory: TaskFactory,
         priority: int,
         name: str,
+        retry_interval: float = 0.0,
     ) -> None:
         super().__init__(priority=priority, name=name, task_factory=task_factory)
         self._exhausted = False
+        self._retry_interval = retry_interval
+        self._retry_after = 0.0
 
     def should_fire(self, ctx: GameContext) -> FightTask | None:
-        if not self._idle or self._exhausted:
+        if not self._idle or self._exhausted or time.monotonic() < self._retry_after:
             return None
         self._idle = False
         return self._build_task(ctx, on_done=self._on_done)
@@ -144,10 +146,16 @@ class ExhaustibleTrigger(Trigger):
                 self.name,
                 result.flag,
             )
+        elif self._retry_interval and (
+            result.flag in (ConditionFlag.ACTION_FAILED, ConditionFlag.SL)
+            or (result.flag is ConditionFlag.DOCK_FULL and not result.dock_full_destroyed)
+        ):
+            # 战役和演习优先于决战。页面一直出错时，留出一段时间让决战继续。
+            self._retry_after = time.monotonic() + self._retry_interval
+            _log.warning('[调度] {} 本次未完成，{:.0f} 秒后重试', self.name, self._retry_interval)
 
     def reset(self) -> None:
         self._exhausted = False
-        self._idle = True
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -212,8 +220,11 @@ class ExerciseTrigger(ExhaustibleTrigger):
         task_factory: TaskFactory,
         priority: int,
         name: str,
+        retry_interval: float = 0.0,
     ) -> None:
-        super().__init__(task_factory=task_factory, priority=priority, name=name)
+        super().__init__(
+            task_factory=task_factory, priority=priority, name=name, retry_interval=retry_interval
+        )
         self._last_slot = self._current_slot()
 
     @staticmethod
@@ -235,7 +246,6 @@ class ExerciseTrigger(ExhaustibleTrigger):
                 slot,
             )
             self._exhausted = False
-            self._idle = True
             self._last_slot = slot
         return super().should_fire(ctx)
 
@@ -435,6 +445,4 @@ class NormalFightTrigger(Trigger):
     def reset(self) -> None:
         for plan in self._plans:
             plan.completed = 0
-        self._idle = True
-        self._current = None
         self._round_robin = 0

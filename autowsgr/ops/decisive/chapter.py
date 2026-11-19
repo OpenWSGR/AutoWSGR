@@ -10,6 +10,7 @@ from autowsgr.infra import DockFullError
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.decisive.base import DecisiveBase
 from autowsgr.types import PageName
+from autowsgr.ui.utils.navigation import check_stop
 
 
 _log = get_logger('ops.decisive')
@@ -27,7 +28,10 @@ class DecisiveChapterOps(DecisiveBase):
         """进入决战总览并推断入口状态。"""
         from autowsgr.ops.navigate import goto_page
 
+        check_stop(self._ctx.stop_event)
         goto_page(self._ctx, PageName.DECISIVE_BATTLE)
+        if self._state.expected_stage is not None:
+            return
         self._battle_page.navigate_to_chapter(self._config.chapter)
 
     def _do_dock_full_destroy(self) -> None:
@@ -36,8 +40,8 @@ class DecisiveChapterOps(DecisiveBase):
             from autowsgr.ops.destroy import destroy_ships_auto
 
             _log.warning('[决战] 船坞已满，执行自动解装')
-            self._ctrl.click(0.38, 0.565)
-            if not destroy_ships_auto(self._ctx):
+            check_stop(self._ctx.stop_event)
+            if not destroy_ships_auto(self._ctx, from_dialog=True):
                 # 保留舰种覆盖全部舰种, 无可解装对象, 船坞仍满
                 raise DockFullError('决战中船坞已满，且无可解装舰种')
             return
