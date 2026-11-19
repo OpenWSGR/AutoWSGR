@@ -21,7 +21,9 @@ from typing import TYPE_CHECKING
 from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import DecisiveEntryStatus, PageName
-from autowsgr.ui.utils import click_and_wait_for_page, confirm_operation
+from autowsgr.ui.decisive.overlay import ENTRY_STATUS_ROI
+from autowsgr.ui.utils import click_and_wait_for_page
+from autowsgr.ui.utils.navigation import NavConfig, check_stop, wait_for_page
 from autowsgr.vision import (
     Color,
     ImageChecker,
@@ -38,9 +40,15 @@ if TYPE_CHECKING:
     import numpy as np
 
     from autowsgr.context import GameContext
+    from autowsgr.vision.image_template import ImageMatchDetail
 
 
 _log = get_logger('ui.decisive')
+
+
+class ResetConfirmationTimeoutError(TimeoutError):
+    """已提交重置，但还未看到第一小关。重试时只能核实存档。"""
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 页面识别签名
@@ -175,7 +183,10 @@ class DecisiveBattlePage:
         深色活动主题页误命中) 保留备查, 不再参与判定。
         """
         result = ImageChecker.find_any(
-            screen, Templates.Decisive.entry_status_templates(), confidence=0.8
+            screen,
+            Templates.Decisive.entry_status_templates(),
+            roi=ENTRY_STATUS_ROI,
+            confidence=0.8,
         )
         name = PageName.DECISIVE_BATTLE.value
         if result is None:
@@ -232,6 +243,7 @@ class DecisiveBattlePage:
     def click_enter_map(self) -> None:
         """从决战总览页进入当前章节的决战地图页。"""
         _log.info('[决战] 决战总览 → 进入地图')
+        check_stop(self._ctx.stop_event)
         self._ctrl.click(*CLICK_ENTER_MAP)
 
     # ── 章节 OCR ──────────────────────────────────────────────────────────
@@ -304,6 +316,7 @@ class DecisiveBattlePage:
             raise RuntimeError('navigate_to_chapter 需要 OCR 引擎')
 
         for attempt in range(_CHAPTER_NAV_MAX_ATTEMPTS):
+            check_stop(self._ctx.stop_event)
             current = self._read_chapter()
             if current is None:
                 _log.warning(
@@ -317,6 +330,7 @@ class DecisiveBattlePage:
                 _log.info('[决战] 决战章节导航: 已到达 Ex-{}', target)
                 return
 
+            check_stop(self._ctx.stop_event)
             if current > target:
                 self.go_prev_chapter()
             else:
@@ -400,32 +414,48 @@ class DecisiveBattlePage:
         TimeoutError
             超时仍未匹配到任何入口状态。
         """
-        from autowsgr.image_resources import Templates
+        status, _ = self.wait_for_entry_status(
+            timeout=timeout, interval=interval, confidence=confidence
+        )
+        return status
 
+    def wait_for_entry_status(
+        self, *, timeout: float = 10.0, interval: float = 0.3, confidence: float = 0.8
+    ) -> tuple[DecisiveEntryStatus, np.ndarray]:
+        """同时返回入口状态和对应画面，供恢复流程核实同一存档。"""
         templates = Templates.Decisive.entry_status_templates()
-        statuses = list(DecisiveEntryStatus)
+        statuses = {
+            template.name: status
+            for template, status in zip(templates, DecisiveEntryStatus, strict=True)
+        }
+        status = None
 
-        deadline = time.monotonic() + timeout
-        while True:
-            screen = self._ctrl.screenshot()
+        def has_status(image: np.ndarray) -> bool:
+            nonlocal status
             detail = ImageChecker.find_any(
-                screen,
-                templates,
-                confidence=confidence,
+                image, templates, roi=ENTRY_STATUS_ROI, confidence=confidence
             )
-            if detail is not None:
-                idx = next(i for i, t in enumerate(templates) if t.name == detail.template_name)
-                status = statuses[idx]
-                _log.info('[决战] 决战入口状态: {}', status.value)
-                return status
+            if detail is None:
+                return False
+            status = statuses[detail.template_name]
+            return True
 
-            if time.monotonic() >= deadline:
-                raise TimeoutError(f'检测决战入口状态超时 ({timeout}s): 未匹配到任何状态模板')
-            time.sleep(interval)
+        screen = wait_for_page(
+            self._ctrl,
+            has_status,
+            target='决战总览',
+            timeout=timeout,
+            interval=interval,
+            stop_event=self._ctx.stop_event,
+            timeout_error=TimeoutError,
+        )
+        if status is None:
+            raise TimeoutError('未识别到决战入口状态')
+        return status, screen
 
     # ── 章节重置 ─────────────────────────────────────────────────────────
 
-    def reset_chapter(self) -> bool:
+    def reset_chapter(self, chapter: int | None = None) -> bool:
         """使用磁盘重置当前章节。
 
         在决战总览页点击"重置关卡"按钮并确认操作。
@@ -436,18 +466,58 @@ class DecisiveBattlePage:
             调用前需确保已在决战总览页且已导航到目标章节。
             船坞已满处理由调用方负责。
         """
-        _log.info('[决战] 决战页面 → 重置关卡')
-        self._ctrl.click(*CLICK_RESET_CHAPTER)
-        time.sleep(1.0)
-        screen = self._ctrl.screenshot()
-        if ImageChecker.template_exists(
-            screen,
-            Templates.Build.SHIP_FULL_DEPOT,
-            confidence=0.8,
-        ):
+
+        _log.info('[决战] 重置当前关卡')
+        if chapter is None:
+            chapter = self._read_chapter()
+            if chapter is None:
+                raise RuntimeError('重置前未能确认当前决战章节')
+
+        def full(image: np.ndarray) -> bool:
+            return ImageChecker.template_exists(
+                image, Templates.Build.SHIP_FULL_DEPOT, confidence=0.8
+            )
+
+        def confirmation(image: np.ndarray) -> ImageMatchDetail | None:
+            return ImageChecker.find_any(image, Templates.Confirm.all(), confidence=0.85)
+
+        screen = click_and_wait_for_page(
+            self._ctrl,
+            CLICK_RESET_CHAPTER,
+            lambda image: full(image) or confirmation(image) is not None,
+            target='重置关卡确认',
+            config=NavConfig(timeout=5.0, interval=0.3),
+            stop_event=self._ctx.stop_event,
+            timeout_error=TimeoutError,
+        )
+        if full(screen):
             _log.warning('[决战] 重置关卡时检测到船坞已满')
             return False
-        confirm_operation(self._ctrl, must_confirm=True, timeout=5.0)
-        time.sleep(1.0)  # 防止后续 stage 识别出问题
-        _log.info('[决战] 决战关卡重置完成')
+        button = confirmation(screen)
+        if button is None:
+            raise RuntimeError('未找到重置关卡的确认按钮')
+
+        def first_stage_visible(image: np.ndarray) -> bool:
+            # 进图按钮可能先于小关标记出现。只等同一章第一小关亮起，不再点击。
+            entry = ImageChecker.find_any(
+                image,
+                Templates.Decisive.entry_status_templates()[:3],
+                roi=ENTRY_STATUS_ROI,
+                confidence=0.8,
+            )
+            if entry is None:
+                return False
+            if entry.template_name == Templates.Decisive.ENTRY_CANT_FIGHT.name:
+                return True  # 留给调用方报告无法出击。
+            return self.detect_stage(image, chapter) == 1 and self._read_chapter(image) == chapter
+
+        click_and_wait_for_page(
+            self._ctrl,
+            button.center,
+            first_stage_visible,
+            target=f'重置后第 {chapter} 章第一小关入口',
+            config=NavConfig(timeout=5.0, interval=0.3),
+            stop_event=self._ctx.stop_event,
+            timeout_error=ResetConfirmationTimeoutError,
+        )
         return True

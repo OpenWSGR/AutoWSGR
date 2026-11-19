@@ -763,7 +763,16 @@ def test_collection_does_not_recognize_non_map_or_overlay_frames(
     if overlay:
         patch = getattr(Templates.Decisive, overlay).image
         height, width = patch.shape[:2]
-        pixels[50 : 50 + height, 700 : 700 + width] = patch
+        x, y = {
+            'FLEET_ACQUISITION': (500, 42),
+            'CONFIRM_EXIT': (370, 165),
+            'ADVANCE_CHOICE': (330, 241),
+        }[overlay]
+        template = getattr(Templates.Decisive, overlay)
+        scale = 1280 / template.source_resolution[0]
+        patch = cv2.resize(patch, (round(width * scale), round(height * scale)))
+        height, width = patch.shape[:2]
+        pixels[y : y + height, x : x + width] = patch
     native = MagicMock()
     monkeypatch.setattr('autowsgr.ui.decisive.map_controller.get_api_dll', lambda: native)
     assert (
