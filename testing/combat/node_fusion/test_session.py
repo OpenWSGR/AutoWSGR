@@ -458,7 +458,7 @@ def test_finish_warns_with_feedback_details_on_mismatch(
     assert '请反馈' in text
     assert '地图 2-1' in text
     assert '节点 A' in text
-    assert '槽1 驱逐→BB(战列)' in text
+    assert '敌方编队第 1 个位置预期为驱逐，识别为战列（BB）' in text
 
 
 def test_arrival_logs_attribution_with_channel_candidates(

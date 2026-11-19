@@ -42,6 +42,13 @@ class DecisiveState:
     fleet: list[str] = field(default_factory=lambda: [''] * 7)
     ship_stats: list[ShipDamageState] = field(default_factory=lambda: [ShipDamageState.NO_SHIP] * 6)
 
+    # 战果已提交后，收完选路、战备或掉落，才能在下一节点交回调度。
+    node_completed: bool = False
+    at_node_boundary: bool = False
+    # 其他任务接管过页面时，先导航回总览，并核对将要进入的小关。
+    navigate_to_entry: bool = False
+    expected_stage: int | None = None
+
     def reset(self) -> None:
         """重置状态 (保留 chapter)。"""
         chapter = self.chapter

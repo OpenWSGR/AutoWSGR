@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from autowsgr.image_resources import Templates
 from autowsgr.infra.logger import get_logger
 from autowsgr.vision import (
+    ROI,
     ImageChecker,
     ImageTemplate,
     MatchStrategy,
@@ -31,6 +32,23 @@ if TYPE_CHECKING:
 
 
 _log = get_logger('ui.decisive')
+
+
+def _padded_roi(x1: float, y1: float, x2: float, y2: float) -> ROI:
+    """Fork 的 720p 截图边界留一像素，避免模板大小取整后比 ROI 大。"""
+    return ROI(
+        max(0.0, x1 - 1 / 1280),
+        max(0.0, y1 - 1 / 720),
+        min(1.0, x2 + 1 / 1280),
+        min(1.0, y2 + 1 / 720),
+    )
+
+
+ENTRY_STATUS_ROI = _padded_roi(547 / 1280, 635 / 720, 814 / 1280, 705 / 720)
+USE_LAST_FLEET_ROI = _padded_roi(0.82, 0.30, 1.0, 0.50)
+CONFIRM_EXIT_ROI = _padded_roi(363 / 1280, 161 / 720, 917 / 1280, 465 / 720)
+ADVANCE_CHOICE_ROI = _padded_roi(324 / 1280, 237 / 720, 607 / 1280, 429 / 720)
+ADVANCE_CHOICE_THREE_ROI = _padded_roi(142 / 1280, 235 / 720, 429 / 1280, 431 / 720)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 枚举
@@ -215,7 +233,12 @@ ADVANCE_CARD_POSITIONS: list[tuple[float, float]] = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
+def detect_decisive_overlay(
+    screen: np.ndarray,
+    *,
+    branch_count: int | None = None,
+    advance_choice_roi: ROI | None = None,
+) -> DecisiveOverlay | None:
     """按优先级检测决战地图页上的弹窗。
 
     Parameters
@@ -228,10 +251,12 @@ def detect_decisive_overlay(screen: np.ndarray) -> DecisiveOverlay | None:
     DecisiveOverlay | None
         首个命中的弹窗类型；无弹窗则返回 ``None``。
     """
-    for overlay_type, tmpl in _OVERLAY_TEMPLATE_MAP.items():
-        if ImageChecker.template_exists(screen, tmpl, confidence=0.85):
-            _log.debug('[决战] 检测到 overlay: {}', overlay_type.value)
-            return overlay_type
+    if is_fleet_acquisition(screen):
+        return DecisiveOverlay.FLEET_ACQUISITION
+    if is_confirm_exit(screen):
+        return DecisiveOverlay.CONFIRM_EXIT
+    if advance_choice_layout(screen, branch_count=branch_count, roi=advance_choice_roi):
+        return DecisiveOverlay.ADVANCE_CHOICE
     return None
 
 
@@ -249,12 +274,35 @@ def is_fleet_acquisition(screen: np.ndarray) -> bool:
 
 def is_advance_choice(screen: np.ndarray) -> bool:
     """截图是否为选择前进点 overlay。"""
-    return ImageChecker.template_exists(screen, Templates.Decisive.ADVANCE_CHOICE, confidence=0.85)
+    return advance_choice_layout(screen) is not None
+
+
+def advance_choice_layout(
+    screen: np.ndarray,
+    *,
+    branch_count: int | None = None,
+    roi: ROI | None = None,
+) -> int | None:
+    """路线只决定优先搜索区域，实际匹配仍决定两卡或三卡布局。"""
+    preferred = ADVANCE_CHOICE_THREE_ROI if branch_count == 3 else ADVANCE_CHOICE_ROI
+    areas = (preferred, ADVANCE_CHOICE_ROI, ADVANCE_CHOICE_THREE_ROI)
+    if roi is not None:
+        areas = (roi, *areas)
+    for area in dict.fromkeys(areas):
+        if ImageChecker.template_exists(
+            screen, Templates.Decisive.ADVANCE_CHOICE, roi=area, confidence=0.8
+        ):
+            if area == ADVANCE_CHOICE_THREE_ROI:
+                return 3
+            return 3 if area == roi and branch_count == 3 else 2
+    return None
 
 
 def is_confirm_exit(screen: np.ndarray) -> bool:
     """截图是否为确认退出 overlay。"""
-    return ImageChecker.template_exists(screen, Templates.Decisive.CONFIRM_EXIT, confidence=0.85)
+    return ImageChecker.template_exists(
+        screen, Templates.Decisive.CONFIRM_EXIT, roi=CONFIRM_EXIT_ROI, confidence=0.85
+    )
 
 
 def get_overlay_template(overlay: DecisiveOverlay) -> ImageTemplate:

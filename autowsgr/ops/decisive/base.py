@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from autowsgr.constants import DECISIVE_SKILL_NAMES, update_shipnames
 from autowsgr.infra import DecisiveConfig, get_logger
 from autowsgr.ops.decisive.logic import DecisiveLogic
+from autowsgr.ops.decisive.repair import DecisiveRepairCoordinator
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ops.decisive.tracking import DecisiveTrackingSession
 from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
@@ -19,6 +20,10 @@ from autowsgr.ui.decisive import DecisiveBattlePage, DecisiveMapController
 
 if TYPE_CHECKING:
     from autowsgr.context import GameContext
+    from autowsgr.infra import UserConfig
+    from autowsgr.ops.decisive.repair import RepairOutcome
+    from autowsgr.scheduler import TaskScheduler
+    from autowsgr.types import DecisivePhase
 
 _log = get_logger('ops.decisive')
 
@@ -35,7 +40,7 @@ class DecisiveBase:
         _logic             纯决策模块 (DecisiveLogic)
         _battle_page       决战总览页 UI
         _map               决战地图页 UI
-        _inventory_refresh_required  编队和完整库存是否需要重新核实
+        _inventory_refresh_required  是否需要重新确认编队及首屏可选舰船
         _has_chosen_fleet  是否已经历过战备舰队获取
         _wait_deadline     等待超时截止时间
         _use_last_fleet_attempts  使用上次舰队尝试次数
@@ -48,20 +53,24 @@ class DecisiveBase:
         └── DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps)
     """
 
+    _scheduler: TaskScheduler | None = None
+    _resume_outcome: RepairOutcome | None = None
+    _failures: int = 0
+
     def __init__(
         self,
         ctx: GameContext,
         config: DecisiveConfig,
+        *,
+        user_config: UserConfig | None = None,
     ) -> None:
         self._ctx = ctx
         self._ctrl = ctx.ctrl
         self._ocr = ctx.ocr
         # 合并配置：传入的 config 覆盖 ctx.config，未指定的字段使用 ctx.config 的值
-        base = (
-            ctx.config.decisive_battle.model_dump()
-            if ctx.config.decisive_battle is not None
-            else {}
-        )
+        settings = user_config if user_config is not None else ctx.config
+        self._settings = settings
+        base = settings.decisive_battle.model_dump() if settings.decisive_battle is not None else {}
         merged_config_dict = {
             **base,
             **config.model_dump(exclude_unset=True),
@@ -77,7 +86,15 @@ class DecisiveBase:
         update_shipnames(merged_config.level1 + merged_config.level2 + DECISIVE_SKILL_NAMES)
 
         self._state = DecisiveState(chapter=merged_config.chapter)
-        self._logic = DecisiveLogic(merged_config, self._state, ctx=ctx)
+        self._repairs = DecisiveRepairCoordinator(ctx, merged_config, user_config=settings)
+        self._scheduled_repair: RepairOutcome | None = None
+        self._after_settlement: DecisivePhase | None = None
+        self._logic = DecisiveLogic(
+            merged_config,
+            self._state,
+            ctx=ctx,
+            prefer_healthy=settings.quick_repair_threshold_seconds is not None,
+        )
         self._battle_page = DecisiveBattlePage(self._ctx, ocr=self._ocr)
         self._map = DecisiveMapController(
             ctx,

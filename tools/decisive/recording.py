@@ -33,6 +33,16 @@ class FileStopEvent(threading.Event):
             self.set()
         return super().is_set()
 
+    def wait(self, timeout: float | None = None) -> bool:
+        """维修可能等待数分钟，等待期间也要响应采集器的停止文件。"""
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while not self.is_set():
+            interval = 0.25 if deadline is None else min(0.25, deadline - time.monotonic())
+            if interval <= 0:
+                return False
+            super().wait(interval)
+        return True
+
 
 class SampleArchive:
     """逐条落盘；进程中断时已保存的 PNG 与 JSONL 仍可使用。"""

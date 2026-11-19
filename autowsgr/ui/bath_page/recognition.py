@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import TYPE_CHECKING
 
 import cv2
@@ -32,6 +33,9 @@ if TYPE_CHECKING:
 _log = get_logger('ui.bath_page.recognition')
 
 # ── 卡片检测参数 ──────────────────────────────────────────────────────
+
+_REFERENCE_SIZE = (1280, 720)
+"""卡片尺寸和文字区域的标定分辨率。"""
 
 _CARD_MIN_W = 150
 """卡片最小宽度 (像素)。"""
@@ -83,8 +87,9 @@ _TIME_CROP_Y = 195
 _TIME_SCALE = 2
 """时间区域 OCR 前的放大倍数，提升数字识别精度。"""
 
-_TIME_PATTERN = re.compile(r'\d{2}:\d{2}:\d{2}')
-"""修理时间格式: HH:MM:SS。"""
+_TIME_PATTERN = re.compile(
+    r'(?:耗时\s*:?\s*)?([0-9]{2})\s*[:;,.]?\s*([0-5][0-9])\s*[:;,.]?\s*([0-5][0-9])'
+)
 
 
 def is_fully_visible(
@@ -130,16 +135,23 @@ def _detect_card_rects(image: np.ndarray) -> list[tuple[int, int, int, int]]:
     """
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     _, thresh = cv2.threshold(gray, _BORDER_THRESHOLD, 255, cv2.THRESH_BINARY)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    cards: list[tuple[int, int, int, int]] = []
-    for c in contours:
+    cards: dict[int, tuple[int, int, int, int]] = {}
+    for i, c in enumerate(contours):
         x, y, w, h = cv2.boundingRect(c)
         if _CARD_MIN_W < w < _CARD_MAX_W and _CARD_MIN_H < h < _CARD_MAX_H:
-            cards.append((x, y, w, h))
+            cards[i] = (x, y, w, h)
 
-    cards.sort(key=lambda r: r[0])
-    return cards
+    # 亮色卡框的内外沿都可能符合尺寸，只保留同一卡片的最外层轮廓。
+    outer_cards = []
+    for i, rect in cards.items():
+        parent = hierarchy[0, i, 3]
+        while parent >= 0 and parent not in cards:
+            parent = hierarchy[0, parent, 3]
+        if parent < 0:
+            outer_cards.append(rect)
+    return sorted(outer_cards, key=lambda r: r[0])
 
 
 def _normalize_time(raw: str) -> str:
@@ -147,22 +159,8 @@ def _normalize_time(raw: str) -> str:
 
     EasyOCR 常将 ``:`` 识别为 ``;`` 、 ``,`` 或 ``.``，需统一替换。
     """
-    t = raw.replace('耗时', '').replace(' ', '')
-    t = t.replace(';', ':').replace(',', ':').replace('.', ':')
-    t = t.strip(':')
-    # 去除非数字和冒号字符
-    t = ''.join(c for c in t if c.isdigit() or c == ':')
-    # 合并连续冒号
-    while '::' in t:
-        t = t.replace('::', ':')
-    m = _TIME_PATTERN.search(t)
-    if m:
-        return m.group(0)
-    # 补救: OCR 可能丢失冒号，如 "005609" -> "00:56:09"
-    digits = ''.join(c for c in t if c.isdigit())
-    if len(digits) == 6:
-        return f'{digits[0:2]}:{digits[2:4]}:{digits[4:6]}'
-    return t
+    match = _TIME_PATTERN.fullmatch(unicodedata.normalize('NFKC', raw).strip())
+    return ':'.join(match.groups()) if match else ''
 
 
 def _ocr_card(
@@ -228,12 +226,9 @@ def _ocr_card(
     for r in time_results:
         if r.bbox is None:
             continue
-        txt = r.text
-        if '耗时' in txt or ':' in txt or ';' in txt or '.' in txt:
-            normalized = _normalize_time(txt)
-            if _TIME_PATTERN.match(normalized):
-                time_text = normalized
-                break
+        time_text = _normalize_time(r.text)
+        if time_text:
+            break
 
     if name is None and time_text == '':
         return None
@@ -267,10 +262,10 @@ def recognize_repair_cards(
     list[RepairShipInfo]
         按从左到右顺序排列的舰船信息列表，仅包含完整可见的卡片。
     """
-    _h, w = screen.shape[:2]
-    # 检测时使用 BGR (cv2 默认)，但输入是 RGB
-    bgr = cv2.cvtColor(screen, cv2.COLOR_RGB2BGR)
-    cards = _detect_card_rects(bgr)
+    if screen.shape[:2] != _REFERENCE_SIZE[::-1]:
+        screen = cv2.resize(screen, _REFERENCE_SIZE)
+    w = screen.shape[1]
+    cards = _detect_card_rects(screen)
 
     _log.debug('[修理识别] 检测到 {} 张卡片矩形', len(cards))
 

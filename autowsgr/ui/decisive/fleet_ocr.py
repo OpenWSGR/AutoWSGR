@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING
 
 import cv2
@@ -26,13 +25,14 @@ from autowsgr.ui.decisive.overlay import (
     SHIP_NAME_X_RANGES,
     SHIP_NAME_Y_RANGE,
 )
+from autowsgr.ui.utils.navigation import check_stop
 from autowsgr.vision import ROI, OCREngine
 
 
 if TYPE_CHECKING:
     import numpy as np
 
-    from autowsgr.emulator import AndroidController
+    from autowsgr.context import GameContext
 
 
 _log = get_logger('ui.decisive')
@@ -124,28 +124,24 @@ def recognize_fleet_options(
     )
     cost_img = cost_roi.crop(screen)
     cost_results = ocr.recognize(cost_img, allowlist='0123456789xX')
-    # cost_results 按bbox[0]从小到大排序 保证顺序正确
-    cost_results.sort(key=lambda x: x.bbox[0])
-
-    costs: list[int] = []
-    for r in cost_results:
-        cost = _parse_offer_cost_text(r.text)
-        if cost is None:
-            _log.debug("[舰队OCR] 费用解析跳过: '{}'", r.text)
+    # OCR 漏掉一张卡的费用时，其余费用仍按画面位置归属。
+    costs: dict[int, list[int]] = {}
+    width = screen.shape[1]
+    for result in cost_results:
+        cost = _parse_offer_cost_text(result.text)
+        if result.bbox is None or cost is None or cost < 0:
             continue
-        costs.append(cost)
-    _log.debug('[舰队OCR] 识别到 {} 项费用: {}', len(costs), costs)
-    if any(c < 4 for c in costs[0:4]):
-        _log.warning('[舰队OCR] 识别到小于4的费用, 建议检查配队是否有误')
+        center = (int(cost_roi.x1 * width) + (result.bbox[0] + result.bbox[2]) / 2) / width
+        for slot, (left, right) in enumerate(SHIP_NAME_X_RANGES):
+            if left <= center <= right:
+                costs.setdefault(slot, []).append(cost)
+                break
 
-    # 3. 恢复原版行为：仅对可购买项识别舰名
     selections: dict[str, FleetSelection] = {}
-    for i, cost in enumerate(costs):
-        if cost > score:
+    for i, values in sorted(costs.items()):
+        if len(values) != 1 or values[0] > score:
             continue
-        if i >= len(SHIP_NAME_X_RANGES):
-            break
-
+        cost = values[0]
         x_range = SHIP_NAME_X_RANGES[i]
         y_range = SHIP_NAME_Y_RANGE
         name_roi = ROI(x1=x_range[0], y1=y_range[0], x2=x_range[1], y2=y_range[1])
@@ -153,13 +149,14 @@ def recognize_fleet_options(
 
         name = ocr.recognize_ship_name(name_img)
         if name is None:
-            raw = ocr.recognize_single(name_img)
-            name = raw.text.strip() or f'未识别_{i}'
-            _log.debug("[舰队OCR] 舰船名模糊匹配失败, 原文: '{}'", name)
+            _log.debug('[舰队OCR] 卡位 {} 未识别，不作为可购买项', i)
+            continue
 
         click_x = FLEET_CARD_X_POSITIONS[i] if i < len(FLEET_CARD_X_POSITIONS) else 0.5
         click_y = FLEET_CARD_CLICK_Y
 
+        if name in selections and selections[name].cost <= cost:
+            continue
         selections[name] = FleetSelection(
             name=name,
             cost=cost,
@@ -183,24 +180,27 @@ def detect_last_offer_name(
 
 
 def use_skill(
-    ctrl: AndroidController,
+    ctx: GameContext,
     ocr: OCREngine,
 ) -> list[str]:
     """在地图页使用一次副官技能并返回识别到的舰船。"""
     skill_pos = (0.2143, 0.894)
     ship_area = ROI(x1=0.26, y1=0.685, x2=0.74, y2=0.715)
 
-    ctrl.click(*skill_pos)
-    time.sleep(1.0)
+    check_stop(ctx.stop_event)
+    ctx.ctrl.click(*skill_pos)
+    ctx.stop_event.wait(1.0)
+    check_stop(ctx.stop_event)
 
-    screen = ctrl.screenshot()
+    screen = ctx.ctrl.screenshot()
     crop = ship_area.crop(screen)
     result = ocr.recognize_ship_names(crop)
     acquired: list[str] = []
     if result is not None:
         acquired.extend(result)
 
-    ctrl.click(*skill_pos)  # 快进一下
+    check_stop(ctx.stop_event)
+    ctx.ctrl.click(*skill_pos)  # 快进一下
     return acquired
 
 

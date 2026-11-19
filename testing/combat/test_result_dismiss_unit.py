@@ -7,7 +7,7 @@
      返回, 引擎等待 PROCEED/GET_SHIP 等状态 7.5s 全落空 → 恢复失败 →
      强制重启游戏。
 现行判据是**到达验证**: 在 ``[phase] + 后继状态`` 集合上识别,
-命中后继才算成功, 识别不到任何状态 (未知中间页) 则继续点击推进。
+命中后继才算成功。遇到持续未知的中间页时，决战战果交回决战流程，其他情况继续点击。
 经验结算子页后正式注册为 ``CombatPhase.EXP_SETTLEMENT``, 不再是盲点。
 """
 
@@ -20,6 +20,7 @@ import pytest
 
 from autowsgr.combat import handlers as handlers_mod
 from autowsgr.combat.handlers import PhaseHandlersMixin
+from autowsgr.combat.plan import CombatMode
 from autowsgr.combat.state import CombatPhase
 from autowsgr.types import ConditionFlag
 
@@ -79,6 +80,7 @@ class TestClickResultUntilClosed:
         窗口内只等待不点击 (防穿透); 4 次 None 耗尽 polls 后才第二次点击。
         """
         host, device, _ = _make_host([None, None, None, None, CombatPhase.GET_SHIP])
+        host._plan.mode = CombatMode.NORMAL
         host._click_result_until_closed(CombatPhase.RESULT)
         assert device.click.call_count == 2
 
@@ -219,6 +221,19 @@ class TestHandleResultModes:
         # 经验页命中后继续点击, 直到 PROCEED 才停 → 2 次点击
         assert device.click.call_count == 2
         host._history.add.assert_not_called()
+
+    def test_decisive_result_hands_off_after_unknown_polls(self) -> None:
+        host, device, recognizer = _make_host(
+            [None, CombatPhase.RESULT, CombatPhase.EXP_SETTLEMENT, None, None, None, None],
+            end_phase=CombatPhase.RESULT,
+            collect_result_info=False,
+        )
+        host._plan.mode = CombatMode.DECISIVE
+        host._tracking_phase = MagicMock()
+
+        assert host._make_decision(CombatPhase.RESULT) == ConditionFlag.FIGHT_END
+        assert device.click.call_count == 3
+        assert recognizer.identify_current.call_count == 7
 
     def test_slow_collects_grade_mvp_and_records(self):
         """慢速: 采集评级/MVP 记入战斗历史, 经验页是到达点 (只点一次)。"""

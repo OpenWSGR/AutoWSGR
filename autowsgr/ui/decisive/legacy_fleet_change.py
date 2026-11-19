@@ -35,7 +35,7 @@ def change_fleet_legacy(
     ]
     names += [None] * (6 - len(names))
     if fleet_id == 1 and names[0] is None:
-        raise ValueError('1 队槽位 0 不能为空')
+        raise ValueError('第 1 舰队必须指定旗舰')
 
     if fleet_id and page.get_selected_fleet(page._ctrl.screenshot()) != fleet_id:
         page.select_fleet(fleet_id)
@@ -57,7 +57,7 @@ def change_fleet_legacy(
 
             slot = next((index for index in range(6) if not ok[index]), None)
             if slot is None:
-                _log.warning("[决战] 无可用槽位放置 '{}'", name)
+                _log.warning('[决战] 编队中没有可以换入 {} 的位置', name)
                 continue
 
             selected = page._change_single_ship(

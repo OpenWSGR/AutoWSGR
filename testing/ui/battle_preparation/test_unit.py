@@ -1374,7 +1374,7 @@ class TestDecisiveFleetChangeFeatureGate:
     def test_original_flow_rejects_empty_first_fleet(self):
         page = MagicMock()
 
-        with pytest.raises(ValueError, match='1 队槽位 0 不能为空'):
+        with pytest.raises(ValueError, match='第 1 舰队必须指定旗舰'):
             change_fleet_legacy(page, 1, [])
 
         page.detect_fleet.assert_not_called()
@@ -1727,7 +1727,7 @@ class TestSmartFleetChange:
         with (
             patch.object(page, 'get_selected_fleet', return_value=1),
             patch.object(page, 'detect_fleet_snapshot') as detect,
-            pytest.raises(ValueError, match='1 队槽位 0 不能为空'),
+            pytest.raises(ValueError, match='第 1 舰队必须指定旗舰'),
         ):
             page.change_fleet(1, ())
 

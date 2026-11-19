@@ -223,6 +223,8 @@ class ShipDamageState(IntEnum):
     """中破（黄血）。"""
     SEVERE = 2
     """大破（红血或空血）。"""
+    REPAIRING = 3
+    """准备页明确显示正在修理。"""
     NO_SHIP = -1
     """无舰船（蓝色空位）。"""
 
@@ -525,6 +527,9 @@ class DecisivePhase(enum.Enum):
 
     PREPARE_COMBAT = enum.auto()
     """出征准备页 — 编队、修理。"""
+
+    WAITING_FOR_REPAIR = enum.auto()
+    """保留本轮进度，等待派修或到期复查。"""
 
     IN_COMBAT = enum.auto()
     """战斗引擎运行中。"""

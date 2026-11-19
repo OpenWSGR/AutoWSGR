@@ -1,78 +1,84 @@
-"""决战中文迁移保留全部旧槽位及战术决策，未知资料不伪造信息。"""
+"""验证 EX 地图迁移保留原图路线、敌方编队顺序和战术决策，资料缺失时保留未知。"""
 
 from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
-from autowsgr_native.vessel_type import VesselType
+import yaml
 
 from autowsgr.infra import DecisiveConfig
-from autowsgr.ops.decisive.config import MapData, _enemy_slots, _load_enemy_spec_data
+from autowsgr.ops.decisive.config import MapData, enemy_codes_to_slots
 from autowsgr.ops.decisive.logic import DecisiveLogic, _count_anti_sub
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.types import Formation
 
 
-# 282ca457 原始 84 节点列表的摘要；包含章、小关、节点、首位占位及空槽。
-_LEGACY_DIGEST = 'b495cbe91e764f4bf319b367837ae6465da2b5df698953fe39761b9f9b8d063b'
-_LEGACY_ANTI_SUB = {
-    (4, 1): '32244322',
-    (4, 2): '31212130',
-    (4, 3): '0221120110',
-    (5, 1): '11104431',
-    (5, 2): '3210202210',
-    (5, 3): '1220320121',
-    (6, 1): '2002232331',
-    (6, 2): '3101200012',
-    (6, 3): '1011200110',
-}
+# 18 份 ShiinaKuroko EX 原始 YAML 解析后的摘要，不受换行或字典顺序影响。
+_SOURCE_DIGEST = '749a8c66348b7f9ac41d2a0a3ca04550d1d3c4c7f1e21d8a8c2da53a0407539d'
 
 
-def test_all_84_migrated_fleets_preserve_order_and_placeholder() -> None:
-    legacy_codes = {
-        value.as_chinese(): value.as_english()
-        for name in dir(VesselType)
-        if isinstance(value := getattr(VesselType, name), VesselType)
-    }
-    legacy_codes.update({'机场': 'AF', '大巡': 'BG', '导战': 'BBG', '': ''})
-    rows = [
-        (chapter, stage, node, [legacy_codes[ship] for ship in ships])
-        for chapter, chapters in enumerate(_load_enemy_spec_data()['enemy'])
-        if isinstance(chapters, list)
-        for stage, stages in enumerate(chapters)
-        if isinstance(stages, dict)
-        for node, ships in stages.items()
-    ]
-    assert len(rows) == 84
-    payload = json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode()
-    assert hashlib.sha256(payload).hexdigest() == _LEGACY_DIGEST
+def test_all_ex_maps_preserve_topology_enemy_order_and_tactics() -> None:
+    root = Path(__file__).resolve().parents[2] / 'autowsgr/data/map/decisive_battle/silent_warrior'
+    rows = [yaml.safe_load(path.read_bytes()) for path in sorted(root.glob('EX-*.yaml'))]
+    payload = json.dumps(rows, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode()
+    assert hashlib.sha256(payload).hexdigest() == _SOURCE_DIGEST
+    assert len(rows) == 18
+    nodes = edges = records = 0
+    for row in rows:
+        chapter, stage = row['chapter'], row['stage']
+        routes = MapData.get_route_nodes(chapter, stage)
+        metadata = MapData.tracking_map(chapter, stage)
+        nodes += len(routes)
+        assert set(routes) == row['nodes'].keys()
+        assert MapData.get_key_points(chapter, stage) == set(row['key_points'])
+        state = DecisiveState(chapter=chapter, stage=stage)
+        logic = DecisiveLogic(DecisiveConfig(chapter=chapter), state)
+        for index, route in routes.items():
+            assert route.next_nodes == tuple(row['nodes'][index]['next'])
+            edges += len(route.next_nodes)
+            if index != '0':
+                assert MapData.is_stage_end(chapter, stage, index) == (not route.next_nodes)
+                successors = tuple(dict.fromkeys(routes[item].label for item in route.next_nodes))
+                assert metadata.nodes[route.label].next_nodes == successors
+        for label, raw in row['enemy'].items():
+            records += 1
+            slots = MapData.get_enemy(chapter, stage, label)
+            assert slots == enemy_codes_to_slots(raw)
+            assert len(slots) == 6
+            assert metadata.nodes[label].enemy_formations[0].ships == tuple(slots)
+            for has_sub in (False, True):
+                state.fleet[1] = 'U-1206' if has_sub else ''
+                expected = (
+                    Formation.wedge
+                    if _count_anti_sub(slots) <= has_sub
+                    else Formation.double_column
+                )
+                assert logic.get_formation(label) == expected
+    assert (nodes, edges, records) == (319, 401, 154)
 
 
-@pytest.mark.parametrize(('chapter', 'stage'), _LEGACY_ANTI_SUB)
-@pytest.mark.parametrize('submarine', [False, True])
-def test_all_84_formation_decisions_match_legacy(chapter: int, stage: int, submarine: bool) -> None:
-    state = DecisiveState(chapter=chapter, stage=stage, node='A')
-    if submarine:
-        state.fleet[1] = 'U-1206'
-    logic = DecisiveLogic(DecisiveConfig(chapter=chapter), state)
-    for index, count in enumerate(_LEGACY_ANTI_SUB[chapter, stage]):
-        node = chr(ord('A') + index)
-        slots = MapData.get_enemy(chapter, stage, node)
-        assert len(slots) == 6
-        assert _count_anti_sub(slots) == int(count)
-        expected = Formation.wedge if int(count) <= int(submarine) else Formation.double_column
-        assert logic.get_formation(node) == expected
-    # 计算其它候选的战术不修改用于界面显示的当前节点。
-    assert state.node == 'A'
+@pytest.mark.parametrize(
+    ('chapter', 'stage', 'node', 'slots'),
+    [
+        (4, 1, 'G', ['战列', '大巡', '重巡', '重巡', '轻巡', '驱逐']),
+        (4, 3, 'G', ['战列', '战列', '战列', '重巡', '重巡', '重巡']),
+        (6, 3, 'D', ['战列', '战巡', '战列', '航母', '导驱', '轻巡']),
+    ],
+)
+def test_conflicting_legacy_records_use_ex(
+    chapter: int, stage: int, node: str, slots: list[str]
+) -> None:
+    assert MapData.get_enemy(chapter, stage, node) == slots
 
 
 def test_six_slot_loader_preserves_airport_and_internal_empty_slot() -> None:
     assert MapData.get_enemy(6, 1, 'A') == ['轻巡', '轻巡', None, None, None, None]
     assert MapData.get_enemy(6, 1, 'J')[0] == '机场'
     assert MapData.get_enemy(6, 2, 'J')[3] == '机场'
-    assert _enemy_slots(['', '大巡', '', '导战', '补给'], 'test') == [
+    assert enemy_codes_to_slots(['大巡', '', '导战', '补给']) == [
         '大巡',
         None,
         '导战',
@@ -82,10 +88,10 @@ def test_six_slot_loader_preserves_airport_and_internal_empty_slot() -> None:
     ]
 
 
-@pytest.mark.parametrize('raw', [['DD'], ['', 'AF'], ['', ['轻巡']], [''] * 8, '驱逐'])
+@pytest.mark.parametrize('raw', [['INVALID'], [42], ['', ['轻巡']], [''] * 7, '驱逐'])
 def test_invalid_enemy_data_is_reported(raw: object) -> None:
-    with pytest.raises(ValueError, match='决战敌情'):
-        _enemy_slots(raw, '6-1 A')
+    with pytest.raises((ValueError, TypeError), match='决战敌情'):
+        enemy_codes_to_slots(raw)
 
 
 def test_decisive_metadata_preserves_unknown_geometry_and_formation() -> None:
@@ -99,7 +105,7 @@ def test_decisive_metadata_preserves_unknown_geometry_and_formation() -> None:
     assert not metadata.capabilities['distance']
     assert not metadata.capabilities['ray']
     assert '0' not in metadata.nodes
-    assert MapData.tracking_map(1, 1).nodes['A'].enemy_formations is None
+    assert MapData.tracking_map(1, 1).nodes['A'].enemy_formations[0].ships[0] == '轻巡'
     assert MapData.get_enemy(6, 1, 'unknown') == []
 
 

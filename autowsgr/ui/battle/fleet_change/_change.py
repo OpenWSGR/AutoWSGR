@@ -154,7 +154,7 @@ class FleetChangeMixin(FleetAlignmentMixin):
         snapshot: FleetSnapshot,
         selectors: Sequence[FleetSlotRule | None],
     ) -> None:
-        """记录一轮 OCR 合并后的六槽结果、规则与匹配结论。"""
+        """合并一轮 OCR 结果后，逐个记录编队位置的识别结果、目标规则和匹配结论。"""
         ship_types = snapshot.ship_types or [None] * 6
         ship_levels = snapshot.ship_levels or [None] * 6
         for slot, selector in enumerate(selectors):
@@ -308,13 +308,13 @@ class FleetChangeMixin(FleetAlignmentMixin):
 
         return current, occupied
 
-    # 执行一套六槽舰队的完整换船、排序和验证流程。
+    # 按目标编队换船、调整顺序并检查结果。
     def change_fleet(
         self,
         fleet_id: int | None,
         ship_names: Sequence[FleetSlotRule],
     ) -> bool:
-        """返回最终舰队是否符合六个目标槽位。"""
+        """检查最终编队中每艘船的位置和预留的空位是否符合配置。"""
         self._last_changed_fleet = None
         # Step 1：切换到 YAML 指定的舰队。
         # 当前舰队已经正确时，不重复点击舰队按钮。
@@ -322,7 +322,7 @@ class FleetChangeMixin(FleetAlignmentMixin):
             self.select_fleet(fleet_id)
             time.sleep(0.5)
 
-        # Step 2：保存六个槽位的规则，不足六槽时补空。
+        # Step 2：按编队顺序保存规则，未配置的位置留空。
         selectors: list[FleetSlotRule | None] = list(ship_names[:6])
         selectors += [None] * (6 - len(selectors))
 
@@ -333,7 +333,7 @@ class FleetChangeMixin(FleetAlignmentMixin):
             return False
         # 第一舰队最后一艘舰船不能移除，但第一舰队本身允许更换编成。
         if fleet_id == 1 and assigned[0] is None:
-            raise ValueError('1 队槽位 0 不能为空')
+            raise ValueError('第 1 舰队必须指定旗舰')
 
         expected_pool = self._ocr_target_pool(selectors)
         snapshot = self._detect_initial_snapshot(expected_pool, selectors)

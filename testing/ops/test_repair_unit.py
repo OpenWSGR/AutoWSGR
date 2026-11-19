@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import types
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
+
+import pytest
 
 from autowsgr.context.bathroom import BathRoom
+from autowsgr.context.game_context import GameContext
+from autowsgr.types import ShipDamageState
+from autowsgr.ui.bath_page import BathPage, RepairShipInfo
 
 
 if TYPE_CHECKING:
-    import pytest
+    from collections.abc import Callable
 
 
 # ── 替身 ──
@@ -31,9 +37,16 @@ class _FakeBathPage:
     def go_to_choose_repair(self) -> None:
         self.go_to_choose_repair_calls += 1
 
-    def repair_longest(self, blacklist: set[str] | None = None) -> int:  # noqa: ARG002  # 签名匹配真实接口 (调用方按关键字传 blacklist=)
+    def repair_longest(
+        self, *, blacklist: set[str], on_accepted: Callable[[str, int], None]
+    ) -> int:
         self.repair_longest_calls += 1
-        return self._results.pop(0) if self._results else -1
+        seconds = self._results.pop(0) if self._results else -1
+        if seconds >= 0:
+            name = f'舰船{self.repair_longest_calls}'
+            assert name not in blacklist
+            on_accepted(name, seconds)
+        return seconds
 
 
 class _FakeCtx:
@@ -42,15 +55,20 @@ class _FakeCtx:
     def __init__(self, slot_count: int) -> None:
         self.bathroom = BathRoom(slot_count=slot_count)
         self.config = types.SimpleNamespace(bathroom_count=slot_count)
+        self.ship_registry = {}
+        self.ctrl = Mock()
+
+    get_ship = GameContext.get_ship
 
 
-def _patch_repair(monkeypatch: pytest.MonkeyPatch, fake_page: _FakeBathPage) -> None:
+def _patch_repair(monkeypatch: pytest.MonkeyPatch, fake_page: _FakeBathPage | BathPage) -> None:
     """把 repair 模块的设备依赖 (goto_page / BathPage / sleep) 替换为 no-op。"""
     import autowsgr.ops.repair as mod
 
     monkeypatch.setattr(mod, 'goto_page', lambda *_a, **_kw: None)
     monkeypatch.setattr(mod, 'BathPage', lambda _ctx: fake_page)
-    monkeypatch.setattr(mod, 'time', types.SimpleNamespace(sleep=lambda *_a, **_kw: None))
+    monkeypatch.setattr(mod.time, 'sleep', lambda *_a, **_kw: None)
+    monkeypatch.setattr(mod.time, 'time', lambda: 1000.0)
 
 
 # ── 循环填满 ──
@@ -69,6 +87,9 @@ def test_fills_all_free_slots_then_stops(monkeypatch: pytest.MonkeyPatch):
     assert fake.repair_longest_calls == 2  # 恰好修 2 艘, 不是 1 也不是死循环
     assert fake.go_to_choose_repair_calls == 2  # 每艘都重开 overlay
     assert ctx.bathroom.is_available() is False  # 两槽全满
+    assert ctx.bathroom.available_time == [1100.0, 1200.0]
+    assert ctx.get_ship('舰船1').repair_end_time == 1100.0
+    assert ctx.get_ship('舰船2').damage_state is ShipDamageState.REPAIRING
 
 
 def test_partial_fill_then_no_candidates(monkeypatch: pytest.MonkeyPatch):
@@ -125,3 +146,45 @@ def test_skip_when_no_free_slot(monkeypatch: pytest.MonkeyPatch):
 
     assert mod.repair_one_available(ctx) is False
     assert fake.go_to_choose_repair_calls == 0  # 没开 overlay
+
+
+@pytest.mark.parametrize('mode', ['具名', '空闲'])
+@pytest.mark.parametrize(
+    ('raw', 'accepted', 'registered'),
+    [('00:12:18', True, 738), ('00:00:00', True, 0), ('', True, None), ('00:12:18', False, None)],
+)
+def test_registry_only_after_confirmed_quote(
+    monkeypatch: pytest.MonkeyPatch, mode: str, raw: str, accepted: bool, registered: int | None
+):
+    """使用真实选船和入浴逻辑，核对点击、舰船记录和槽位时间。"""
+    import autowsgr.ops.repair as mod
+
+    ctx = _FakeCtx(slot_count=1)
+    page = BathPage(ctx)
+    monkeypatch.setattr(page, 'go_to_choose_repair', lambda: None)
+    monkeypatch.setattr(BathPage, 'has_choose_repair_overlay', staticmethod(lambda _screen: True))
+    card = RepairShipInfo('U-351', (0.3, 0.5), raw)
+    monkeypatch.setattr(page, 'recognize_repair_ships', lambda: [card])
+    monkeypatch.setattr(page, 'wait_repair_accepted', lambda: accepted)
+    _patch_repair(monkeypatch, page)
+
+    if mode == '空闲':
+        assert mod.repair_one_available(ctx) is (registered is not None)
+    elif not raw:
+        with pytest.raises(ValueError, match=r'U-351.*时长'):
+            mod.repair_ship_by_name(ctx, 'U-351')
+    else:
+        seconds = mod.repair_ship_by_name(ctx, 'U-351')
+        assert seconds == (registered if registered is not None else -1)
+
+    assert ctx.ctrl.click.call_count == bool(raw)
+    if registered is None:
+        assert not ctx.ship_registry
+        assert ctx.bathroom.available_time is None
+    else:
+        ship = ctx.get_ship('U-351')
+        assert ship.repair_end_time == 1000 + registered
+        assert ship.damage_state is ShipDamageState.REPAIRING
+        monkeypatch.setattr(mod.time, 'time', lambda: 2000.0)
+        assert not ship.available
+        assert ctx.bathroom.available_time == [1000 + registered if registered else 0.0]

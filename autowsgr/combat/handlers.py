@@ -529,7 +529,7 @@ class PhaseHandlersMixin:
           - 命中 *phase* → 点击被动画吞掉, 立即重试点击 (重试即动画等待);
           - 识别不到 (过渡帧/页面渐变中) → **只等待不点击**: 对切换中的
             页面盲目连点会穿透中间页, 落点若是 PROCEED 对话框还可能误触
-            按钮。轮询窗口耗尽仍认不出才继续点击推进 (真正的未知页)。
+            按钮。窗口耗尽时，决战战果交回决战流程识别地图或浮窗，其他情况继续点击。
 
         参数
         ----------
@@ -570,7 +570,9 @@ class PhaseHandlersMixin:
                 _log.debug('[Combat] {} 已推进到 {}', phase.name, current.name)
                 return
             else:
-                # 整个轮询窗口都无法识别 → 未知页, 继续点击推进
+                if phase == CombatPhase.RESULT and self._plan.mode == CombatMode.DECISIVE:
+                    _log.debug('[Combat] 决战战果点击后持续无法识别，交回决战流程')
+                    return
                 _log.debug(
                     '[Combat] {} 点击后持续无法识别 (第 {} 次), 继续点击', phase.name, attempt
                 )

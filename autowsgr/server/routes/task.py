@@ -317,6 +317,8 @@ async def _start_decisive(ctx: Any, request: DecisiveRequest) -> ApiResponse:
                 task_manager.update_progress(current_round=i + 1, current_node='决战')
                 _log.info('[Task] 决战第 {}/{} 轮', i + 1, request.decisive_rounds)
                 result = controller.run()
+                if result.value == 'stopped':
+                    return TaskOutcome(results=results, success=False)
                 is_error = result.value == 'error'
                 converted = {
                     'round': i + 1,

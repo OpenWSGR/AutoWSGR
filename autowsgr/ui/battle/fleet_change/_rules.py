@@ -144,7 +144,7 @@ class FleetRuleMixin(FleetDetectMixin):
             option.search_name,
         )
 
-    # 验证当前六个槽位是否完整满足目标，并拒绝队内同名舰。
+    # 逐个核对编队中的舰船和空位，编队中不能有同名舰。
     @classmethod
     def _validate_with_selector(
         cls,

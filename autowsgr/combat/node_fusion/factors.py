@@ -98,7 +98,7 @@ class EnemyFactor:
         """已知敌情变体使用联合似然；未知变体不调用此项。"""
         log_model = self._fleet_score(fleet, evidence)
         if evidence not in self._background_cache:
-            # 异常帧可能整体像另一支舰队，不能把它当作各槽独立随机错误。
+            # 一帧可能把整队识别成另一支舰队，多个位置的错误可能相关。
             # 整帧混合项限制这种一致错误带来的过大优势。
             scores = np.array([self._fleet_score(fleet, evidence) for fleet in self._all_variants])
             self._background_cache[evidence] = _logsum(scores) - math.log(len(scores))
@@ -151,7 +151,7 @@ class EnemyFactor:
             enemy.detour,
         )
         if not any(signature.ships) and signature.formation is None and signature.detour is None:
-            return {'available': False, 'reason': '六槽、阵型及迂回信息均缺失', 'weights': {}}
+            return {'available': False, 'reason': '未识别到敌方舰种、阵型或迂回按钮', 'weights': {}}
         robust_scores: dict[str, float] = {}
         supported_nodes = []
         for name, node in self.map_data.nodes.items():

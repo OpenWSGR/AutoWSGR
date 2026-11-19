@@ -36,6 +36,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from autowsgr.context import GameContext
+    from autowsgr.infra.config import UserConfig
+    from autowsgr.ops.decisive.controller import DecisiveResult
+    from autowsgr.ops.decisive.repair import RepairOutcome
+    from autowsgr.scheduler.decisive import ScheduledAction
     from autowsgr.scheduler.triggers import Trigger
 
 _log = get_logger('scheduler')
@@ -150,7 +154,7 @@ class TaskScheduler:
         self._last_expedition_time: float = 0.0
         # 触发器调度 (auto_daily 长期挂机)
         self._triggers: list[Trigger] = []
-        self._queue: list[FightTask] = []
+        self._queue: list[FightTask | ScheduledAction] = []
         self._last_date: date = date.today()  # noqa: DTZ011  # 跨日按本地墙上时钟 (游戏 0 点刷新)
 
     # ── 任务管理 ──
@@ -204,6 +208,50 @@ class TaskScheduler:
         self._print_summary()
         return list(self._tasks)
 
+    def run_decisive(
+        self,
+        advance: Callable[[], DecisiveResult | None],
+        next_repair: Callable[[], RepairOutcome],
+        dispatch: Callable[[], RepairOutcome],
+        resume: Callable[[RepairOutcome], None],
+        *,
+        park: Callable[[], bool] | None = None,
+    ) -> DecisiveResult:
+        """将一轮决战的节点和维修放进日常任务的同一队列，到大关结算后返回。"""
+        from autowsgr.ops.decisive.controller import DecisiveResult
+        from autowsgr.scheduler.decisive import DecisiveRound
+
+        chapter = DecisiveRound(self, advance, next_repair, dispatch, resume, park)
+        stop = self._ctx.stop_event
+        self._enqueue(chapter.node)
+        try:
+            while not stop.is_set() and chapter.result is None:
+                chapter.wake_if_due()
+                if chapter.result is not None or stop.is_set():
+                    break
+                if self._run_ready(chapter.select) or stop.is_set():
+                    continue
+                # 等待期间设备空闲，仍按日常调度间隔检查远征、奖励等触发器。
+                if chapter.wake_at is None:
+                    raise RuntimeError('决战缺少待执行的任务或维修结束时间')
+                delay = max(0.0, chapter.wake_at - time.monotonic())
+                stop.wait(min(self._idle_sleep, delay) if self._triggers else delay)
+            return chapter.result if chapter.result is not None else DecisiveResult.STOPPED
+        finally:
+            self._discard(chapter.node)
+            self._discard(chapter.repair)
+
+    @classmethod
+    def for_decisive(
+        cls, ctx: GameContext, *, user_config: UserConfig | None = None
+    ) -> TaskScheduler:
+        """构建决战会话。跨轮复用，保留日常触发器的时钟和未完成任务。"""
+        from autowsgr.scheduler.daily_plan import build_daily_plan
+
+        scheduler = cls(ctx, expedition_interval=0)
+        build_daily_plan(scheduler, ctx, decisive_session=True, user_config=user_config)
+        return scheduler
+
     def _ensure_main_page_clean(self) -> None:
         """常驻弹窗检查: 每日首次消除主页面浮层 (新闻公告 / 每日签到 / 活动预约)。
 
@@ -222,7 +270,7 @@ class TaskScheduler:
                 exc,
             )
 
-    def _run_task(self, task: FightTask) -> None:
+    def _run_task(self, task: FightTask, *, check_expedition: bool = True) -> None:
         """执行单个任务的全部轮次。"""
         # 统一用 BatchRunnerAdapter 包装: 完整保留 run()→list[CombatResult],
         # 对 run()→单个 CombatResult 规范化为单元素列表, 兼容两类 runner
@@ -251,7 +299,8 @@ class TaskScheduler:
                 )
 
                 # 远征检查 (战斗前) — 仅旧 run() 路径有效;run_daily() 下由触发器接管
-                self._maybe_collect_expedition()
+                if check_expedition:
+                    self._maybe_collect_expedition()
 
                 try:
                     results = runner.run()
@@ -357,43 +406,7 @@ class TaskScheduler:
         self._sync_initial_counts()
 
         while not self._ctx.stop_event.is_set():
-            self._check_daily_reset()
-
-            # 收集触发器产出的新任务
-            for trigger in self._triggers:
-                try:
-                    task = trigger.should_fire(self._ctx)
-                except Exception as exc:
-                    _log.opt(exception=True).warning(
-                        '[Scheduler] 触发器 {} 异常: {}',
-                        trigger.name,
-                        exc,
-                    )
-                    continue
-                if task is not None:
-                    self._enqueue(task)
-
-            # 取队首执行
-            task = self._dequeue()
-            if task is not None:
-                try:
-                    self._run_task(task)
-                except Exception as exc:
-                    # _run_task 自身异常 (非 runner.run, 极少见) 兜底: 复位触发器
-                    # _idle 避免该触发器卡死不再产出, 继续主循环, 不崩溃脚本。
-                    _log.opt(exception=True).error(
-                        '[Scheduler] 子任务 {} 执行崩溃, 已跳过: {}',
-                        task.name,
-                        exc,
-                    )
-                    if task.on_done is not None:
-                        try:
-                            task.on_done(
-                                CombatResult(flag=ConditionFlag.ACTION_FAILED),
-                            )
-                        except Exception:  # noqa: S110  # on_done 回调异常不应影响主循环
-                            pass
-            else:
+            if not self._run_ready():
                 # 队列空:所有触发器暂无任务 (常规战打满 / 只等远征定时) → 挂机等待
                 # 挂机期间顺带做常驻弹窗检查, 保证回到主页面时浮层不残留
                 self._ensure_main_page_clean()
@@ -402,10 +415,50 @@ class TaskScheduler:
         _log.info('[Scheduler] 收到停止信号, 调度结束')
         self._print_summary()
 
-    def _enqueue(self, task: FightTask) -> None:
+    def _run_ready(
+        self,
+        select: Callable[[FightTask | ScheduledAction], FightTask | ScheduledAction] | None = None,
+    ) -> bool:
+        """收集触发器产出的任务，串行执行一次。现场安全交接后才取走队首。"""
+        self._check_daily_reset()
+        for trigger in self._triggers:
+            try:
+                task = trigger.should_fire(self._ctx)
+            except Exception as exc:
+                _log.opt(exception=True).warning(
+                    '[Scheduler] 触发器 {} 异常: {}', trigger.name, exc
+                )
+                continue
+            if task is not None:
+                self._enqueue(task)
+        if not self._queue or self._ctx.stop_event.is_set():
+            return False
+        selected = self._queue[0]
+        if select is not None:
+            selected = select(selected)
+        if self._ctx.stop_event.is_set():
+            return True
+        self._discard(selected)
+        if not isinstance(selected, FightTask):
+            selected.run()
+            return True
+        try:
+            self._run_task(selected, check_expedition=False)
+        except Exception as exc:
+            _log.opt(exception=True).error('[Scheduler] 子任务 {} 执行崩溃: {}', selected.name, exc)
+            if selected.on_done is not None:
+                try:
+                    selected.on_done(CombatResult(flag=ConditionFlag.ACTION_FAILED))
+                except Exception as error:
+                    _log.warning('[Scheduler] {} 结束回调失败: {}', selected.name, error)
+        return True
+
+    def _enqueue(self, task: FightTask | ScheduledAction) -> None:
         """按 priority 插入队列 (数值小先出;同 priority FIFO)。"""
         idx = len(self._queue)
         for i, existing in enumerate(self._queue):
+            if existing is task:
+                return
             if existing.priority > task.priority:
                 idx = i
                 break
@@ -417,7 +470,10 @@ class TaskScheduler:
             len(self._queue),
         )
 
-    def _dequeue(self) -> FightTask | None:
+    def _discard(self, task: FightTask | ScheduledAction) -> None:
+        self._queue[:] = [queued for queued in self._queue if queued is not task]
+
+    def _dequeue(self) -> FightTask | ScheduledAction | None:
         """取出队首任务 (priority 最小者)。"""
         if not self._queue:
             return None
