@@ -21,6 +21,7 @@ from autowsgr.vision import ImageChecker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from threading import Event
 
     import numpy as np
 
@@ -83,6 +84,12 @@ DEFAULT_NAV_CONFIG = NavConfig()
 # ---------------------------------------------------------------------------
 
 
+def check_stop(stop_event: Event | None) -> None:
+    """在下一次截屏或触摸前响应任务停止请求。"""
+    if stop_event is not None and stop_event.is_set():
+        raise InterruptedError('收到停止请求')
+
+
 def wait_for_page(
     ctrl: AndroidController,
     checker: Callable[[np.ndarray], bool],
@@ -93,10 +100,12 @@ def wait_for_page(
     source: str = '',
     target: str = '',
     candidates: set[str] | None = None,
+    stop_event: Event | None = None,
+    timeout_error: type[Exception] = NavigationError,
 ) -> np.ndarray:
     """反复截图，直到 ``checker`` 返回 ``True``。
 
-    内置浮层消除。遇到可消除浮层时立即处理并继续轮询（不计入睡眠延迟）。
+    设置 stop_event 时，停止请求可打断截图间隔。
 
     Parameters
     ----------
@@ -107,7 +116,7 @@ def wait_for_page(
     Raises
     ------
     NavigationError
-        超时仍未匹配。
+        超时仍未匹配。传入 timeout_error 时改用该异常报告超时。
     """
     from autowsgr.ui.page import get_current_page
 
@@ -116,9 +125,10 @@ def wait_for_page(
     _log.debug('[UI] 等待到达: {} -> {} (超时 {:.1f}s)', source or '?', target or '?', timeout)
 
     while True:
+        check_stop(stop_event)
         attempt += 1
         screen = ctrl.screenshot()
-
+        check_stop(stop_event)
         if checker(screen):
             _log.debug(
                 '[UI] 已到达: {} -> {} (第 {} 次截图)', source or '?', target or '?', attempt
@@ -140,9 +150,15 @@ def wait_for_page(
                 f'{attempt} 次截图后仍未到达, 当前: {current or "未知"}'
             )
             _log.error('[UI] {}', msg)
-            raise NavigationError(msg, screen=screen)
+            error = NavigationError(msg, screen=screen)
+            if timeout_error is NavigationError:
+                raise error
+            raise timeout_error(msg) from error
 
-        time.sleep(interval)
+        if stop_event is None:
+            time.sleep(interval)
+        else:
+            stop_event.wait(interval)
 
 
 def wait_leave_page(
@@ -238,8 +254,10 @@ def click_and_wait_for_page(
     target: str = '',
     config: NavConfig = DEFAULT_NAV_CONFIG,
     candidates: set[str] | None = None,
+    stop_event: Event | None = None,
+    timeout_error: type[Exception] = NavigationError,
 ) -> np.ndarray:
-    """点击 + 等待到达目标页面，内置重试。
+    """点击一次，随后反复截图验证是否到达目标页。
 
     Raises
     ------
@@ -247,6 +265,7 @@ def click_and_wait_for_page(
         点击后未到达目标页面。
 
     """
+    check_stop(stop_event)
     ctrl.click(*click_coord)
     return wait_for_page(
         ctrl,
@@ -257,6 +276,8 @@ def click_and_wait_for_page(
         source=source,
         target=target,
         candidates=candidates,
+        stop_event=stop_event,
+        timeout_error=timeout_error,
     )
 
 

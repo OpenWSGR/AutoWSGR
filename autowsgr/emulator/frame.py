@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, replace
 
-
-if TYPE_CHECKING:
-    import numpy as np
+import numpy as np
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,3 +18,17 @@ class CapturedFrame:
     image: np.ndarray
     sequence: int | None
     captured_at: float
+
+    def snapshot(self) -> CapturedFrame:
+        """保留观察时的像素，防止无解码序号的控制器复用缓冲区。"""
+        return self if self.sequence is not None else replace(self, image=self.image.copy())
+
+    def is_newer_than(self, previous: CapturedFrame | None, *, allow_static: bool) -> bool:
+        """优先比较解码序号。无序号时，只有允许静态复核才能接受相同像素。"""
+        if previous is None:
+            return True
+        if self.sequence is not None and previous.sequence is not None:
+            return self.sequence > previous.sequence
+        return self.captured_at > previous.captured_at and (
+            allow_static or not np.array_equal(previous.image, self.image)
+        )
