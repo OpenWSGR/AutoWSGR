@@ -60,7 +60,7 @@ _BLOOD_COLORS: tuple[tuple[Color, ShipDamageState], ...] = (
 def classify_blood(pixel: Color) -> ShipDamageState:
     """根据像素颜色判断血量状态。
 
-    计算像素与五种参考颜色的欧氏距离，返回距离最近的对应状态。
+    计算像素与六种参考颜色的欧氏距离，返回距离最近的对应状态。
 
     Parameters
     ----------

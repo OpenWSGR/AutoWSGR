@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import time
-
 from autowsgr.infra import ActionFailedError
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
@@ -32,14 +30,20 @@ class RepairMixin(BaseBattlePreparation):
 
         if not positions:
             return
+        if self._ctx.stop_event.is_set():
+            return
         self.select_panel(Panel.QUICK_REPAIR)
-        time.sleep(0.8)
+        if self._ctx.stop_event.wait(0.8):
+            return
         for pos in positions:
             if pos not in BLOOD_BAR_PROBE:
                 _log.warning('[UI] 无效修理位置: {}', pos)
                 continue
+            if self._ctx.stop_event.is_set():
+                return
             self._ctrl.click(*BLOOD_BAR_PROBE[pos])
-            time.sleep(1.5)
+            if self._ctx.stop_event.wait(1.5):
+                return
             _log.info('[UI] 出征准备 → 修理位置 {}', pos)
 
     def check_repair(

@@ -9,7 +9,7 @@
 -----------------------
 ``available_time`` 仅跟踪**本脚本派出的修理**: :meth:`BathRoom.occupy` 在
 成功派修后记录该槽释放时间。配合 ``BathPage`` 选择修理 overlay 的点击反馈
-(``_try_wait_overlay_close``: overlay 关闭 = 修成功 / 未关 = 浴场满) 实现:
+(``wait_repair_accepted``: overlay 关闭 = 修成功 / 未关 = 浴场满) 实现:
 
 - 有空闲槽才派修 (:meth:`is_available`);
 - 跟踪已派修理的进度 (释放时间戳自然到期 = 槽回收);

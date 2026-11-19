@@ -74,6 +74,7 @@ operation_delay_min: 0.0           # 单次操作最小延迟
 operation_delay_max: 0.0           # 单次操作最大延迟
 dock_full_destroy: true            # 船坞满时自动清空
 repair_manually: false             # 是否手动修理
+quick_repair_threshold_seconds: null  # 决战：null 沿用原策略；短于阈值立即入浴，达到阈值时优先换船，缺员才用桶
 bathroom_count: 2                  # 浴室修理槽位数 (auto_bath_repair 空位调度用)
 
 # ── 解装设置 ──
@@ -143,7 +144,7 @@ decisive_battle:
     - U-96
     - U-1206
   repair_level: 1                  # 维修策略 (1=中破修, 2=大破修)
-  use_quick_repair: true           # 是否启用快修（桶修），关闭后不修理受损舰船。
+  use_quick_repair: true           # 允许使用快修桶；关闭后仍可按时长阈值安排入浴。
   full_destroy: false              # 船舱满了是否解装舰船
   useful_skill: false              # 充分利用技能
   useful_skill_strict: false       # 严格利用技能 (useful_skill 为 true 时才生效)

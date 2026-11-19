@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import time
+from functools import partial
 from typing import TYPE_CHECKING
 
 from autowsgr.infra.logger import get_logger
@@ -52,6 +53,13 @@ def repair_in_bath(ctx: GameContext) -> None:
     _log.info('[OPS] 浴室修理操作完成')
 
 
+def _record_bath(ctx: GameContext, name: str, seconds: int) -> None:
+    """确认入浴后登记舰船与槽位。到期时还需查看舰船的实际伤情。"""
+    ctx.get_ship(name).record_bath(time.time() + seconds)
+    ctx.bathroom.slot_count = ctx.config.bathroom_count
+    ctx.bathroom.occupy(seconds)
+
+
 def repair_ship_by_name(ctx: GameContext, ship_name: str) -> int:
     """使用浴室修理指定名称的舰船。
 
@@ -74,8 +82,7 @@ def repair_ship_by_name(ctx: GameContext, ship_name: str) -> int:
     repair_secs = page.repair_ship(ship_name)
 
     if repair_secs >= 0:
-        ship = ctx.get_ship(ship_name)
-        ship.set_repair(repair_secs)
+        _record_bath(ctx, ship_name, repair_secs)
         _log.info('[OPS] 浴室修理操作完成: {} ({}s)', ship_name, repair_secs)
     else:
         _log.warning('[OPS] 浴场已满, 无法修理 {}', ship_name)
@@ -122,25 +129,28 @@ def repair_one_available(
     goto_page(ctx, PageName.BATH)
     page = BathPage(ctx)
     repaired = 0
+    record = partial(_record_bath, ctx)
 
     # 循环填满所有空闲槽: 每修一艘 overlay 即自动关闭, 故每轮需重开 overlay。
     # 终止条件: 无空闲槽 (is_available False) / 无可修候选 (secs==-1) /
     # 浴场满 (secs==-2)。空闲槽数 = slot_count, 故循环上限即槽位数, 不会死循环。
     while bath.is_available():
         page.go_to_choose_repair()
-        secs = page.repair_longest(blacklist=blocked)
+        secs = page.repair_longest(blacklist=blocked, on_accepted=record)
 
-        if secs > 0:
-            bath.occupy(secs)
+        if secs >= 0:
             repaired += 1
             _log.info('[OPS] 浴室修理派单成功 ({}s, 本轮已派 {} 艘)', secs, repaired)
+            if secs == 0:
+                # 实际读到零秒时槽位仍为空，下一轮触发时再选船。
+                break
             continue
         if secs == -2:
             # 浴场满: 状态不可靠, 标记未知下次重试
             bath.mark_unknown()
             _log.warning('[OPS] 浴场已满, 稍后重试 (本轮已派 {} 艘)', repaired)
             break
-        # secs == -1 (无可修候选) 或 == 0 (修理时间解析失败): 状态不变, 结束派单
+        # 没有可修候选，结束本轮派单。
         _log.debug('[OPS] 无可修理舰船, 结束派单 (本轮已派 {} 艘)', repaired)
         break
 

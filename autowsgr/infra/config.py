@@ -90,7 +90,7 @@ class AccountConfig(BaseModel):
 
 
 def resolve_ocr_gpu_enabled(configured: bool) -> bool:
-    """Apply the process OCR GPU override to one configured GPU preference."""
+    """按当前进程的环境变量调整 OCR 的 GPU 设置。"""
     override = os.getenv('AUTOWSGR_OCR_GPU_MODE', '').lower()
     if override == 'cuda':
         return True
@@ -382,7 +382,7 @@ class DecisiveConfig(BaseModel):
 
 
 class IntensifyConfig(BaseModel):
-    """Autonomous intensify material policy persisted in usersettings.yaml."""
+    """用户设置中保存的自动强化素材策略。"""
 
     model_config = {'frozen': True}
 
@@ -460,6 +460,8 @@ class UserConfig(BaseModel):
     """兼容旧版布尔字段 (仅当 ``dock_full_mode`` 为 None 时作为回退依据)"""
     repair_manually: bool = False
     """是否手动修理"""
+    quick_repair_threshold_seconds: int | None = Field(default=None, strict=True, ge=0)
+    """决战维修耗时阈值（秒）。短于阈值入浴，达到阈值先换船，缺员才用桶，未设置时沿用原策略。"""
     bathroom_count: int = 2
     """修理位置总数 (≤12)。预留:智能浴场空位调度用。"""
 
