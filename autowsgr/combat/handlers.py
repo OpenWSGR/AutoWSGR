@@ -200,6 +200,20 @@ class PhaseHandlersMixin:
             self._device, lambda device: click_image(device, TemplateKey.BYPASS, 2.5)
         )
 
+    def _recheck_detour_button(self, attempts: int = 3, interval: float = 0.3) -> bool:
+        """迂回按钮证据未知时的复检: 重新截图多次匹配 BYPASS 模板。
+
+        ``evidence.detour`` 为 ``None`` 表示"未检测到"(可能是单帧漏检),
+        不能直接当作"无按钮"。仅在计划要求迂回时由决策层调用; 每次尝试
+        重新截图, 间隔 *interval* 秒以消化过渡动画, 任一次命中即返回 ``True``。
+        """
+        for attempt in range(attempts):
+            if attempt:
+                time.sleep(interval)
+            if image_exist(self._device, TemplateKey.BYPASS, 0.8):
+                return True
+        return False
+
     def _handle_spot_enemy(self) -> ConditionFlag:  # noqa: PLR0912
         """处理索敌成功 — 核心决策节点。
 
@@ -234,12 +248,21 @@ class PhaseHandlersMixin:
             )
             return ConditionFlag.FIGHT_END
 
-        # 检查迂回按钮是否可用
+        # 检查迂回按钮是否可用 (evidence.detour=None 表示未检测到, 可能漏检)
         can_detour = (
             evidence.detour
             if evidence is not None
             else image_exist(self._device, TemplateKey.BYPASS, 0.8)
         )
+        # 仅当计划要求迂回且按钮证据未知/未命中时才复检: 漏检不应直接翻转成开战,
+        # 不要求迂回时无需确认按钮, 不复检。
+        if decision.detour and not can_detour:
+            can_detour = self._recheck_detour_button()
+            if not can_detour:
+                _log.warning(
+                    '[Combat] 计划要求迂回, 但复检仍未发现迂回按钮, 按无按钮处理 (node={})',
+                    self._node,
+                )
         want_detour = can_detour and decision.detour
 
         # 阵型规则优先
