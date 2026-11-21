@@ -138,12 +138,24 @@ def map_decision_session(
     return session
 
 
+def detour_map(detour: bool | None, node: str = 'Z') -> TrackingMap:
+    """最小地图：入口 0 与单个战斗节点；``detour=None`` 模拟旧 YAML 缺该属性。"""
+    raw: dict[str, dict[str, object]] = {
+        '0': {'position': [0.1, 0.2], 'next': [node], 'type': 'NULL'},
+        node: {'position': [0.5, 0.2], 'next': [], 'type': 'FIGHT'},
+    }
+    if detour is not None:
+        raw[node]['detour'] = detour
+    return TrackingMap.from_dict(raw)
+
+
 def make_engine(
     frame: CapturedFrame,
     tmp_path: Path,
     *,
     single: bool = False,
     detour: bool = False,
+    map_detour: bool | None = True,
     record_replay: bool = False,
 ) -> CombatEngine:
     context = SimpleNamespace(
@@ -165,6 +177,7 @@ def make_engine(
     if not single:
         engine._tracking = TrackingSession()
         engine._tracking.tracker = RecordingFusion()
+        engine._tracking.map_data = detour_map(map_detour)
         if record_replay:
             engine._tracking.log_path = tmp_path / 'tracking.jsonl'
         engine._tracking.detector = MagicMock(detection_status='no_cluster')
@@ -289,6 +302,106 @@ def test_detour_records_actual_dispatch_time(
     assert action.timestamp == 17.0
     assert leave.call_count == int(clicked)
     assert engine._tracking.current_node == ('0' if clicked else 'Z')
+
+
+def test_detour_available_reads_node_attribute_and_keeps_unknown_none() -> None:
+    """会话只报告地图资料；未加载、未确认或缺少字段一律返回 None。"""
+    session = TrackingSession()
+    assert session.detour_available('Z') is None
+    session.tracker = RecordingFusion()
+    session.map_data = detour_map(True)
+    assert session.detour_available('Z') is True
+    assert session.detour_available('0') is None
+    assert session.detour_available('missing') is None
+    session._decision_estimate = estimate('Z')
+    assert session.detour_available() is True
+    session.map_data = detour_map(None)
+    assert session.detour_available('Z') is None
+
+
+def test_node_detour_ignores_missing_button_detection(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: CapturedFrame,
+    evidence: EnemyObservation,
+    tmp_path: Path,
+) -> None:
+    """节点属性可迂回时，按钮模板未检出不再阻止迂回。"""
+    engine = make_engine(frame, tmp_path, detour=True, map_detour=True)
+    monkeypatch.setattr(integration_module, 'observe_enemy', lambda *_a, **_k: evidence)
+    monkeypatch.setattr(
+        handlers_module, 'image_exist', MagicMock(side_effect=AssertionError('应使用节点属性'))
+    )
+    click = MagicMock(return_value=True)
+    monkeypatch.setattr(handlers_module, 'click_image', click)
+    monkeypatch.setattr(handlers_module, 'wait_leave_page', MagicMock(return_value=frame.image))
+    engine._make_decision(CombatPhase.SPOT_ENEMY_SUCCESS)
+    click.assert_called_once()
+    assert engine._tracking.tracker.observations[-1].action == 'detour'
+
+
+def test_node_detour_true_warns_when_button_not_detected(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: CapturedFrame,
+    evidence: EnemyObservation,
+    tmp_path: Path,
+) -> None:
+    """地图标记可迂回但画面未检测到按钮时，保留反向冲突的反馈告警。"""
+    engine = make_engine(frame, tmp_path, detour=True, map_detour=True)
+    monkeypatch.setattr(integration_module, 'observe_enemy', lambda *_a, **_k: evidence)
+    warning = MagicMock()
+    monkeypatch.setattr(handlers_module._log, 'warning', warning)
+    click = MagicMock(return_value=True)
+    monkeypatch.setattr(handlers_module, 'click_image', click)
+    monkeypatch.setattr(handlers_module, 'wait_leave_page', MagicMock(return_value=frame.image))
+    engine._make_decision(CombatPhase.SPOT_ENEMY_SUCCESS)
+    click.assert_called_once()
+    messages = [call.args[0] for call in warning.call_args_list]
+    assert any('可迂回' in message and '未检测到' in message for message in messages)
+
+
+def test_node_detour_false_overrides_detected_button_and_warns(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: CapturedFrame,
+    evidence: EnemyObservation,
+    tmp_path: Path,
+) -> None:
+    """地图标记不可迂回时不点击，并保留画面与资料不一致的反馈信息。"""
+    engine = make_engine(frame, tmp_path, detour=True, map_detour=False)
+    monkeypatch.setattr(
+        integration_module, 'observe_enemy', lambda *_a, **_k: replace(evidence, detour=True)
+    )
+    click = MagicMock()
+    enter = MagicMock()
+    warning = MagicMock()
+    monkeypatch.setattr(handlers_module, 'click_image', click)
+    monkeypatch.setattr(handlers_module, 'click_enter_fight', enter)
+    monkeypatch.setattr(handlers_module._log, 'warning', warning)
+    engine._make_decision(CombatPhase.SPOT_ENEMY_SUCCESS)
+    click.assert_not_called()
+    enter.assert_called_once()
+    messages = [call.args[0] for call in warning.call_args_list]
+    assert any('不可迂回' in message and '反馈' in message for message in messages)
+    assert engine._last_action == 'fight'
+    assert engine._tracking.tracker.observations[-1].action == 'fight'
+
+
+def test_missing_node_detour_falls_back_to_button_detection(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: CapturedFrame,
+    tmp_path: Path,
+) -> None:
+    """旧活动图没有迂回属性且本次未采到敌情时，仍按截图按钮决定。"""
+    engine = make_engine(frame, tmp_path, detour=True, map_detour=None)
+    monkeypatch.setattr(integration_module, 'observe_enemy', lambda *_a, **_k: None)
+    monkeypatch.setattr(handlers_module, 'get_enemy_info', MagicMock(return_value={'DD': 6}))
+    monkeypatch.setattr(handlers_module, 'get_enemy_formation', MagicMock(return_value='复纵阵'))
+    monkeypatch.setattr(handlers_module, 'image_exist', MagicMock(return_value=True))
+    click = MagicMock(return_value=True)
+    monkeypatch.setattr(handlers_module, 'click_image', click)
+    monkeypatch.setattr(handlers_module, 'wait_leave_page', MagicMock(return_value=frame.image))
+    engine._make_decision(CombatPhase.SPOT_ENEMY_SUCCESS)
+    click.assert_called_once()
+    assert engine._tracking.tracker.observations[-1].action == 'detour'
 
 
 def test_click_time_proxy_keeps_shared_click_interface(
