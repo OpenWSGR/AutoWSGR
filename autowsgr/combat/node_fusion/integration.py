@@ -110,6 +110,7 @@ class TrackingSession:
 
     def __init__(self) -> None:
         self.tracker: FusionTracker | None = None
+        self.map_data: TrackingMap | None = None
         self.detector = ShipPositionDetector()
         self.log_path: Path | None = None
         self._last_result: NodeEstimate | None = None
@@ -136,6 +137,20 @@ class TrackingSession:
         if self._decision_estimate is None:
             return '0'
         return self._decision_estimate.current_node or '0'
+
+    def detour_available(self, node: str | None = None) -> bool | None:
+        """节点地图声明的迂回属性，供战斗决策使用。
+
+        只读取已加载的地图快照，不根据画面按钮改判：未知节点、未加载地图或
+        资料缺少该字段时返回 ``None``，由调用方自行降级（例如回退按钮识别）。
+        """
+        if self.tracker is None or self.map_data is None:
+            return None
+        name = self.current_node if node is None else node
+        if name == '0':
+            return None
+        node_data = self.map_data.nodes.get(name)
+        return None if node_data is None else node_data.detour
 
     @classmethod
     def start(
@@ -174,6 +189,7 @@ class TrackingSession:
                 min_travel_seconds=1.0 if plan.mode == CombatMode.NORMAL else None
             )
             session.tracker = FusionTracker(metadata, profile)
+            session.map_data = metadata
             session._history_tracker = session.tracker
         except Exception as exc:
             session.fail(f'初始化失败: {type(exc).__name__}: {exc}')

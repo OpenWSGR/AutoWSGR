@@ -44,6 +44,7 @@ from autowsgr.vision import ImageChecker
 
 if TYPE_CHECKING:
     from autowsgr.combat.node_fusion.enemy import EnemyObservation
+    from autowsgr.combat.node_fusion.integration import TrackingSession
     from autowsgr.combat.recognizer import CombatRecognizer
     from autowsgr.emulator import AndroidController
     from autowsgr.vision import OCREngine
@@ -88,6 +89,7 @@ class PhaseHandlersMixin:
         _node_count: int
         _formation_by_rule: Formation | None
         _recognizer: CombatRecognizer
+        _tracking: TrackingSession | None
     """
 
     # 类型提示 (供 IDE/mypy 在 Mixin 上下文使用)
@@ -101,6 +103,7 @@ class PhaseHandlersMixin:
     _recognizer: CombatRecognizer
     _node_count: int
     _formation_by_rule: Formation | None
+    _tracking: TrackingSession | None
 
     def _make_decision(self, phase: CombatPhase) -> ConditionFlag:
         """根据当前状态做出决策并执行操作。
@@ -200,15 +203,53 @@ class PhaseHandlersMixin:
             self._device, lambda device: click_image(device, TemplateKey.BYPASS, 2.5)
         )
 
+    def _detour_capability(self, evidence: EnemyObservation | None) -> tuple[bool, str]:
+        """能否迂回：节点地图属性优先，资料缺失时才回退按钮识别。
+
+        返回 ``(能否迂回, 判定来源)``，来源为 ``'node'`` 或 ``'image'``。
+        只有旧 YAML 坐标的活动图没有迂回属性，此时保持原有截图判定，
+        不把未知属性当成不可迂回。
+        """
+        if self._tracking is not None:
+            attribute = self._tracking.detour_available(self._node)
+            if attribute is not None:
+                self._log_node_detour(attribute, evidence)
+                return attribute, 'node'
+        detected = (
+            evidence.detour
+            if evidence is not None
+            else image_exist(self._device, TemplateKey.BYPASS, 0.8)
+        )
+        return bool(detected), 'image'
+
+    def _log_node_detour(self, available: bool, evidence: EnemyObservation | None) -> None:
+        """节点资料是唯一判据；与画面冲突时留痕供地图维护反馈。"""
+        _log.debug('[Combat] 节点 {} 地图迂回属性: {}', self._node, available)
+        if evidence is None:
+            return
+        if not available and evidence.detour:
+            _log.warning(
+                '[Combat] 节点 {} 地图标记为不可迂回, 但画面存在迂回按钮; '
+                '已按节点资料处理, 请反馈该地图',
+                self._node,
+            )
+        elif available and not evidence.detour:
+            _log.warning(
+                '[Combat] 节点 {} 地图标记为可迂回, 但画面未检测到迂回按钮; '
+                '已按节点资料处理, 请反馈该地图',
+                self._node,
+            )
+
     def _handle_spot_enemy(self) -> ConditionFlag:  # noqa: PLR0912
         """处理索敌成功 — 核心决策节点。
 
         决策顺序:
         1. 采集敌方编成和阵型
         2. 检查节点是否在白名单中
-        3. 检查阵型规则 (formation_rules)
-        4. 检查敌舰规则 (enemy_rules)
-        5. 根据结果执行: 撤退 / 迂回 / 设置阵型 / 进入战斗
+        3. 解析迂回能力 (节点地图属性优先, 缺失时回退按钮识别)
+        4. 检查阵型规则 (formation_rules)
+        5. 检查敌舰规则 (enemy_rules)
+        6. 根据结果执行: 撤退 / 迂回 / 设置阵型 / 进入战斗
         """
         # ── 信息采集 ──
         enemies, enemy_formation, evidence = self._collect_spot_evidence()
@@ -234,12 +275,8 @@ class PhaseHandlersMixin:
             )
             return ConditionFlag.FIGHT_END
 
-        # 检查迂回按钮是否可用
-        can_detour = (
-            evidence.detour
-            if evidence is not None
-            else image_exist(self._device, TemplateKey.BYPASS, 0.8)
-        )
+        # 能否迂回由已确认节点的地图属性决定，不再依赖按钮模板是否命中。
+        can_detour, detour_source = self._detour_capability(evidence)
         want_detour = can_detour and decision.detour
 
         # 阵型规则优先
@@ -272,8 +309,14 @@ class PhaseHandlersMixin:
 
             if rule_action.result == RuleResult.DETOUR:
                 if not can_detour:
-                    _log.error('[Combat] 规则指定迂回, 但该点无法迂回')
-                    raise ValueError('该点无法迂回, 但在规则中指定了迂回')
+                    _log.error(
+                        '[Combat] 规则指定迂回, 但节点 {} 判定为不可迂回 (来源={})',
+                        self._node,
+                        detour_source,
+                    )
+                    raise ValueError(
+                        f'节点 {self._node} 不可迂回 (来源={detour_source}), 但在规则中指定了迂回'
+                    )
                 want_detour = True
 
             if rule_action.result == RuleResult.FORMATION and rule_action.formation:
