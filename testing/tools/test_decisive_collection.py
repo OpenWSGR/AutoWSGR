@@ -28,7 +28,14 @@ from autowsgr.ops.decisive.controller import DecisiveController, DecisiveResult
 from autowsgr.ops.decisive.logic import DecisiveLogic
 from autowsgr.ops.decisive.state import DecisiveState
 from autowsgr.ops.decisive.tracking import DecisiveTrackingSession
-from autowsgr.types import ConditionFlag, DecisiveEntryStatus, DecisivePhase, Formation, OSType
+from autowsgr.types import (
+    ConditionFlag,
+    DecisiveEntryStatus,
+    DecisivePhase,
+    Formation,
+    OSType,
+    ShipDamageState,
+)
 from autowsgr.ui.decisive.map_controller import DecisiveMapController
 
 from tools.decisive.collect import CollectionController, RecordingCombatEngine, main, parse_args
@@ -66,6 +73,7 @@ def test_only_completed_combat_reaches_node_result(
     flag: ConditionFlag, stopped: bool, expected: DecisivePhase
 ) -> None:
     controller = DecisiveController.__new__(DecisiveController)
+    controller._repairs = MagicMock()
     controller._ctx = SimpleNamespace(stop_event=threading.Event())
     if stopped:
         controller._ctx.stop_event.set()
@@ -85,7 +93,9 @@ def test_only_completed_combat_reaches_node_result(
 
 def test_stop_before_node_result_does_not_increment() -> None:
     controller = DecisiveController.__new__(DecisiveController)
+    controller._repairs = MagicMock()
     controller._ctx = SimpleNamespace(stop_event=threading.Event())
+    controller._settings = SimpleNamespace(daily_automation=None)
     controller._ctx.stop_event.set()
     controller._state = DecisiveState(stage=1, node='J', phase=DecisivePhase.NODE_RESULT)
     controller._tracking = None
@@ -96,7 +106,9 @@ def test_stop_before_node_result_does_not_increment() -> None:
 
 def test_finished_without_clear_is_not_success() -> None:
     controller = DecisiveController.__new__(DecisiveController)
+    controller._repairs = MagicMock()
     controller._ctx = SimpleNamespace(stop_event=threading.Event())
+    controller._settings = SimpleNamespace(daily_automation=None)
     controller._state = DecisiveState(phase=DecisivePhase.FINISHED)
     controller._tracking = None
     assert controller._main_loop() == DecisiveResult.ERROR
@@ -145,6 +157,9 @@ def _collection_controller() -> CollectionController:
     controller._battle_page = MagicMock()
     controller.archive = SimpleNamespace(context={}, record=MagicMock())
     controller.round_number = 1
+    controller._repairs = MagicMock()
+    controller._repairs.needs_dispatch = False
+    controller._repairs.park_after_settlement.return_value = False
     controller._tracking = None
     controller._known_start_stage = None
     controller._battle_encounter_id = None
@@ -529,7 +544,7 @@ def test_collector_does_not_duplicate_production_fleet_scan(
     controller._map.is_skill_used.return_value = True
     controller._map.check_fleet.return_value = (
         ['芝加哥', None, None, None, None, None],
-        {},
+        {0: ShipDamageState.NORMAL},
         {'芝加哥'},
     )
     controller._logic = DecisiveLogic(controller._config, controller._state)
@@ -763,7 +778,16 @@ def test_collection_does_not_recognize_non_map_or_overlay_frames(
     if overlay:
         patch = getattr(Templates.Decisive, overlay).image
         height, width = patch.shape[:2]
-        pixels[50 : 50 + height, 700 : 700 + width] = patch
+        x, y = {
+            'FLEET_ACQUISITION': (500, 42),
+            'CONFIRM_EXIT': (370, 165),
+            'ADVANCE_CHOICE': (330, 241),
+        }[overlay]
+        template = getattr(Templates.Decisive, overlay)
+        scale = 1280 / template.source_resolution[0]
+        patch = cv2.resize(patch, (round(width * scale), round(height * scale)))
+        height, width = patch.shape[:2]
+        pixels[y : y + height, x : x + width] = patch
     native = MagicMock()
     monkeypatch.setattr('autowsgr.ui.decisive.map_controller.get_api_dll', lambda: native)
     assert (

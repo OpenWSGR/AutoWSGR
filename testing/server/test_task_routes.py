@@ -1,4 +1,4 @@
-"""Task route admission tests."""
+"""任务接口的启动条件测试。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -86,7 +87,7 @@ class _ExecutingTaskManager:
 
 
 def test_task_start_rejects_concurrent_task(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task admission rejects a second running task under the lifecycle lock."""
+    """持有任务锁时拒绝启动第二个任务。"""
     monkeypatch.setattr(task, 'task_manager', _TaskManager(is_running=True))
 
     with pytest.raises(HTTPException) as exc_info:
@@ -96,7 +97,7 @@ def test_task_start_rejects_concurrent_task(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_task_start_requires_system_context(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task admission fails after system shutdown removed the context."""
+    """系统关闭并释放上下文后无法启动任务。"""
     monkeypatch.setattr(task, 'task_manager', _TaskManager())
     monkeypatch.setattr(server_main, '_ctx', None)
 
@@ -107,7 +108,7 @@ def test_task_start_requires_system_context(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_task_start_reports_device_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task lease conflicts are returned synchronously as HTTP 409."""
+    """任务占用冲突应同步返回 HTTP 409。"""
     manager = _TaskManager()
     ctx = type('Context', (), {'stop_event': None})()
 
@@ -139,7 +140,7 @@ def test_task_start_dispatches_request_with_shared_context(
     task_request: object,
     helper_name: str,
 ) -> None:
-    """Each supported request is admitted with the current context and stop token."""
+    """各类任务使用当前上下文和停止标志启动。"""
     manager = _TaskManager()
     ctx = type('Context', (), {'stop_event': None})()
     calls: list[tuple[object, object]] = []
@@ -163,7 +164,7 @@ def test_task_start_dispatches_request_with_shared_context(
 def test_decisive_error_result_marks_task_failed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A decisive ERROR is a task failure, not a successful completed round."""
+    """决战发生错误时应报告本轮失败。"""
     from autowsgr import ops
     from autowsgr.ops import DecisiveResult
 
@@ -193,10 +194,24 @@ def test_decisive_error_result_marks_task_failed(
     ]
 
 
+def test_decisive_stop_does_not_record_a_completed_round(monkeypatch: pytest.MonkeyPatch) -> None:
+    from autowsgr import ops
+    from autowsgr.ops import DecisiveResult
+
+    manager = _ExecutingTaskManager()
+    monkeypatch.setattr(task, 'task_manager', manager)
+    controller = MagicMock()
+    controller.run.return_value = DecisiveResult.STOPPED
+    monkeypatch.setattr(ops, 'DecisiveController', lambda *_args: controller)
+    asyncio.run(task._start_decisive(object(), DecisiveRequest(decisive_rounds=2)))
+    controller.run.assert_called_once()
+    assert manager.outcome.results == []
+
+
 def test_decisive_leave_result_remains_successful(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An intentional decisive leave remains a successful terminal result."""
+    """主动暂离时任务正常结束。"""
     from autowsgr import ops
     from autowsgr.ops import DecisiveResult
 
@@ -240,12 +255,12 @@ def test_decisive_leave_result_remains_successful(
 def test_round_result_schema_preserves_existing_detail_shapes(
     detail: dict[str, Any],
 ) -> None:
-    """Typed task results must not strip or synthesize detail fields."""
+    """任务结果应保留实际提供的详情字段。"""
     assert RoundResult.model_validate(detail).model_dump(exclude_unset=True) == detail
 
 
 def test_task_status_openapi_exposes_typed_data() -> None:
-    """The status endpoint documents TaskStatusResponse instead of untyped Any."""
+    """状态接口应声明 TaskStatusResponse 响应类型。"""
     schema = server_main.app.openapi()
     response_schema = schema['paths']['/api/task/status']['get']['responses']['200']['content'][
         'application/json'
@@ -257,7 +272,7 @@ def test_task_status_openapi_exposes_typed_data() -> None:
 
 
 def test_typed_task_status_preserves_terminal_wire_payload() -> None:
-    """Typed envelope round-trips terminal details without adding absent fields."""
+    """结果序列化往返后保留原有详情字段。"""
     payload = {
         'success': True,
         'data': {
@@ -282,7 +297,7 @@ def test_typed_task_status_preserves_terminal_wire_payload() -> None:
 
 
 def test_task_status_returns_typed_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The route validates manager status through its typed response contract."""
+    """路由应按声明的响应模型验证任务状态。"""
     status = {
         'task_id': None,
         'status': 'idle',
@@ -437,7 +452,7 @@ def test_event_route_top_level_fleet_id_overrides_api_plan(
 def test_normal_route_enters_real_runner_with_resolved_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """HTTP route reaches the public ops entry and constructs the real runner."""
+    """HTTP 路由应调用公开的操作入口并创建实际执行器。"""
     manager = _ExecutingTaskManager()
     captured: list[ResolvedFleetSelection] = []
 

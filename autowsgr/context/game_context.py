@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from autowsgr.constants import normalize_ship_name
 from autowsgr.infra.logger import get_logger
 from autowsgr.types import ShipDamageState
 from autowsgr.ui.stack import UIStack
@@ -136,10 +137,11 @@ class GameContext:
         return self.fleets[fleet_id - 1]
 
     def get_ship(self, name: str) -> Ship:
-        """按名称获取舰船, 不存在则自动注册。"""
-        if name not in self.ship_registry:
-            self.ship_registry[name] = Ship(name=name)
-        return self.ship_registry[name]
+        """首次实见时登记舰名，同船别名共用伤情和维修记录。"""
+        key = normalize_ship_name(name) or name
+        if key not in self.ship_registry:
+            self.ship_registry[key] = Ship(name=key)
+        return self.ship_registry[key]
 
     def is_ship_available(self, name: str) -> bool:
         """判断舰船是否可用 (非大破 且 非修理中)。"""

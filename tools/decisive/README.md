@@ -6,12 +6,13 @@
 `testing/fixtures/decisive-clear/` 和 `testing/fixtures/decisive-observations/` 已忽略。
 生产识别需要的通用控件模板仍位于 `autowsgr/data/images/decisive/`。
 
+以下命令从仓库根目录运行。将 `usersettings.yaml` 换成你的配置文件，采集结果写入仓库外的空目录 `../decisive-samples/run-01`。
 在固定提交的独立 worktree 运行，使用现有虚拟环境。首次启动保留当前地图；
 如果实际位于主页，则导航到第 6 章，核实小关后进入已有进度，不额外重置。
 首轮若出现「重置关卡」入口立即保存现场停止。只有完成本轮三小关后才开始下一轮并正常重置章节。
 
 ```powershell
-python -m tools.decisive.collect --config D:/Games/autowsgr/user_settings.yaml --output D:/Games/autowsgr/decisive-samples/run-01 --rounds 3 --start-stage 1 --start-node A
+python -m tools.decisive.collect --config usersettings.yaml --output ../decisive-samples/run-01 --rounds 3 --start-stage 1 --start-node A
 ```
 
 `--start-node A` 表示调用者已确认当前点位，采集器不会把 native 预测冒充标签。
@@ -34,18 +35,15 @@ python -m tools.decisive.collect --config D:/Games/autowsgr/user_settings.yaml -
 舰队、旗舰、维修设置全部沿用原配置。异常、船坞满、撤退请求或停止时保存现场并退出，
 不计作完成节点，也不通过自动重试清空采集进度。
 
-恢复、购买或技能尝试后的库存由生产完整扫描核实；单屏不滚动，溢出列表按完整重叠行
-遍历，含在队舰船的六槽快照只在验证返回地图后发布。扫描失败或停止保留旧数据并退出，
-不能带着部分库存继续编队、维修或开战。新旧决战换船共用该列表遍历器，逐次重新定位。
-候选列表为空时仍须确认未筛选、完整端点和稳定空背景；它只表示没有备用舰船，
-在队舰船仍计入完整库存。进入已占用槽时的系统离队卡不计作舰船。
+恢复进度、购舰或使用副官技能后，采集器沿用决战的编队检查。程序在准备页逐一核对在队舰船的舰名和伤情，
+再查看选船列表第一页的候补舰。返回地图后才更新编队和已获得的舰船名单。即使第一页没有候补舰，在队舰船也计入名单。
 
 输出包含 `manifest.json`（PID、提交、native 版本、停止入口）、`effective_config.json`、
 `effective_log_config.json`、`observations.jsonl`、`progress.json`、`summary.json` 和 `images/`。
 输出目录必须为空；已有内容时在连接游戏前停止，防止重新编号覆盖旧图片或混合两次档案。
 在输出目录创建空文件 `STOP` 即请求停止；采集器在控制器循环、战斗识别和点击前检查。
-PNG 保留索敌匹配帧、战果、地图字母裁剪与通关页面；JSONL 保留原始六槽、中文结果、
-阵型 OCR、帧序号、单调采集时间、遭遇 ID 及 native/OCR 耗时。
+PNG 保留索敌匹配帧、战果、地图字母裁剪与通关页面。JSONL 按敌方编队顺序列出各位置的原始舰种代码和中文舰种，
+另记录阵型 OCR、帧序号、单调采集时间、遭遇 ID 及 native/OCR 耗时。
 native 结果直接供本次战斗决策和融合会话使用，不为记录重复识别。采集模式每个遭遇
 停采时仍为每个遭遇保留一次稳定地图字母观测，启采时跟随生产读取后续新稳定帧，
 同帧不会重复调用 native。定位和裁剪使用同一帧；`used_for_tracking`
@@ -64,8 +62,8 @@ native 结果直接供本次战斗决策和融合会话使用，不为记录重�
 的成功战斗推进及真实通关／重置。模型改写预测节点不会改写标签，重复战果不重复计步。
 新档案的 `encounter_complete.observation` 直接归档生产会话已提交的完成事件，保留真实时间和
 遭遇标识；随后停止或等待地图超时不会撤销已经发生的完成事件。
-确认 A 才使用确定 A 初始化；未知进度保留全节点候选。索敌未发生记为缺失，
-不写入伪造六槽。通关预测仅用于开始检查真实确认控件；控件缺失立即保存现场停止，
+确认 A 才使用确定 A 初始化；未知进度保留全节点候选。没有出现索敌画面时，记录为未取得敌方编队信息。
+通关预测仅用于开始检查真实确认控件；控件缺失立即保存现场停止，
 完成操作后还必须看到决战入口，才能记录小关完成。采集原始页用于后续构建更具体的
 通关页面识别。采集运行内开启 v4 融合回放，文件位于输出目录的 `node-fusion/`，原用户
 配置文件保持不变。采集 JSONL 的 `fusion_log`、`encounter_id`、`fusion_event_id` 可以关联
@@ -76,13 +74,13 @@ native 结果直接供本次战斗决策和融合会话使用，不为记录重�
 旧采集版本只有原始 JSONL 时，可以转换为每轮、每小关独立的 v4 回放：
 
 ```powershell
-python -m tools.decisive.replay_collection D:/Games/autowsgr/decisive-fusion-validation/collection-02/observations.jsonl --output D:/Games/autowsgr/decisive-fusion-validation/replay-02
+python -m tools.decisive.replay_collection ../decisive-samples/run-01/observations.jsonl --output ../decisive-samples/replay-01
 ```
 
 转换器一次读取完整换行行的固定快照，正在写入的末尾行留到下次；每次运行新建
 `snapshot-*` 目录，不覆盖采集或旧报告。初始化只接受首次观测前的明确标签来源，
 后续 `label_node` 和 `predicted_node` 不作为节点证据。native 字母仅来自 `map.raw_node`，
-敌情直接复用六槽原始码、中文结果和 OCR，不重新识别图片。新采集记录中的
+敌情直接使用归档中敌方各位置的原始舰种代码、中文舰种和阵型 OCR 结果。新采集记录中的
 `used_for_tracking=false` 会保留，旧版本没有此字段时按实际存在的字母观测重放。
 
 新档案优先重放生产会话的显式 `encounter_complete`，不从页面日志再次推测完成。

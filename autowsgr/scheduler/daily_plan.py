@@ -3,9 +3,9 @@
 激活 dev 的「死配置」``daily_automation``: 读取其字段, 为每个启用的日常任务
 (远征 / 战役 / 演习 / 常规战) 构造触发器并注册到 :class:`TaskScheduler`。
 
-优先级 (数值小先执行, 由 :mod:`autowsgr.scheduler.triggers` 定义)::
+优先级 (数值小先执行)::
 
-    远征 0  <  奖励 1  <  战役 5  <  演习 10  <  常规战 100  <  浴室修理 200 (空闲填充, 最后执行)
+    远征 0、奖励 1、战役 5、演习 10、决战派修 40、决战节点 50、常规战 100、空闲维修 200
 
 使用方式::
 
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from autowsgr.context import GameContext
-    from autowsgr.infra.config import DailyAutomationConfig
+    from autowsgr.infra.config import DailyAutomationConfig, UserConfig
     from autowsgr.scheduler.scheduler import TaskScheduler
 
 _log = get_logger('scheduler')
@@ -49,6 +49,8 @@ PRIO_EXPEDITION = 0
 PRIO_BONUS = 1
 PRIO_CAMPAIGN = 5
 PRIO_EXERCISE = 10
+PRIO_REQUESTED_REPAIR = 40
+PRIO_DECISIVE = 50
 PRIO_NORMAL_FIGHT = 100
 # 浴室修理: 空闲填充, 排在所有战斗任务之后 —— 仅当战役/演习/常规战都无 pending
 # 任务 (常规战 _is_exhausted、战役演习 _exhausted) 时才出队执行, 还原 classic
@@ -85,6 +87,8 @@ def build_daily_plan(
     ctx: GameContext,
     *,
     expedition_interval: float = DEFAULT_EXPEDITION_INTERVAL,
+    decisive_session: bool = False,
+    user_config: UserConfig | None = None,
 ) -> None:
     """读取 ``ctx.config.daily_automation``, 注册各触发器到 ``scheduler``。
 
@@ -96,13 +100,19 @@ def build_daily_plan(
         游戏上下文 (提供 config / 控制器)。
     expedition_interval:
         远征定时触发的轮询间隔 (秒)。
+    decisive_session:
+        决战期间关闭常规战。战役、演习操作失败后等下个检查周期再试，避免抢占每一个决战节点。
+    user_config:
+        本次会话实际采用的用户配置，默认使用上下文配置。
     """
-    cfg = ctx.config.daily_automation
+    settings = user_config if user_config is not None else ctx.config
+    cfg = settings.daily_automation
     if cfg is None:
         _log.warning('[daily] 未配置 daily_automation, 不注册任何触发器')
         return
 
     _log.info('[daily] 构建 auto_daily 计划')
+    retry_interval = expedition_interval if decisive_session else 0.0
 
     # ── 远征 (定时, prio 0) ──
     if cfg.auto_expedition:
@@ -166,6 +176,7 @@ def build_daily_plan(
                 task_factory=lambda c: CampaignRunner(c, battle_type, times=1),
                 priority=PRIO_CAMPAIGN,
                 name=f'战役/{battle_type}',
+                retry_interval=retry_interval,
             ),
         )
 
@@ -179,18 +190,19 @@ def build_daily_plan(
                 task_factory=lambda c: ExerciseOnceRunner(c, fleet_id),
                 priority=PRIO_EXERCISE,
                 name='演习',
+                retry_interval=retry_interval,
             ),
         )
 
     # ── 常规战 (条件, prio 100, 空闲填充) ──
-    if cfg.auto_normal_fight and cfg.normal_fight_tasks:
-        _register_normal_fight(scheduler, cfg, plan_root=ctx.config.plan_root)
+    if not decisive_session and cfg.auto_normal_fight and cfg.normal_fight_tasks:
+        _register_normal_fight(scheduler, cfg, plan_root=settings.plan_root)
 
     # ── 浴室修理被无限常规战抢占的告警 ──
     # 改 prio 后浴室修理 (200) 排在常规战 (100) 之后; 若存在无限常规战
     # (times=None) 且未开任何停止上限, 常规战会持续产出 prio=100 任务、
     # 永远抢占浴室修理致其无声失效。这是 classic 没有的 dev 新场景, 显式提示。
-    if _bath_repair_starved_by_normal_fight(cfg):
+    if not decisive_session and _bath_repair_starved_by_normal_fight(cfg):
         _log.warning(
             '[daily] 已启用浴室修理, 但存在无限常规战 (times 未设置) 且未开启任何'
             '停止上限 (stop_max_ship / stop_max_loot / quick_repair_limit)。'
@@ -198,7 +210,7 @@ def build_daily_plan(
             '或开启任一停止上限。',
         )
 
-    if not scheduler._triggers:
+    if not decisive_session and not scheduler._triggers:
         _log.warning('[daily] 未启用任何日常任务, run_daily 将空转')
 
 

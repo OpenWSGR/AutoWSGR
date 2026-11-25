@@ -1,8 +1,8 @@
 """使用不含敌情观测的历史定位核对 native 敌舰识别；不符时由会话告警请求反馈。
 
 参照节点仍是独立证据形成的估计，并非人工真值。只比较所有合法敌情变体均一致的
-字段，避免用待测识别结果选择最相似的模板，再把它当作正确答案。普通战第 3 槽
-战利品补给不告警；整队 AP 过期签名的资料豁免是独立规则。
+字段，避免用待测识别结果选择最相似的模板，再把它当作正确答案。普通战敌方编队第三个位置
+出现战利品补给舰时不报警。整队都是补给舰的过期地图记录有单独的豁免规则。
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ _AP_SHIP = VesselType.AP.as_chinese()
 
 @dataclass(frozen=True)
 class SlotMismatch:
-    """确认定位遭遇中与地图签名不符的槽位；保留原始识别码便于反馈排查。"""
+    """节点已确认时，记录哪艘敌舰的舰种与地图资料不符，并保留原始识别代码。"""
 
     node: str
     slot: int
@@ -94,7 +94,7 @@ def _slot_mismatches(
     for index in range(6):
         expected = {item.ships[index] if index < len(item.ships) else None for item in variants}
         if len(expected) != 1 or expected == {None}:
-            # 变体分歧或空槽没有唯一真值，不可核对。
+            # 同一位置在各编队里舰种不同，或一直空着，都无法核对。
             continue
         true_ship = next(iter(expected))
         if true_ship not in SHIP_TYPES:
@@ -109,7 +109,7 @@ def _slot_mismatches(
         if value == true_ship:
             continue
         if value == _AP_SHIP and combat_mode == CombatMode.NORMAL and index == 2:
-            # 只有普通战第 3 槽会被战利品补给替换；活动与决战没有此机制。
+            # 普通战敌方编队的第三个位置可能出现战利品补给舰。
             continue
         found.append((index + 1, true_ship, code, value))
     return found
@@ -118,7 +118,7 @@ def _slot_mismatches(
 def recognition_mismatches(
     tracker: FusionTracker, *, combat_mode: str = CombatMode.NORMAL
 ) -> list[SlotMismatch]:
-    """确认定位遭遇中与地图签名不符的槽位；每个独立遭遇只取最早索敌帧。"""
+    """用每次遭遇的首张索敌画面，核对已确认节点的敌方编队中哪些位置舰种不符。"""
     mismatches: list[SlotMismatch] = []
     if not any(obs.phase == 'SPOT_ENEMY_SUCCESS' for obs in tracker.observations):
         return mismatches

@@ -50,6 +50,8 @@ from autowsgr.vision import Color, ImageChecker, PageMatch, PixelChecker
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy as np
 
     from autowsgr.context import GameContext
@@ -86,32 +88,13 @@ class RepairShipInfo:
 
     @property
     def repair_seconds(self) -> int:
-        """将 repair_time (HH:MM:SS) 转换为秒数。解析失败返回 0。"""
-        return _time_str_to_seconds(self.repair_time)
+        """读取完整修理时长。未读出时保留舰名并在点击前报告。"""
+        from autowsgr.ops.repair_policy import parse_repair_duration
 
-
-def _time_str_to_seconds(time_str: str) -> int:
-    """将 HH:MM:SS 格式的时间字符串转换为秒数。
-
-    Parameters
-    ----------
-    time_str:
-        格式为 ``"HH:MM:SS"`` 的时间字符串。
-
-    Returns
-    -------
-    int
-        总秒数, 解析失败返回 0。
-    """
-    if not time_str:
-        return 0
-    parts = time_str.split(':')
-    if len(parts) != 3:
-        return 0
-    try:
-        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    except ValueError:
-        return 0
+        seconds = parse_repair_duration(self.repair_time)
+        if seconds is None:
+            raise ValueError(f'未能识别 {self.name} 的维修时长，本次未派修')
+        return seconds
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -316,6 +299,8 @@ class BathPage:
         ------
         NavigationError
             选择修理 overlay 未打开，或舰船未找到。
+        ValueError
+            已找到目标舰船，但未能读出其修理时长。
         """
         from autowsgr.ui.utils import NavigationError
 
@@ -328,12 +313,12 @@ class BathPage:
             ships = self.recognize_repair_ships()
             for ship in ships:
                 if ship.name == ship_name:
-                    _log.info('[UI] 选择修理: 找到 {} (耗时 {})，点击', ship_name, ship.repair_time)
                     repair_secs = ship.repair_seconds
+                    _log.info('[UI] 选择修理: 找到 {} (耗时 {})，点击', ship_name, ship.repair_time)
                     self._ctrl.click(*ship.position)
 
                     # 检测浴场是否已满: overlay 未关闭说明浴场满
-                    if self._try_wait_overlay_close():
+                    if self.wait_repair_accepted():
                         _log.info('[UI] 修理成功: {} ({}s)', ship_name, repair_secs)
                         return repair_secs
 
@@ -355,7 +340,12 @@ class BathPage:
             screen=self._ctrl.screenshot(),
         )
 
-    def repair_longest(self, blacklist: set[str] | None = None) -> int:
+    def repair_longest(
+        self,
+        blacklist: set[str] | None = None,
+        *,
+        on_accepted: Callable[[str, int], None] | None = None,
+    ) -> int:
         """在选择修理 overlay 中修理修理时间最长的非黑名单舰船。
 
         逐页扫描 (最多 10 页), 在第一个含非黑名单候选的页内选最长者点击。
@@ -365,11 +355,13 @@ class BathPage:
         ----------
         blacklist:
             不修理的舰船名集合 (中文全名)。命中则跳过。
+        on_accepted:
+            确认入浴后通知调用方实际舰名和时长。
 
         Returns
         -------
         int
-            修理秒数 (``>0`` 成功); ``-1`` 无可修候选 (空或全被排除);
+            确认入浴的修理秒数；``-1`` 无可修候选或无法读出时长；
             ``-2`` 浴场已满 (点击后 overlay 未关闭)。
         """
         blocked = blacklist or set()
@@ -378,7 +370,12 @@ class BathPage:
             ships = self.recognize_repair_ships()
             candidates = [s for s in ships if s.name and s.name not in blocked]
             if candidates:
-                target = max(candidates, key=lambda s: s.repair_seconds)
+                quoted = [s for s in candidates if s.repair_time]
+                try:
+                    target = max(quoted or candidates, key=lambda s: s.repair_seconds)
+                except ValueError as exc:
+                    _log.warning('[UI] {}', exc)
+                    return -1
                 break
             if len(ships) < _MAX_VISIBLE_CARDS:
                 # 本页未填满一屏 (含被黑名单排除的), 说明已到修理列表末尾
@@ -399,9 +396,12 @@ class BathPage:
             target.name,
             target.repair_time,
         )
+        seconds = target.repair_seconds
         self._ctrl.click(*target.position)
-        if self._try_wait_overlay_close():
-            return target.repair_seconds
+        if self.wait_repair_accepted():
+            if on_accepted is not None:
+                on_accepted(target.name, seconds)
+            return seconds
         _log.warning('[UI] 浴场已满, 修理 {} 失败', target.name)
         return -2
 
@@ -451,15 +451,8 @@ class BathPage:
             target='浴室',
         )
 
-    def _try_wait_overlay_close(self) -> bool:
-        """尝试等待 overlay 关闭, 超时返回 False (浴场已满)。
-
-        Returns
-        -------
-        bool
-            ``True`` 表示 overlay 已关闭 (修理成功),
-            ``False`` 表示超时 overlay 仍打开 (浴场已满)。
-        """
+    def wait_repair_accepted(self) -> bool:
+        """确认选船弹窗已关闭且已返回浴室。超时表示尚未确认入浴。"""
         deadline = time.monotonic() + BATH_FULL_TIMEOUT
         while time.monotonic() < deadline:
             screen = self._ctrl.screenshot()

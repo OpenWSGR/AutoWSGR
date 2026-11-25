@@ -94,7 +94,7 @@ def test_later_enemy_resolves_partial_evidence_conflict_without_more_letters(
     assert first.node_weights['C'] == pytest.approx(letter_accuracy)
     assert set(first.node_weights) == set(names)
 
-    # 第一个敌情只有一个有效槽，与错误字母冲突时保留歧义和完整候选。
+    # 首次索敌只识别出一艘敌舰的舰种，与错误字母冲突时保留全部候选节点。
     partial = _phase(
         tracker,
         'first',

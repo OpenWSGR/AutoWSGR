@@ -6,11 +6,13 @@
 
 from __future__ import annotations
 
+from itertools import combinations
 from typing import TYPE_CHECKING
 
+from autowsgr.constants import DECISIVE_SKILL_NAMES, ship_name_identity
 from autowsgr.infra.logger import get_logger
 from autowsgr.ops.decisive.config import MapData
-from autowsgr.types import FleetSelection, Formation
+from autowsgr.types import FleetSelection, Formation, ShipDamageState
 
 
 if TYPE_CHECKING:
@@ -28,7 +30,7 @@ _log = get_logger('ops.decisive')
 
 def _is_ship(name: str) -> bool:
     """判断名称是否为舰船（而非增益技能）。"""
-    return name not in {'长跑训练', '肌肉记忆', '黑科技'}
+    return bool(name) and name not in DECISIVE_SKILL_NAMES
 
 
 def _count_anti_sub(enemy: list[str | None]) -> int:
@@ -61,13 +63,16 @@ class DecisiveLogic:
         config: DecisiveConfig,
         state: DecisiveState,
         ctx: GameContext | None = None,
+        *,
+        prefer_healthy: bool = False,
     ) -> None:
         self.config = config
         self.state = state
         self._ctx = ctx
+        self._prefer_healthy = prefer_healthy
         self._level1_set = set(config.level1)
         # level2_full = level1 + level2 + 增益技能
-        self._level2_full = list({'长跑训练', '肌肉记忆', *config.level1, *config.level2, '黑科技'})
+        self._level2_full = [*config.level1, *config.level2, *DECISIVE_SKILL_NAMES]
 
     # ── 战备舰队选择 ───────────────────────────────────────────────────
 
@@ -77,58 +82,59 @@ class DecisiveLogic:
         *,
         first_node: bool = False,
     ) -> list[str]:
-        """从可购买列表中选择要购买的舰船/技能。
-
-        策略优先级::
-
-            舰队为空/仅1艘 → 只购买 level1 舰船
-            舰队未满编     → 购买 level2 中的舰船 (不买技能)
-            满编但有非一级 → 优先凑齐 level1
-            满编且全一级   → 可购买增益技能
-            第一节点额外   → 同时尝试购买二级舰船
-
-        Parameters
-        ----------
-        selections:
-            当前可购买项 ``{name: FleetSelection}``。
-        first_node:
-            是否为第一小关第一节点。
-
-        Returns
-        -------
-        list[str]
-            选中购买的名称列表（按决策顺序）。
-        """
-        fleet_count = sum(1 for s in self.state.fleet[1:] if s)
+        """在预算内先增加主备池舰数，同数优先一级舰、低费用。"""
+        primary = list(dict.fromkeys(ship_name_identity(name) for name in self.config.level1))
+        pool = list(dict.fromkeys([*primary, *(ship_name_identity(n) for n in self.config.level2)]))
+        owned = {ship_name_identity(name) for name in self.state.ships}.intersection(pool)
         score = self.state.score
+        offers: dict[str, FleetSelection] = {}
+        for name, offer in selections.items():
+            identity = ship_name_identity(name)
+            if (
+                identity is not None
+                and identity in pool
+                and _is_ship(name)
+                and 0 <= offer.cost <= score
+                and (identity not in offers or offer.cost < offers[identity].cost)
+            ):
+                offers[identity] = offer
 
-        if fleet_count <= 1:
-            candidates = self.config.level1
-        elif fleet_count < 6:
-            candidates = [e for e in self._level2_full if _is_ship(e)]
-        elif not {s for s in self.state.fleet[1:] if s}.issubset(self._level1_set):
-            candidates = self.config.level1
-        else:
-            candidates = self.config.level1 + [e for e in self._level2_full if not _is_ship(e)]
+        target = 2 if first_node and len(owned) < 2 else 6
+        candidates = [identity for identity in pool if identity in offers and identity not in owned]
 
-        lim = 6 if fleet_count < 6 else score
-        lim = score if fleet_count == 0 else lim
-        result: list[str] = []
-        for target in candidates:
-            if target in selections:
-                sel = selections[target]
-                if score >= sel.cost and sel.cost <= lim:
-                    score -= sel.cost
-                    result.append(target)
+        def best_bundle(candidates: list[str], capacity: int) -> tuple[str, ...]:
+            best = ()
+            best_rank = (0, 0, 0)
+            for count in range(1, min(capacity, len(candidates)) + 1):
+                for bundle in combinations(candidates, count):
+                    cost = sum(offers[identity].cost for identity in bundle)
+                    rank = (count, sum(identity in primary for identity in bundle), -cost)
+                    if cost <= score and rank > best_rank:
+                        best, best_rank = bundle, rank
+            return best
 
-        # 第一节点没选上Lv1，也购买Lv2舰船
-        if first_node:
-            for target in set(self._level2_full) - self._level1_set:
-                if target in selections:
-                    sel = selections[target]
-                    if score >= sel.cost and sel.cost <= lim:
-                        score -= sel.cost
-                        result.append(target)
+        selected = list(best_bundle(candidates, target - len(owned)))
+        score -= sum(offers[identity].cost for identity in selected)
+        owned.update(selected)
+        if not first_node and len(owned) >= 6:
+            for upgrade in (False, True):
+                candidates = [
+                    identity
+                    for identity in primary
+                    if identity in offers
+                    and identity not in selected
+                    and (identity in owned) == upgrade
+                ]
+                batch = best_bundle(candidates, len(candidates))
+                score -= sum(offers[identity].cost for identity in batch)
+                selected.extend(batch)
+                owned.update(batch)
+        result = [offers[identity].name for identity in selected]
+        if len(owned.intersection(primary)) >= 6:
+            for name in DECISIVE_SKILL_NAMES:
+                if name in selections and 0 <= selections[name].cost <= score:
+                    result.append(name)
+                    score -= selections[name].cost
         return result
 
     # ── 状态判断 ───────────────────────────────────────────────────────
@@ -215,54 +221,57 @@ class DecisiveLogic:
 
     # ── 编队计算 ───────────────────────────────────────────────────────
 
-    def get_best_fleet(self) -> list[str]:
-        """根据当前拥有的舰船计算最优编队。
+    def get_best_fleet(
+        self, blocked: frozenset[str] = frozenset(), damaged: frozenset[str] = frozenset()
+    ) -> list[str]:
+        """按配置顺序挑选主备舰，启用按时长维修时优先使用健康候补。"""
+        by_identity = {ship_name_identity(name): name for name in sorted(self.state.ships)}
+        candidates = list(
+            dict.fromkeys(
+                ship_name_identity(name)
+                for name in (*self.config.level1, *self.config.level2)
+                if _is_ship(name)
+            )
+        )
+        damage = {
+            ship_name_identity(name): state
+            for name, state in zip(self.state.fleet[1:], self.state.ship_stats, strict=True)
+            if name
+        }
 
-        Returns
-        -------
-        list[str]
-            长度 7 的列表：索引 0 留空，1-6 为各位置舰船名。
-        """
-        ships = self.state.ships
-        best: list[str] = ['']
-        _log.debug('[决战] 当前舰船: {}', ships)
-        for ship in self.config.level1:
-            if ship in ships and self._is_available(ship) and len(best) < 7:
-                best.append(ship)
+        def needs_repair(identity: str) -> bool:
+            health = damage.get(identity)
+            if health is not None:
+                return health >= self.config.repair_level
+            return identity in damaged or not self._is_available(by_identity[identity])
 
-        for ship in self.config.level2:
-            if ship in ships and ship not in best and self._is_available(ship) and len(best) < 7:
-                best.append(ship)
-
-        for flag_ship in self.config.flagship_priority:
-            if flag_ship in best[1:]:
-                idx = best.index(flag_ship)
-                best[idx], best[1] = best[1], best[idx]
+        identities = [
+            identity
+            for identity in candidates
+            if identity in by_identity and identity not in blocked
+        ]
+        if self._prefer_healthy:
+            identities.sort(key=needs_repair)
+        else:
+            # 原编队优先级允许中破主力；有可用替补时，大破舰不占它的舰位。
+            identities.sort(
+                key=lambda identity: (
+                    damage.get(identity) is ShipDamageState.SEVERE
+                    or not self._is_available(by_identity[identity])
+                )
+            )
+        selected = identities[:6]
+        for name in self.config.flagship_priority:
+            identity = ship_name_identity(name)
+            if identity in selected:
+                idx = selected.index(identity)
+                selected[0], selected[idx] = selected[idx], selected[0]
                 break
-
-        while len(best) < 7:
-            best.append('')
-
-        _log.debug('[决战] 最优编队: {}', best)
-        return best
-
-    # ── 路径选择 ───────────────────────────────────────────────────────
-
-    def get_advance_choice(self, options: list[str]) -> int:  # noqa: ARG002
-        """选择前进点索引。
-
-        Parameters
-        ----------
-        options:
-            可选前进点列表 (如 ``["A1", "A2"]``)。
-
-        Returns
-        -------
-        int
-            选中选项的索引 (0-based)。
-        """
-        # TODO: 根据地图数据和关键节点信息做出更智能的选择
-        return 0
+        return [
+            '',
+            *(by_identity[identity] for identity in selected),
+            *([''] * (6 - len(selected))),
+        ]
 
     def get_formation(self, node: str | None = None) -> Formation:
         """根据指定候选节点敌方编成选择阵型；省略节点时使用当前状态。

@@ -14,6 +14,7 @@ import pytest
 
 from autowsgr.emulator.frame import CapturedFrame
 from autowsgr.image_resources import Templates
+from autowsgr.types import DecisivePhase
 from autowsgr.ui.decisive import map_controller as module
 from autowsgr.ui.decisive.map_controller import DecisiveMapController
 
@@ -49,6 +50,8 @@ def _reward_screen(menu: ImageTemplate | None, *, dialogue: bool) -> np.ndarray:
 def controller(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> DecisiveMapController:
     ctrl = DecisiveMapController.__new__(DecisiveMapController)
     ctrl._ctrl = MagicMock()
+    ctrl._branch_count = None
+    ctrl.reset_settlement()
     ctrl._ocr = MagicMock(side_effect=AssertionError('Unexpected OCR model dependency'))
     ctrl._ctx = SimpleNamespace(
         stop_event=threading.Event(),
@@ -153,7 +156,7 @@ def test_item_reward_can_resume_settlement_with_real_templates(
         (round(template.width * 1280 / 960), round(template.height * 720 / 540)),
     )
     height, width = patch.shape[:2]
-    entry[600 : 600 + height, 500 : 500 + width] = patch
+    entry[645 : 645 + height, 580 : 580 + width] = patch
     controller._ctrl.capture_frame.side_effect = [
         CapturedFrame(image, 1, 1.0),
         CapturedFrame(entry, 2, 2.0),
@@ -197,7 +200,7 @@ def test_clear_transition_cannot_become_a_stable_normal_map(
         final,
     ]
     monkeypatch.setattr(module, 'is_decisive_map_page', lambda _: True)
-    monkeypatch.setattr(module, 'detect_decisive_overlay', lambda _: None)
+    monkeypatch.setattr(module, 'detect_decisive_overlay', lambda _, **_kwargs: None)
     monkeypatch.setattr(controller, '_locate_ship_icon', lambda _: None)
     assert controller.wait_for_stable_map_frame() is final
 
@@ -215,7 +218,7 @@ def test_settlement_checks_each_control_and_waits_for_two_fresh_entry_frames(
         clear,
         clear,  # 缓存帧不能重复确认。
         CapturedFrame(screen(), 2, 2.0),  # 过场不能盲点。
-        CapturedFrame(screen('reward_confirm'), 3, 3.0),
+        CapturedFrame(screen('entry', 'reward_confirm'), 3, 3.0),
         CapturedFrame(screen(*_DROP), 4, 4.0),
         entry,
         entry,
@@ -358,6 +361,55 @@ def test_entry_confirmation_requires_consecutive_frames(
     assert controller._ctrl.capture_frame.call_count == 5
 
 
+def test_unsequenced_cached_rewards_are_consumed_once_and_static_entry_finishes(
+    controller: DecisiveMapController,
+    screen: Callable[..., np.ndarray],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    drop = MagicMock(return_value=SimpleNamespace(ship_name='测试舰甲'))
+    monkeypatch.setattr('autowsgr.combat.recognize_ship_drop', drop)
+    clear, confirm, reward, entry = (
+        screen(*_CLEAR),
+        screen('reward_confirm'),
+        screen(*_DROP),
+        screen('entry'),
+    )
+    pages = [clear, clear, confirm, confirm, reward, reward, entry, entry]
+    shared_buffer = clear.copy()
+
+    def capture() -> CapturedFrame:
+        index = controller._ctrl.capture_frame.call_count - 1
+        np.copyto(shared_buffer, pages[index])
+        return CapturedFrame(shared_buffer, None, float(index))
+
+    controller._ctrl.capture_frame.side_effect = capture
+    assert controller.confirm_stage_clear() == ['测试舰甲']
+    assert [call.args for call in controller._ctrl.click.call_args_list] == [
+        (0.502, 0.847),
+        (0.502, 0.566),
+        (0.953, 0.954),
+    ]
+    assert controller._ctrl.capture_frame.call_count == 8
+    drop.assert_called_once()
+
+
+def test_unsequenced_entry_can_finish_after_capture_interruption(
+    controller: DecisiveMapController, screen: Callable[..., np.ndarray]
+) -> None:
+    entry = screen('entry')
+    controller._ctrl.capture_frame.side_effect = [
+        CapturedFrame(screen(*_CLEAR), None, 1.0),
+        CapturedFrame(entry, None, 2.0),
+        OSError('采集中断'),
+    ]
+    with pytest.raises(OSError, match='采集中断'):
+        controller.confirm_stage_clear()
+
+    controller._ctrl.capture_frame.side_effect = [CapturedFrame(entry.copy(), None, 3.0)]
+    assert controller.confirm_stage_clear() == []
+    controller._ctrl.click.assert_called_once_with(0.502, 0.847)
+
+
 def test_unselected_clear_card_is_selected_before_confirmation(
     controller: DecisiveMapController,
     screen: Callable[..., np.ndarray],
@@ -371,6 +423,57 @@ def test_unselected_clear_card_is_selected_before_confirmation(
     assert controller.confirm_stage_clear() == []
     assert controller._ctrl.click.call_args_list[0].args == (0.31, 0.48)
     assert controller._ctrl.click.call_args_list[1].args == (0.502, 0.847)
+
+
+def test_interrupted_settlement_resumes_with_distinct_drops(
+    controller: DecisiveMapController,
+    screen: Callable[..., np.ndarray],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    drop = MagicMock(
+        side_effect=[
+            SimpleNamespace(ship_name=name) for name in ('测试舰甲', '测试舰甲', '测试舰乙')
+        ]
+    )
+    monkeypatch.setattr('autowsgr.combat.recognize_ship_drop', drop)
+    first_drop = CapturedFrame(screen(*_DROP), 2, 2.0)
+    controller._ctrl.capture_frame.side_effect = [
+        CapturedFrame(screen(*_CLEAR), 1, 1.0),
+        first_drop,
+        OSError('采集中断'),
+    ]
+    with pytest.raises(OSError, match='采集中断'):
+        controller.confirm_stage_clear()
+
+    # 恢复时缓存的旧帧不能再点击，淡入后的同名奖励也不能重复记录。
+    controller._ctrl.capture_frame.side_effect = [
+        first_drop,
+        CapturedFrame(screen(), 3, 3.0),
+        CapturedFrame(screen(*_DROP), 4, 4.0),
+        CapturedFrame(screen(*_DROP), 5, 5.0),
+        CapturedFrame(screen('entry'), 6, 6.0),
+        CapturedFrame(screen('entry'), 7, 7.0),
+    ]
+    assert controller.confirm_stage_clear() == ['测试舰甲', '测试舰乙']
+    assert drop.call_count == 3
+    assert controller._ctrl.click.call_count == 4
+
+
+def test_consumed_overlay_waits_until_first_allowed_page(
+    controller: DecisiveMapController, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stages = [DecisivePhase.USE_LAST_FLEET, DecisivePhase.PREPARE_COMBAT]
+    monkeypatch.setattr(
+        controller, '_phase_on_screen', lambda image, **_: stages[int(image[0, 0, 0])]
+    )
+    monkeypatch.setattr('autowsgr.ui.page.get_current_page', lambda *_, **__: None)
+    controller._ctx.ctrl = controller._ctrl
+    controller._ctrl.screenshot.side_effect = [
+        np.full((2, 2, 3), page, np.uint8) for page in (0, 1)
+    ]
+    assert controller.wait_for_entry_phase(wait_for_use_last=False) == DecisivePhase.PREPARE_COMBAT
+    assert controller._ctrl.screenshot.call_count == 2
+    controller._ctrl.click.assert_not_called()
 
 
 def test_stop_before_settlement_has_no_device_actions(controller: DecisiveMapController) -> None:

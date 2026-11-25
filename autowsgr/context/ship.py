@@ -45,6 +45,9 @@ class Ship:
     repairing: bool = False
     """是否由上层标记为修理中 (手动设置/清除, 决战只读)。"""
 
+    repair_recheck_at: float = 0.0
+    """看见维修标记但不知道结束时间时，下次核实该舰伤情的时刻。"""
+
     # ── 计算属性 ──
 
     @property
@@ -57,7 +60,11 @@ class Ship:
     @property
     def is_repairing(self) -> bool:
         """舰船是否正在修理中。"""
-        return self.repairing or time.time() < self.repair_end_time
+        return (
+            self.repairing
+            or self.damage_state == ShipDamageState.REPAIRING
+            or time.time() < self.repair_end_time
+        )
 
     @property
     def available(self) -> bool:
@@ -74,8 +81,17 @@ class Ship:
         duration_seconds:
             修理时长 (秒)。0 表示快修 (立即完成)。
         """
-        self.repair_end_time = time.time() + duration_seconds
-        self.damage_state = ShipDamageState.NORMAL
+        if duration_seconds > 0:
+            self.record_bath(time.time() + duration_seconds)
+        else:
+            self.repair_end_time = self.repair_recheck_at = 0.0
+            self.damage_state = ShipDamageState.NORMAL
+
+    def record_bath(self, deadline: float) -> None:
+        """确认入浴后记录结束时间，到期仍需观察这艘舰才能确认伤情。"""
+        self.repair_end_time = deadline
+        self.repair_recheck_at = 0.0
+        self.damage_state = ShipDamageState.REPAIRING
 
     def needs_repair(self, mode: RepairMode) -> bool:
         """根据修理策略判断是否需要入浴。"""

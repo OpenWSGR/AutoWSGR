@@ -19,6 +19,7 @@ from ._planning import FleetPlanningMixin
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from threading import Event
 
     from autowsgr.ui.choose_ship_page import ChooseShipPage
 
@@ -49,30 +50,36 @@ class FleetSelectionMixin(FleetPlanningMixin):
         search_names = aliases if option.name in aliases else (*aliases, option.name)
         return tuple(replace(option, search_name=name) for name in search_names)
 
-    def _open_choose_page(self, slot: int) -> ChooseShipPage:
+    def _open_choose_page(self, slot: int, *, stop_event: Event | None = None) -> ChooseShipPage:
         """打开指定物理槽位的选船页面。"""
         from autowsgr.ui.choose_ship_page import ChooseShipPage
         from autowsgr.ui.utils import wait_for_page
+        from autowsgr.ui.utils.navigation import check_stop
 
+        check_stop(stop_event)
         self.click_ship_slot(slot)
         wait_for_page(
             self._ctrl,
             ChooseShipPage.is_current_page,
             timeout=_CHOOSE_PAGE_TIMEOUT,
+            stop_event=stop_event,
             source='编队',
             target='编队选船',
         )
         return ChooseShipPage(self._ctx)
 
-    def _cancel_choose_page(self) -> None:
+    def _cancel_choose_page(self, *, stop_event: Event | None = None) -> None:
         """规则未命中时退出选船页，恢复到编队准备页。"""
         from autowsgr.ui.utils import wait_for_page
+        from autowsgr.ui.utils.navigation import check_stop
 
+        check_stop(stop_event)
         self._ctrl.click(*CLICK_BACK)
         wait_for_page(
             self._ctrl,
             self.is_current_page,
             timeout=_CHOOSE_PAGE_TIMEOUT,
+            stop_event=stop_event,
             source='编队选船',
             target='编队',
         )
