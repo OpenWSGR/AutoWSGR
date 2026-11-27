@@ -34,6 +34,10 @@
 覆盖度越高，说明测试图像的亮区域越接近该模板。
 参考模板由多张截图 OR 合成，覆盖了各标签激活状态。
 
+**叠加类活动元素**: 活动徽章「战利品↑」挂在出征 tab 上方，随活动出现/消失。
+它不进参考模板，而是在匹配前用色探针探测，命中时把徽章固定区从测试
+条带中抹掉 (只抹 test 侧)。徽章有无都不影响识别，见 :func:`_loot_badge_visible`。
+
 标签与页面对应::
 
     索引  地图(5标签)  建造(4标签)  强化(3标签)  任务(5标签)  好友(4标签)
@@ -131,6 +135,31 @@ TAB_DARK_MAX: int = 80
 
 TAB_DARK = (22, 37, 62)
 """非激活标签探测点的参考暗色 (RGB)，用于测试截图构造。"""
+
+
+# ── 活动徽章「战利品↑」 ──
+#
+# 徽章是活动期间的临时叠加物，挂在出征 tab 右上角、位置固定，
+# 活动结束即消失 —— 因此不进参考模板，改为探测后在匹配期排除。
+
+LOOT_BADGE_PROBES: tuple[tuple[float, float], ...] = (
+    (0.224, 0.030),
+    (0.274, 0.030),
+)
+"""活动徽章「战利品↑」的 2 个探测点 (相对坐标)。
+
+落在徽章橙色实底的左右两侧 (避开中央白色文字)，两帧实测均覆盖。
+两个探测点**同时**命中才判定徽章在场。
+"""
+
+LOOT_BADGE_COLOR = Color.of(246, 93, 56)
+"""活动徽章底色 (RGB)。"""
+
+LOOT_BADGE_TOLERANCE: float = 40.0
+"""徽章色探测容差 (欧几里得距离)。"""
+
+LOOT_BADGE_MASK_REL: tuple[float, float, float, float] = (0.215, 0.283, 0.0, 0.052)
+"""徽章排除区 ``(x0, x1, y0, y1)`` (相对坐标) — 徽章 bbox 加余量。"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -275,12 +304,57 @@ def _coverage(test: np.ndarray, template: np.ndarray) -> float:
     return float((test & template).sum()) / test_sum
 
 
+def _loot_badge_visible(screen: np.ndarray) -> bool:
+    """探测活动徽章「战利品↑」是否在场。
+
+    两个固定探测点**同时**命中徽章底色才判定在场，避免其他橙色 UI 误触发。
+
+    Parameters
+    ----------
+    screen:
+        截图 (HxWx3, RGB)。
+
+    Returns
+    -------
+    bool
+        徽章在场返回 ``True``。
+    """
+    return all(
+        PixelChecker.check_pixel(screen, x, y, LOOT_BADGE_COLOR, LOOT_BADGE_TOLERANCE)
+        for x, y in LOOT_BADGE_PROBES
+    )
+
+
+def _mask_loot_badge(strip: np.ndarray, x_end: float) -> None:
+    """把徽章区从标签栏二值化条带的 test 侧抹掉 (原地修改)。
+
+    徽章像素几乎都不在参考模板中，抹掉后单向覆盖度的分母变干净、分数回升；
+    探针未命中 (徽章不存在) 时本函数不会被调用，模板像素照常匹配。
+
+    Parameters
+    ----------
+    strip:
+        标签栏二值化条带 (``_binarize_tabbar`` 的返回值)，原地置 False。
+    x_end:
+        该条带对应的裁剪宽度 (屏幕宽度比例)，用于把相对坐标换算成列号。
+    """
+    x0, x1, y0, y1 = LOOT_BADGE_MASK_REL
+    rows, cols = strip.shape[:2]
+    tx0 = min(max(int(x0 / x_end * cols), 0), cols)
+    tx1 = min(max(int(x1 / x_end * cols), 0), cols)
+    ty0 = min(max(int(y0 / _CROP_Y * rows), 0), rows)
+    ty1 = min(max(int(y1 / _CROP_Y * rows), 0), rows)
+    strip[ty0:ty1, tx0:tx1] = False
+
+
 def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
     """通过模板匹配识别标签页面类型。
 
     对标签栏区域二值化后，与 5 个参考模板逐一比较覆盖度，
     取最高者。各页面类型使用各自的裁剪宽度 (见 ``_STRIP_CROP_X``)，
     同一裁剪宽度的二值化结果只计算一次。
+
+    活动徽章「战利品↑」在场时 (色探针命中),二值化条带先抹掉徽章区再计分。
 
     Parameters
     ----------
@@ -297,13 +371,17 @@ def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
     if not templates:
         return None
 
+    badge_on = _loot_badge_visible(screen)
     test_bins: dict[float, np.ndarray] = {}
     best_type: TabbedPageType | None = None
     best_score = -1.0
     for page_type, tmpl in templates.items():
         x_end = _STRIP_CROP_X[page_type]
         if x_end not in test_bins:
-            test_bins[x_end] = _binarize_tabbar(screen, x_end)
+            strip = _binarize_tabbar(screen, x_end)
+            if badge_on:
+                _mask_loot_badge(strip, x_end)
+            test_bins[x_end] = strip
         score = _coverage(test_bins[x_end], tmpl)
         if score > 0.6 and score > best_score:
             best_score = score
