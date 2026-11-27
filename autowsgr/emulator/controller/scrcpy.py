@@ -18,6 +18,7 @@ INJECT_TEXT）实现，延迟远低于 ``adb shell input``。仅应用启停、�
 
 from __future__ import annotations
 
+import secrets
 import socket
 import struct
 import threading
@@ -26,6 +27,7 @@ from itertools import count
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from autowsgr.emulator.controller.display import find_package_display
 from autowsgr.emulator.controller.protocol import AndroidController, DeviceInfo
 from autowsgr.emulator.detector import (
     _find_adb,
@@ -40,6 +42,8 @@ from autowsgr.infra.logger import caller_info, get_logger
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy as np
     from adbutils import AdbConnection, AdbDevice
 
@@ -79,6 +83,7 @@ _POINTER_ID_FINGER = -2
 
 # 同一手势内相邻控制消息（如 DOWN→UP、按键 DOWN→UP）之间的最小间隔。
 _MIN_GESTURE_INTERVAL = 0.01  # 10 毫秒
+_DISPLAY_CHECK_INTERVAL = 2.0
 
 # 视频流标识不会复用，其他控制器重连后也不会与旧标识冲突。
 _STREAM_IDS = count(1)
@@ -118,6 +123,8 @@ class ScrcpyController(AndroidController):
         视频流最大帧率（0 = 不限制）。
     screenshot_timeout:
         截图超时（秒），超过仍无帧时抛出异常。
+    package_name:
+        用于自动选择显示屏的游戏包名；未提供时由 start_app() 设置。
     """
 
     def __init__(
@@ -128,6 +135,8 @@ class ScrcpyController(AndroidController):
         bitrate: int = 8_000_000,
         max_fps: int = 0,
         screenshot_timeout: float = 10.0,
+        *,
+        package_name: str | None = None,
     ) -> None:
         self._serial = serial
         self._config = config
@@ -135,6 +144,10 @@ class ScrcpyController(AndroidController):
         self._bitrate = bitrate
         self._max_fps = max_fps
         self._screenshot_timeout = screenshot_timeout
+        self._package_name = package_name
+        self._display_id = 0
+        self._last_display_check = float('-inf')
+        self._socket_name = 'scrcpy'
 
         self._device: AdbDevice | None = None
         self._resolution: tuple[int, int] = (0, 0)
@@ -149,9 +162,10 @@ class ScrcpyController(AndroidController):
         self._video_socket: socket.socket | None = None
         self._control_socket: socket.socket | None = None
         self._decode_thread: threading.Thread | None = None
+        self._decode_stop = threading.Event()
         self._frame_ready = threading.Event()  # 首帧就绪信号
         self._frame_lock = threading.Lock()
-        self._reconnect_lock = threading.Lock()
+        self._reconnect_lock = threading.RLock()
         self._control_lock = threading.Lock()  # 控制流写串行化
 
     # ── 连接 ──
@@ -186,17 +200,9 @@ class ScrcpyController(AndroidController):
             _log.warning('[Emulator] 无法获取设备分辨率，使用默认值 960x540')
 
         # ── 部署并启动 scrcpy-server ──
-        self._deploy_server()
-        self._start_server()
-        self._connect_video_socket()
-        self._connect_control_socket()
-        self._start_decode_thread()
-
-        # ── 等待首帧 ──
-        if not self._frame_ready.wait(timeout=self._screenshot_timeout):
-            raise EmulatorConnectionError(
-                f'scrcpy 视频流未能在 {self._screenshot_timeout}s 内产生首帧'
-            )
+        with self._reconnect_lock:
+            self._close_video_channel()
+            self._open_stream()
 
         _log.info(
             '[Emulator] 已连接设备 (scrcpy): {} ({}x{})',
@@ -269,6 +275,9 @@ class ScrcpyController(AndroidController):
 
     def _start_server(self) -> None:
         """在设备上启动 scrcpy-server 进程。"""
+        # 独立 socket 名避免重连时误接入仍在退出中的旧 server。
+        scid = secrets.randbits(31)
+        self._socket_name = f'scrcpy_{scid:08x}'
         cmd = [
             f'CLASSPATH={_DEVICE_JAR_PATH}',
             'app_process',
@@ -280,6 +289,8 @@ class ScrcpyController(AndroidController):
             'video=true',
             'audio=false',
             'control=true',
+            f'display_id={self._display_id}',
+            f'scid={scid:08x}',
             f'max_size={self._max_size}',
             f'video_bit_rate={self._bitrate}',
             f'max_fps={self._max_fps}',
@@ -304,7 +315,7 @@ class ScrcpyController(AndroidController):
             try:
                 self._video_socket = dev.create_connection(
                     adbutils.Network.LOCAL_ABSTRACT,
-                    'scrcpy',
+                    self._socket_name,
                 )
                 break
             except Exception:
@@ -313,7 +324,9 @@ class ScrcpyController(AndroidController):
             raise EmulatorConnectionError('无法连接 scrcpy-server 视频通道（3s 超时）')
 
         # 读取 dummy byte
+        self._video_socket.settimeout(self._screenshot_timeout)
         dummy = self._video_socket.recv(1)
+        self._video_socket.settimeout(None)
         if not dummy:
             raise EmulatorConnectionError('未收到 scrcpy dummy byte，连接可能已断开')
         _log.debug('[Emulator] scrcpy 视频通道已连接')
@@ -331,7 +344,7 @@ class ScrcpyController(AndroidController):
             try:
                 self._control_socket = dev.create_connection(
                     adbutils.Network.LOCAL_ABSTRACT,
-                    'scrcpy',
+                    self._socket_name,
                 )
                 break
             except Exception:
@@ -348,6 +361,7 @@ class ScrcpyController(AndroidController):
 
     def _start_decode_thread(self) -> None:
         """启动后台 H264 解码线程。"""
+        assert self._video_socket is not None
         with self._frame_lock:
             self._stream_id = _next_stream_id()
             self._last_frame = None
@@ -355,42 +369,45 @@ class ScrcpyController(AndroidController):
             self._last_frame_captured_at = None
             self._frame_ready.clear()
         self._alive = True
+        self._decode_stop = threading.Event()
         self._decode_thread = threading.Thread(
             target=self._stream_loop,
-            args=(self._stream_id,),
+            args=(self._video_socket, self._decode_stop, self._stream_id),
             name='scrcpy-decode',
             daemon=True,
         )
         self._decode_thread.start()
 
-    def _stream_loop(self, stream_id: int) -> None:
+    def _stream_loop(
+        self, video_sock: socket.socket, stop: threading.Event, stream_id: int
+    ) -> None:
         """后台解码循环：接收 H264 流并解码为 numpy 帧。"""
-        import av
+        try:
+            import av
 
-        codec = av.CodecContext.create('h264', 'r')
-        video_sock = self._video_socket
-        assert video_sock is not None
-        while self._alive and stream_id == self._stream_id:
-            try:
+            codec = av.CodecContext.create('h264', 'r')
+            while not stop.is_set():
                 raw = video_sock.recv(0x10000)
                 if not raw:
-                    if self._alive and stream_id == self._stream_id:
+                    if not stop.is_set():
                         _log.warning('[Emulator] scrcpy 视频流已断开')
-                        self._alive = False
                     break
 
                 for packet in codec.parse(raw):
                     for frame in codec.decode(packet):
                         rgb = frame.to_ndarray(format='rgb24')
+                        if stop.is_set():
+                            return
                         self._publish_frame(rgb, stream_id)
 
-            except BlockingIOError:
-                time.sleep(0.01)
-            except (ConnectionError, OSError) as exc:
-                if self._alive and stream_id == self._stream_id:
-                    _log.warning('[Emulator] scrcpy 视频流异常: {}', exc)
+        except Exception as exc:
+            if not stop.is_set():
+                _log.warning('[Emulator] scrcpy 视频流异常: {}', exc)
+        finally:
+            # 旧 worker 永远不能覆盖新连接的状态。
+            with self._frame_lock:
+                if self._decode_stop is stop and stream_id == self._stream_id:
                     self._alive = False
-                break
 
     def _publish_frame(self, image: np.ndarray, stream_id: int) -> None:
         """原子发布图像与解码元数据，丢弃已停用视频流的帧。"""
@@ -409,19 +426,22 @@ class ScrcpyController(AndroidController):
 
     def disconnect(self) -> None:
         serial = self._serial or 'auto'
-        self._close_video_channel()
-
-        self._device = None
-        self._resolution = (0, 0)
-        with self._frame_lock:
-            self._last_frame = None
-            self._last_frame_sequence = None
-            self._last_frame_captured_at = None
+        with self._reconnect_lock:
+            self._close_video_channel()
+            self._device = None
+            self._resolution = (0, 0)
+            self._display_id = 0
+            self._last_display_check = float('-inf')
         _log.info('[Emulator] 已断开设备连接: {}', serial)
 
     @property
     def resolution(self) -> tuple[int, int]:
         return self._resolution
+
+    @property
+    def display_id(self) -> int:
+        """当前视频和触控连接使用的 Android 显示屏编号。"""
+        return self._display_id
 
     def _require_device(self) -> AdbDevice:
         """返回已连接的设备实例，未连接时抛出异常。"""
@@ -434,10 +454,18 @@ class ScrcpyController(AndroidController):
         # 超过等待时限后继续发布旧帧。
         with self._frame_lock:
             self._alive = False
+            self._decode_stop.set()
             self._stream_id = _next_stream_id()
+            self._last_frame = None
+            self._last_frame_sequence = None
+            self._last_frame_captured_at = None
             self._frame_ready.clear()
 
         if self._control_socket is not None:
+            try:
+                self._control_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             try:
                 self._control_socket.close()
             except Exception as exc:
@@ -445,6 +473,10 @@ class ScrcpyController(AndroidController):
             self._control_socket = None
 
         if self._video_socket is not None:
+            try:
+                self._video_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             try:
                 self._video_socket.close()
             except Exception as exc:
@@ -460,29 +492,74 @@ class ScrcpyController(AndroidController):
 
         if self._decode_thread is not None:
             self._decode_thread.join(timeout=3.0)
+            if self._decode_thread.is_alive():
+                raise EmulatorConnectionError('旧 scrcpy 解码线程未能退出，拒绝创建重叠连接')
             self._decode_thread = None
 
-        self._alive = False
-        self._frame_ready.clear()
+        with self._frame_lock:
+            self._last_frame = None
+            self._frame_ready.clear()
+
+    def _resolve_display_id(self) -> int:
+        """选择游戏屏；应用未运行时选默认屏，ADB 查询失败时保留当前屏。"""
+        if self._config is not None and self._config.display_id is not None:
+            return self._config.display_id
+        if not self._package_name:
+            return self._display_id
+        self._last_display_check = time.monotonic()
+        try:
+            dev = self._require_device()
+            # force-stop 后 activity 记录可能暂未清理，甚至仍标为 Resumed。
+            # 先检查实际进程，避免重连旧游戏屏并将应用启动到 scrcpy 镜像屏。
+            pids = str(dev.shell(['pidof', self._package_name])).strip()
+            if not pids:
+                return 0
+            if not all(pid.isdecimal() for pid in pids.split()):
+                raise ValueError(f'无法识别 pidof 输出: {pids}')
+            output = dev.shell('dumpsys activity activities')
+            detected = find_package_display(str(output), self._package_name)
+        except Exception as exc:
+            _log.debug('[Emulator] 无法检测游戏显示屏，保留 {}: {}', self._display_id, exc)
+            return self._display_id
+        return 0 if detected is None else detected
+
+    def _refresh_display(self, *, force: bool = False) -> None:
+        """按限频检测应用换屏，并同时重建视频和触控连接。"""
+        if not self._package_name or (
+            self._config is not None and self._config.display_id is not None
+        ):
+            return
+        with self._reconnect_lock:
+            if not force and time.monotonic() - self._last_display_check < _DISPLAY_CHECK_INTERVAL:
+                return
+            display_id = self._resolve_display_id()
+            if display_id != self._display_id:
+                _log.info('[Emulator] 游戏显示屏变化: {} → {}', self._display_id, display_id)
+                self._display_id = display_id
+                self._reopen_stream()
+
+    def _open_stream(self) -> None:
+        """启动同一显示屏的视频及触控通道，失败时清理所有已创建的资源。"""
+        self._display_id = self._resolve_display_id()
+        try:
+            self._deploy_server()
+            self._start_server()
+            self._connect_video_socket()
+            self._connect_control_socket()
+            self._start_decode_thread()
+            if not self._frame_ready.wait(timeout=self._screenshot_timeout):
+                raise EmulatorConnectionError(
+                    f'scrcpy 视频流未能在 {self._screenshot_timeout}s 内产生首帧 '
+                    f'(display_id={self._display_id})'
+                )
+        except Exception:
+            self._close_video_channel()
+            raise
 
     def _reopen_stream(self) -> None:
         """在保持 ADB 设备连接的前提下重建 scrcpy 视频流与控制流。"""
         self._close_video_channel()
-        with self._frame_lock:
-            self._last_frame = None
-            self._last_frame_sequence = None
-            self._last_frame_captured_at = None
-        self._deploy_server()
-        self._start_server()
-        self._connect_video_socket()
-        self._connect_control_socket()
-        self._start_decode_thread()
-
-        if not self._frame_ready.wait(timeout=self._screenshot_timeout):
-            raise EmulatorConnectionError(
-                f'scrcpy 视频流重连失败：{self._screenshot_timeout}s 内无首帧'
-            )
-
+        self._open_stream()
         _log.info('[Emulator] scrcpy 视频流已重连')
 
     def _ensure_stream_alive(self) -> None:
@@ -506,18 +583,19 @@ class ScrcpyController(AndroidController):
             raise EmulatorConnectionError('scrcpy 控制通道未连接')
         return self._control_socket
 
-    def _send_control(self, data: bytes) -> None:
-        """向控制 socket 串行写入一帧消息（线程安全）。"""
-        sock = self._require_control_socket()
-        with self._control_lock:
+    def _send_control(self, data: bytes | Callable[[], bytes]) -> None:
+        """串行写入消息；几何消息在连接就绪后构建，重连后按新分辨率重建。"""
+        build_message = data if callable(data) else lambda: data
+        with self._reconnect_lock, self._control_lock:
+            sock = self._require_control_socket()
             try:
-                sock.sendall(data)
+                sock.sendall(build_message())
             except (ConnectionError, OSError) as exc:
                 _log.warning('[Emulator] 控制流发送失败，触发重连: {}', exc)
                 self._alive = False
                 self._ensure_stream_alive()
                 sock = self._require_control_socket()
-                sock.sendall(data)
+                sock.sendall(build_message())
 
     @staticmethod
     def _float_to_u16fp(value: float) -> int:
@@ -549,24 +627,26 @@ class ScrcpyController(AndroidController):
         布局：type(1) | action(1) | pointer_id(8) | x(4) | y(4)
               | width(2) | height(2) | pressure(2) | action_button(4) | buttons(4)
         """
-        w, h = self._resolution
-        px, py = self._to_absolute(x, y)
-        u16_pressure = self._float_to_u16fp(pressure)
-        data = struct.pack(
-            '>BBqIIHHHII',
-            _TYPE_INJECT_TOUCH_EVENT,
-            action,
-            pointer_id,
-            px,
-            py,
-            w,
-            h,
-            u16_pressure,
-            0,  # action_button（触摸事件为 0）
-            0,  # buttons（触摸事件为 0）
-        )
-        # struct '>BBqIIHHHII' = 1+1+8+4+4+2+2+2+4+4 = 32 字节
-        self._send_control(data)
+
+        def build_message() -> bytes:
+            w, h = self._resolution
+            px, py = self._to_absolute(x, y)
+            u16_pressure = self._float_to_u16fp(pressure)
+            return struct.pack(
+                '>BBqIIHHHII',
+                _TYPE_INJECT_TOUCH_EVENT,
+                action,
+                pointer_id,
+                px,
+                py,
+                w,
+                h,
+                u16_pressure,
+                0,  # action_button（触摸事件为 0）
+                0,  # buttons（触摸事件为 0）
+            )
+
+        self._send_control(build_message)
 
     def _inject_keycode(self, key_code: int, action: int = _KEY_ACTION_UP) -> None:
         """发送 INJECT_KEYCODE 控制消息（scrcpy 2.7，14 字节）。
@@ -592,20 +672,23 @@ class ScrcpyController(AndroidController):
         vertical: float,
     ) -> None:
         """发送 INJECT_SCROLL_EVENT 控制消息（scrcpy 2.7，21 字节）。"""
-        width, height = self._resolution
-        px, py = self._to_absolute(x, y)
-        data = struct.pack(
-            '>BIIHHhhI',
-            _TYPE_INJECT_SCROLL_EVENT,
-            px,
-            py,
-            width,
-            height,
-            self._float_to_i16fp(horizontal),
-            self._float_to_i16fp(vertical),
-            0,
-        )
-        self._send_control(data)
+
+        def build_message() -> bytes:
+            width, height = self._resolution
+            px, py = self._to_absolute(x, y)
+            return struct.pack(
+                '>BIIHHhhI',
+                _TYPE_INJECT_SCROLL_EVENT,
+                px,
+                py,
+                width,
+                height,
+                self._float_to_i16fp(horizontal),
+                self._float_to_i16fp(vertical),
+                0,
+            )
+
+        self._send_control(build_message)
 
     def _inject_text(self, content: str) -> None:
         """发送 INJECT_TEXT 控制消息（scrcpy 2.7）。
@@ -649,6 +732,7 @@ class ScrcpyController(AndroidController):
 
     def capture_frame(self) -> CapturedFrame:
         """在同一次加锁读取中返回当前解码帧及其序号、时间。"""
+        self._refresh_display()
         self._ensure_stream_alive()
 
         start = time.monotonic()
@@ -821,7 +905,13 @@ class ScrcpyController(AndroidController):
     def start_app(self, package: str, *, delay: bool = True) -> None:
         dev = self._require_device()
         _log.info('[Emulator] 启动应用: {}  {}', package, caller_info())
-        dev.app_start(package)
+        with self._reconnect_lock:
+            self._package_name = package
+            # MuMu 可能将新 Activity 启动到当前 scrcpy 镜像屏；其生命周期
+            # 随连接结束而终止，因此应用启动期间必须先撤下所有旧镜像。
+            self._close_video_channel()
+            dev.app_start(package)
+            self._open_stream()
 
         # 增加延迟，改动同 click_delay
         if delay:  # True 才走延迟

@@ -61,6 +61,7 @@ def test_stream_restart_does_not_reuse_ids_and_rejects_retired_frames(
     ctrl._publish_frame(image, old_stream)
     old = ctrl.capture_frame()
     monkeypatch.setattr(scrcpy.threading, 'Thread', MagicMock())
+    ctrl._video_socket = MagicMock()
     ctrl._start_decode_thread()
     assert ctrl._last_frame is None
     ctrl._publish_frame(image, old_stream)
@@ -124,7 +125,7 @@ def test_decode_loop_publishes_every_decoded_frame(monkeypatch: pytest.MonkeyPat
         captured.append(ctrl.capture_frame())
 
     monkeypatch.setattr(ctrl, '_publish_frame', record)
-    ctrl._stream_loop(ctrl._stream_id)
+    ctrl._stream_loop(ctrl._video_socket, ctrl._decode_stop, ctrl._stream_id)
     assert len(captured) == 2
     assert captured[0].image is images[0]
     assert captured[1].image is images[1]

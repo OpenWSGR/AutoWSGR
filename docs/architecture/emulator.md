@@ -76,9 +76,32 @@ class AndroidController(Protocol):
 ctrl = ScrcpyController(
     serial='emulator-5554',   # ADB serial，可为 None (自动检测)
     config=emulator_config,    # EmulatorConfig
+    package_name='com.huanmeng.zhanjian2',  # 按游戏包名选择显示屏
 )
 ctrl.connect()  # → DeviceInfo(resolution, device_name)
 ```
+
+### MuMu 等多显示屏模拟器
+
+新版 MuMu 可能将游戏放在独立的 Android 显示屏上，而 0 号屏仍显示启动器。
+`Launcher` 会传入账号渠道的游戏包名；控制器先检查游戏进程，再从
+`dumpsys activity activities` 的逐屏活动列表定位游戏，优先使用已恢复的游戏活动。
+游戏进程不存在时使用 0 号屏，避免应用停止后残留的活动记录指向旧显示屏。
+启动应用前会先关闭旧视频与触控连接，避免 MuMu 把新活动放到临时镜像屏；
+启动后和视频流重连时会重新检测，正常截图期间最多每 2 秒检测一次，
+屏幕编号改变时同时重建视频与触控连接。因此无需将某次运行的编号写死。
+
+默认配置使用自动检测，也可为特殊设备手动指定非负的显示屏编号：
+
+```yaml
+emulator:
+  display_id: null  # 默认：按游戏包名自动检测；0 表示固定使用默认屏
+```
+
+手动编号优先于自动检测。直接使用 `ScrcpyController` 时，在构造函数传入
+`package_name`，或通过 `start_app(package)` 设置跟踪的包名。
+视频和触控通过同一个 scrcpy server 的 `display_id` 指向相同显示屏；
+重建连接时会关闭旧 socket、等待解码线程退出，并丢弃旧帧。
 
 ### 连接流程
 
