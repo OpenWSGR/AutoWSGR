@@ -1,0 +1,219 @@
+"""决战恢复、确认起点及停止请求必须先于出征等有副作用的操作。"""
+
+from __future__ import annotations
+
+import threading
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import cv2
+import numpy as np
+import pytest
+
+from autowsgr.combat.node_fusion.map import TrackingMap
+from autowsgr.combat.node_fusion.model import FusionTracker
+from autowsgr.emulator.frame import CapturedFrame
+from autowsgr.image_resources import Templates
+from autowsgr.infra import DecisiveConfig
+from autowsgr.ops.decisive import handlers as handlers_module
+from autowsgr.ops.decisive.config import MapData
+from autowsgr.ops.decisive.controller import DecisiveController
+from autowsgr.ops.decisive.logic import DecisiveLogic
+from autowsgr.ops.decisive.state import DecisiveState
+from autowsgr.ops.decisive.tracking import DecisiveTrackingSession
+from autowsgr.types import DecisiveEntryStatus, DecisivePhase, ShipDamageState
+from autowsgr.ui.battle.fleet_change._detect import FleetSnapshot
+from autowsgr.ui.decisive.battle_page import DecisiveBattlePage
+
+
+def _chapter_overview(visible_nodes: int, *, chapter: int = 6) -> np.ndarray:
+    """合成入口像素契约：亮起的节点包含当前小关，不代表已通过数量。"""
+    image = np.full((720, 1280, 3), 40, dtype=np.uint8)
+    template = Templates.Decisive.ENTRY_CHALLENGING
+    patch = cv2.resize(
+        template.image,
+        (round(template.width * 1280 / 960), round(template.height * 720 / 540)),
+    )
+    height, width = patch.shape[:2]
+    image[600 : 600 + height, 500 : 500 + width] = patch
+    points = {
+        1: ((0.4115, 0.4019), (0.6604, 0.4630), (0.8396, 0.7093)),
+        6: ((0.606, 0.375), (0.532, 0.703), (0.862, 0.644)),
+    }[chapter]
+    for index, (x, y) in enumerate(points):
+        px, py = int(x * 1280), int(y * 720)
+        # 颜色取自首环已亮、0/30 的真实总览；这里只验证识别与消费契约。
+        image[py - 2 : py + 3, px - 2 : px + 3] = (
+            (254, 246, 251) if index < visible_nodes else (0, 81, 189)
+        )
+    assert DecisiveBattlePage.is_current_page(image).matched
+    return image
+
+
+@pytest.fixture
+def controller(monkeypatch: pytest.MonkeyPatch) -> DecisiveController:
+    metadata = TrackingMap.from_dict(
+        {'A': {'next': ['B']}, 'B': {'next': []}},
+    )
+    monkeypatch.setattr(MapData, 'tracking_map', lambda *_: metadata)
+    monkeypatch.setattr(handlers_module.time, 'sleep', lambda _: None)
+    fleet = ['U1206', 'U2540', 'U1405', 'U47', 'U96', 'M296']
+    ctrl = DecisiveController.__new__(DecisiveController)
+    ctrl._ctx = SimpleNamespace(
+        stop_event=threading.Event(),
+        update_ship_damage=MagicMock(),
+        is_ship_available=lambda _name: True,
+        config=SimpleNamespace(log=SimpleNamespace(dir=None, node_fusion_replay=False)),
+    )
+    ctrl._ctrl = MagicMock()
+    ctrl._ocr = MagicMock()
+    ctrl._config = DecisiveConfig(chapter=6, level1=fleet, useful_skill=False)
+    ctrl._state = DecisiveState(chapter=6, stage=1, phase=DecisivePhase.PREPARE_COMBAT)
+    ctrl._logic = DecisiveLogic(ctrl._config, ctrl._state, ctx=ctrl._ctx)
+    ctrl._map = MagicMock()
+    frame = CapturedFrame(np.zeros((2, 2, 3), dtype=np.uint8), 1, 1.0)
+    ctrl._ctrl.screenshot.return_value = _chapter_overview(1)
+    ctrl._map.wait_for_stable_map_frame.return_value = frame
+    ctrl._map.detect_decisive_phase.return_value = DecisivePhase.PREPARE_COMBAT
+    ctrl._map.recognize_node.return_value = None
+    ctrl._map.is_skill_used.return_value = True
+    ctrl._map.check_fleet.return_value = (fleet, {}, set(fleet))
+    ctrl._battle_page = MagicMock()
+    ctrl._battle_page.detect_entry_status.return_value = DecisiveEntryStatus.CHALLENGING
+    ctrl._battle_page.detect_stage.side_effect = DecisiveBattlePage.recognize_stage
+    ctrl._tracking = DecisiveTrackingSession(6, 1)
+    ctrl._known_start_stage = None
+    ctrl._battle_encounter_id = None
+    ctrl._inventory_refresh_required = True
+    ctrl._has_chosen_fleet = True
+    page = MagicMock()
+    page.change_fleet.return_value = True
+    page.detect_fleet_snapshot.return_value = FleetSnapshot(fleet[:], [True] * 6)
+    page.detect_ship_damage.return_value = dict.fromkeys(range(6), ShipDamageState.NORMAL)
+    monkeypatch.setattr(
+        handlers_module, 'DecisiveBattlePreparationPage', MagicMock(return_value=page)
+    )
+    return ctrl
+
+
+@pytest.mark.parametrize('letter', [None, 'A'])
+def test_unknown_and_soft_a_recovery_scan_real_fleet(
+    controller: DecisiveController, letter: str | None
+) -> None:
+    controller._map.recognize_node.return_value = letter
+    controller._handle_prepare_combat()
+
+    controller._map.check_fleet.assert_called_once()
+    assert controller._tracking.tracker.initial is None
+    assert controller.state.node == ('U' if letter is None else 'A')
+    assert controller.state.ships == set(controller._config.level1)
+    assert controller.state.fleet[1:] == controller._config.level1
+    assert controller.state.phase == DecisivePhase.IN_COMBAT
+
+
+def test_chapter_one_unknown_entry_preserves_recovery_scan(controller: DecisiveController) -> None:
+    controller._config = controller._config.model_copy(update={'chapter': 1})
+    controller._state.chapter = 1
+    controller._ctrl.screenshot.return_value = _chapter_overview(1, chapter=1)
+    controller._tracking = None
+    controller._handle_enter_map()
+    controller._handle_prepare_combat()
+
+    controller._map.check_fleet.assert_called_once()
+    assert controller._tracking.tracker.initial is None
+
+
+def test_stop_during_repair_never_starts_another_battle(controller: DecisiveController) -> None:
+    page = handlers_module.DecisiveBattlePreparationPage.return_value
+    page.apply_repair.side_effect = lambda *_args, **_kwargs: controller._ctx.stop_event.set()
+
+    controller._handle_prepare_combat()
+
+    page.apply_repair.assert_called_once()
+    page.start_battle.assert_not_called()
+    assert controller.state.phase == DecisivePhase.FINISHED
+    assert not any(
+        obs.action == 'encounter_complete' for obs in controller._tracking.tracker.observations
+    )
+
+
+@pytest.mark.parametrize(
+    ('following_status', 'visible_nodes', 'valid'),
+    [
+        (DecisiveEntryStatus.REFRESHED, 1, True),
+        (DecisiveEntryStatus.REFRESHED, 0, False),
+        (DecisiveEntryStatus.REFRESHED, 2, False),
+        (DecisiveEntryStatus.REFRESH, 1, False),
+    ],
+)
+def test_reset_needs_verified_first_stage_before_certain_a(
+    controller: DecisiveController,
+    following_status: DecisiveEntryStatus,
+    visible_nodes: int,
+    valid: bool,
+) -> None:
+    controller._inventory_refresh_required = False
+    controller._battle_page.detect_entry_status.side_effect = [
+        DecisiveEntryStatus.REFRESH,
+        following_status,
+    ]
+    controller._ctrl.screenshot.return_value = _chapter_overview(visible_nodes)
+    controller._battle_page.reset_chapter.return_value = True
+    if not valid:
+        with pytest.raises(RuntimeError, match='拒绝假定 A 起点'):
+            controller._handle_enter_map()
+        controller._battle_page.click_enter_map.assert_not_called()
+        assert controller._known_start_stage is None
+        return
+
+    controller._handle_enter_map()
+
+    controller._battle_page.click_enter_map.assert_called_once()
+    assert controller._known_start_stage == 1
+    assert controller._inventory_refresh_required
+    session = controller._ensure_tracking()
+    assert session.tracker.initial == {'A': 1.0}
+    assert session.current_node == 'A'
+    assert not session.sample_node_label
+
+
+@pytest.mark.parametrize('stage', [1, 2, 3])
+def test_entry_preserves_current_stage_from_visible_nodes(
+    controller: DecisiveController, stage: int
+) -> None:
+    screen = _chapter_overview(stage)
+    assert DecisiveBattlePage.recognize_stage(screen, 6) == stage
+    controller._ctrl.screenshot.return_value = screen
+
+    controller._handle_enter_map()
+
+    assert controller.state.stage == stage
+    assert controller.state.phase == DecisivePhase.WAITING_FOR_MAP
+    assert controller._ensure_tracking().stage == stage
+    controller._battle_page.click_enter_map.assert_called_once()
+
+
+def test_unlit_nodes_do_not_identify_first_stage() -> None:
+    assert DecisiveBattlePage.recognize_stage(_chapter_overview(0), 6) == 0
+
+
+def test_unverified_retreat_does_not_create_a_start_prior(controller: DecisiveController) -> None:
+    controller._known_start_stage = 1
+    controller._inventory_refresh_required = False
+    controller._execute_retreat()
+
+    controller._map.confirm_retreat.assert_called_once()
+    assert controller._known_start_stage is None
+    assert controller._inventory_refresh_required
+    assert controller._ensure_tracking().tracker.initial is None
+
+
+def test_metadata_reports_missing_facts_without_disabling_decisive_history() -> None:
+    metadata = TrackingMap.from_dict({'A': {'next': ['B']}, 'B': {'next': []}})
+    reasons = '；'.join(metadata.degradation_reasons)
+    assert '缺少起始点 0 声明' in reasons
+    assert '由场景策略决定' in reasons
+    assert '不启用遭遇次数推进' not in reasons
+    assert '停用' not in reasons
+    tracker = FusionTracker(metadata, dynamics='decisive', initial={'A': 1.0})
+    assert tracker.estimate.current_node == 'A'

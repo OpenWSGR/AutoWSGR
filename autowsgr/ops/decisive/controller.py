@@ -53,6 +53,9 @@ class DecisiveResult(enum.Enum):
     ERROR = 'error'
     """异常退出。"""
 
+    STOPPED = 'stopped'
+    """收到停止请求；不代表战斗完成或节点推进。"""
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 组装控制器
@@ -74,28 +77,36 @@ class DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps):
 
     def run(self) -> DecisiveResult:
         """执行一轮完整决战（3 个小关）。"""
+        if self._ctx.stop_event.is_set():
+            return DecisiveResult.STOPPED
         _log.info('[决战] 开始第 {} 章决战', self._config.chapter)
+        self._close_tracking()
+        self._known_start_stage = None
         self._state.reset()
-        # 默认进入恢复模式，扫描舰船进度
-        self._resume_mode = True
+        # 进入已有进度和重新开局都需要核实库存，确定 A 不能代替库存观察。
+        self._inventory_refresh_required = True
         self._has_chosen_fleet = False
         self._prepare_entry_state()
         self._state.phase = DecisivePhase.ENTER_MAP
         try:
             return self._main_loop()
         except Exception:
+            if self._ctx.stop_event.is_set():
+                return DecisiveResult.STOPPED
             _log.exception('[决战] 执行异常')
             self._state.phase = DecisivePhase.FINISHED
             return DecisiveResult.ERROR
+        finally:
+            self._close_tracking()
 
     def run_for_times(self, times: int = 1) -> list[DecisiveResult]:
-        """执行多轮决战；遇到 LEAVE / ERROR 时提前停止。"""
+        """执行多轮决战；未完成一轮时停止，不重新开始或清空进度。"""
         results: list[DecisiveResult] = []
         for i in range(times):
             _log.info('[决战] 第 {}/{} 轮', i + 1, times)
             result = self.run()
             results.append(result)
-            if result in (DecisiveResult.LEAVE, DecisiveResult.ERROR):
+            if result != DecisiveResult.CHAPTER_CLEAR:
                 _log.warning('[决战] 第 {} 轮终止: {}', i + 1, result.value)
                 break
         return results
@@ -118,6 +129,9 @@ class DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps):
         }
 
         while self._state.phase != DecisivePhase.FINISHED:
+            if self._ctx.stop_event.is_set():
+                self._close_tracking()
+                return DecisiveResult.STOPPED
             phase = self._state.phase
 
             # WAITING_FOR_MAP 太频繁，只在非等待阶段打日志
@@ -153,4 +167,8 @@ class DecisiveController(DecisivePhaseHandlers, DecisiveChapterOps):
 
             handler()
 
-        return DecisiveResult.CHAPTER_CLEAR
+        if self._ctx.stop_event.is_set():
+            self._close_tracking()
+            return DecisiveResult.STOPPED
+        self._close_tracking()
+        return DecisiveResult.ERROR

@@ -262,7 +262,7 @@ def test_adb_stepper_detects_inventory_sized_synthetic_thumbs(
     thumb_bounds: tuple[int, int],
 ) -> None:
     screen = np.full((1080, 1920, 3), 70, dtype=np.uint8)
-    screen[thumb_bounds[0] : thumb_bounds[1], 1580] = (185, 186, 187)
+    screen[thumb_bounds[0] : thumb_bounds[1], 1580:1584] = (185, 186, 187)
 
     assert AdbScrollbarStepper(MagicMock()).thumb_bounds(screen) == thumb_bounds
 
@@ -276,7 +276,8 @@ def test_adb_stepper_ignores_scale_safe_isolated_track_noise(
     thumb_bounds = (round(350 * height / 1080), round(430 * height / 1080))
     noise_y = round(600 * height / 1080)
     screen = np.full((height, width, 3), 70, dtype=np.uint8)
-    screen[thumb_bounds[0] : thumb_bounds[1], x] = (185, 186, 187)
+    stripe_width = max(2, round(3 * width / 1280))
+    screen[thumb_bounds[0] : thumb_bounds[1], x : x + stripe_width] = (185, 186, 187)
     screen[noise_y, x] = (185, 186, 187)
 
     assert AdbScrollbarStepper(MagicMock()).thumb_bounds(screen) == thumb_bounds
@@ -284,8 +285,8 @@ def test_adb_stepper_ignores_scale_safe_isolated_track_noise(
 
 def test_adb_stepper_rejects_multiple_neutral_light_runs_as_ambiguous() -> None:
     screen = np.full((1080, 1920, 3), 70, dtype=np.uint8)
-    screen[250:290, 1580] = (185, 186, 187)
-    screen[700:750, 1580] = (185, 186, 187)
+    screen[250:290, 1580:1584] = (185, 186, 187)
+    screen[700:750, 1580:1584] = (185, 186, 187)
 
     with pytest.raises(MaterialInventoryScanError, match='定位不唯一') as error:
         AdbScrollbarStepper(MagicMock()).thumb_bounds(screen)

@@ -66,6 +66,32 @@ def _button_observation() -> EnemyObservation:
     )
 
 
+@pytest.mark.parametrize('missing_node', ['0', 'A'])
+def test_partial_coordinates_preserve_available_later_segments(missing_node: str) -> None:
+    raw = {
+        '0': _node((0.05, 0.1), ['A'], 'NULL'),
+        'A': _node((0.2, 0.1), ['B'], 'NULL'),
+        'B': _node((0.5, 0.1), ['C'], 'NULL'),
+        'C': _node((0.8, 0.1), [], 'FIGHT'),
+    }
+    raw[missing_node]['position'] = None
+    tracker = _tracker(raw)
+
+    moving = _motion(tracker, 1.0, (0.65, 0.1))
+
+    assert moving.anomaly is None
+    assert moving.current_node is None
+    terms = moving.diagnostics['geometry']['terms']
+    assert terms['B->C']['distance_px'] == pytest.approx(0.0)
+    assert all(missing_node not in segment.split('->') for segment in terms)
+    if missing_node == '0':
+        # 正向断言：缺坐标节点的下游航段仍在证据里，实现丢段时测试应失败
+        assert 'A->B' in terms
+    arrived = _phase(tracker, 2.0, 'FORMATION')
+    assert arrived.anomaly is None
+    assert arrived.current_node == 'C'
+
+
 def test_real_classic_map_without_start_or_routes_can_locate_one_fresh_frame() -> None:
     metadata = TrackingMap.load_event('20220928', 'E', 1)
     assert metadata is not None

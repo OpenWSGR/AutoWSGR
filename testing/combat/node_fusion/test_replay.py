@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import asdict, replace
 from typing import TYPE_CHECKING
@@ -16,6 +17,7 @@ from autowsgr.combat.node_fusion import (
 )
 from autowsgr.combat.node_fusion.enemy import EnemyObservation
 from autowsgr.combat.node_fusion.map import TrackingMap
+from autowsgr.ops.decisive.config import MapData
 
 from tools.node_fusion.replay import main, replay
 
@@ -45,7 +47,18 @@ def scalar_log(tmp_path: Path) -> Path:
         FusionObservation('phase', 3.0, frame_id=3, phase='FORMATION'),
     ]
     records = [
-        {'kind': 'start', 'map': [2, 1], 'metadata_sha256': metadata.fingerprint},
+        {
+            'kind': 'start',
+            'schema_version': 4,
+            'model_version': MODEL_VERSION,
+            'combat_mode': 'normal',
+            'dynamics': 'map',
+            'initial': None,
+            'sampling': {},
+            'map': [2, 1],
+            'metadata_sha256': metadata.fingerprint,
+            'metadata_snapshot': metadata.to_dict(),
+        },
         {'kind': 'profile', 'profile': asdict(profile)},
     ]
     for observation in observations:
@@ -159,12 +172,18 @@ def test_event_log_uses_matching_event_metadata(tmp_path: Path) -> None:
     records = [
         {
             'kind': 'start',
+            'schema_version': 4,
+            'model_version': MODEL_VERSION,
             'mode': 'fusion',
             'combat_mode': 'event',
+            'dynamics': 'map',
+            'initial': None,
+            'sampling': {},
             'event_name': '20260930',
             'entrance': None,
             'map': ['E', 1],
             'metadata_sha256': metadata.fingerprint,
+            'metadata_snapshot': metadata.to_dict(),
         },
         {'kind': 'profile', 'profile': asdict(profile)},
     ]
@@ -213,11 +232,11 @@ def test_replay_preserves_each_diagnostic_channel(scalar_log: Path) -> None:
         assert json.loads(json.dumps(phase['diagnostics'])) == recorded[phase['event_id']]
 
 
-def test_replay_rejects_conflicting_historical_decision_labels(scalar_log: Path) -> None:
+def test_replay_rejects_legacy_observation_fields_in_v4(scalar_log: Path) -> None:
     rows = [json.loads(line) for line in scalar_log.read_text(encoding='utf-8').splitlines()]
     rows[2]['observation']['legacy_node'] = 'A'
     scalar_log.write_text(''.join(json.dumps(row) + '\n' for row in rows), encoding='utf-8')
-    with pytest.raises(ValueError, match='Conflicting recorded decision node labels'):
+    with pytest.raises(ValueError, match='legacy_node'):
         replay(scalar_log)
 
 
@@ -255,3 +274,185 @@ def test_frozen_snapshot_rejects_changed_data_or_capabilities(scalar_log: Path, 
     scalar_log.write_text(''.join(json.dumps(row) + '\n' for row in rows), encoding='utf-8')
     with pytest.raises(ValueError, match=r'fingerprint|capabilities'):
         replay(scalar_log)
+
+
+@pytest.mark.parametrize('schema', [None, 1, 2, 3])
+def test_replay_legacy_schema_requires_matching_revision(
+    scalar_log: Path, schema: int | None
+) -> None:
+    rows = [json.loads(line) for line in scalar_log.read_text(encoding='utf-8').splitlines()]
+    if schema is None:
+        rows[0].pop('schema_version')
+    else:
+        rows[0]['schema_version'] = schema
+    scalar_log.write_text(''.join(json.dumps(row) + '\n' for row in rows), encoding='utf-8')
+    with pytest.raises(
+        ValueError, match='schema version differs; use the matching backend revision'
+    ):
+        replay(scalar_log)
+
+
+@pytest.mark.parametrize('field', ['initial', 'dynamics', 'sampling', 'metadata_snapshot'])
+def test_replay_requires_scene_and_frozen_metadata(scalar_log: Path, field: str) -> None:
+    rows = [json.loads(line) for line in scalar_log.read_text(encoding='utf-8').splitlines()]
+    rows[0].pop(field)
+    scalar_log.write_text(''.join(json.dumps(row) + '\n' for row in rows), encoding='utf-8')
+    with pytest.raises(ValueError, match=r'inconsistent|requires'):
+        replay(scalar_log)
+
+
+def test_replay_reads_gzip_directly_and_preserves_source_name(scalar_log: Path) -> None:
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    compressed.write_bytes(gzip.compress(scalar_log.read_bytes()))
+    expected = replay(scalar_log)
+    actual = replay(compressed)
+    assert actual.pop('source') == str(compressed)
+    expected.pop('source')
+    assert actual == expected
+    with pytest.raises(SystemExit):
+        main([str(compressed), '--output', str(compressed)])
+
+
+@pytest.mark.parametrize('missing_bytes', [1, 4, 8])
+def test_replay_retains_complete_records_when_final_gzip_trailer_is_truncated(
+    scalar_log: Path, missing_bytes: int
+) -> None:
+    members = [gzip.compress(line) for line in scalar_log.read_bytes().splitlines(keepends=True)]
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    original = b''.join(members[:-1]) + members[-1][:-missing_bytes]
+    compressed.write_bytes(original)
+
+    result = replay(compressed)
+
+    assert result['observation_count'] == 4
+    assert result['online_comparison'] == {'compared': 4, 'matches': 4, 'mismatches': []}
+    assert result['warnings'] == [
+        'Recovered truncated final gzip member; tail records lack a complete integrity check'
+    ]
+    assert compressed.read_bytes() == original
+
+
+@pytest.mark.parametrize('header_only', [True, False])
+def test_replay_recovers_complete_prefix_when_final_gzip_payload_is_truncated(
+    scalar_log: Path, header_only: bool
+) -> None:
+    members = [gzip.compress(line) for line in scalar_log.read_bytes().splitlines(keepends=True)]
+    cutoff = 10 if header_only else len(members[-1]) // 2
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    compressed.write_bytes(b''.join(members[:-1]) + members[-1][:cutoff])
+
+    result = replay(compressed)
+
+    assert result['observation_count'] == 3
+    assert result['online_comparison'] == {'compared': 3, 'matches': 3, 'mismatches': []}
+    assert result['warnings'][0] == (
+        'Recovered truncated final gzip member; tail records lack a complete integrity check'
+    )
+    if not header_only:
+        assert result['warnings'][1:] == ['Ignored truncated final line 6']
+
+
+@pytest.mark.parametrize('member_index', [0, 2, -1])
+@pytest.mark.parametrize('damage', ['payload', 'checksum'])
+def test_replay_rejects_gzip_corruption_even_in_final_member(
+    scalar_log: Path, member_index: int, damage: str
+) -> None:
+    members = [gzip.compress(line) for line in scalar_log.read_bytes().splitlines(keepends=True)]
+    damaged = bytearray(members[member_index])
+    if damage == 'checksum':
+        damaged[-8] ^= 1
+    else:
+        # DEFLATE block type 3 is reserved, so this is corruption rather than a short write.
+        damaged[10] |= 0b110
+    members[member_index] = bytes(damaged)
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    compressed.write_bytes(b''.join(members))
+
+    with pytest.raises(ValueError, match=r'Invalid.*gzip'):
+        replay(compressed)
+
+
+def test_replay_rejects_truncated_gzip_member_before_later_records(scalar_log: Path) -> None:
+    members = [gzip.compress(line) for line in scalar_log.read_bytes().splitlines(keepends=True)]
+    members[2] = members[2][:-3]
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    compressed.write_bytes(b''.join(members))
+
+    with pytest.raises(ValueError, match=r'Invalid.*gzip'):
+        replay(compressed)
+
+
+@pytest.mark.parametrize('header_size', [1, 2, 3, 4, 9, 10])
+def test_replay_recovers_after_partial_valid_gzip_header(
+    scalar_log: Path, header_size: int
+) -> None:
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    following_member = gzip.compress(b'{"kind": "disabled"}\n')
+    compressed.write_bytes(gzip.compress(scalar_log.read_bytes()) + following_member[:header_size])
+
+    result = replay(compressed)
+
+    assert result['observation_count'] == 4
+    assert result['warnings'] == [
+        'Recovered truncated final gzip member; tail records lack a complete integrity check'
+    ]
+
+
+@pytest.mark.parametrize('tail', [b'x', b'\xff', b'\x1f\x00', b'\x1f\x8bx'])
+def test_replay_rejects_non_gzip_trailing_bytes(scalar_log: Path, tail: bytes) -> None:
+    compressed = scalar_log.with_suffix('.jsonl.gz')
+    compressed.write_bytes(gzip.compress(scalar_log.read_bytes()) + tail)
+
+    with pytest.raises(ValueError, match=r'Invalid.*gzip'):
+        replay(compressed)
+
+
+@pytest.mark.parametrize('initial', [None, {'A': 1.0}])
+def test_decisive_replay_preserves_scene_initial_and_sampling(
+    tmp_path: Path, initial: dict[str, float] | None
+) -> None:
+    metadata = MapData.tracking_map(6, 1)
+    profile = FusionProfile()
+    tracker = FusionTracker(metadata, profile, dynamics='decisive', initial=initial)
+    observations = [
+        FusionObservation('phase', 1.0, phase='DECISIVE_MAP_READY', node_label='A'),
+        FusionObservation('phase', 2.0, phase='FORMATION', encounter_id='first'),
+        FusionObservation('phase', 3.0, phase='RESULT', encounter_id='first'),
+        FusionObservation('action', 4.0, action='encounter_complete', encounter_id='first'),
+        FusionObservation('action', 5.0, action='encounter_complete', encounter_id='first'),
+        FusionObservation('phase', 6.0, phase='DECISIVE_MAP_READY'),
+        FusionObservation('phase', 7.0, phase='FORMATION', encounter_id='second'),
+    ]
+    sampling = {'pause_weight': 0.95, 'resume_weight': 0.80}
+    records = [
+        {
+            'kind': 'start',
+            'schema_version': 4,
+            'model_version': MODEL_VERSION,
+            'combat_mode': 'decisive',
+            'dynamics': 'decisive',
+            'initial': initial,
+            'sampling': sampling,
+            'map': [6, 1],
+            'metadata_sha256': metadata.fingerprint,
+            'metadata_snapshot': metadata.to_dict(),
+            'capabilities': metadata.capabilities,
+        },
+        {'kind': 'profile', 'profile': asdict(profile)},
+    ]
+    records.extend(
+        {
+            'kind': 'observation',
+            'observation': asdict(observation),
+            'estimate': tracker.observe(observation).as_dict(),
+        }
+        for observation in observations
+    )
+    path = tmp_path / 'decisive.jsonl.gz'
+    path.write_bytes(gzip.compress(''.join(json.dumps(row) + '\n' for row in records).encode()))
+    summary = replay(path, {'1': 'A', '6': 'B'})
+    assert summary['initial'] == initial
+    assert summary['dynamics'] == 'decisive'
+    assert summary['sampling'] == sampling
+    assert summary['labels']['top1_correct'] == 2
+    assert summary['online_comparison'] == {'compared': 7, 'matches': 7, 'mismatches': []}

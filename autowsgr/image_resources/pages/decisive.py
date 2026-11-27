@@ -83,6 +83,27 @@ class Decisive:
     )
     """选择前进点浮层 (选项含涂字, 匹配率需实机验证, 281x191)。"""
 
+    STAGE_CLEAR_TITLE = LazyTemplate(
+        'decisive/stage_clear_title_720p.png',
+        'decisive_stage_clear_title',
+        source_resolution=(1280, 720),
+    )
+    """实机通关选择左卡的「确认通关」，与右卡和实际按钮联合判断。"""
+
+    STAGE_CLEAR_ABANDON = LazyTemplate(
+        'decisive/stage_clear_abandon_720p.png',
+        'decisive_stage_clear_abandon',
+        source_resolution=(1280, 720),
+    )
+    """实机通关选择右卡的「放弃」，仅在对应布局中使用。"""
+
+    REWARD_DIALOG_CORNER = LazyTemplate(
+        'decisive/reward_dialog_corner_720p.png',
+        'decisive_reward_dialog_corner',
+        source_resolution=(1280, 720),
+    )
+    """掉落展示层可点击对话框的右下角，与掉落页菜单联合确认。"""
+
     @classmethod
     def entry_status_templates(cls) -> list[ImageTemplate]:
         """按 :class:`~autowsgr.types.DecisiveEntryStatus` 枚举顺序返回入口状态模板列表。
