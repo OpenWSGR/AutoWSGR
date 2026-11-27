@@ -1,8 +1,8 @@
 """标签页模板完整性回归测试。
 
-背景: 决战 tab 中心 x≈0.698, 曾在地图页模板视野 (左侧 63%) 之外，
+背景: 决战 tab 文字在地图页模板视野 (左侧 63%) 之外，
 导致切到决战 tab 后页面识别全部失败 (NavigationError)。
-修复后地图页模板为 743 宽 (裁剪 78%), 决战区域有内容。
+修复后地图页模板为 729 宽 (裁剪 76.5%), 决战区域有内容。
 若有人用旧裁剪比例重新生成 map.png, 本测试会立即失败。
 """
 
@@ -18,9 +18,9 @@ from autowsgr.ui.tabbed_page import (
 
 
 def test_map_crop_width_covers_decisive_tab():
-    """地图页裁剪比例必须覆盖决战 tab (右缘 ≈0.76)。"""
+    """地图页裁剪比例必须覆盖决战 tab 文字 (右缘实测 0.7622)。"""
     assert _STRIP_CROP_X[TabbedPageType.MAP] == _CROP_X_MAP
-    assert _CROP_X_MAP >= 0.78
+    assert _CROP_X_MAP > 0.7622
 
 
 def test_template_widths_match_crop_ratio():
