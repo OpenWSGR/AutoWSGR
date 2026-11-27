@@ -15,10 +15,9 @@
    → 确认为标签页，蓝色索引 = 激活标签 (0-4)
 
 2. **模板匹配** — 对标签栏区域 (顶部 7.5%) 进行自适应二值化，
-   缩放到标准尺寸后与 5 个参考模板逐一比较，取覆盖度 (coverage)
-   最高者为页面类型。裁剪宽度按页面区分: 地图页取左侧 78%
-   (含第 5 个标签「决战」)，其余页面取 63%；对应标准宽度
-   743 / 600 像素 (同一线性比例)。
+   与 5 个参考模板逐一比较覆盖度 (coverage)，取最高者为页面类型。
+   所有候选共用同一条条带: 统一裁到左侧 78% (743 像素宽，含第 5 个
+   标签「决战」)，600 像素宽的模板右侧补齐空白后再比较。
 
 模板匹配原理
 ------------
@@ -33,6 +32,11 @@
 
 覆盖度越高，说明测试图像的亮区域越接近该模板。
 参考模板由多张截图 OR 合成，覆盖了各标签激活状态。
+
+**统一条带**: 覆盖度的分母是「条带内的白像素总数」，所以各候选必须在
+同一条条带上比较。若按候选各裁一个宽度，同一块屏幕区域在不同候选里
+占分母的比例不同——分母小的候选遇到叠加物 (活动徽章、资源计数器等)
+时会涨得更快，分数失去可比性。见 :func:`score_all_pages`。
 
 标签与页面对应::
 
@@ -156,7 +160,11 @@ _STRIP_CROP_X: dict[TabbedPageType, float] = {
     TabbedPageType.MISSION: _CROP_X,
     TabbedPageType.FRIEND: _CROP_X,
 }
-"""各页面类型对应的标签栏裁剪宽度 (屏幕宽度比例)。"""
+"""各页面类型模板自身的宽度 (屏幕宽度比例)。
+
+只用于加载时确定模板 PNG 的标准宽度; 匹配阶段所有候选统一裁到
+``_CROP_X_MAP`` 再补齐比较, 见 :func:`score_all_pages`。
+"""
 
 _REF_W: int = 600
 """基准标准宽度 (像素) — 对应裁剪宽度 ``_CROP_X`` (0.63)。"""
@@ -262,7 +270,7 @@ def _coverage(test: np.ndarray, template: np.ndarray) -> float:
     test:
         测试图像布尔数组。
     template:
-        参考模板布尔数组。
+        参考模板布尔数组, 宽度需与 *test* 一致。
 
     Returns
     -------
@@ -275,12 +283,62 @@ def _coverage(test: np.ndarray, template: np.ndarray) -> float:
     return float((test & template).sum()) / test_sum
 
 
+def _pad_template(template: np.ndarray, width: int) -> np.ndarray:
+    """把模板右侧补齐到 *width* 列 (补 False)。
+
+    补入的空白列永远匹配不上, 不改变模板自身的命中数; 作用是让所有候选
+    与同一条带对齐, 使覆盖度的分母变成同一个数。
+
+    Parameters
+    ----------
+    template:
+        参考模板布尔数组 (宽 <= *width*)。
+    width:
+        目标宽度 (像素)。
+
+    Returns
+    -------
+    np.ndarray
+        宽度为 *width* 的布尔数组。
+    """
+    if template.shape[1] >= width:
+        return template[:, :width]
+    pad = width - template.shape[1]
+    return np.pad(template, ((0, 0), (0, pad)), constant_values=False)
+
+
+def score_all_pages(screen: np.ndarray) -> dict[TabbedPageType, float]:
+    """对全部 5 个标签页面类型给出覆盖度分数。
+
+    只对标签栏做一次二值化 (统一裁到 ``_CROP_X_MAP``), 5 个模板各自补齐到
+    同一条带宽度后比较 —— 候选之间的分母完全一致, 分数可直接互比。
+
+    Parameters
+    ----------
+    screen:
+        截图 (HxWx3)。
+
+    Returns
+    -------
+    dict[TabbedPageType, float]
+        页面类型 → 覆盖度 [0.0, 1.0];无模板时返回空字典。
+    """
+    templates = _get_templates()
+    if not templates:
+        return {}
+    strip = _binarize_tabbar(screen, _CROP_X_MAP)
+    width = strip.shape[1]
+    return {
+        page_type: _coverage(strip, _pad_template(tmpl, width))
+        for page_type, tmpl in templates.items()
+    }
+
+
 def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
     """通过模板匹配识别标签页面类型。
 
-    对标签栏区域二值化后，与 5 个参考模板逐一比较覆盖度，
-    取最高者。各页面类型使用各自的裁剪宽度 (见 ``_STRIP_CROP_X``)，
-    同一裁剪宽度的二值化结果只计算一次。
+    对标签栏区域二值化 (统一一条条带), 与 5 个参考模板逐一比较覆盖度,
+    取最高者; 所有候选共用同一条带, 分母相同。
 
     Parameters
     ----------
@@ -293,22 +351,12 @@ def _match_page_type(screen: np.ndarray) -> tuple[TabbedPageType, float] | None:
         ``(页面类型, 覆盖度)``;覆盖度需 > 0.6 才视为命中。
         无模板或无命中时返回 ``None``。
     """
-    templates = _get_templates()
-    if not templates:
+    scores = score_all_pages(screen)
+    if not scores:
         return None
-
-    test_bins: dict[float, np.ndarray] = {}
-    best_type: TabbedPageType | None = None
-    best_score = -1.0
-    for page_type, tmpl in templates.items():
-        x_end = _STRIP_CROP_X[page_type]
-        if x_end not in test_bins:
-            test_bins[x_end] = _binarize_tabbar(screen, x_end)
-        score = _coverage(test_bins[x_end], tmpl)
-        if score > 0.6 and score > best_score:
-            best_score = score
-            best_type = page_type
-    if best_type is None:
+    best_type = max(scores, key=lambda page_type: scores[page_type])
+    best_score = scores[best_type]
+    if best_score <= 0.6:
         return None
     return best_type, best_score
 
