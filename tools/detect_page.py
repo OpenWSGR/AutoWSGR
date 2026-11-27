@@ -85,7 +85,10 @@ def report_tabbed(screen: np.ndarray) -> None:
     print(f'\n=== 页面类型覆盖度 (共用 {tp._ref_width(tp._CROP_X_MAP)} px 条带) ===')
     for page_type, score in ranked:
         mark = '命中' if tabbed and score > _THRESHOLD else ''
-        print(f'  {_page_name(page_type):6s} {score:.4f}  {_bar(score)}  {mark}')
+        note = ''
+        if page_type in tp._SELF_STRIP_PAGES:
+            note = f' [自身 {tp._ref_width(tp._STRIP_CROP_X[page_type])} px 条带]'
+        print(f'  {_page_name(page_type):6s} {score:.4f}  {_bar(score)}  {mark}{note}')
     print(f'  阈值 {_THRESHOLD:.2f}: 低于该值的页面不会被认定')
 
 

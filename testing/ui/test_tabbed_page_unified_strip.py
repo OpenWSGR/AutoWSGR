@@ -1,4 +1,4 @@
-"""回归覆盖：所有候选必须共用同一条标签栏条带。
+"""回归覆盖：候选共用同一条标签栏条带（任务页除外）。
 
 背景: 覆盖度 ``|test ∩ template| / |test|`` 的分母是「条带里的白像素总数」。
 若地图页裁到 76.5% (729 px) 而其余页面裁到 63% (600 px)，同一块屏幕区域在
@@ -6,7 +6,8 @@
 数器) 时涨得更快，分数失去可比性, 地图页会被判成建造页。
 
 修复后 :func:`score_all_pages` 只生成一条条带 (统一裁到 ``_CROP_X_MAP``),
-600 宽的模板右侧补齐空白后再比较。
+600 宽的模板右侧补齐空白后再比较。任务页 (``_SELF_STRIP_PAGES``) 例外,
+保留按自身 63% 裁剪计分的老行为。
 """
 
 from __future__ import annotations
@@ -37,10 +38,10 @@ def _render_frame(page_type: tp.TabbedPageType, width: int, height: int) -> np.n
 
 
 @pytest.mark.parametrize(('width', 'height'), _RESOLUTIONS)
-def test_matching_binarizes_one_strip_only(
+def test_matching_binarizes_one_shared_strip(
     monkeypatch: pytest.MonkeyPatch, width: int, height: int
 ) -> None:
-    """匹配过程只生成一条条带, 且宽度为地图页裁剪宽度。"""
+    """共用条带只生成一次, 另加任务页自身的一条条带。"""
     calls: list[float] = []
     original = tp._binarize_tabbar
 
@@ -51,21 +52,38 @@ def test_matching_binarizes_one_strip_only(
     monkeypatch.setattr(tp, '_binarize_tabbar', _spy)
     tp._match_page_type(_render_frame(tp.TabbedPageType.MAP, width, height))
 
-    assert calls == [tp._CROP_X_MAP]
+    assert calls.count(tp._CROP_X_MAP) == 1
+    assert calls.count(tp._STRIP_CROP_X[tp.TabbedPageType.MISSION]) == 1
+    assert len(calls) == 2
 
 
 @pytest.mark.parametrize(('width', 'height'), _RESOLUTIONS)
-def test_all_scores_share_the_same_denominator(width: int, height: int) -> None:
-    """每个分数都等于「同一条带上」的命中比例。"""
+def test_shared_scores_share_the_same_denominator(width: int, height: int) -> None:
+    """共用条带的页面, 每个分数都等于同一条条带上的命中比例。"""
     screen = _render_frame(tp.TabbedPageType.MAP, width, height)
     strip = tp._binarize_tabbar(screen, tp._CROP_X_MAP)
     scores = tp.score_all_pages(screen)
 
     assert set(scores) == set(tp.TabbedPageType)
     for page_type, score in scores.items():
+        if page_type in tp._SELF_STRIP_PAGES:
+            continue
         padded = tp._pad_template(tp._get_templates()[page_type], strip.shape[1])
         expected = float((strip & padded).sum()) / int(strip.sum())
         assert score == pytest.approx(expected, abs=1e-12), page_type
+
+
+@pytest.mark.parametrize(('width', 'height'), _RESOLUTIONS)
+def test_mission_keeps_its_own_strip(width: int, height: int) -> None:
+    """任务页按自身 63% 条带计分, 不走统一条带。"""
+    screen = _render_frame(tp.TabbedPageType.MISSION, width, height)
+    own_strip = tp._binarize_tabbar(screen, tp._STRIP_CROP_X[tp.TabbedPageType.MISSION])
+    tmpl = tp._get_templates()[tp.TabbedPageType.MISSION]
+    expected = float((own_strip & tmpl).sum()) / int(own_strip.sum())
+
+    assert tp.score_all_pages(screen)[tp.TabbedPageType.MISSION] == pytest.approx(
+        expected, abs=1e-12
+    )
 
 
 def test_pad_template_preserves_hits() -> None:
