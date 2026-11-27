@@ -16,7 +16,7 @@
 
 2. **模板匹配** — 对标签栏区域 (顶部 7.5%) 进行自适应二值化，
    与 5 个参考模板逐一比较覆盖度 (coverage)，取最高者为页面类型。
-   所有候选共用同一条条带: 统一裁到左侧 78% (743 像素宽，含第 5 个
+   所有候选共用同一条条带: 统一裁到左侧 76.5% (729 像素宽，含第 5 个
    标签「决战」)，600 像素宽的模板右侧补齐空白后再比较。
 
 模板匹配原理
@@ -150,8 +150,12 @@ _CROP_Y: float = 0.075
 _CROP_X: float = 0.63
 """标签栏默认裁剪宽度比例 (左侧 63%) — 建造/强化/任务/好友页。"""
 
-_CROP_X_MAP: float = 0.78
-"""地图页裁剪宽度比例 — 需含第 5 个标签「决战」(中心 x≈0.698, tab 右缘 ≈0.76)。"""
+_CROP_X_MAP: float = 0.765
+"""地图页裁剪宽度比例 — 需含第 5 个标签「决战」(文字 0.641~0.762)。
+
+上界取 0.765 而非 0.78: 决战文字右缘之外 0.769 起是右侧资源计数器方框，
+方框边框随游戏状态出现/消失，切进条带会带来不属于任何模板的白像素。
+"""
 
 _STRIP_CROP_X: dict[TabbedPageType, float] = {
     TabbedPageType.MAP: _CROP_X_MAP,
@@ -173,7 +177,7 @@ _REF_W: int = 600
 def _ref_width(x_end: float) -> int:
     """裁剪宽度 *x_end* 对应的标准宽度 (像素)。
 
-    与基准保持同一线性比例: 0.63 → 600, 0.78 → 743。
+    与基准保持同一线性比例: 0.63 → 600, 0.765 → 729。
     """
     return round(_REF_W * x_end / _CROP_X)
 
@@ -191,8 +195,9 @@ _ADAPTIVE_C: int = -5
 def _load_templates() -> dict[TabbedPageType, np.ndarray]:
     """从 ``autowsgr/ui/templates/`` 加载 5 个参考模板。
 
-    模板为二值 PNG (0/255)，尺寸与页面类型的裁剪宽度对应:
-    地图页 743x40 (含决战 tab)，其余 600x40。
+    模板为二值 PNG (0/255)，按页面类型的裁剪宽度裁到标准宽度
+    ``_ref_width``: 地图页 729x40 (含决战 tab，模板文件比该宽度多出的
+    列直接丢弃)，其余 600x40。
 
     Returns
     -------
@@ -211,7 +216,7 @@ def _load_templates() -> dict[TabbedPageType, np.ndarray]:
         path = _TEMPLATE_DIR / filename
         buf = np.frombuffer(path.read_bytes(), np.uint8)
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
-        result[page_type] = img > 0
+        result[page_type] = img[:, : _ref_width(_STRIP_CROP_X[page_type])] > 0
     return result
 
 
@@ -237,7 +242,7 @@ def _binarize_tabbar(screen: np.ndarray, x_end: float = _CROP_X) -> np.ndarray:
     screen:
         截图 (HxWx3, RGB 或 BGR 均可用于灰度转换)。
     x_end:
-        裁剪宽度 (屏幕宽度比例)。地图页需传 ``_CROP_X_MAP`` (0.78)
+        裁剪宽度 (屏幕宽度比例)。地图页需传 ``_CROP_X_MAP`` (0.765)
         以包含决战 tab。
 
     Returns

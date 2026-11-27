@@ -1,7 +1,7 @@
 """回归覆盖：所有候选必须共用同一条标签栏条带。
 
 背景: 覆盖度 ``|test ∩ template| / |test|`` 的分母是「条带里的白像素总数」。
-若地图页裁到 78% (743 px) 而其余页面裁到 63% (600 px)，同一块屏幕区域在
+若地图页裁到 76.5% (729 px) 而其余页面裁到 63% (600 px)，同一块屏幕区域在
 两个候选里占分母的比例不同 —— 分母小的候选遇到叠加物 (活动徽章、资源计
 数器) 时涨得更快，分数失去可比性, 地图页会被判成建造页。
 
@@ -72,10 +72,13 @@ def test_pad_template_preserves_hits() -> None:
     """补空不改变命中数, 只补右侧空白列。"""
     tmpl = tp._get_templates()[tp.TabbedPageType.BUILD]
     test = tmpl.copy()
+    strip_width = tp._ref_width(tp._CROP_X_MAP)
+    pad = strip_width - tmpl.shape[1]
 
-    padded = tp._pad_template(tmpl, tmpl.shape[1] + 129)
+    padded = tp._pad_template(tmpl, strip_width)
 
-    assert padded.shape == (tmpl.shape[0], tmpl.shape[1] + 129)
+    assert padded.shape == (tmpl.shape[0], strip_width)
+    assert pad > 0
     assert not padded[:, tmpl.shape[1] :].any()
     overlap = int((test & padded[:, : test.shape[1]]).sum())
     assert overlap == int((test & tmpl).sum())
