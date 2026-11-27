@@ -20,13 +20,9 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import cv2
-
-
-if TYPE_CHECKING:
-    import numpy as np
+import numpy as np
 
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -119,7 +115,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.image:
-        bgr = cv2.imread(args.image)
+        # 用 imdecode 而非 imread: 截图文件名常含中文, imread 在 Windows 上会失败
+        buf = np.fromfile(args.image, dtype=np.uint8)
+        bgr = cv2.imdecode(buf, cv2.IMREAD_COLOR) if buf.size else None
         if bgr is None:
             print(f'错误: 无法加载图片: {args.image}')
             sys.exit(1)
